@@ -45,6 +45,14 @@ from app.tophap import mcp_url, write_dotenv  # noqa: E402
 
 CALLBACK_PORT = 8765
 CALLBACK_PATH = "/callback"
+
+
+def redirect_uri() -> str:
+    """OAuth 回调地址。默认本机 localhost；浏览器与本机不在同一 host 时，
+    可设 TOPHAP_REDIRECT_URI（如 https://httpbin.org/get）让浏览器把 code
+    回显在公网页面上再读回。code 经 PKCE 绑定，无 verifier 无法换 token，
+    回显页看到 code 也无风险。"""
+    return os.environ.get("TOPHAP_REDIRECT_URI") or f"http://127.0.0.1:{CALLBACK_PORT}{CALLBACK_PATH}"
 USER_TIMEOUT = 10 * 60  # 等用户点 Approve 最长 10 分钟
 NET_TIMEOUT = 15
 
@@ -123,7 +131,7 @@ def register_client(as_meta: dict) -> dict:
         raise SystemExit("授权服务器不支持动态注册，且未提供 TOPHAP_CLIENT_ID")
     body = {
         "client_name": "DealDesk",
-        "redirect_uris": [f"http://127.0.0.1:{CALLBACK_PORT}{CALLBACK_PATH}"],
+        "redirect_uris": [redirect_uri()],
         "grant_types": ["authorization_code"],
         "response_types": ["code"],
         "token_endpoint_auth_method": "none",
@@ -156,10 +164,13 @@ def pkce_pair() -> tuple[str, str]:
 
 def build_authorize_url(as_meta: dict, client_id: str, challenge: str,
                         state: str, scope: str | None = None) -> str:
+    # RFC 8707：authorize 必须带 resource，否则 AS 下发 opaque token，
+    # MCP 端 401 "no token payload"（2026-09-28 实测）。
     q = {
         "response_type": "code",
         "client_id": client_id,
-        "redirect_uri": f"http://127.0.0.1:{CALLBACK_PORT}{CALLBACK_PATH}",
+        "redirect_uri": redirect_uri(),
+        "resource": mcp_url(),
         "code_challenge": challenge,
         "code_challenge_method": "S256",
         "state": state,
@@ -220,10 +231,12 @@ def wait_for_code(manual: bool) -> str:
 
 def exchange_code(as_meta: dict, client_id: str, client_secret: str | None,
                   code: str, verifier: str) -> dict:
+    # RFC 8707：token 交换也必须带 resource（与 authorize 一致），否则 401。
     body = {
         "grant_type": "authorization_code",
         "code": code,
-        "redirect_uri": f"http://127.0.0.1:{CALLBACK_PORT}{CALLBACK_PATH}",
+        "redirect_uri": redirect_uri(),
+        "resource": mcp_url(),
         "client_id": client_id,
         "code_verifier": verifier,
     }
