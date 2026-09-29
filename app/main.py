@@ -93,6 +93,13 @@ def health():
     return {"ok": True, "service": "dealdesk"}
 
 
+@app.get("/api/tophap/status")
+def tophap_status():
+    """TopHap 数据源状态：开关 / 授权 / 连通性 / tool 面（OAuth 授权后的校验入口）。"""
+    from . import tophap  # 懒导入：未启用时不增加启动依赖
+    return tophap.status()
+
+
 @app.get("/api/projects")
 def list_projects(track: str | None = None, sort: str | None = None):
     """sort=cash_to_close 时按全口径现金需求升序（Miao 硬约束：资金有限，先看便宜的）。"""

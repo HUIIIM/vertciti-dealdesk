@@ -380,6 +380,33 @@ def _candidate_priority(url: str) -> int:
     return 9
 
 
+# ---------- TopHap enrich（懒导入：避免 app/tophap.py 与本模块循环 import） ----------
+
+def _tophap_enrich_address(address: str, log: list | None) -> dict:
+    try:
+        from . import tophap
+    except Exception as e:  # noqa: BLE001
+        _log(log, "TopHap", "skipped", f"适配器加载失败（已降级）: {str(e)[:120]}")
+        return {"ok": False, "fields": [], "note": "TopHap 适配器加载失败，已降级"}
+    try:
+        return tophap.enrich_address(address, log)
+    except Exception as e:  # noqa: BLE001
+        _log(log, "TopHap", "failed", f"enrich 内部异常（已降级）: {str(e)[:120]}")
+        return {"ok": False, "fields": [], "note": "TopHap enrich 内部异常，已降级"}
+
+
+def _tophap_summary_field(th: dict) -> dict:
+    return {"key": "tophap_enrich_status", "label": "TopHap 数据源状态",
+            "value": th.get("tool_used") or "tophap", "display": th.get("note", ""),
+            "source": "DealDesk（系统标记）", "source_url": "",
+            "fetched_at": _now(), "confidence": "高",
+            "seller_claimed": False, "claim_label": "",
+            "note": "TopHap 公共记录 enrich 完成；字段级来源/可信度以各自字段为准",
+            "status": "filled"}
+
+
+# ---------- pipeline 入口 ----------
+
 def run_address_pipeline(address: str, log: list | None = None) -> dict:
     """纯地址 → 全网搜集。"""
     log = log if log is not None else []
@@ -419,6 +446,13 @@ def run_address_pipeline(address: str, log: list | None = None) -> dict:
             news.append({"title": c["title"][:120], "url": c["url"]})
 
     fields = merge_fields(all_fields)
+    # TopHap 公共记录 enrich：已授权且可用时并入合并（高/中/低可信度由 merge_fields 原有规则比较）
+    th = _tophap_enrich_address(parsed.get("full") or address, log)
+    if th["ok"]:
+        fields = merge_fields(fields + th["fields"])
+        fields.append(_tophap_summary_field(th))
+    elif th.get("note"):
+        _log(log, "TopHap", "skipped", th["note"])
     if news:
         fields.append({"key": "market_news", "label": "市场新闻/供需信号",
                        "value": news[:6],

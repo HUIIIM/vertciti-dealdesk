@@ -111,11 +111,57 @@ NOI 口径（F13/F14/F15）：EGI =（合同租金＋其他收入）×(1−空�
 - **cash-to-close（一级字段）** = 现金首付＋交割费＋储备金（n 个月 debt service/PITI）＋首年 capex/TI-LC（＋酒店 PIP capex）；
   金额硬上限不硬编码（待 Miao 给数额）；列表支持 `?sort=cash_to_close` 升序。
 
+## TopHap 数据源接入（可选 enrich）
+
+DealDesk 可从 TopHap（公共房产记录聚合，`mcp.tophap.com/api/mcp`，beta 期间免费，
+**无 API key、纯 OAuth**）补充**公共记录口径**字段：估值参考＋区间、在押/历史贷款、
+成交/产权历史、计税估值、法拍预警、可比成交、周边学校等。默认**关闭**；
+打开前工作台照常走 DuckDuckGo 公开搜集 pipeline。
+
+实测 tool 面（2026-09-28，照抄 `tophap.com/mcp`）：
+`find_property_by_address` / `search_properties` / `get_property_detail` /
+`get_property_insights` / `get_property_cma` / `get_building_units` /
+`search_schools` / `get_school_detail` / `lookup_area_boundary`。
+核心链路：`find_property_by_address` → `get_property_detail` →
+`get_property_insights` / `get_property_cma` → 估值 enrich。
+
+### 接线步骤（Miao 只需做 1 步）
+
+1. **跑一次授权脚本，在浏览器点 Approve**（唯一的手动步骤）：
+   ```bash
+   cd ~/workspace/vertcity/dealdesk
+   .venv/bin/python tools/tophap_oauth_setup.py
+   ```
+   脚本会打印一个授权 URL → 在已登录 TopHap 的浏览器打开 → 点 **Approve**。
+   完成后：短期 access token 进 `.env`（gitignored），refresh token 只进
+   Secure Vault（存不进则脚本直接中止，绝不落盘、不打印）。
+
+2. 设置 `TOPHAP_ENABLED=1` 并重启服务，任意地址跑一次 intake；
+   工作台出现 `TopHap 数据源状态` 字段即接通，或调 `GET /api/tophap/status` 验证。
+
+```bash
+TOPHAP_ENABLED=1                     # 总开关（默认关闭）
+TOPHAP_MCP_URL=https://mcp.tophap.com/api/mcp  # 默认即此，可不填
+# 以下由授权脚本写入 .env，无需手填：
+# TOPHAP_ACCESS_TOKEN / TOPHAP_TOKEN_EXPIRES_AT / TOPHAP_TOKEN_ENDPOINT / TOPHAP_CLIENT_ID
+```
+
+设计要点：
+
+- **自动降级**：未启用 / 无 token / 401（自动用 vault refresh 换一次，重试一次；
+  仍失败则降级）/ 超时 / tool 缺失 → 全部记中文日志后静默走原 pipeline，
+  intake 不中断。
+- **可信度标定**：公共记录（面积/税/成交/贷款/产权）= 高；算法估值/CMA = 中（含区间）；
+  算法租金估算 = 低。每字段都带来源（TopHap MCP）＋抓取时间，绝不混淆卖方口径。
+- `GET /api/tophap/status`：查开关 / 授权 / 连通性 / 9 个 tool 是否齐全。
+- 详见 `docs/tophap-mcp-integration.md`（实测 vs 待验证清单、字段映射表）。
+
 ## API
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
 | GET | /api/health | 健康检查 |
+| GET | /api/tophap/status | TopHap 数据源状态（开关/授权/连通性/tool 面） |
 | GET/POST | /api/projects | 项目列表（`?sort=cash_to_close` 按全口径现金需求升序）/ 新建（自动打分入库） |
 | GET/PUT/DELETE | /api/projects/{id} | 读取（含最新引擎重算）/ 更新 / 删除 |
 | POST | /api/score | 一键打分（不入库，录入预览用） |
@@ -136,6 +182,11 @@ dealdesk/
     sensitivity.py        # 敏感性分析
     db.py                 # SQLite 项目库
     report.py             # 中文打印报告
+    tophap.py             # TopHap MCP 数据源适配器（OAuth + 9 tools enrich + 降级）
+  tools/
+    tophap_oauth_setup.py # TopHap 首次 OAuth 授权脚本（独立运行一次）
+  docs/
+    tophap-mcp-integration.md  # TopHap 集成说明（实测/待验证、字段映射）
   static/                 # 中文前端（index.html / app.js / style.css，无构建）
   tests/                  # 单元测试（48 个）
   run.sh                  # 一键启动
