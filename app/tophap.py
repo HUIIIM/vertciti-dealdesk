@@ -15,24 +15,26 @@
 本模块对参数键做多样式兼容（address/query；property_id/propertyId/id），
 返回做防御式映射：缺字段跳过，未知结构不崩。
 
-认证：
-  首次：跑 tools/tophap_oauth_setup.py（标准 OAuth + PKCE，localhost 回调；
-  用户在已登录 TopHap 的浏览器里点一次 Approve）→ 短期 access token 进 .env，
-  refresh_token 只进 Secure Vault，绝不落盘、不打印。
-  日常：读 TOPHAP_ACCESS_TOKEN；401 时用 vault 里的 refresh token 换一次，
-  换不到就降级（不崩）并提示重新跑授权脚本。
+认证（2026-09-29 修订：Secure Vault 按平台设计是 opaque 的，存进的值读不回，
+静默刷新此路不通）：
+  授权：跑 tools/tophap_oauth_setup.py（标准 OAuth + PKCE，localhost 回调；
+  用户在已登录 TopHap 的浏览器里点一次 Approve）→ access token＋绝对过期
+  时间戳进 .env（gitignored）。refresh_token 不持久化（无处可安全存放且
+  读不回）；access token 过期后重跑脚本即可（约 1 分钟）。
+  日常：import 时自动加载仓库 .env（仅 TOPHAP_* 键，不覆盖已有环境变量）；
+  401/过期一律降级，不抛异常，note/status 明确提示重跑授权脚本。
 
 配置（环境变量/.env，.env 已 gitignore；密钥绝不硬编码）：
   TOPHAP_ENABLED=1        功能开关（默认 0=关闭）
   TOPHAP_MCP_URL          默认 https://mcp.tophap.com/api/mcp
   TOPHAP_ACCESS_TOKEN     OAuth access token（短期，授权脚本写入）
-  TOPHAP_TOKEN_EXPIRES_AT ISO 时间（可选）
+  TOPHAP_TOKEN_EXPIRES_AT 绝对 epoch 秒（授权脚本写入；status() 据此判过期）
   TOPHAP_TOKEN_ENDPOINT   OAuth token endpoint（授权脚本写入，非敏感）
   TOPHAP_CLIENT_ID        OAuth client_id（授权脚本写入，非敏感）
 
 诚实铁律：每字段带来源(TopHap MCP)＋抓取时间＋可信度；
 公共记录类=高，算法估值=中（含区间），算法租金=低。
-任何失败（未启用/无 token/401/超时/tool 缺失）返回 ok=False，
+任何失败（未启用/无 token/token 过期/401/超时/tool 缺失）返回 ok=False，
 由 research_pipeline 降级走原 DDG pipeline，绝不打断 intake。
 """
 
@@ -40,7 +42,7 @@ from __future__ import annotations
 
 import json
 import os
-import subprocess
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -51,7 +53,6 @@ from . import research_pipeline as rp
 MCP_URL_DEFAULT = "https://mcp.tophap.com/api/mcp"
 RPC_TIMEOUT_INIT = 10
 RPC_TIMEOUT_CALL = 25
-VAULT_TIMEOUT = 10
 SOURCE_NAME = "TopHap MCP"
 
 # ---- 实测 tool 名（2026-09-28 照抄 https://www.tophap.com/mcp） ----
@@ -115,6 +116,30 @@ def dotenv_path() -> Path:
     return repo_root() / ".env"
 
 
+def _load_dotenv() -> None:
+    """import 时加载仓库 .env（仅 TOPHAP_* 键；已有环境变量优先，不覆盖）。
+
+    run.sh 不 source .env，这个 loader 保证授权脚本写入的 token 在 API
+    进程里可见。零依赖，失败静默（环境变量直传照常工作）。"""
+    try:
+        path = dotenv_path()
+        if not path.exists():
+            return
+        for line in path.read_text().splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            k, v = line.split("=", 1)
+            k, v = k.strip(), v.strip().strip('"').strip("'")
+            if k.startswith("TOPHAP_") and k not in os.environ:
+                os.environ[k] = v
+    except Exception:
+        pass
+
+
+_load_dotenv()
+
+
 def mcp_url() -> str:
     return os.environ.get("TOPHAP_MCP_URL", MCP_URL_DEFAULT).strip() or MCP_URL_DEFAULT
 
@@ -129,41 +154,6 @@ def access_token() -> str:
 
 def is_configured() -> bool:
     return bool(access_token())
-
-
-# ---------------- Secure Vault（refresh token 专用，绝不落盘） ----------------
-# [平台相关·待运行时验证] 经 /opt/hatch/bin/hatch-vault 与平台 Secure Vault 交互。
-# 语义是 fail-safe 的：存/读任何失败都返回 False/None，调用方必须中止流程，
-# 绝不回退到磁盘文件。这是硬约束，不是可选项。
-
-VAULT_BIN = "/opt/hatch/bin/hatch-vault"
-VAULT_REFRESH_NAME = "tophap_refresh_token"
-
-
-def vault_store_secret(name: str, value: str) -> bool:
-    """往 Secure Vault 存一个密钥。成功 True；任何失败 False（调用方中止，不落盘）。"""
-    try:
-        payload = json.dumps({"name": name, "value": value}).encode()
-        p = subprocess.run([VAULT_BIN, "store"], input=payload,
-                           capture_output=True, timeout=VAULT_TIMEOUT)
-        return p.returncode == 0
-    except Exception:
-        return False
-
-
-def vault_read_secret(name: str) -> str | None:
-    """从 Secure Vault 读一个密钥。失败/不存在返回 None（内存中短暂持有，不打印不落盘）。"""
-    try:
-        payload = json.dumps({"name": name}).encode()
-        p = subprocess.run([VAULT_BIN, "get"], input=payload,
-                           capture_output=True, timeout=VAULT_TIMEOUT)
-        if p.returncode != 0:
-            return None
-        data = json.loads((p.stdout or b"").decode() or "{}")
-        v = data.get("value") if isinstance(data, dict) else None
-        return v if isinstance(v, str) and v else None
-    except Exception:
-        return None
 
 
 def write_dotenv(updates: dict) -> None:
@@ -295,7 +285,7 @@ def call_tool(name: str, arguments: dict, req_id: int = 3) -> dict:
 def _call_with_arg_styles(tool: str, value: str, styles: tuple) -> dict:
     """参数键多样式兼容：逐个试，返回第一个非空结果（[待验证] 授权后校准）。
 
-    401/403 直接上抛（换参数重试没有意义，走 refresh 流程）。"""
+    401/403 直接上抛（调用方降级并提示重跑授权脚本；不再 refresh）。"""
     for style in styles:
         try:
             rec = call_tool(tool, {style: value})
@@ -323,51 +313,6 @@ def _extract_property_id(found: dict) -> str | None:
     if isinstance(cands, list) and cands and isinstance(cands[0], dict):
         return _extract_property_id(cands[0])
     return None
-
-
-# ---------------- token 刷新 ----------------
-
-def try_refresh(log: list | None = None) -> bool:
-    """用 Secure Vault 里的 refresh_token 换新的 access token。
-
-    成功：更新环境变量 + .env，返回 True。
-    失败：返回 False（调用方降级并提示重新跑授权脚本）。绝不抛异常。"""
-    try:
-        rt = vault_read_secret(VAULT_REFRESH_NAME)
-        token_ep = os.environ.get("TOPHAP_TOKEN_ENDPOINT", "").strip()
-        client_id = os.environ.get("TOPHAP_CLIENT_ID", "").strip()
-        if not (rt and token_ep and client_id):
-            if log is not None:
-                rp._log(log, "TopHap", "auth", "refresh 不可用（vault/endpoint/client_id 缺失）")
-            return False
-        resp = httpx.post(token_ep,
-                          data={"grant_type": "refresh_token",
-                                "refresh_token": rt,
-                                "client_id": client_id},
-                          timeout=15)
-        data = resp.json() if resp.status_code == 200 else {}
-        new_at = data.get("access_token")
-        if not new_at:
-            if log is not None:
-                rp._log(log, "TopHap", "auth",
-                        f"refresh 被拒（HTTP {resp.status_code}），需重新授权")
-            return False
-        updates = {"TOPHAP_ACCESS_TOKEN": new_at}
-        exp = data.get("expires_in")
-        if exp:
-            updates["TOPHAP_TOKEN_EXPIRES_AT"] = str(exp)
-        os.environ["TOPHAP_ACCESS_TOKEN"] = new_at
-        write_dotenv(updates)
-        new_rt = data.get("refresh_token")
-        if new_rt:
-            vault_store_secret(VAULT_REFRESH_NAME, new_rt)  # rotation，进 vault
-        if log is not None:
-            rp._log(log, "TopHap", "auth", "access token 已刷新")
-        return True
-    except Exception as e:  # noqa: BLE001
-        if log is not None:
-            rp._log(log, "TopHap", "auth", f"refresh 异常：{str(e)[:100]}")
-        return False
 
 
 # ---------------- 记录 → DealDesk 字段 ----------------
@@ -672,7 +617,7 @@ def enrich_address(address: str, log: list | None = None) -> dict:
     """按地址取 TopHap 全记录 → DealDesk 字段。返回 {ok, fields, note, tool_used}。
 
     失败时 ok=False + 中文 note，调用方负责降级；本函数不抛异常（除程序 bug）。
-    401 时自动用 vault refresh token 换一次 access token 后重试一次。"""
+    401/过期 → 直接降级，note 提示重跑授权脚本（不再 refresh：Vault opaque 读不回）。"""
     log = log if log is not None else []
     if not is_enabled():
         return {"ok": False, "fields": [],
@@ -689,15 +634,8 @@ def enrich_address(address: str, log: list | None = None) -> dict:
     try:
         fields, used = _enrich_chain(address, log)
     except MCPAuthError as e:
-        rp._log(log, "TopHap", "auth", f"{e}；尝试 refresh token…")
-        if try_refresh(log):
-            try:
-                fields, used = _enrich_chain(address, log)
-            except MCPError as e2:
-                return _degraded(log, f"{e2}；refresh 后仍失败，需重新跑授权脚本")
-        else:
-            return _degraded(log, f"{e}；refresh 不可用，需重新跑 "
-                                  "tools/tophap_oauth_setup.py 完成授权")
+        return _degraded(log, f"{e}；需重跑 tools/tophap_oauth_setup.py 完成一次 "
+                              "OAuth 授权（在已登录 TopHap 的浏览器里点 Approve）")
     except MCPError as e:
         return _degraded(log, str(e))
     rp._log(log, "TopHap", "ok", f"链路 {used}，映射 {len(fields)} 个字段（公共记录口径）")
@@ -705,17 +643,37 @@ def enrich_address(address: str, log: list | None = None) -> dict:
             "note": f"TopHap 公共记录 enrich：{len(fields)} 个字段"}
 
 
+def token_expires_at() -> int | None:
+    """TOPHAP_TOKEN_EXPIRES_AT：绝对 epoch 秒；缺失/非法返回 None（视为未知）。"""
+    raw = os.environ.get("TOPHAP_TOKEN_EXPIRES_AT", "").strip()
+    try:
+        v = int(raw)
+        return v if v > 0 else None
+    except (TypeError, ValueError):
+        return None
+
+
+def is_token_expired() -> bool:
+    exp = token_expires_at()
+    return exp is not None and exp <= int(time.time())
+
+
 def status() -> dict:
-    """数据源状态：开关 / 授权 / 连通性 / tool 面（供前端与授权后验证用）。"""
+    """数据源状态：开关 / 授权 / token 过期 / 连通性 / tool 面（供前端与授权后验证用）。"""
     st: dict = {"enabled": is_enabled(), "configured": is_configured(),
                 "mcp_url": mcp_url(), "reachable": None,
-                "tools": [], "core_ready": False, "note": ""}
+                "tools": [], "core_ready": False, "token_expired": False, "note": ""}
     if not st["enabled"]:
         st["note"] = "未启用：设置 TOPHAP_ENABLED=1 开启"
         return st
     if not st["configured"]:
         st["note"] = ("未配置：跑 tools/tophap_oauth_setup.py 完成一次 OAuth 授权 "
-                      "（浏览器里点 Approve），access token 进 .env，refresh token 进 Secure Vault")
+                      "（浏览器里点 Approve），access token 进 .env")
+        return st
+    if is_token_expired():
+        st["token_expired"] = True
+        st["note"] = ("token 过期，需重跑 tools/tophap_oauth_setup.py 完成一次 OAuth 授权 "
+                      "（在已登录 TopHap 的浏览器里点 Approve）")
         return st
     try:
         tools = discover_tools()
@@ -726,6 +684,10 @@ def status() -> dict:
         st["note"] = ("MCP 连通；核心链路 tool 齐全"
                       if st["core_ready"]
                       else "MCP 连通，但缺少核心 tool：" + ", ".join(missing))
+    except MCPAuthError as e:
+        st["reachable"] = False
+        st["note"] = (f"{e}；需重跑 tools/tophap_oauth_setup.py 完成一次 OAuth 授权 "
+                      "（在已登录 TopHap 的浏览器里点 Approve）")
     except MCPError as e:
         st["reachable"] = False
         st["note"] = str(e)

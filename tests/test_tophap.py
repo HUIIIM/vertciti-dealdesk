@@ -1,9 +1,13 @@
-"""TopHap 适配器 v2 测试：实测 9 tools 链路 + OAuth/refresh + 降级。
+"""TopHap 适配器 v2 测试：实测 9 tools 链路 + OAuth + 降级。
+
+无 refresh 测试：Secure Vault 按平台设计是 opaque 的（存进读不回），静默刷新
+此路不通——401/过期一律降级并提示重跑授权脚本。
 
 全部 fixture/模拟：不调用真实公网、不读真实 token、不写真实 .env/vault。
 测试铁律：跑前已删 dealdesk.db 隔离。"""
 import importlib.util
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -18,6 +22,7 @@ REPO = Path(__file__).resolve().parent.parent
 def env_clean(monkeypatch):
     monkeypatch.setenv("TOPHAP_ENABLED", "0")
     for k in ("TOPHAP_ACCESS_TOKEN", "TOPHAP_TOKEN",
+              "TOPHAP_TOKEN_EXPIRES_AT",
               "TOPHAP_TOKEN_ENDPOINT", "TOPHAP_CLIENT_ID"):
         monkeypatch.delenv(k, raising=False)
     monkeypatch.setenv("TOPHAP_MCP_URL", "https://mcp.tophap.local/api/mcp")
@@ -245,58 +250,78 @@ def test_find_without_property_id_degrades(monkeypatch):
     assert out["ok"] is False and "property_id" in out["note"]
 
 
-# ---------- 401 → refresh → 重试 / 降级 ----------
+# ---------- 401 → 直接降级（不再 refresh） ----------
 
-def test_401_triggers_refresh_and_retry(monkeypatch):
+def test_401_degrades_with_reauth_note(monkeypatch):
+    """401 → 不 refresh，直接降级，note 指回授权脚本；
+    不调 token endpoint、不写 .env。"""
     calls = []
     _enable(monkeypatch, calls, fail_first_call_401=True)
-    monkeypatch.setenv("TOPHAP_TOKEN_ENDPOINT", "https://auth.tophap.local/token")
-    monkeypatch.setenv("TOPHAP_CLIENT_ID", "cid-1")
-    monkeypatch.setattr(tophap, "vault_read_secret",
-                        lambda name: "rt-123" if name == "tophap_refresh_token" else None)
-    monkeypatch.setattr(tophap, "vault_store_secret", lambda n, v: True)
-    out = tophap.enrich_address("123 Main St, Tampa, FL 33602")
-    assert out["ok"] is True
-    assert ("token-endpoint", None) in calls
-    assert ("dotenv", ["TOPHAP_ACCESS_TOKEN"]) in calls
-    by_key = {f["key"]: f for f in out["fields"]}
-    assert by_key["tophap_value"]["value"] == 500000
-
-
-def test_401_without_refresh_degrades_with_reauth_note(monkeypatch):
-    calls = []
-    _enable(monkeypatch, calls, fail_first_call_401=True)
-    monkeypatch.setattr(tophap, "vault_read_secret", lambda name: None)
     out = tophap.enrich_address("123 Main St, Tampa, FL 33602")
     assert out["ok"] is False
     assert "tophap_oauth_setup.py" in out["note"]
+    assert ("token-endpoint", None) not in calls
+    assert not any(c[0] == "dotenv" for c in calls)
 
 
-def test_try_refresh_rejected_returns_false(monkeypatch):
-    monkeypatch.setenv("TOPHAP_TOKEN_ENDPOINT", "https://auth.tophap.local/token")
-    monkeypatch.setenv("TOPHAP_CLIENT_ID", "cid-1")
-    monkeypatch.setattr(tophap, "vault_read_secret", lambda name: "rt-bad")
-    monkeypatch.setattr(tophap.httpx, "post",
-                        lambda *a, **k: FakeResp({"error": "invalid_grant"}, status=400))
-    assert tophap.try_refresh() is False
+def test_expired_token_status_reports_reauth(monkeypatch):
+    """TOPHAP_TOKEN_EXPIRES_AT 已过 → status() 直接报过期，不发起 HTTP。"""
+    calls = []
+    monkeypatch.setenv("TOPHAP_ENABLED", "1")
+    monkeypatch.setenv("TOPHAP_ACCESS_TOKEN", "fake-at")
+    monkeypatch.setenv("TOPHAP_TOKEN_EXPIRES_AT", "1000")  # 1970，早已过期
+    monkeypatch.setattr(tophap.httpx, "post", make_chain_post(calls))
+    st = tophap.status()
+    assert st["token_expired"] is True
+    assert "过期" in st["note"] and "tophap_oauth_setup.py" in st["note"]
+    assert calls == []
 
 
-# ---------- vault fail-safe ----------
+def test_status_future_expiry_proceeds(monkeypatch):
+    """过期时间戳在未来 → status() 正常走连通性检查。"""
+    import time as _t
+    calls = []
+    monkeypatch.setenv("TOPHAP_ENABLED", "1")
+    monkeypatch.setenv("TOPHAP_ACCESS_TOKEN", "fake-at")
+    monkeypatch.setenv("TOPHAP_TOKEN_EXPIRES_AT", str(int(_t.time()) + 3600))
+    monkeypatch.setattr(tophap.httpx, "post", make_chain_post(calls))
+    st = tophap.status()
+    assert st["token_expired"] is False and st["reachable"] is True
 
-def test_vault_helpers_fail_safe(monkeypatch):
+
+def test_status_401_reports_reauth(monkeypatch):
+    """无过期时间戳但 401 → status() 报授权失败并指回脚本。"""
+    monkeypatch.setenv("TOPHAP_ENABLED", "1")
+    monkeypatch.setenv("TOPHAP_ACCESS_TOKEN", "fake-at")
+
     def boom(*a, **k):
-        raise OSError("no vault")
-    monkeypatch.setattr(tophap.subprocess, "run", boom)
-    assert tophap.vault_store_secret("x", "y") is False
-    assert tophap.vault_read_secret("x") is None
+        raise tophap.MCPAuthError("TopHap 授权失败（401）：access token 无效或过期")
+    monkeypatch.setattr(tophap, "discover_tools", boom)
+    st = tophap.status()
+    assert st["reachable"] is False
+    assert "tophap_oauth_setup.py" in st["note"]
 
 
-def test_vault_read_nonzero_rc_returns_none(monkeypatch):
-    class R:
-        returncode = 1
-        stdout = b""
-    monkeypatch.setattr(tophap.subprocess, "run", lambda *a, **k: R())
-    assert tophap.vault_read_secret("x") is None
+# ---------- .env 自动加载 ----------
+
+def test_load_dotenv_loads_tophap_keys_only(tmp_path, monkeypatch):
+    env_file = tmp_path / ".env"
+    env_file.write_text("TOPHAP_ACCESS_TOKEN=from-file\nOTHER=1\n# comment\n")
+    monkeypatch.delenv("TOPHAP_ACCESS_TOKEN", raising=False)
+    monkeypatch.delenv("OTHER", raising=False)
+    monkeypatch.setattr(tophap, "dotenv_path", lambda: env_file)
+    tophap._load_dotenv()
+    assert os.environ["TOPHAP_ACCESS_TOKEN"] == "from-file"
+    assert "OTHER" not in os.environ
+
+
+def test_load_dotenv_does_not_override_env(tmp_path, monkeypatch):
+    env_file = tmp_path / ".env"
+    env_file.write_text("TOPHAP_ACCESS_TOKEN=from-file\n")
+    monkeypatch.setenv("TOPHAP_ACCESS_TOKEN", "from-shell")
+    monkeypatch.setattr(tophap, "dotenv_path", lambda: env_file)
+    tophap._load_dotenv()
+    assert os.environ["TOPHAP_ACCESS_TOKEN"] == "from-shell"
 
 
 # ---------- pipeline 集成 ----------

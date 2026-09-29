@@ -7,17 +7,19 @@
   3. 取 Authorization Server Metadata → authorization/token/registration endpoints
   4. 动态注册 client（RFC 7591，public client + PKCE，不产生 client_secret）
   5. 起 localhost 回调，打印授权 URL → 用户在已登录 TopHap 的浏览器打开 → 点 Approve
-  6. 回调拿到 code → 换 access_token + refresh_token（+ expires_in）
-  7. access_token / expires_at / token_endpoint / client_id → .env（gitignored）
-  8. refresh_token → Secure Vault（存不进则中止：绝不落盘、绝不打印）
+  6. 回调拿到 code → 换 access_token（+ expires_in）
+  7. access_token / 绝对过期时间戳（TOPHAP_TOKEN_EXPIRES_AT，epoch 秒）/
+     token_endpoint / client_id → .env（gitignored）
+     refresh_token 不持久化：Secure Vault 按平台设计是 opaque 的（存进的值
+     读不回），静默刷新此路不通；access token 过期后重跑本脚本即可（约 1 分钟）。
 
 用法：
   cd ~/workspace/vertcity/dealdesk && .venv/bin/python tools/tophap_oauth_setup.py
   # 若浏览器打不开 localhost 回调：加 --manual，按提示粘贴跳转 URL 或 code
 
-安全铁律：
-  - refresh_token 只进 Secure Vault；本脚本任何分支都不把它写文件、不打印。
-  - vault 存入失败 → 直接中止（exit 2），.env 也不写，不留半吊子状态。
+说明：
+  - .env 已 gitignore；access token 只进 .env，不进 git、不打印。
+  - 本脚本不依赖 Secure Vault；vault 相关门槛已按平台 opaque 特性移除。
 """
 
 from __future__ import annotations
@@ -39,10 +41,7 @@ import httpx
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
-from app.tophap import (  # noqa: E402
-    VAULT_REFRESH_NAME, mcp_url, vault_read_secret, vault_store_secret,
-    write_dotenv,
-)
+from app.tophap import mcp_url, write_dotenv  # noqa: E402
 
 CALLBACK_PORT = 8765
 CALLBACK_PATH = "/callback"
@@ -125,7 +124,7 @@ def register_client(as_meta: dict) -> dict:
     body = {
         "client_name": "DealDesk",
         "redirect_uris": [f"http://127.0.0.1:{CALLBACK_PORT}{CALLBACK_PATH}"],
-        "grant_types": ["authorization_code", "refresh_token"],
+        "grant_types": ["authorization_code"],
         "response_types": ["code"],
         "token_endpoint_auth_method": "none",
         "scope": "openid profile email",
@@ -142,8 +141,8 @@ def register_client(as_meta: dict) -> dict:
     if not reg.get("client_id"):
         raise SystemExit(f"注册返回缺 client_id：{str(reg)[:200]}")
     if reg.get("client_secret"):
-        log("警告：server 下发了 client_secret（本应 public client）；"
-            "它将只进 Secure Vault，不落盘")
+        log("server 下发了 client_secret，但本设计不做静默刷新（Vault opaque 读不回），"
+            "忽略它；access token 过期后重跑本脚本即可")
     log(f"client 注册成功（client_id={reg['client_id'][:12]}…）")
     return reg
 
@@ -237,8 +236,8 @@ def exchange_code(as_meta: dict, client_id: str, client_secret: str | None,
     if r.status_code != 200:
         raise SystemExit(f"换 token 失败（HTTP {r.status_code}）：{r.text[:300]}")
     tok = r.json()
-    if not tok.get("access_token") or not tok.get("refresh_token"):
-        raise SystemExit(f"token 响应缺字段：{sorted(tok.keys())}")
+    if not tok.get("access_token"):
+        raise SystemExit(f"token 响应缺 access_token：{sorted(tok.keys())}")
     return tok
 
 
@@ -272,21 +271,8 @@ def main() -> None:
     log("拿到授权码，换 token…")
     tok = exchange_code(as_meta, client_id, client_secret, code, verifier)
 
-    # 先存 refresh_token 进 Secure Vault —— 存不进就整体中止，绝不落盘
-    log("refresh_token → Secure Vault…")
-    if not vault_store_secret(VAULT_REFRESH_NAME, tok["refresh_token"]):
-        raise SystemExit(
-            "exit 2：Secure Vault 写入失败。为安全起见中止，.env 未写入，"
-            "refresh_token 未落盘。请确认 vault 可用后重跑本脚本。")
-    # 回读校验（只比对是否一致，不打印值）
-    if vault_read_secret(VAULT_REFRESH_NAME) != tok["refresh_token"]:
-        raise SystemExit("exit 2：vault 回读校验不一致，中止。请重跑本脚本。")
-    log("refresh_token 已进 Secure Vault（回读校验通过）")
-    if client_secret:
-        if not vault_store_secret("tophap_client_secret", client_secret):
-            raise SystemExit("exit 2：client_secret 进 vault 失败，中止。请重跑。")
-        log("client_secret 已进 Secure Vault")
-
+    # 直接写 .env（无 vault 门槛：Secure Vault opaque 读不回，静默刷新此路不通；
+    # refresh_token 不持久化，access token 过期后重跑本脚本即可）
     updates = {
         "TOPHAP_MCP_URL": mcp,
         "TOPHAP_ACCESS_TOKEN": tok["access_token"],
@@ -294,9 +280,13 @@ def main() -> None:
         "TOPHAP_CLIENT_ID": client_id,
     }
     if tok.get("expires_in"):
-        updates["TOPHAP_TOKEN_EXPIRES_AT"] = str(tok["expires_in"])
+        try:
+            updates["TOPHAP_TOKEN_EXPIRES_AT"] = str(
+                int(time.time()) + int(tok["expires_in"]))
+        except (TypeError, ValueError):
+            log(f"expires_in 非法（{tok['expires_in']!r}），跳过过期时间戳")
     write_dotenv(updates)
-    log(".env 已写入（access token 等短期凭证；refresh token 只在 vault 里）")
+    log(".env 已写入：access token＋绝对过期时间戳（TOPHAP_TOKEN_EXPIRES_AT，epoch 秒）")
 
     print()
     print("授权完成。下一步：在 shell 里执行")
