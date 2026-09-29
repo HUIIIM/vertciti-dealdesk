@@ -73,7 +73,7 @@ CORE_TOOLS = (TOOL_FIND, TOOL_DETAIL, TOOL_INSIGHTS, TOOL_CMA)
 
 # 参数键多样式兼容（[待验证] 授权后以实测校准）
 FIND_ARG_STYLES = ("address", "query")
-ID_ARG_STYLES = ("property_id", "propertyId", "id")
+ID_ARG_STYLES = ("attomId", "property_id", "propertyId", "id")
 
 # 新增字段标签（注册进 research_pipeline.FIELD_LABELS，保持单一标签表）
 TOPHAP_FIELD_LABELS = {
@@ -299,10 +299,19 @@ def _call_with_arg_styles(tool: str, value: str, styles: tuple) -> dict:
 
 
 def _extract_property_id(found: dict) -> str | None:
-    """从 find_property_by_address 返回里提取 property_id（防御式）。"""
+    """从 find_property_by_address 返回里提取物业 ID（防御式）。
+
+    TopHap 真实结构（2026-09-29 实测）：{match: {attomId: 169551792, ...}, alternates: [...]}。
+    """
     if not isinstance(found, dict):
         return None
-    for key in ("property_id", "propertyId", "id"):
+    m = found.get("match")
+    if isinstance(m, dict):
+        for key in ("attomId", "property_id", "propertyId", "id"):
+            v = m.get(key)
+            if v:
+                return str(v)
+    for key in ("attomId", "property_id", "propertyId", "id"):
         v = found.get(key)
         if v:
             return str(v)
@@ -352,85 +361,133 @@ def _getter(rec: dict):
 
 
 def _map_detail(rec: dict) -> list[dict]:
-    """get_property_detail → 建筑/占地/房型等公共记录字段（可信度=高）。"""
+    """get_property_detail → TopHap 物业档案（字段结构 2026-09-29 对 MCP 实测校准）。"""
     g = _getter(rec or {})
     out = []
-    ptype = g("propertyType", "property_type", "useCode")
+    ptype = g("propType")
     if ptype:
+        pc = g("propClass")
         out.append(_new_field("property_type_detail", str(ptype),
-                              note="TopHap 物业档案（公共记录）"))
-    parcel = g("parcelId", "parcel_id", "apn")
-    if parcel:
-        out.append(_new_field("parcel_id", str(parcel),
-                              note="TopHap 物业档案（公共记录）"))
-    beds = _num(g("bedrooms", "beds"))
+                              note="TopHap 物业档案（公共记录）" + (f"，分类 {pc}" if pc else "")))
+    nb = g("neighborhood")
+    nb_name = nb.get("name") if isinstance(nb, dict) else nb
+    if nb_name:
+        out.append(_new_field("neighborhood", str(nb_name), note="TopHap 社区划分"))
+    beds = _num(g("beds"))
     if beds is not None:
         out.append(_new_field("beds", int(beds), note="TopHap 物业档案（公共记录）"))
-    baths = _num(g("bathrooms", "baths"))
+    baths = _num(g("baths"))
     if baths is not None:
         out.append(_new_field("baths", baths, note="TopHap 物业档案（公共记录）"))
-    sf = _num(g("livingAreaSqft", "building_sf", "buildingAreaSqft", "sqft"))
+    st = _num(g("stories"))
+    if st is not None:
+        out.append(_new_field("stories", int(st), note="TopHap 物业档案（公共记录）"))
+    uc = _num(g("unitCount"))
+    if uc is not None:
+        out.append(_new_field("building_units", int(uc), note="TopHap 单元数（公共记录）"))
+    sf = _num(g("sqft"))
     if sf is not None:
         out.append(_new_field("building_sf", sf, f"{sf:,.0f} SF",
                               note="TopHap 物业档案（公共记录）"))
-    lot = _num(g("lotSizeSqft", "lot_sf", "lotAreaSqft"))
+    lot = _num(g("lotSqft"))
     if lot is not None:
         out.append(_new_field("lot_sf", lot, f"{lot:,.0f} SF",
                               note="TopHap 物业档案（公共记录）"))
-    yb = _num(g("yearBuilt", "year_built"))
+    yb = _num(g("yearBuilt"))
     if yb is not None:
-        out.append(_new_field("year_built", int(yb),
-                              note="TopHap 物业档案（公共记录）"))
-    units = _num(g("unitCount", "units", "buildingUnits"))
-    if units is not None:
-        out.append(_new_field("building_units", int(units),
-                              note="TopHap 楼宇单元（公共记录）；condo/co-op 适用"))
+        out.append(_new_field("year_built", int(yb), note="TopHap 物业档案（公共记录）"))
+    avm = _num(g("avmValue"))
+    if avm is not None:
+        out.append(_new_field("tophap_value", avm, _money(avm), confidence="中",
+                              note="TopHap AVM 算法估值，非成交价；以可比成交校准为准"))
+        ahl, ahh = _num(g("avmLow")), _num(g("avmHigh"))
+        if ahl is not None and ahh is not None:
+            out.append(_new_field("tophap_value_range", [ahl, ahh],
+                                  f"{_money(ahl)} - {_money(ahh)}", confidence="中",
+                                  note="TopHap AVM 置信区间"))
+    tax = _num(g("taxAmount"))
+    if tax is not None:
+        ty = g("taxYear")
+        out.append(_new_field("taxes_annual", tax,
+                              f"${tax:,.0f}/年" + (f"（{ty}）" if ty else ""),
+                              note="TopHap 税务记录（公共记录）"))
+    av = _num(g("assessedValue"))
+    if av is not None:
+        ay = g("assessedYear")
+        out.append(_new_field("tax_assessed_value", av, _money(av),
+                              note="TopHap 计税估值（公共记录）" + (f"，{ay} 年" if ay else "")))
+    mv = _num(g("marketValue"))
+    if mv is not None:
+        out.append(_new_field("market_value", mv, _money(mv),
+                              note="TopHap 市场价值（公共记录口径）"))
+    lsp = _num(g("lastSaleAmount"))
+    if lsp is not None:
+        out.append(_new_field("last_sale_price", lsp, _money(lsp),
+                              note="TopHap 上次成交记录（公共记录）"))
+        lsd = g("lastSaleDate")
+        if lsd:
+            out.append(_new_field("last_sale_date", str(lsd), str(lsd),
+                                  note="TopHap 上次成交记录（公共记录）"))
+    own = g("ownerName")
+    if own:
+        flags = []
+        if g("companyOwned"):
+            flags.append("公司持有")
+        if g("absenteeOwner"):
+            flags.append("absentee owner")
+        out.append(_new_field("owner_name", str(own),
+                              note="TopHap 业主记录（公共记录）" + ("；" + "、".join(flags) if flags else "")))
+    fz = g("floodFemaZone")
+    if fz:
+        out.append(_new_field("flood_zone", str(fz), note="TopHap FEMA 洪水区划"))
+    rt = _num(g("riskTotal"))
+    if rt is not None:
+        out.append(_new_field("risk_total", rt, f"综合风险指数 {rt:g}",
+                              note="TopHap 风险指数（heat/storm/wildfire/drought/flood 综合）"))
+    ltv = _num(g("ltv"))
+    if ltv is not None:
+        out.append(_new_field("ltv_estimate", ltv, f"LTV 约 {ltv:g}%",
+                              confidence="中", note="TopHap 杠杆估算（公共记录推算）"))
+    eq = _num(g("equityAvailable"))
+    if eq is not None:
+        out.append(_new_field("equity_available", eq, _money(eq),
+                              note="TopHap 可用净值估算（公共记录推算）"))
+    lp = g("loanPositions")
+    lp_n = len(lp) if isinstance(lp, list) else _num(lp)
+    if lp_n is not None:
+        out.append(_new_field("loan_positions", int(lp_n),
+                              note="TopHap 在押顺位数（公共记录）；subject-to 核保以 title/statement 独立验证"))
+    if g("distressActive"):
+        dt = g("distressType") or "distress"
+        ad = g("auctionDate") or ""
+        out.append(_new_field("distress", True, f"{dt} {ad}".strip(),
+                              note="TopHap distress 预警（公共记录）；硬风险信号"))
+    rurl = g("pdfReportUrl")
+    if rurl:
+        out.append(_new_field("tophap_report_url", str(rurl), "TopHap 物业报告 PDF",
+                              note="TopHap 生成的物业报告"))
     return [f for f in out if f]
 
 
 def _map_insights(rec: dict) -> list[dict]:
-    """get_property_insights → 估值/税/成交/贷款/产权等（公共记录=高，算法=中/低）。"""
+    """get_property_insights → 成交记录/社区/学校/法拍预警（2026-09-29 对 MCP 实测校准）。"""
     g = _getter(rec or {})
     out = []
 
-    est = g("estimatedValue", "valueEstimate", "estimated_value")
-    est_v = est_l = est_h = None
-    if isinstance(est, dict):
-        est_v, est_l, est_h = (_num(est.get("value")), _num(est.get("low")),
-                              _num(est.get("high")))
-    else:
-        est_v = _num(est)
-    if est_v is not None:
-        out.append(_new_field("tophap_value", est_v, _money(est_v), confidence="中",
-                              note="TopHap 算法估值，非成交价；以可比成交校准为准"))
-        if est_l is not None and est_h is not None:
-            out.append(_new_field("tophap_value_range", [est_l, est_h],
-                                  f"{_money(est_l)} - {_money(est_h)}", confidence="中",
-                                  note="TopHap 公布的估值置信区间"))
-
-    tax = g("tax", "propertyTax")
-    tax_annual = (_num(tax.get("annualAmount")) if isinstance(tax, dict)
-                  else _num(g("taxes_annual", "taxAnnual")))
-    if tax_annual is not None:
-        out.append(_new_field("taxes_annual", tax_annual, f"${tax_annual:,.0f}/年",
-                              note="TopHap 税务记录（公共记录）"))
-    assessed = (_num(tax.get("assessedValue")) if isinstance(tax, dict)
-                else _num(g("assessedValue", "tax_assessed_value")))
-    if assessed is not None:
-        out.append(_new_field("tax_assessed_value", assessed, _money(assessed),
-                              note="TopHap 计税估值（公共记录）"))
-
-    sales = g("salesHistory", "sale_history", "sales") or []
+    txs = g("transactions") or []
     hist = []
-    if isinstance(sales, list):
-        for s in sales:
-            if not isinstance(s, dict):
+    if isinstance(txs, list):
+        for t in txs:
+            if not isinstance(t, dict):
                 continue
-            p = _num(s.get("price"))
-            if p is None:
+            amt = _num(t.get("amount"))
+            if amt is None:
                 continue
-            hist.append({"date": str(s.get("date", "")),
-                         "event": str(s.get("type", "记录")), "price": p})
+            hist.append({"date": str(t.get("date", "")),
+                         "event": str(t.get("transType", "记录")),
+                         "price": amt,
+                         "price_per_sqft": _num(t.get("pricePerSqft")),
+                         "doc": str(t.get("docNumber", ""))})
     if hist:
         out.append(_new_field(
             "price_history", hist,
@@ -443,76 +500,108 @@ def _map_insights(rec: dict) -> list[dict]:
             out.append(_new_field("last_sale_date", last["date"], last["date"],
                                   note="TopHap 上次成交记录"))
 
-    loans = g("loans", "loanHistory", "mortgages") or []
-    if isinstance(loans, list) and loans:
-        open_l = [l for l in loans
-                  if isinstance(l, dict)
-                  and str(l.get("status", "open")).lower() in ("open", "active", "current")]
-        if open_l:
-            parts = []
-            for l in open_l:
-                amt = _money(l.get("amount")) or "金额未知"
-                rate = l.get("rate")
-                rate_s = f" @{rate}%" if rate not in (None, "") else ""
-                parts.append(f"{amt}{rate_s}（{l.get('date', '日期未知')}，"
-                             f"{l.get('lender', 'lender 未知')}）")
-            out.append(_new_field("open_loans", open_l,
-                                  f"{len(open_l)} 笔在押：" + "; ".join(parts),
-                                  note="TopHap 贷款记录（公共记录）；subject-to 核保需以 title/statement 独立验证"))
-        out.append(_new_field("loan_history", loans, f"共 {len(loans)} 条贷款记录",
-                              note="TopHap 贷款历史（公共记录）"))
+    comm = g("community")
+    if isinstance(comm, dict):
+        parts = []
+        if comm.get("name"):
+            parts.append(str(comm["name"]))
+        mhi = _num(comm.get("medianHouseholdIncome"))
+        if mhi is not None:
+            parts.append(f"家庭收入中位 ${mhi:,.0f}")
+        ci = _num(comm.get("crimeIndex"))
+        if ci is not None:
+            parts.append(f"犯罪指数 {ci:g}")
+        if parts:
+            out.append(_new_field("tophap_community", comm, "；".join(parts),
+                                  confidence="中", note="TopHap 社区统计"))
 
-    own = g("ownershipHistory", "ownership_history", "owners") or []
-    if isinstance(own, list) and own:
+    dn = g("districtName")
+    if dn:
+        out.append(_new_field("school_district", str(dn), note="TopHap 学区（公共记录）"))
+
+    sch = g("schools") or []
+    rows = []
+    if isinstance(sch, list):
+        for s in sch:
+            if not isinstance(s, dict) or not s.get("name"):
+                continue
+            rows.append({"name": s["name"], "level": s.get("level"),
+                         "rating": s.get("rating"),
+                         "distance_mi": _num(s.get("distanceMiles"))})
+    if rows:
         disp = "; ".join(
-            f"{o.get('from', '')}-{o.get('to', '今')} {o.get('owner', '')}".strip()
-            for o in own[:4] if isinstance(o, dict))
-        out.append(_new_field("ownership_history", own, disp or f"共 {len(own)} 段",
-                              note="TopHap 产权历史（公共记录）"))
+            f"{r['name']}" + (f"（{r['level']}，评级 {r['rating']}）" if r.get("rating") else "")
+            for r in rows[:5])
+        out.append(_new_field("tophap_schools", rows, f"{len(rows)} 所学校：" + disp,
+                              confidence="中", note="TopHap 学校数据（公共记录）"))
 
-    pf = g("preForeclosure", "pre_foreclosure", "foreclosureFilings") or []
+    pf = g("preforeclosure") or []
     if isinstance(pf, list) and pf:
         out.append(_new_field("pre_foreclosure", pf, f"{len(pf)} 条预警记录",
                               note="TopHap 法拍预警（公共记录）；有记录=硬风险信号"))
-
-    rent = g("rentEstimate", "rent_estimate")
-    rent_m = _num(rent.get("monthly") if isinstance(rent, dict) else rent)
-    if rent_m is not None:
-        out.append(_new_field("monthly_rent", rent_m, f"${rent_m:,.0f}/月",
-                              confidence="低",
-                              note="TopHap 算法租金估算，仅参考；以 1007/实测租金为准"))
     return [f for f in out if f]
 
 
 def _map_cma(rec: dict) -> list[dict]:
-    """get_property_cma → 可比成交列表（可信度=中，recorded sales 口径）。"""
+    """get_property_cma → 可比成交＋年度价格趋势（2026-09-29 对 MCP 实测校准）。"""
     g = _getter(rec or {})
-    comps = g("comparables", "comps", "comparableSales") or []
+    out = []
+    comps = g("comparables") or []
     rows = []
     if isinstance(comps, list):
         for c in comps:
             if not isinstance(c, dict):
                 continue
-            price = _num(c.get("price") or c.get("salePrice"))
+            price = _num(c.get("salePrice"))
             if price is None:
                 continue
+            addr = str(c.get("address", ""))
+            if c.get("city"):
+                addr += f", {c.get('city')}"
             rows.append({
-                "address": str(c.get("address", "")),
+                "address": addr,
                 "price": price,
-                "date": str(c.get("saleDate") or c.get("date") or ""),
+                "date": str(c.get("saleDate") or ""),
+                "price_per_sqft": _num(c.get("pricePerSqft")),
                 "beds": _num(c.get("beds")),
                 "baths": _num(c.get("baths")),
-                "sqft": _num(c.get("sqft") or c.get("livingArea")),
-                "distance_mi": _num(c.get("distance") or c.get("distanceMi")),
+                "sqft": _num(c.get("sqft")),
+                "year_built": _num(c.get("yearBuilt")),
+                "distance_mi": _num(c.get("distanceMiles")),
             })
-    if not rows:
-        return []
-    disp = "; ".join(f"{r['address']} ${_num(r['price']):,.0f}（{r['date']}）"
-                     for r in rows[:6])
-    f = _new_field("tophap_comps", rows, f"{len(rows)} 套可比成交：" + disp,
-                   confidence="中",
-                   note="TopHap CMA（recorded sales 口径）；建议在工作台按距离/日期/面积筛选后重跑比较法")
-    return [f] if f else []
+    if rows:
+        disp = "; ".join(f"{r['address']} ${_num(r['price']):,.0f}（{r['date']}）"
+                         for r in rows[:6])
+        crit = g("criteria") or {}
+        note = "TopHap CMA（recorded sales 口径）"
+        if isinstance(crit, dict) and crit.get("miles"):
+            note += f"；筛选 {crit.get('miles')} 英里内、近 {crit.get('saleDateMonths')} 个月"
+        if g("widened"):
+            note += "；条件已放宽"
+        out.append(_new_field("tophap_comps", rows, f"{len(rows)} 套可比成交：" + disp,
+                              confidence="中", note=note))
+    trend = g("trend") or []
+    trows = []
+    if isinstance(trend, list):
+        for t in trend:
+            if not isinstance(t, dict) or t.get("year") is None:
+                continue
+            med = _num(t.get("medSalePrice"))
+            if med is None:
+                continue
+            trows.append({"year": t["year"], "med_sale_price": med,
+                          "avg_sale_price": _num(t.get("avgSalePrice")),
+                          "sale_count": _num(t.get("homeSaleCount"))})
+    if trows:
+        ta = g("trendArea") or ""
+        disp = "；".join(f"{r['year']} 年中位 ${r['med_sale_price']:,.0f}" for r in trows[-5:])
+        out.append(_new_field("tophap_market_trend", trows, f"{ta}年度中位价：{disp}",
+                              confidence="中", note="TopHap 区域年度成交趋势（recorded sales）"))
+    rurl = g("pdfReportUrl")
+    if rurl:
+        out.append(_new_field("tophap_cma_report_url", str(rurl), "TopHap CMA 报告 PDF",
+                              note="TopHap 生成的 CMA 报告"))
+    return [f for f in out if f]
 
 
 def _map_schools(items: list) -> list[dict]:
@@ -527,7 +616,7 @@ def _map_schools(items: list) -> list[dict]:
         rows.append({
             "name": name,
             "rating": s.get("rating"),
-            "distance_mi": _num(s.get("distance") or s.get("distanceMi")),
+            "distance_mi": _num(s.get("distanceMiles") or s.get("distance") or s.get("distanceMi")),
         })
     if not rows:
         return []
@@ -557,9 +646,9 @@ def _enrich_chain(address: str, log: list) -> tuple[list[dict], str]:
     found = _call_with_arg_styles(TOOL_FIND, address, FIND_ARG_STYLES)
     pid = _extract_property_id(found)
     if not pid:
-        raise MCPError("find_property_by_address 未返回 property_id，无法定位物业")
+        raise MCPError("find_property_by_address 未返回 attomId，无法定位物业")
     used.append(TOOL_FIND)
-    rp._log(log, "TopHap", "ok", f"地址定位成功（property_id={pid[:24]}）")
+    rp._log(log, "TopHap", "ok", f"地址定位成功（attomId={pid[:24]}）")
 
     fields: list[dict] = []
     if TOOL_DETAIL in tools:

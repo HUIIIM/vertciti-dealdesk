@@ -35,26 +35,42 @@ TOOLS9 = ["find_property_by_address", "search_properties", "get_property_detail"
           "search_schools", "get_school_detail", "lookup_area_boundary"]
 
 DETAIL = {
-    "propertyType": "Single Family", "parcelId": "1-234-56",
-    "bedrooms": 4, "bathrooms": 2.5, "livingAreaSqft": 2800,
-    "lotSizeSqft": 6000, "yearBuilt": 1998,
+    "attomId": 169551792, "propType": "Single Family", "propClass": "Residential",
+    "beds": 4, "baths": 2.5, "stories": 2, "sqft": 2800,
+    "lotSqft": 6000, "yearBuilt": 1998, "unitCount": 1,
+    "neighborhood": {"name": "Tampa Heights"},
+    "avmValue": 500000, "avmLow": 450000, "avmHigh": 550000,
+    "taxAmount": 9000, "taxYear": 2025,
+    "assessedValue": 480000, "assessedYear": 2025, "marketValue": 510000,
+    "lastSaleAmount": 440000, "lastSaleDate": "2022-05-01",
+    "floodFemaZone": "X", "loanPositions": [{}, {}],
+    "pdfReportUrl": "https://www.tophap.com/api/reports/property/169551792",
 }
 INSIGHTS = {
-    "estimatedValue": {"value": 500000, "low": 450000, "high": 550000},
-    "tax": {"annualAmount": 9000, "assessedValue": 480000},
-    "salesHistory": [{"date": "2022-05-01", "type": "sale", "price": 440000}],
-    "loans": [{"amount": 350000, "rate": 7.5, "date": "2023-03-01",
-               "lender": "Bank X", "status": "open"}],
-    "ownershipHistory": [{"owner": "Jane Doe", "from": "2015", "to": ""}],
-    "rentEstimate": {"monthly": 3200},
+    "transactions": [{"date": "2022-05-01", "transType": "Resale",
+                      "amount": 440000, "pricePerSqft": 157, "docNumber": "12345"}],
+    "community": {"name": "ZIP 33602", "medianHouseholdIncome": 75000, "crimeIndex": 120},
+    "districtName": "Hillsborough County",
+    "schools": [{"name": "PS 101", "level": "Elementary", "rating": "B",
+                 "distanceMiles": 0.4}],
+    "preforeclosure": [],
 }
 CMA = {"comparables": [
-    {"address": "124 Main St", "price": 495000, "saleDate": "2026-06-01",
-     "beds": 4, "baths": 2, "sqft": 2700, "distance": 0.3},
-    {"address": "130 Main St", "price": 510000, "saleDate": "2026-04-15",
-     "beds": 4, "baths": 2.5, "sqft": 2900, "distance": 0.5},
-]}
-SCHOOLS = {"schools": [{"name": "PS 101", "rating": 8, "distance": 0.4}]}
+    {"address": "124 Main St", "city": "Tampa", "salePrice": 495000,
+     "saleDate": "2026-06-01", "pricePerSqft": 183,
+     "beds": 4, "baths": 2, "sqft": 2700, "yearBuilt": 2000, "distanceMiles": 0.3},
+    {"address": "130 Main St", "city": "Tampa", "salePrice": 510000,
+     "saleDate": "2026-04-15", "pricePerSqft": 176,
+     "beds": 4, "baths": 2.5, "sqft": 2900, "yearBuilt": 1999, "distanceMiles": 0.5},
+], "trend": [
+    {"year": 2023, "medSalePrice": 420000, "avgSalePrice": 450000, "homeSaleCount": 100},
+    {"year": 2024, "medSalePrice": 440000, "avgSalePrice": 470000, "homeSaleCount": 110},
+], "trendArea": "ZIP 33602",
+    "criteria": {"miles": 3, "saleDateMonths": 18, "maxComps": 6},
+    "widened": False,
+    "pdfReportUrl": "https://www.tophap.com/api/reports/property/169551792/cma"}
+SCHOOLS = {"schools": [{"name": "PS 101", "level": "Elementary", "rating": "B",
+                        "distanceMiles": 0.4}]}
 
 
 class FakeResp:
@@ -100,8 +116,10 @@ def make_chain_post(calls, tools9=TOOLS9, fail_first_call_401=False,
                 calls.append(("rpc", f"tools/call:{name}:401"))
                 return FakeResp({}, status=401)
             calls.append(("rpc", f"tools/call:{name}"))
-            payload = {"find_property_by_address": {"property_id": "th_123",
-                                                    "matched_address": "123 Main St"},
+            payload = {"find_property_by_address": {"geocodedAddress": "123 Main St, Tampa, FL 33602",
+                                                    "partialMatch": False,
+                                                    "match": {"attomId": 169551792,
+                                                              "oneLine": "123 Main St, Tampa, FL 33602"}},
                        "get_property_detail": DETAIL,
                        "get_property_insights": INSIGHTS,
                        "get_property_cma": CMA,
@@ -169,7 +187,14 @@ def test_detail_mapping(monkeypatch):
     assert by_key["lot_sf"]["value"] == 6000
     assert by_key["year_built"]["value"] == 1998
     assert by_key["beds"]["value"] == 4
-    assert by_key["parcel_id"]["value"] == "1-234-56"
+    assert by_key["neighborhood"]["value"] == "Tampa Heights"
+    assert by_key["tophap_value"]["value"] == 500000
+    assert by_key["tophap_value"]["confidence"] == "中"
+    assert by_key["tophap_value_range"]["value"] == [450000.0, 550000.0]
+    assert by_key["taxes_annual"]["value"] == 9000
+    assert by_key["tax_assessed_value"]["value"] == 480000
+    assert by_key["market_value"]["value"] == 510000
+    assert by_key["loan_positions"]["value"] == 2
     assert by_key["building_sf"]["confidence"] == "高"
 
 
@@ -178,15 +203,12 @@ def test_insights_mapping(monkeypatch):
     _enable(monkeypatch, calls)
     out = tophap.enrich_address("123 Main St, Tampa, FL 33602")
     by_key = {f["key"]: f for f in out["fields"]}
-    assert by_key["tophap_value"]["value"] == 500000
-    assert by_key["tophap_value"]["confidence"] == "中"
-    assert by_key["tophap_value_range"]["value"] == [450000.0, 550000.0]
-    assert by_key["taxes_annual"]["value"] == 9000
-    assert by_key["tax_assessed_value"]["value"] == 480000
     assert by_key["last_sale_price"]["value"] == 440000
-    assert by_key["open_loans"]["confidence"] == "高"
-    assert "subject-to" in by_key["open_loans"]["note"]
-    assert by_key["monthly_rent"]["confidence"] == "低"
+    assert by_key["last_sale_date"]["value"] == "2022-05-01"
+    assert len(by_key["price_history"]["value"]) == 1
+    assert by_key["tophap_schools"]["value"][0]["name"] == "PS 101"
+    assert by_key["school_district"]["value"] == "Hillsborough County"
+    assert "75000" in by_key["tophap_community"]["display"].replace(",", "")
 
 
 def test_cma_mapping(monkeypatch):
@@ -197,9 +219,12 @@ def test_cma_mapping(monkeypatch):
     comps = by_key["tophap_comps"]
     assert comps["confidence"] == "中"
     assert len(comps["value"]) == 2
-    assert comps["value"][0]["address"] == "124 Main St"
+    assert comps["value"][0]["address"] == "124 Main St, Tampa"
     assert comps["value"][0]["price"] == 495000
     assert "recorded sales" in comps["note"]
+    trend = by_key["tophap_market_trend"]
+    assert len(trend["value"]) == 2
+    assert trend["value"][-1]["med_sale_price"] == 440000
 
 
 def test_schools_best_effort(monkeypatch):
@@ -247,7 +272,7 @@ def test_find_without_property_id_degrades(monkeypatch):
         return FakeResp({"jsonrpc": "2.0", "id": 1, "result": {}})
     monkeypatch.setattr(tophap.httpx, "post", fake_post)
     out = tophap.enrich_address("123 Main St, Tampa, FL 33602")
-    assert out["ok"] is False and "property_id" in out["note"]
+    assert out["ok"] is False and "attomId" in out["note"]
 
 
 # ---------- 401 → 直接降级（不再 refresh） ----------
@@ -368,7 +393,8 @@ def test_merge_keeps_ddg_high_and_adds_tophap_unique(monkeypatch):
     merged = rp.merge_fields(ddg + th["fields"])
     by_key = {f["key"]: f for f in merged}
     assert by_key["building_sf"]["value"] == 2100  # 同可信度 tie，独立网页在前
-    assert "open_loans" in by_key  # TopHap 独有字段并入
+    assert "tophap_comps" in by_key  # TopHap 独有字段并入
+    assert "neighborhood" in by_key  # TopHap 独有字段并入
 
 
 # ---------- status ----------
