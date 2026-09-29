@@ -122,6 +122,6 @@ def render(project: dict) -> str:
 <div class="disclaimer">
 本报告为筛选工具输出，不构成投资建议。所有"估算"数字以标注假设为准，未核实项不得作为决策依据。
 每笔真实交易签约/交割/报税前，必须经持牌本地房地产律师、CPA/税务师、title company 审查。
-评分口径：住宅线 buyer-box.md v2.1；商业线 buyer-box-commercial.md v1.1（2026-09-28）。
+评分口径：住宅线 buyer-box.md v2.3；商业线 buyer-box-commercial.md v1.3（2026-09-28）。
 </div>
 </body></html>"""

@@ -4,13 +4,15 @@ from __future__ import annotations
 
 import os
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import ValidationError
+from pydantic import BaseModel, ConfigDict, ValidationError
 
-from . import db, report, scoring_commercial, scoring_residential, sensitivity
+from . import db, pdf_intake, report, research_pipeline, scoring_commercial, scoring_residential, sensitivity, workbench
+from .data import hpi
 from .models import CommercialInput, ProjectCreate, ResidentialInput
+from .workbench import WbComp, WbProperty, WbResearch, WbScenario
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(BASE_DIR, "..", "static")
@@ -167,6 +169,178 @@ def project_report(pid: int):
         raise HTTPException(404, "project not found")
     p = _with_fresh_score(p)
     return report.render(p)
+
+
+# ---------------- 全面分析工作台 ----------------
+# 纯分析接口：测算 / 估值(估算) / 预测(情景) / 市场调查。
+# 打分仍走现有 /api/score 引擎，本工作台只做字段映射，不改核保逻辑。
+
+class _WbValuateReq(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    property: dict = {}
+    comps: list = []
+    income_noi_annual: float | None = None
+    income_cap_rate_pct: float | None = None
+    comp_weight: float = 0.5
+
+
+class _WbForecastReq(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    base_value: float = 0
+    years: int = 3
+    scenarios: list = []
+
+
+class _WbSeriesReq(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    points: list = []
+
+
+class _WbCsvReq(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    csv: str = ""
+
+
+class _WbScoreReq(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    track: str = "residential"
+    property: dict = {}
+
+
+class _WbResearchReq(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    research: dict = {}
+    valuation: dict | None = None
+    forecast: dict | None = None
+
+
+@app.get("/api/wb/markets")
+def wb_markets():
+    """嵌入的公开房价指数数据：市场列表 + 口径说明 + 公开数据源链接."""
+    return {
+        "markets": hpi.market_list(),
+        "series": {k: (v.get("series") or []) for k, v in hpi.MARKETS.items()},
+        "methodology": hpi.METHODOLOGY,
+        "public_sources": hpi.PUBLIC_SOURCES,
+        "release": hpi.FHFA_RELEASE,
+        "release_date": hpi.FHFA_RELEASE_DATE,
+    }
+
+
+@app.post("/api/wb/metrics")
+def wb_metrics(payload: dict):
+    prop = WbProperty.model_validate(payload.get("property", payload))
+    return {"property": prop.model_dump(), "metrics": workbench.property_metrics(prop)}
+
+
+@app.post("/api/wb/valuate")
+def wb_valuate(req: _WbValuateReq):
+    prop = WbProperty.model_validate(req.property)
+    metrics = workbench.property_metrics(prop)
+    comps = [WbComp.model_validate(c) for c in req.comps]
+    comps_val = workbench.valuate_comps(comps)
+    noi = req.income_noi_annual if req.income_noi_annual is not None else metrics["noi_annual"]
+    income_val = workbench.valuate_income(noi, req.income_cap_rate_pct or 0)
+    rec = workbench.reconcile(comps_val.get("estimate"), income_val.get("value"),
+                              req.comp_weight)
+    return {
+        "metrics": metrics,
+        "comps": comps_val,
+        "income": income_val,
+        "reconciled": rec,
+        "tag": workbench.ESTIMATE_TAG,
+    }
+
+
+@app.post("/api/wb/forecast")
+def wb_forecast(req: _WbForecastReq):
+    scenarios = [WbScenario.model_validate(s) for s in req.scenarios] or [
+        WbScenario(name="conservative", label="保守", annual_rate_pct=1.0),
+        WbScenario(name="base", label="基准", annual_rate_pct=3.0),
+        WbScenario(name="optimistic", label="乐观", annual_rate_pct=5.0),
+    ]
+    return workbench.forecast(req.base_value, scenarios, years=max(1, min(req.years, 10)))
+
+
+@app.post("/api/wb/series")
+def wb_series(req: _WbSeriesReq):
+    return workbench.series_stats(req.points)
+
+
+@app.post("/api/wb/comps/parse")
+def wb_comps_parse(req: _WbCsvReq):
+    return workbench.parse_comps_csv(req.csv)
+
+
+@app.post("/api/wb/score")
+def wb_score(req: _WbScoreReq):
+    """工作台一键打分：字段映射到现有核保模型，走现有打分引擎（逻辑零改动）."""
+    if req.track not in ("residential", "commercial"):
+        raise HTTPException(400, f"unknown track: {req.track}")
+    prop = WbProperty.model_validate(req.property)
+    mapped = workbench.to_scoring_input(prop, req.track)
+    return {"score": score_input(req.track, mapped), "mapped_input": mapped,
+            "note": "打分口径：住宅 buyer-box v2.3 / 商业 buyer-box-commercial v1.3（现有引擎）"}
+
+
+@app.post("/api/wb/research")
+def wb_research(req: _WbResearchReq):
+    r = WbResearch.model_validate(req.research)
+    return workbench.research_payload(r, req.valuation, req.forecast)
+
+
+@app.post("/api/wb/research/report", response_class=HTMLResponse)
+def wb_research_report(req: _WbResearchReq):
+    r = WbResearch.model_validate(req.research)
+    return workbench.render_research_report(workbench.research_payload(r, req.valuation, req.forecast))
+
+
+# ---------------- 智能搜集 intake：地址 / 房源链接 / PDF ----------------
+
+class _WbIntakeReq(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    mode: str = "address"  # address | url
+    text: str = ""
+
+
+@app.post("/api/wb/intake/run")
+def wb_intake_run(req: _WbIntakeReq):
+    """智能搜集：纯地址或房源链接 → 全网公开信息自动搜集.
+
+    慢接口（多次公网抓取，约 30-90 秒）。每个字段带来源/抓取时间/可信度；
+    抓不到标"需手动补"；卖方口径标"卖方口径、待验证"。
+    """
+    if req.mode not in ("address", "url"):
+        raise HTTPException(400, f"unknown mode: {req.mode}")
+    try:
+        return research_pipeline.run(req.mode, req.text)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(500, f"搜集失败：{str(e)[:200]}")
+
+
+@app.post("/api/wb/intake/pdf")
+async def wb_intake_pdf(file: UploadFile = File(...)):
+    """PDF intake：上传房源 flyer/OM/卖方材料 → 文本提取 → 结构化字段.
+
+    全部字段标"卖方材料口径、待独立验证"。
+    """
+    name = file.filename or "upload.pdf"
+    if not name.lower().endswith(".pdf"):
+        raise HTTPException(400, "只接受 PDF 文件")
+    data = await file.read()
+    if len(data) > 20 * 1024 * 1024:
+        raise HTTPException(400, "PDF 超过 20MB 上限")
+    if len(data) < 100:
+        raise HTTPException(400, "文件过小或为空")
+    path = pdf_intake.save_upload(data, name)
+    try:
+        return pdf_intake.run_pdf_upload(path, name)
+    finally:
+        try:
+            import os
+            os.remove(path)
+        except Exception:
+            pass
 
 
 app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")

@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DealDesk · 全面分析工作台</title>
+<link rel="stylesheet" href="/style.css">
+<style>
+.wb { max-width: 1180px; margin: 0 auto; padding: 12px 16px 60px; }
+.wb section.card { background: #fff; border: 1px solid #e2e2e2; border-radius: 10px; padding: 18px 20px; margin: 16px 0; }
+.wb h2.sec { font-size: 18px; margin: 0 0 4px; }
+.wb .sec-sub { color: #666; font-size: 13px; margin-bottom: 12px; }
+.wb .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(215px, 1fr)); gap: 10px 14px; }
+.wb label.f { display: flex; flex-direction: column; font-size: 13px; color: #333; }
+.wb label.f input, .wb label.f select, .wb label.f textarea { margin-top: 4px; padding: 7px 9px; font-size: 14px; border: 1px solid #ccc; border-radius: 6px; }
+.wb table.t { width: 100%; border-collapse: collapse; font-size: 13.5px; margin: 10px 0; }
+.wb table.t th, .wb table.t td { border: 1px solid #ddd; padding: 6px 9px; text-align: left; }
+.wb table.t th { background: #f5f5f5; }
+.wb .btn { background: #1a56db; color: #fff; border: 0; border-radius: 7px; padding: 9px 18px; font-size: 14px; cursor: pointer; margin: 6px 8px 6px 0; }
+.wb .btn.ghost { background: #eee; color: #222; }
+.wb .btn.warn { background: #b45309; }
+.wb .tag { display: inline-block; font-size: 12px; font-weight: 700; border-radius: 4px; padding: 2px 8px; margin-left: 8px; vertical-align: middle; }
+.wb .tag.est { background: #e8f0fe; color: #1a56db; }
+.wb .tag.fc { background: #fef3e2; color: #b45309; }
+.wb .disclaimer { background: #fff8e6; border: 1px solid #f0c36d; border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #7a4a00; margin: 10px 0; }
+.wb .neg { color: #c00; font-weight: 700; } .wb .pos { color: #0a7a2f; font-weight: 700; }
+.wb .mono { font-family: ui-monospace, monospace; font-size: 12.5px; }
+.wb .kv { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; margin: 10px 0; }
+.wb .kv .cell { background: #f8f9fb; border: 1px solid #e5e5e5; border-radius: 7px; padding: 8px 11px; font-size: 13px; }
+.wb .kv .cell b { display: block; font-size: 17px; margin-top: 2px; }
+.wb textarea.code { width: 100%; min-height: 90px; font-family: ui-monospace, monospace; font-size: 12.5px; }
+.wb .bar-row { display: flex; align-items: center; gap: 8px; font-size: 13px; margin: 4px 0; }
+.wb .bar { height: 16px; border-radius: 3px; background: #1a56db; min-width: 2px; }
+.wb .bar.neg { background: #c00; }
+.wb .bar-lbl { width: 130px; color: #444; }
+.wb .bar-val { width: 90px; font-weight: 700; }
+.wb .src { font-size: 12px; color: #777; }
+.wb svg.chart { width: 100%; height: 220px; background: #fafbfc; border: 1px solid #e5e5e5; border-radius: 6px; }
+.wb .topnav { display: flex; justify-content: space-between; align-items: center; }
+.wb .topnav a { color: #1a56db; font-size: 14px; }
+.wb .dim-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (max-width: 700px) { .wb .dim-grid { grid-template-columns: 1fr; } }
+.wb .dim { border: 1px solid #e2e2e2; border-radius: 8px; padding: 10px 12px; }
+.wb .dim h4 { margin: 0 0 6px; font-size: 14px; }
+.wb .dim input { width: 100%; margin: 4px 0; padding: 6px 8px; font-size: 13px; border: 1px solid #ccc; border-radius: 6px; }
+#dropzone.over { border-color: #1a56db; background: #e8f0fe; transform: scale(1.01); }
+.badge { display: inline-block; font-size: 11.5px; font-weight: 700; border-radius: 4px; padding: 2px 7px; }
+.badge.seller { background: #fef3e2; color: #b45309; }
+.badge.manual { background: #f1f1f1; color: #666; }
+.badge.high { background: #e6f4ea; color: #0a7a2f; }
+.badge.mid { background: #e8f0fe; color: #1a56db; }
+.badge.low { background: #f1f1f1; color: #666; }
+.logline { font-size: 12.5px; color: #555; padding: 3px 0; border-bottom: 1px dotted #e5e5e5; }
+.logline .st-ok { color: #0a7a2f; font-weight: 700; } .logline .st-blocked { color: #c00; font-weight: 700; }
+.logline .st-failed { color: #b45309; font-weight: 700; } .logline .st-skipped { color: #888; font-weight: 700; }
+</style>
+</head>
+<body>
+<header class="top">
+  <div>
+    <h1>📊 全面分析工作台</h1>
+    <div class="sub">vertciti 房地产收购部 · 录入 → 测算 → 估值 → 涨幅 → 预测 → 周边 → 市场调查，一站式</div>
+  </div>
+  <div class="sub"><a href="/" style="color:#ffd75e">← 返回打分台</a></div>
+</header>
+<main class="wb">
+
+<section class="card" id="sec-intake">
+  <h2 class="sec">⓪ 智能搜集 <span class="tag est">三合一入口</span></h2>
+  <div class="sec-sub">地址 / 房源链接 / PDF 任选其一 —— pipeline 自动全网搜集并填表。每个字段标注来源＋抓取时间＋可信度；抓不到的标"需手动补"；卖方数字标"卖方口径、待验证"。</div>
+  <div id="dropzone" style="border:2px dashed #9db4e8;border-radius:10px;padding:26px;text-align:center;color:#445;background:#f6f9ff;margin-bottom:12px;transition:all .15s">
+    <div style="font-size:16px">📥 把 <b>PDF</b> 拖到这里上传；或从浏览器地址栏把<b>房源链接</b>拖进来</div>
+    <div class="src" style="margin-top:6px">拖入后即时显示并开始解析 pipeline</div>
+  </div>
+  <div class="grid">
+    <label class="f">① 纯地址<input id="in-address" placeholder="如 123 Main St, Tampa, FL 33602"></label>
+    <label class="f">② 房源链接<input id="in-url" placeholder="粘贴 Zillow / Redfin / Realtor 房源 URL"></label>
+    <label class="f">③ PDF（flyer / OM / 卖方材料）<input id="in-pdf" type="file" accept=".pdf,application/pdf"></label>
+  </div>
+  <button class="btn" onclick="WB.intakeAddress()">🔍 地址搜集</button>
+  <button class="btn" onclick="WB.intakeUrl()">🔗 链接解析＋搜集</button>
+  <button class="btn ghost" onclick="WB.intakePdf()">📄 解析 PDF</button>
+  <span class="src" id="intake-status"></span>
+  <div id="intake-results"></div>
+  <div id="intake-log"></div>
+</section>
+
+<section class="card" id="sec-prop">
+  <div class="topnav"><h2 class="sec">① 物业录入</h2></div>
+  <div class="sec-sub">地址 / 类型 / 面积 / 要价 / 融资结构 / 租金 / 税费与各项费用。填完点「测算」。</div>
+  <div class="grid">
+    <label class="f">地址<input id="p-address" placeholder="如 450 West 44th Street, New York, NY"></label>
+    <label class="f">物业类型<select id="p-type"><option value="residential">住宅</option><option value="commercial">商业</option></select></label>
+    <label class="f">建筑面积 SF<input id="p-sf" type="number" min="0" placeholder="4000"></label>
+    <label class="f">单元数<input id="p-units" type="number" min="1" value="1"></label>
+    <label class="f">要价 / 收购价 $<input id="p-asking" type="number" min="0" placeholder="5000000"></label>
+    <label class="f">首付 $<input id="p-down" type="number" min="0" value="0"></label>
+    <label class="f">贷款余额 $<input id="p-loan" type="number" min="0" placeholder="2980000"></label>
+    <label class="f">年利率 %<input id="p-rate" type="number" min="0" step="0.01" placeholder="8.25"></label>
+    <label class="f">剩余年限<input id="p-term" type="number" min="0" value="30"></label>
+    <label class="f">月租金 $<input id="p-rent" type="number" min="0" placeholder="35000"></label>
+    <label class="f">其他月收入 $<input id="p-other" type="number" min="0" value="0"></label>
+    <label class="f">空置率 %<input id="p-vac" type="number" min="0" max="100" value="8"></label>
+    <label class="f">年房产税 $<input id="p-tax" type="number" min="0" value="0"></label>
+    <label class="f">年保险 $<input id="p-ins" type="number" min="0" value="0"></label>
+    <label class="f">月 HOA $<input id="p-hoa" type="number" min="0" value="0"></label>
+    <label class="f">业主承担水电/月 $<input id="p-util" type="number" min="0" value="0"></label>
+    <label class="f">维修 %（按租金）<input id="p-maint" type="number" min="0" max="100" value="8"></label>
+    <label class="f">CapEx %（按租金）<input id="p-capex" type="number" min="0" max="100" value="8"></label>
+    <label class="f">管理费 %（按实收）<input id="p-mgmt" type="number" min="0" max="100" value="10"></label>
+    <label class="f">交割费用 $<input id="p-closing" type="number" min="0" value="0"></label>
+    <label class="f">初期维修 $<input id="p-repairs" type="number" min="0" value="0"></label>
+    <label class="f">储备月数（按 PITI）<input id="p-resv" type="number" min="0" value="0"></label>
+  </div>
+  <button class="btn" onclick="WB.calcMetrics()">📐 测算</button>
+  <div id="metrics-out"></div>
+</section>
+
+<section class="card" id="sec-val">
+  <h2 class="sec">② 估值<span class="tag est">估算</span></h2>
+  <div class="sec-sub">比较法（手动录入可比成交/挂牌，或 CSV 导入）＋ 收益法（NOI / cap rate）→ 调和估值。所有结果均为估算，不是承诺价格。</div>
+  <h4>可比案例</h4>
+  <div class="grid">
+    <label class="f">地址<input id="c-address" placeholder="可比地址"></label>
+    <label class="f">状态<select id="c-status"><option value="sold">已成交 sold</option><option value="active">在售挂牌 active</option></select></label>
+    <label class="f">价格 $<input id="c-price" type="number" min="0"></label>
+    <label class="f">面积 SF<input id="c-sf" type="number" min="0"></label>
+    <label class="f">距离（英里）<input id="c-dist" type="number" min="0" step="0.1" value="0"></label>
+    <label class="f">调整 %（可±）<input id="c-adj" type="number" step="0.5" value="0"></label>
+    <label class="f">备注<input id="c-note" placeholder="如：需大修 / 新装修"></label>
+  </div>
+  <button class="btn ghost" onclick="WB.addComp()">＋ 添加可比</button>
+  <button class="btn ghost" onclick="WB.clearComps()">清空</button>
+  <div style="margin-top:8px">
+    <div class="src">CSV 导入（表头）：<span class="mono" id="csv-template"></span></div>
+    <textarea class="code" id="csv-input" placeholder="粘贴 CSV（含表头）后点导入"></textarea><br>
+    <button class="btn ghost" onclick="WB.importCsv()">📥 导入 CSV</button>
+    <span class="src" id="csv-msg"></span>
+  </div>
+  <div id="comps-table"></div>
+  <h4>收益法</h4>
+  <div class="grid">
+    <label class="f">年 NOI $（留空=用上面测算值）<input id="v-noi" type="number" min="0"></label>
+    <label class="f">cap rate %<input id="v-cap" type="number" min="0" step="0.01" placeholder="6"></label>
+    <label class="f">调和权重：比较法占比 %<input id="v-w" type="number" min="0" max="100" value="50"></label>
+  </div>
+  <button class="btn" onclick="WB.valuate()">⚖️ 综合估值</button>
+  <div id="val-out"></div>
+</section>
+
+<section class="card" id="sec-hpi">
+  <h2 class="sec">③ 历史涨幅</h2>
+  <div class="sec-sub">嵌入的公开房价指数数据（FHFA / FRED / NAR / BLS，本会话逐条核验）。指数是指数，不是房价；各市场序列新旧不同，已分别标注。</div>
+  <label class="f" style="max-width:320px">选择市场
+    <select id="hpi-market"></select>
+  </label>
+  <div id="hpi-out"></div>
+  <h4>自定义指数序列（粘贴你自己的数据画曲线）</h4>
+  <div class="src">格式：每行 <span class="mono">季度,指数值</span>，如 <span class="mono">2025Q2,512.77</span>（逗号分隔，不含表头）</div>
+  <textarea class="code" id="series-input" placeholder="2025Q2,512.77&#10;2025Q3,510.78"></textarea><br>
+  <button class="btn ghost" onclick="WB.customSeries()">📈 画涨幅曲线</button>
+  <div id="series-out"></div>
+</section>
+
+<section class="card" id="sec-fc">
+  <h2 class="sec">④ 未来三年预测<span class="tag fc">情景预测</span></h2>
+  <div class="disclaimer">⚠️ <b>预测是情景假设，不是承诺。</b>下面三个情景的年涨幅假设均可手动修改；结果仅用于压力测试思路，不构成任何收益承诺。</div>
+  <div class="grid">
+    <label class="f">基准价值 $（默认=调和估值）<input id="f-base" type="number" min="0"></label>
+    <label class="f">保守情景年涨幅 %<input id="f-c" type="number" step="0.5" value="1"></label>
+    <label class="f">基准情景年涨幅 %<input id="f-b" type="number" step="0.5" value="3"></label>
+    <label class="f">乐观情景年涨幅 %<input id="f-o" type="number" step="0.5" value="5"></label>
+  </div>
+  <button class="btn warn" onclick="WB.forecast()">🔮 生成三年情景预测</button>
+  <div id="fc-out"></div>
+</section>
+
+<section class="card" id="sec-nearby">
+  <h2 class="sec">⑤ 周边价格</h2>
+  <div class="sec-sub">汇总第 ② 步录入的可比案例：价格 / $/SF / 面积 / 距离。数据全部来自你的录入，未录入=无数据，绝不编造。</div>
+  <button class="btn ghost" onclick="WB.nearby()">🔄 汇总周边价格</button>
+  <div id="nearby-out"><p class="src">尚未汇总。请先在第 ② 步添加可比案例。</p></div>
+</section>
+
+<section class="card" id="sec-research">
+  <h2 class="sec">⑥ 市场调查</h2>
+  <div class="sec-sub">六个维度：供给 / 需求 / 空置 / 租金趋势 / 人口 / 就业。每项填内容＋来源链接（有来源才算"已核实"）。一键生成可打印报告。</div>
+  <label class="f" style="max-width:320px">调查覆盖市场
+    <select id="r-market"></select>
+  </label>
+  <div class="dim-grid" id="research-dims" style="margin-top:10px"></div>
+  <div style="margin-top:10px">
+    <label class="f">补充说明<textarea id="r-extra" rows="2" style="padding:7px 9px;border:1px solid #ccc;border-radius:6px"></textarea></label>
+  </div>
+  <button class="btn" onclick="WB.research()">📝 生成市场调查</button>
+  <button class="btn ghost" onclick="WB.researchReport()">🖨️ 可打印报告（新窗口）</button>
+  <div id="research-out"></div>
+  <h4>公开数据源（点击直达原文）</h4>
+  <div id="sources-out"></div>
+</section>
+
+<section class="card" id="sec-score">
+  <h2 class="sec">⑦ 一键打分</h2>
+  <div class="sec-sub">把本工作台录入的物业映射到现有核保引擎打分（住宅 buyer-box v2.3 / 商业 v1.3）。映射只填字段，打分逻辑零改动。</div>
+  <label class="f" style="max-width:320px">赛道
+    <select id="s-track"><option value="residential">住宅</option><option value="commercial">商业</option></select>
+  </label><br>
+  <button class="btn" onclick="WB.score()">🎯 打分</button>
+  <div id="score-out"></div>
+</section>
+
+</main>
+<script src="/workbench.js"></script>
+</body>
+</html>
