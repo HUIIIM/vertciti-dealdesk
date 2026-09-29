@@ -364,7 +364,56 @@ WB.intakePdf = async function () {
   }
 };
 
-/* 拖拽：PDF 文件 / 链接（地址栏拖入）/ 纯文本地址 */
+/* 截图 intake：上传房源页截图 → pending 队列 → 视觉提取（约10分钟） */
+WB.intakeImage = async function (file) {
+  const f = file || $('#in-img').files[0];
+  if (!f) { alert('请先选择截图文件'); return; }
+  $('#intake-status').textContent = `⏳ 上传截图《${f.name}》中…`;
+  try {
+    const fd = new FormData(); fd.append('file', f, f.name);
+    const r = await fetch('/api/wb/intake/image', {method: 'POST', body: fd});
+    if (!r.ok) throw new Error((await r.text()).slice(0, 200));
+    const d = await r.json();
+    $('#intake-status').innerHTML = `✅ ${esc(d.message || '已收到截图')}（任务 ${esc(d.task_id.slice(0, 8))}…）`;
+    WB.refreshScreenshots();
+  } catch (e) {
+    $('#intake-status').innerHTML = `<span class="neg">截图上传失败：${esc(e.message)}</span>`;
+  }
+};
+
+WB.refreshScreenshots = async function () {
+  const box = $('#screenshot-tasks');
+  try {
+    const r = await fetch('/api/wb/intake/pending');
+    if (!r.ok) throw new Error((await r.text()).slice(0, 200));
+    const d = await r.json();
+    const tasks = d.tasks || [];
+    if (!tasks.length) { box.innerHTML = ''; return; }
+    const badge = s => s === 'done' ? '<span class="badge">✅ 已提取</span>'
+      : s === 'failed' ? '<span class="badge seller">❌ 提取失败</span>'
+      : '<span class="badge manual">⏳ 提取中</span>';
+    box.innerHTML = '<h4>🖼️ 截图提取任务</h4><table class="t"><tr><th>截图</th><th>收到时间</th><th>状态</th><th></th></tr>'
+      + tasks.map(t => `<tr><td>${esc(t.filename)}</td><td class="src">${esc(t.received_at)}</td>`
+        + `<td>${badge(t.status)}${t.note ? ` <span class="src">${esc(t.note)}</span>` : ''}</td>`
+        + `<td>${t.has_result ? `<button class="btn ghost" onclick="WB.loadScreenshotResult('${t.task_id}')">载入结果</button>` : ''}</td></tr>`).join('')
+      + '</table><p class="src">截图字段标"截图提取、待验证"，须独立验证后方可用于估值/打分。</p>';
+  } catch (e) {
+    box.innerHTML = `<span class="neg">读取截图任务失败：${esc(e.message)}</span>`;
+  }
+};
+
+WB.loadScreenshotResult = async function (taskId) {
+  $('#intake-status').textContent = '⏳ 载入截图提取结果…';
+  try {
+    const r = await fetch('/api/wb/intake/extracted/' + encodeURIComponent(taskId));
+    if (!r.ok) throw new Error((await r.text()).slice(0, 200));
+    WB.renderIntake(await r.json());
+  } catch (e) {
+    $('#intake-status').innerHTML = `<span class="neg">载入失败：${esc(e.message)}</span>`;
+  }
+};
+
+/* 拖拽：PDF / 截图 / 链接（地址栏拖入）/ 纯文本地址 */
 WB.initDropzone = function () {
   const z = document.getElementById('dropzone');
   if (!z) return;
@@ -373,13 +422,20 @@ WB.initDropzone = function () {
   z.addEventListener('drop', e => {
     const dt = e.dataTransfer;
     if (dt.files && dt.files.length) {
-      const pdf = [...dt.files].find(f => /\.pdf$/i.test(f.name));
-      const file = pdf || dt.files[0];
-      $('#intake-status').textContent = `⏳ 收到文件《${file.name}》，开始解析…`;
-      const input = $('#in-pdf');
-      const dTrans = new DataTransfer(); dTrans.items.add(file); input.files = dTrans.files;
-      if (pdf) WB.intakePdf();
-      else $('#intake-status').innerHTML = '<span class="neg">只接受 PDF 文件（收到：' + esc(file.name) + '）</span>';
+      const files = [...dt.files];
+      const pdf = files.find(f => /\.pdf$/i.test(f.name));
+      const img = files.find(f => /\.(png|jpe?g|webp)$/i.test(f.name));
+      const file = pdf || img || files[0];
+      if (pdf) {
+        $('#intake-status').textContent = `⏳ 收到文件《${file.name}》，开始解析…`;
+        const input = $('#in-pdf');
+        const dTrans = new DataTransfer(); dTrans.items.add(file); input.files = dTrans.files;
+        WB.intakePdf();
+      } else if (img) {
+        WB.intakeImage(img);
+      } else {
+        $('#intake-status').innerHTML = '<span class="neg">只接受 PDF 或截图（png/jpg/webp），收到：' + esc(file.name) + '</span>';
+      }
       return;
     }
     const uri = dt.getData('text/uri-list') || dt.getData('text/x-moz-url') || '';
@@ -398,7 +454,7 @@ WB.initDropzone = function () {
 
 /* ---------- 初始化 ---------- */
 WB.init = async function () {
-  WB.renderComps(); WB.renderDims(); WB.initDropzone();
+  WB.renderComps(); WB.renderDims(); WB.initDropzone(); WB.refreshScreenshots();
   try {
     const r = await fetch('/api/wb/markets'); WB.markets = await r.json();
     const opts = WB.markets.markets.map(m => `<option value="${m.key}">${esc(m.label)}（${esc(m.geo)}）</option>`).join('');

@@ -9,7 +9,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, ValidationError
 
-from . import db, pdf_intake, report, research_pipeline, scoring_commercial, scoring_residential, sensitivity, workbench
+from . import db, image_intake, pdf_intake, report, research_pipeline, scoring_commercial, scoring_residential, sensitivity, workbench
 from .data import hpi
 from .models import CommercialInput, ProjectCreate, ResidentialInput
 from .workbench import WbComp, WbProperty, WbResearch, WbScenario
@@ -341,6 +341,41 @@ async def wb_intake_pdf(file: UploadFile = File(...)):
             os.remove(path)
         except Exception:
             pass
+
+
+# ---------------- 截图 intake：房源页截图 → pending 队列 → cron 视觉提取 ----------------
+
+@app.post("/api/wb/intake/image")
+async def wb_intake_image(file: UploadFile = File(...)):
+    """截图 intake：上传房源页截图（png/jpg/webp）→ 存入 pending 队列.
+
+    视觉提取由定时 watcher 完成（约10分钟内），结果经
+    GET /api/wb/intake/pending 查询、GET /api/wb/intake/extracted/{task_id} 取回。
+    全部字段标"截图提取、待验证"。
+    """
+    name = file.filename or "screenshot.png"
+    data = await file.read()
+    try:
+        return image_intake.save_screenshot(data, name)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.get("/api/wb/intake/pending")
+def wb_intake_pending():
+    """列出截图提取任务（pending/done/failed）。"""
+    return {"tasks": image_intake.list_tasks()}
+
+
+@app.get("/api/wb/intake/extracted/{task_id}")
+def wb_intake_extracted(task_id: str):
+    """取回某截图任务的视觉提取结果（renderIntake 兼容格式）。"""
+    try:
+        return image_intake.get_extracted(task_id)
+    except FileNotFoundError:
+        raise HTTPException(404, "提取结果尚未生成，请稍后刷新")
+    except ValueError as e:
+        raise HTTPException(400, str(e))
 
 
 app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")

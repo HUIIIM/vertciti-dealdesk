@@ -267,3 +267,81 @@ def test_intake_pdf_endpoint_ok():
     assert not d.get("error"), d.get("error")
     by_key = {f["key"]: f for f in d["fields"]}
     assert by_key["asking_price"]["value"] == 485000
+
+
+# ---------------- 截图 intake ----------------
+from app import image_intake  # noqa: E402
+
+PNG_1x1 = (
+    b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"
+    b"\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDATx\x9cc\xf8\x0f\x00"
+    b"\x00\x01\x01\x00\x05\x18\xd8N\x00\x00\x00\x00IEND\xaeB`\x82"
+)
+JPG_MIN = b"\xff\xd8\xff\xe0\x00\x10JFIF\x00" + b"\x00" * 300
+
+
+def _tmp_pending(monkeypatch, tmp_path):
+    monkeypatch.setattr(image_intake, "PENDING_DIR", str(tmp_path / "pending"))
+
+
+def test_image_upload_ok(monkeypatch, tmp_path):
+    _tmp_pending(monkeypatch, tmp_path)
+    r = client.post("/api/wb/intake/image",
+                    files={"file": ("shot.png", io.BytesIO(PNG_1x1), "image/png")})
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert d["status"] == "pending" and len(d["task_id"]) == 32
+
+
+def test_image_reject_ext(monkeypatch, tmp_path):
+    _tmp_pending(monkeypatch, tmp_path)
+    r = client.post("/api/wb/intake/image",
+                    files={"file": ("a.txt", io.BytesIO(b"x" * 500), "text/plain")})
+    assert r.status_code == 400
+
+
+def test_image_reject_bad_magic(monkeypatch, tmp_path):
+    _tmp_pending(monkeypatch, tmp_path)
+    r = client.post("/api/wb/intake/image",
+                    files={"file": ("fake.png", io.BytesIO(b"not an image" * 50), "image/png")})
+    assert r.status_code == 400
+
+
+def test_image_reject_too_big(monkeypatch, tmp_path):
+    _tmp_pending(monkeypatch, tmp_path)
+    big = JPG_MIN + b"\x00" * (15 * 1024 * 1024)
+    r = client.post("/api/wb/intake/image",
+                    files={"file": ("big.jpg", io.BytesIO(big), "image/jpeg")})
+    assert r.status_code == 400
+
+
+def test_pending_and_extracted_flow(monkeypatch, tmp_path):
+    _tmp_pending(monkeypatch, tmp_path)
+    r = client.post("/api/wb/intake/image",
+                    files={"file": ("shot.jpg", io.BytesIO(JPG_MIN), "image/jpeg")})
+    tid = r.json()["task_id"]
+    # 404 before extraction
+    r2 = client.get(f"/api/wb/intake/extracted/{tid}")
+    assert r2.status_code == 404
+    # 非法 task_id 防穿越
+    r3 = client.get("/api/wb/intake/extracted/..%2f..%2fetc")
+    assert r3.status_code in (400, 404)
+    # 模拟 watcher 写回
+    import json as _json
+    ep = os.path.join(image_intake.PENDING_DIR, tid, "extracted.json")
+    with open(ep, "w", encoding="utf-8") as f:
+        _json.dump({"mode": "screenshot", "filename": "shot.jpg",
+                    "fields": [{"key": "asking_price", "label": "挂牌价", "value": 485000,
+                                "display": "$485,000", "source": "screenshot",
+                                "fetched_at": "2026-09-29 01:00", "confidence": "中",
+                                "seller_claimed": True, "claim_label": "截图提取",
+                                "note": "待验证", "status": "filled"}],
+                    "fetched_at": "2026-09-29 01:00",
+                    "claim_notice": "截图提取、待验证"}, f)
+    r4 = client.get(f"/api/wb/intake/extracted/{tid}")
+    assert r4.status_code == 200
+    assert r4.json()["fields"][0]["value"] == 485000
+    r5 = client.get("/api/wb/intake/pending")
+    assert r5.status_code == 200
+    tasks = r5.json()["tasks"]
+    assert any(t["task_id"] == tid and t["status"] == "done" for t in tasks)
