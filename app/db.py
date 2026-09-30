@@ -7,12 +7,20 @@ import os
 import sqlite3
 import time
 
-DB_PATH = os.environ.get("DEALDESK_DB", os.path.join(os.path.dirname(__file__), "..", "dealdesk.db"))
-DB_PATH = os.path.abspath(DB_PATH)
+def _db_path() -> str:
+    """连接时懒读环境变量。
+
+    不在 import 时求值：pytest collection 阶段各测试模块 import 顺序不定，
+    任何时刻覆盖 DEALDESK_DB（conftest / setUpClass / monkeypatch）都能生效，
+    测试数据永远写不到开发库 dealdesk.db。
+    """
+    return os.path.abspath(
+        os.environ.get("DEALDESK_DB", os.path.join(os.path.dirname(__file__), "..", "dealdesk.db"))
+    )
 
 
 def _conn() -> sqlite3.Connection:
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(_db_path())
     conn.row_factory = sqlite3.Row
     return conn
 
