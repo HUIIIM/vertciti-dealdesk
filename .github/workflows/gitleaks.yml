@@ -1,0 +1,23 @@
+# Source: gitleaks/gitleaks-action (GitHub Marketplace) usage example.
+# Gitleaks detects hardcoded secrets in git history and new commits. Free on all repos.
+name: Secret scan (gitleaks)
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "0 4 * * *"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  scan:
+    name: gitleaks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v3
+        with:
+          config-path: .gitleaks.toml

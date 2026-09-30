@@ -1,0 +1,5 @@
+title = "vertciti-dealdesk gitleaks config"
+
+[allowlist]
+description = "前端表单字段定义 key（{key: 'xxx', label: ...}）误报，非 API 密钥（2026-09-30 人工复核）"
+regexes = ['''key:\s*'[a-z0-9_]{8,}'\s*,\s*label:''']

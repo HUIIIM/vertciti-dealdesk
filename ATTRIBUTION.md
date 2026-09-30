@@ -17,5 +17,4 @@ DealDesk 为 vertciti 自研代码（前后端均为独立重写，未复制任�
 实现为 clean-room 重写）：ronnytiburcio/creative-finance-deal-structurer（wrap/subject-to
 并行测算逻辑）、gmlesher/rental-property-calculator（分级思想）、stanjdev/realyzer（产品形态参考）。
 
-详细学习记录见：
-`../deliverables/real-estate-acquisitions/deal-scout/tool-study-notes.md`
+详细学习记录为内部工作笔记，不随仓库发布。
