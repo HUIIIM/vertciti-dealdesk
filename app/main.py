@@ -5,11 +5,11 @@ from __future__ import annotations
 import os
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, ValidationError
 
-from . import db, image_intake, pdf_intake, report, research_pipeline, scoring_commercial, scoring_residential, sensitivity, workbench
+from . import db, image_intake, pdf_intake, pdf_report, report, research_pipeline, scoring_commercial, scoring_residential, sensitivity, workbench
 from .data import hpi
 from .models import CommercialInput, ProjectCreate, ResidentialInput
 from .workbench import WbComp, WbProperty, WbResearch, WbScenario
@@ -176,6 +176,23 @@ def project_report(pid: int):
         raise HTTPException(404, "project not found")
     p = _with_fresh_score(p)
     return report.render(p)
+
+
+@app.get("/api/projects/{pid}/pdf")
+def project_pdf(pid: int):
+    """一键生成投资筛选备忘录 PDF（服务端直出，无需浏览器打印）。"""
+    p = db.get_project(pid)
+    if not p:
+        raise HTTPException(404, "project not found")
+    p = _with_fresh_score(p)
+    pdf_bytes = pdf_report.build_pdf(p)
+    # Content-Disposition 文件名用 ASCII 安全（中文名放 filename* UTF-8）
+    safe_ascii = f"DealDesk-memo-{pid}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={safe_ascii}"},
+    )
 
 
 # ---------------- 全面分析工作台 ----------------

@@ -790,7 +790,7 @@ async function renderDetail(app) {
   }
   app.innerHTML = `
     <div class="toolbar"><button class="btn" data-act="back">← 返回仪表盘</button><span class="spacer"></span>
-      <button class="btn" data-act="report" data-id="${p.id}">打印报告</button>
+      <button class="btn primary" data-act="pdf" data-id="${p.id}">⬇ 生成 PDF 报告</button>
       <button class="btn" data-act="edit" data-id="${p.id}">编辑</button>
       <button class="btn danger" data-act="del" data-id="${p.id}">删除</button></div>
     <div class="dhero"><div class="dhero-top">
@@ -912,7 +912,12 @@ document.addEventListener('click', async e => {
       const p = await api('GET', '/api/projects/' + id);
       state.track = p.track; state.view = 'detail'; state.detail = p; state.detailTab = 'overview'; render();
     }
-    else if (act === 'report') { window.open('/api/projects/' + id + '/report', '_blank'); }
+    else if (act === 'pdf') {
+      const a = document.createElement('a');
+      a.href = '/api/projects/' + id + '/pdf';
+      a.download = '';
+      document.body.appendChild(a); a.click(); a.remove();
+    }
     else if (act === 'del') {
       if (confirm('确定删除该项目吗？')) {
         await api('DELETE', '/api/projects/' + id);
