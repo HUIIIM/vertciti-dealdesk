@@ -256,3 +256,37 @@ def test_manual_noi_override_f2_pattern():
     r2 = compute_all(example_39_main())
     assert r2["analysis"]["noi_sources"]["projected_noi"] == "cashflow"
     assert approx(r2["analysis"]["projected_noi"], 2000000.0)
+
+
+def test_exit_fee_locked_at_4pct():
+    # 2026-10-01 Miao 决定：退出费锁定 4%，不开放调节
+    d = example_39_main()
+    d["analysis"]["exit_fee_pct"] = 0.10  # 试图覆盖 → 应被忽略
+    r = compute_all(d)
+    assert approx(r["analysis"]["exit_fee_pct"], 0.04)
+    assert approx(r["analysis"]["exit_fees"], r["analysis"]["projected_resale"] * 0.04)
+
+
+def test_tenant_cam_parking_auto_flow():
+    # 模板 T/U 列接通：租户级月 CAM/停车 → 现金流年合计
+    d = default_inputs()
+    d["tenants"] = [
+        {"suite": "1", "tenant": "A", "sf": 1000, "monthly_rent": 1000,
+         "monthly_cam": 100, "monthly_parking": 50},
+        {"suite": "2", "tenant": "B", "sf": 1000, "monthly_rent": 1000},
+    ]
+    r = compute_all(d)
+    rr = r["rent_roll"]
+    assert approx(rr["total_annual_cam"], 1200.0)
+    assert approx(rr["total_annual_parking"], 600.0)
+    # 空=自动取租户表
+    assert approx(r["historical"]["cam_recovery"], 1200.0)
+    assert approx(r["historical"]["parking_income"], 600.0)
+    assert r["historical"]["income_sources"]["cam_recovery"] == "rent_roll"
+    # 手填=覆盖
+    d["historical"]["cam_recovery"] = 5000
+    r2 = compute_all(d)
+    assert approx(r2["historical"]["cam_recovery"], 5000.0)
+    assert r2["historical"]["income_sources"]["cam_recovery"] == "manual"
+    assert approx(r2["historical"]["total_potential"],
+                  r2["historical"]["base_rents"] + 5000 + 600)

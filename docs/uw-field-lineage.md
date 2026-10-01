@@ -100,7 +100,7 @@
 | F16 | Market Cap rate | 0.04 [手] | 0.05 [手] | 输入 |
 | F17 | Projected Resale Value | `=F15/F16` 50,000,000 | `=F15/F16` 12,320,000 | [算] |
 | F18 | Acquisition fees | `=SUM(C14:C17)` 1,284,000 | `=SUM(C14:C17)` 975,000 | [算]（注意：是 C14:C17 四项之和）|
-| F19 | Exit fees (4%) | `=F17*0.04` 2,000,000 | `=F17*0.04` 492,800 | [算]（4% 硬编码在公式里）|
+| F19 | Exit fees (4%) | `=F17*0.04` 2,000,000 | `=F17*0.04` 492,800 | [算]（4% 硬编码在公式里；**2026-10-01 Miao 决定锁定为基础设施，不开放调节**）|
 | F20 | Net Gains before taxes | `=F17-(C13+F18+F19)` 4,716,000 | 同式 1,852,200 | [算] |
 | F21 | Return on investment | `=F20/C21` 33.97% | `=F20/C21` 50.40% | [算] |
 
@@ -136,7 +136,9 @@ Cash Flow→Analysis 有**四个手工断点**（F13/F15/F23/F24/I23/I24），�
 | B9 链 Rent Roll | `base_rents` 默认取 `total_annual_lease`（历史），预测取 `total_annual_uw` |
 | Analysis 四手工断点 | `underwritten_noi`/`projected_noi`/`inplace_noi_cf` 三输入，空=自动取现金流；`noi_sources` 标记血缘 |
 | C26 "IO" 文本无公式分支 | 引擎增强：`amort_type` IO/AMORTIZING 真切换 |
-| F19 4% 硬编码 | `exit_fee_pct` 可调，默认 0.04 |
+| F19 4% 硬编码 | **2026-10-01 Miao 决定锁定**：引擎硬编码 0.04，不开放调节（与模板一致）|
+| T/U 列（租户 CAM/停车） | 租户表新增月 CAM / 月停车费输入；年合计自动流入现金流双栏（空=自动，手填=覆盖，`income_sources` 标记血缘）|
+| 空置面积死数据 | 空置面积输入旁显示隐含空置率，一键填入两栏空置/坏账损失 %（仍可手工覆盖）|
 
 ## 5. 待验证 / 诚实标记
 

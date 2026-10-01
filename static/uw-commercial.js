@@ -28,17 +28,22 @@ function rentRoll(tenants, vacantSf) {
   const rows = (tenants || []).map((t) => {
     const sf = f(t.sf), monthly = f(t.monthly_rent);
     const annual = monthly * 12;
+    const mCam = f(t.monthly_cam), mPkg = f(t.monthly_parking);
     const uw = t.underwritten_annual === "" || t.underwritten_annual == null ? annual : f(t.underwritten_annual);
     return {
       suite: t.suite || "", tenant: t.tenant || "", sf, monthly_rent: monthly,
       monthly_per_sf: div(monthly, sf), annual_rent: annual,
       annual_per_sf: div(annual, sf), underwritten_annual: uw, uw_per_sf: div(uw, sf),
+      monthly_cam: mCam, monthly_parking: mPkg,
+      annual_cam: mCam * 12, annual_parking: mPkg * 12,
     };
   });
   const totalSf = rows.reduce((s, r) => s + r.sf, 0);
   const totalMonthly = rows.reduce((s, r) => s + r.monthly_rent, 0);
   const totalLease = rows.reduce((s, r) => s + r.annual_rent, 0);
   const totalUw = rows.reduce((s, r) => s + r.underwritten_annual, 0);
+  const totalCam = rows.reduce((s, r) => s + r.annual_cam, 0);
+  const totalPkg = rows.reduce((s, r) => s + r.annual_parking, 0);
   const vac = f(vacantSf), propSf = totalSf + vac;
   rows.forEach((r) => {
     r.pct_lease = div(r.annual_rent, totalLease);
@@ -47,13 +52,19 @@ function rentRoll(tenants, vacantSf) {
   return {
     tenants: rows, total_sf_existing: totalSf, total_monthly: totalMonthly,
     total_annual_lease: totalLease, total_annual_uw: totalUw,
+    total_annual_cam: totalCam, total_annual_parking: totalPkg,
     vacant_sf: vac, total_sf_property: propSf, occupancy: div(totalSf, propSf),
   };
 }
 
-function scenario(inp, baseRents, netSf, purchase) {
+function scenario(inp, baseRents, netSf, purchase, autoCam, autoPkg) {
   inp = inp || {};
-  const camRec = f(inp.cam_recovery), parking = f(inp.parking_income), other = f(inp.other_income);
+  // 模板 T/U 列接通：空=自动取租户表明细，手填=覆盖
+  const camMan = f(inp.cam_recovery), pkgMan = f(inp.parking_income);
+  const camRec = camMan || f(autoCam), parking = pkgMan || f(autoPkg);
+  const other = f(inp.other_income);
+  const camSrc = camMan ? "manual" : (f(autoCam) ? "rent_roll" : "none");
+  const pkgSrc = pkgMan ? "manual" : (f(autoPkg) ? "rent_roll" : "none");
   const totalPotential = baseRents + camRec + parking + other;
   const vacPct = f(inp.vacancy_pct);
   const vacLoss = totalPotential * vacPct;
@@ -65,6 +76,7 @@ function scenario(inp, baseRents, netSf, purchase) {
   const ti = f(inp.tenant_improvements), capex = f(inp.capex), lc = f(inp.leasing_commissions);
   return {
     base_rents: baseRents, cam_recovery: camRec, parking_income: parking, other_income: other,
+    income_sources: { cam_recovery: camSrc, parking_income: pkgSrc },
     total_potential: totalPotential, vacancy_pct: vacPct, vacancy_loss: vacLoss, egi,
     expenses, total_expenses: totalExp, noi,
     tenant_improvements: ti, capex, leasing_commissions: lc,
@@ -104,7 +116,7 @@ function irrOf(flows) {
 function computeExit(a, pro, loanBal, rate, amortType, amortYears, annualDebt, netLiq) {
   const holdYears = Math.round(f(a.hold_years, 5));
   const growth = f(a.noi_growth, 0.02), exitCap = f(a.exit_cap_rate, 0.05);
-  const exitFeePct = f(a.exit_fee_pct, 0.04), abate = f(a.abatements);
+  const exitFeePct = 0.04, abate = f(a.abatements);  // 模板固定 4%，2026-10-01 Miao 决定锁定
   if (holdYears <= 0 || netLiq <= 0)
     return { hold_years: holdYears, irr: 0, equity_multiple: 0, sale_price: 0, sale_proceeds: 0, remaining_loan: 0 };
   const baseNoi = pro.noi, flows = [-netLiq];
@@ -142,7 +154,7 @@ function computeAnalysis(a, hist, pro) {
   const marketCap = f(a.market_cap_rate);
   const resale = div(prNoi, marketCap);
   const acqFees = repairs + reserve + lenderFees + closing;
-  const exitFeePct = f(a.exit_fee_pct, 0.04);
+  const exitFeePct = 0.04;  // 模板固定 4%，2026-10-01 Miao 决定锁定
   const exitFees = resale * exitFeePct;
   const netGains = resale - (purchase + acqFees + exitFees);
   const abate = f(a.abatements);
@@ -181,8 +193,8 @@ function computeAll(data) {
   const netSf = f(prop.net_rentable_sf);
   const rent = rentRoll(data.tenants, data.vacant_sf);
   const purchase = f((data.analysis || {}).purchase_price);
-  const hist = scenario(data.historical, rent.total_annual_lease, netSf, purchase);
-  const pro = scenario(data.proforma, rent.total_annual_uw, netSf, purchase);
+  const hist = scenario(data.historical, rent.total_annual_lease, netSf, purchase, rent.total_annual_cam, rent.total_annual_parking);
+  const pro = scenario(data.proforma, rent.total_annual_uw, netSf, purchase, rent.total_annual_cam, rent.total_annual_parking);
   const analysis = computeAnalysis(data.analysis, hist, pro);
   const propOut = Object.assign({}, prop);
   propOut.parking_per_1000sf = div(f(prop.parking_spaces), netSf / 1000); // 模板公式 =F6/(F4/1000)
@@ -302,6 +314,8 @@ function renderRentTable(flash) {
       `<td class="calc" data-p="annual_per_sf">${money2(r.annual_per_sf)}</td>` +
       `<td><input class="cell-in sm" type="number" data-t="underwritten_annual" data-i="${i}" value="${num(r.underwritten_annual)}" title="包租年租（预测口径用）"></td>` +
       `<td class="calc" data-p="uw_per_sf">${money2(r.uw_per_sf)}</td>` +
+      `<td><input class="cell-in sm" type="number" data-t="monthly_cam" data-i="${i}" value="${num(r.monthly_cam)}" title="月 CAM（模板 T 列）"></td>` +
+      `<td><input class="cell-in sm" type="number" data-t="monthly_parking" data-i="${i}" value="${num(r.monthly_parking)}" title="月停车费（模板 U 列）"></td>` +
       `<td><button class="del-tenant" data-i="${i}" title="删除">×</button></td>`;
     tb.appendChild(tr);
   });
@@ -309,7 +323,17 @@ function renderRentTable(flash) {
   $("#rentFoot").innerHTML =
     `<tr class="total"><td colspan="2">合计</td><td>${fmtNum(rr.total_sf_existing)}</td>` +
     `<td>${fmtMoney(rr.total_monthly)}</td><td></td><td class="linked" title="→ B 现金流 · 历史基础租金">${fmtMoney(rr.total_annual_lease)}</td>` +
-    `<td></td><td class="linked" title="→ B 现金流 · 预测基础租金">${fmtMoney(rr.total_annual_uw)}</td><td></td><td></td></tr>`;
+    `<td></td><td class="linked" title="→ B 现金流 · 预测基础租金">${fmtMoney(rr.total_annual_uw)}</td><td></td>` +
+    `<td class="linked" title="→ B/C 现金流 · CAM 回收（模板 T 列）">${fmtMoney(rr.total_annual_cam)}</td>` +
+    `<td class="linked" title="→ B/C 现金流 · 停车收入（模板 U 列）">${fmtMoney(rr.total_annual_parking)}</td><td></td></tr>`;
+  // 空置率建议：空置面积隐含比例
+  const vacEl = $("#vacHint");
+  if (vacEl) {
+    const impl = rr.total_sf_property ? rr.vacant_sf / rr.total_sf_property : 0;
+    vacEl.innerHTML = rr.vacant_sf > 0
+      ? `空置 ${fmtNum(rr.vacant_sf)} SF / 总 ${fmtNum(rr.total_sf_property)} SF，隐含空置率 <b>${(impl * 100).toFixed(2)}%</b> <button class="btn sm ghost" id="btnFillVac">填入两栏空置率</button>`
+      : `空置面积为 0`;
+  }
 }
 
 function cfTableHTML(sc, title, linkedNote) {
@@ -321,8 +345,15 @@ function cfTableHTML(sc, title, linkedNote) {
   const inp = (lbl, key, isPct) => {
     const v = state[title][key];
     const disp = isPct ? (v ? (f(v) * 100).toFixed(2) : "") : (v || "");
-    return `<tr><td class="lbl">${lbl}${isPct ? ' <span class="tag new">NEW</span>' : ""}</td>` +
-      `<td><input class="cell-in" type="number" data-cf="${title}" data-k="${key}" data-ispct="${isPct ? 1 : 0}" value="${disp}" step="any"></td></tr>`;
+    let srcTag = "", ph = "";
+    if (sc.income_sources && sc.income_sources[key]) {
+      const s = sc.income_sources[key];
+      if (s === "rent_roll") srcTag = ' <span class="tag live" title="自动取自租户表 T/U 列年合计">租户表自动</span>';
+      else if (s === "manual") srcTag = ' <span class="tag" title="手工输入覆盖租户表">手工</span>';
+      if (!v && (key === "cam_recovery" || key === "parking_income")) ph = ' placeholder="空=租户表自动"';
+    }
+    return `<tr><td class="lbl">${lbl}${srcTag}${isPct ? ' <span class="tag new">NEW</span>' : ""}</td>` +
+      `<td><input class="cell-in" type="number" data-cf="${title}" data-k="${key}" data-ispct="${isPct ? 1 : 0}" value="${disp}" step="any"${ph}></td></tr>`;
   };
   let h = "";
   h += row("基础租金 Base Rents", sc.base_rents, "money", { linked: true, title: linkedNote });
@@ -472,6 +503,14 @@ function bindInputs() {
       state.tenants.splice(+del.dataset.i, 1);
       renderAll(true);
       markDirty();
+      return;
+    }
+    if (e.target.closest("#btnFillVac")) {
+      const rr = result.rent_roll;
+      const impl = rr.total_sf_property ? rr.vacant_sf / rr.total_sf_property : 0;
+      state.historical.vacancy_pct = Math.round(impl * 10000) / 10000;
+      state.proforma.vacancy_pct = Math.round(impl * 10000) / 10000;
+      syncInputs(); renderAll(false); markDirty();
     }
   });
   $("#btnAddTenant").addEventListener("click", () => {
@@ -520,7 +559,7 @@ function blankState() {
     tenants: [{ suite: "1", tenant: "", sf: 0, monthly_rent: 0, underwritten_annual: "" }],
     vacant_sf: 0,
     historical: baseScenario(), proforma: baseScenario(),
-    analysis: { purchase_price: 0, building_repairs: 0, capital_reserve: 0, lender_fees: 0, closing_costs: 0, down_pct: 0.3, rate: 0.06, amort_type: "IO", amort_years: 30, market_cap_rate: 0.04, exit_fee_pct: 0.04, abatements: 0, underwritten_noi: null, projected_noi: null, inplace_noi_cf: null, hold_years: 5, noi_growth: 0.02, exit_cap_rate: 0.05 },
+    analysis: { purchase_price: 0, building_repairs: 0, capital_reserve: 0, lender_fees: 0, closing_costs: 0, down_pct: 0.3, rate: 0.06, amort_type: "IO", amort_years: 30, market_cap_rate: 0.04, abatements: 0, underwritten_noi: null, projected_noi: null, inplace_noi_cf: null, hold_years: 5, noi_growth: 0.02, exit_cap_rate: 0.05 },
   };
 }
 function baseScenario() {
