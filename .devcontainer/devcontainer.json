@@ -1,0 +1,1 @@
+{"forwardPorts":[8100],"image":"mcr.microsoft.com/devcontainers/python:3.12","name":"DealDesk","portsAttributes":{"8100":{"label":"DealDesk","onAutoForward":"openPreview"}},"postCreateCommand":"pip install -q -r requirements.txt","postStartCommand":"bash .devcontainer/start.sh"}
