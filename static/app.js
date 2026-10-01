@@ -1,16 +1,44 @@
-/* DealDesk 前端：住宅/商业双轨 · 全中文 */
-const state = { track: 'residential', view: 'list', projects: [], editingId: null, detail: null, compareIds: [], sortCash: false };
+/* DealDesk v2 · 专业核保仪表盘
+   层级铁律：L0 结论 hero → L1 分区 → L2 KPI → L3 数据 → L4 元信息（折叠）
+   只做加法：评分引擎 / DB / API 契约零改动。新增仅前端 intake 编排（复用 /api/wb/intake/run）。 */
+const state = {
+  view: 'dashboard', track: 'residential', projects: [],
+  editingId: null, detail: null, detailTab: 'overview', compareIds: [],
+  sortKey: 'cash_to_close', sortDir: 1, query: '',
+  intake: null, // {stage, steps, result, error, draftInput, draftSources, track}
+  _fill: null,
+};
 
 const $ = s => document.querySelector(s);
-const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const money = x => x == null ? '—' : '$' + Number(x).toLocaleString('en-US', {maximumFractionDigits: 0});
-const pct1 = x => x == null ? '—' : (x * 100).toFixed(1) + '%';
-const num2 = x => x == null ? '—' : Number(x).toFixed(2);
-const signed = (x, f) => x == null ? '—' : `<span class="${x < 0 ? 'neg' : 'pos'}">${f(x)}</span>`;
-
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const money = x => x == null || isNaN(x) ? '—' : '$' + Number(x).toLocaleString('en-US', {maximumFractionDigits: 0});
+const moneyS = x => x == null || isNaN(x) ? '—' : (x < 0 ? '-' : '') + '$' + Math.abs(Number(x)).toLocaleString('en-US', {maximumFractionDigits: 0});
+const pct1 = x => x == null || isNaN(x) ? '—' : (Number(x) * 100).toFixed(1) + '%';
+const num2 = x => x == null || isNaN(x) ? '—' : Number(x).toFixed(2);
 const numOpts = n => Array.from({length: n + 1}, (_, i) => [i, String(i)]);
+function ago(ts) {
+  const s = Math.max(0, (Date.now() / 1000 - ts));
+  if (s < 3600) return Math.floor(s / 60) + ' 分钟前';
+  if (s < 86400) return Math.floor(s / 3600) + ' 小时前';
+  return Math.floor(s / 86400) + ' 天前';
+}
 
-/* ---------------- 字段 Schema ---------------- */
+async function api(method, path, body, timeoutMs) {
+  const ctl = new AbortController();
+  const t = timeoutMs ? setTimeout(() => ctl.abort(), timeoutMs) : null;
+  try {
+    const r = await fetch(path, {method, headers: {'Content-Type': 'application/json'},
+      body: body ? JSON.stringify(body) : undefined, signal: ctl.signal});
+    if (!r.ok) {
+      const txt = await r.text();
+      try { const j = JSON.parse(txt); throw new Error(j.detail || txt || r.statusText); }
+      catch (e) { if (e.message && e.message !== txt) throw e; throw new Error(txt || r.statusText); }
+    }
+    return r.json();
+  } finally { if (t) clearTimeout(t); }
+}
+
+/* ================= 字段 Schema（与旧版一致，口径零改动） ================= */
 const RES_SECTIONS = [
   {title: '基本信息', fields: [
     {key: 'name', label: '项目名称', type: 'text', def: ''},
@@ -194,30 +222,454 @@ const COM_SECTIONS = [
   ]},
 ];
 
-/* ---------------- API ---------------- */
-async function api(method, path, body) {
-  const r = await fetch(path, {method, headers: {'Content-Type': 'application/json'},
-    body: body ? JSON.stringify(body) : undefined});
-  if (!r.ok) {
-    const t = await r.text();
-    try { const j = JSON.parse(t); throw new Error(j.detail || t || r.statusText); }
-    catch (e) { if (e.message && e.message !== t) throw e; throw new Error(t || r.statusText); }
+/* ================= 测算指标定义 ================= */
+const RES_METRICS = [
+  ['月供 P&I', 'monthly_pi', 'money'], ['月 PITI', 'piti', 'money'],
+  ['月净现金流', 'cash_flow_monthly', 'moneysigned', 1], ['单门现金流', 'cash_flow_per_door', 'moneysigned'],
+  ['Cash-on-cash', 'cash_on_cash', 'pct'], ['DSCR', 'dscr', 'num'],
+  ['Cap rate', 'cap_rate', 'pct'], ['现金总投入', 'cash_invested', 'money'],
+  ['全口径现金需求 cash-to-close', 'cash_to_close', 'money', 1], ['交割净值', 'equity', 'moneysigned'],
+];
+const COM_METRICS = [
+  ['年 NOI', 'noi', 'money', 1], ['入场 cap', 'entry_cap', 'pct'],
+  ['Spread', 'spread_bps', 'bps'], ['DSCR', 'dscr', 'num'],
+  ['月净现金流', 'net_cf_monthly', 'moneysigned', 1], ['Cash-on-cash', 'cash_on_cash', 'pct'],
+  ['年还本付息', 'annual_debt_service', 'money'], ['现金总投入', 'cash_invested', 'money'],
+  ['全口径现金需求 cash-to-close', 'cash_to_close', 'money', 1], ['交割净值', 'equity', 'moneysigned'],
+];
+function fmtVal(kind, x) {
+  if (x == null || (typeof x === 'number' && isNaN(x))) return '<span class="muted">—</span>';
+  if (kind === 'money') return money(x);
+  if (kind === 'moneysigned') {
+    const cls = x < 0 ? 'neg' : (x > 0 ? 'pos' : '');
+    return `<span class="${cls}">${moneyS(x)}</span>`;
   }
-  return r.json();
+  if (kind === 'pct') return pct1(x);
+  if (kind === 'bps') return Math.round(x) + '<small>bps</small>';
+  return num2(x);
 }
 
-/* ---------------- 表单 ---------------- */
-function fieldHtml(f) {
+/* 评分展示：结论行 + 折叠明细（progressive disclosure） */
+function scoreHtml(s, track) {
+  const defs = track === 'residential' ? RES_METRICS : COM_METRICS;
+  const veto = s.vetoes.length
+    ? `<div class="veto-banner bad"><b>⛔ 一票否决（${s.vetoes.length} 项）</b><ul>` +
+      s.vetoes.map(v => `<li>${esc(v.message)}</li>`).join('') + '</ul></div>'
+    : `<div class="veto-banner good"><b>✅ 无否决项</b><span class="muted"> —— 进入分级流程</span></div>`;
+  const dg = (s.downgrades || []).length
+    ? `<div class="veto-banner warn"><b>⚠️ 降级提示（封顶降级，非一票否决）</b><ul>` +
+      s.downgrades.map(v => `<li>${esc(v.message)}</li>`).join('') + '</ul></div>' : '';
+  const metrics = defs.map(([label, key, kind, hero]) =>
+    `<div class="metric${hero ? ' hero' : ''}"><div class="k">${label}</div><div class="v">${fmtVal(kind, s.metrics[key])}</div></div>`).join('');
+  const dims = s.dimensions.map(dm => `
+    <details class="dim"><summary>
+      <span class="dl">${esc(dm.label)}</span>
+      <span class="bar"><div style="width:${Math.min(100, dm.points / dm.weight * 100)}%"></div></span>
+      <span class="dp num">${dm.points} / ${dm.weight}</span><span class="chev">▾</span>
+    </summary><div class="dd">${esc(dm.detail)}</div></details>`).join('');
+  const checks = s.checks.map(c =>
+    `<tr><td>${c.ok ? '<span class="st ok">通过</span>' : '<span class="st bad">不通过</span>'} ${esc(c.label)}</td><td class="muted">${esc(c.note)}</td></tr>`).join('');
+  return `${veto}${dg}
+    <h3 class="sec-t" style="margin-top:18px">测算结果 <span class="micro">保守全口径</span></h3><div class="metrics">${metrics}</div>
+    <h3 class="sec-t" style="margin-top:18px">评分明细 <span class="micro">点击展开依据</span></h3>${dims}
+    <h3 class="sec-t" style="margin-top:18px">阈值对照</h3>
+    <div class="tbl-wrap"><table class="data"><thead><tr><th>检查项</th><th>说明</th></tr></thead><tbody>${checks}</tbody></table></div>`;
+}
+
+function sensHtml(sens, track) {
+  const rentCols = track === 'residential'
+    ? [['cash_flow_monthly', '月净现金流', 'moneysigned'], ['cash_flow_per_door', '单门现金流', 'moneysigned'],
+       ['cash_on_cash_pct', 'CoC %', 'rawpct'], ['dscr', 'DSCR', 'num']]
+    : [['net_cf_monthly', '月净现金流', 'moneysigned'], ['cash_on_cash_pct', 'CoC %', 'rawpct'],
+       ['dscr', 'DSCR', 'num'], ['entry_cap_pct', '入场 cap %', 'rawpct']];
+  const rateCols = track === 'residential'
+    ? [['cash_flow_monthly', '月净现金流', 'moneysigned'], ['cash_on_cash_pct', 'CoC %', 'rawpct'], ['dscr', 'DSCR', 'num']]
+    : [['net_cf_monthly', '月净现金流', 'moneysigned'], ['cash_on_cash_pct', 'CoC %', 'rawpct'], ['dscr', 'DSCR', 'num']];
+  const cell = (kind, v) => {
+    if (v == null) return '<span class="muted">—</span>';
+    if (kind === 'moneysigned') { const cls = v < 0 ? 'neg' : 'pos'; return `<span class="${cls} num">${moneyS(v)}</span>`; }
+    if (kind === 'rawpct') return `<span class="num">${Number(v).toFixed(1)}%</span>`;
+    return `<span class="num">${num2(v)}</span>`;
+  };
+  const table = (title, rows, cols) => `
+    <h3 class="sec-t" style="margin-top:16px">${title}</h3>
+    <div class="tbl-wrap"><table class="data"><thead><tr><th>情景</th>${cols.map(c => `<th class="num">${c[1]}</th>`).join('')}</tr></thead>
+    <tbody>${rows.map(r => `<tr class="${r.label === '+0%' ? 'base' : ''}"><td><b>${r.label}</b></td>` +
+      cols.map(c => `<td class="num">${cell(c[2], r[c[0]])}</td>`).join('') + '</tr>').join('')}</tbody></table></div>`;
+  return `<p class="micro" style="margin:4px 0 0">五情景压力测试：租金 ±10% / 利率 ±2%，基准行高亮。结论先看现金流是否转负、DSCR 是否跌破 1.0。</p>`
+    + table('租金变动情景（±10%）', sens.rent_table, rentCols)
+    + table('利率变动情景（±2%）', sens.rate_table, rateCols);
+}
+
+/* 可信度芯片 */
+function confChip(f) {
+  if (f.status === 'manual_needed') return '<span class="conf manual">需手动补</span>';
+  if (f.seller_claimed) return '<span class="conf seller">卖方口径·待验证</span>';
+  const c = f.confidence;
+  if (c === '高') return '<span class="conf high">高·已验证</span>';
+  if (c === '中') return '<span class="conf mid">中·平台数据</span>';
+  return '<span class="conf low">低·估算</span>';
+}
+
+/* ================= 视图路由 ================= */
+function render() {
+  document.querySelectorAll('#nav button').forEach(b => b.classList.toggle('on', b.dataset.view === state.view));
+  $('#cmpCount').textContent = state.compareIds.length ? state.compareIds.length + '/3' : '';
+  const app = $('#app');
+  if (state.view === 'dashboard') renderDashboard(app);
+  else if (state.view === 'intake') renderIntake(app);
+  else if (state.view === 'form') renderForm(app);
+  else if (state.view === 'detail') renderDetail(app);
+  else if (state.view === 'compare') renderCompare(app);
+  window.scrollTo(0, 0);
+}
+
+async function loadProjects() {
+  state.projects = await api('GET', '/api/projects');
+}
+
+/* ================= 仪表盘 ================= */
+function kpiData() {
+  const ps = state.projects;
+  const a = ps.filter(p => p.score.grade === 'A').length;
+  const veto = ps.filter(p => p.score.grade === '否决' || (p.score.vetoes || []).length > 0).length;
+  const avg = ps.length ? ps.reduce((s, p) => s + (p.score.total || 0), 0) / ps.length : null;
+  const cash = ps.reduce((s, p) => s + (p.cash_to_close || 0), 0);
+  return {n: ps.length, a, veto, avg, cash};
+}
+
+function insightHtml() {
+  const k = kpiData();
+  if (!k.n) return `<div class="insight idle"><div class="ic">📭</div><div>
+    <div class="t">管线是空的，还没有任何项目</div>
+    <div class="d">在顶部粘贴一条房源链接（Zillow / Redfin / LoopNet / Realtor），一键搜集，仪表盘会自动填满。</div></div>
+    <div class="act"><button class="btn primary" data-act="focusIntake">去搜集第一条</button></div></div>`;
+  if (k.veto) {
+    const names = state.projects.filter(p => p.score.grade === '否决' || (p.score.vetoes || []).length)
+      .slice(0, 3).map(p => esc(p.name || p.address || ('#' + p.id))).join('、');
+    return `<div class="insight bad"><div class="ic">⛔</div><div>
+    <div class="t">${k.veto} 个项目触发一票否决${k.a ? `，但有 ${k.a} 个 A 级项目可推进` : '，暂无 A 级项目'}</div>
+    <div class="d">否决：${names}${k.veto > 3 ? ` 等 ${k.veto} 个` : ''}。否决项在详情页逐条列出，先处理否决再谈分级。</div></div></div>`;
+  }
+  if (k.a) return `<div class="insight good"><div class="ic">🎯</div><div>
+    <div class="t">${k.a} 个 A 级项目在管线中，总全口径现金需求 ${money(k.cash)}</div>
+    <div class="d">按 cash-to-close 升序排列，先看最便宜的——资金有限，贵的不先谈。</div></div></div>`;
+  const b = state.projects.filter(p => p.score.grade === 'B').length;
+  return `<div class="insight warn"><div class="ic">👀</div><div>
+    <div class="t">暂无 A 级项目，${b} 个 B 级可继续推进观察</div>
+    <div class="d">B 级进日报收录；C 级只进观察名单。点击行进入详情看差在哪几分。</div></div></div>`;
+}
+
+function sortVal(p, key) {
+  const m = p.score.metrics || {};
+  switch (key) {
+    case 'score': return p.score.total ?? -1;
+    case 'cf': return state.track === 'residential' ? (m.cash_flow_monthly ?? -1e18) : (m.net_cf_monthly ?? -1e18);
+    case 'dscr': return m.dscr ?? -1e18;
+    case 'coc': return m.cash_on_cash ?? -1e18;
+    case 'cash_to_close': return p.cash_to_close ?? 1e18;
+    case 'updated': return p.updated_at ?? 0;
+    default: return 0;
+  }
+}
+
+function pipelineRows() {
+  let ps = state.projects.filter(p => p.track === state.track);
+  const q = state.query.trim().toLowerCase();
+  if (q) ps = ps.filter(p => (p.name + ' ' + p.address).toLowerCase().includes(q));
+  ps = ps.slice().sort((a, b) => (sortVal(a, state.sortKey) - sortVal(b, state.sortKey)) * state.sortDir);
+  return ps;
+}
+
+function renderDashboard(app) {
+  const k = kpiData();
+  const rows = pipelineRows();
+  const th = (label, key, num) => {
+    const arrow = state.sortKey === key ? (state.sortDir === 1 ? ' ▲' : ' ▼') : '';
+    return `<th class="sortable${num ? ' num' : ''}" data-sort="${key}">${label}${arrow}</th>`;
+  };
+  const body = rows.map(p => {
+    const s = p.score, m = s.metrics || {};
+    const cf = state.track === 'residential' ? m.cash_flow_monthly : m.net_cf_monthly;
+    const cfCls = cf == null ? '' : (cf < 0 ? 'neg' : 'pos');
+    const vetoN = (s.vetoes || []).length;
+    return `<tr class="rowlink" data-open="${p.id}">
+      <td><b>${esc(p.name) || '(未命名)'}</b><div class="micro">${esc(p.address)}</div></td>
+      <td><span class="badge ${esc(s.grade)}">${esc(s.grade)}</span></td>
+      <td class="num"><b>${s.total}</b><span class="micro">/100</span></td>
+      <td class="num ${cfCls}"><b>${moneyS(cf)}</b></td>
+      <td class="num">${num2(m.dscr)}</td>
+      <td class="num">${pct1(m.cash_on_cash)}</td>
+      <td class="num"><b>${money(p.cash_to_close)}</b></td>
+      <td>${vetoN ? `<span class="st bad">${vetoN} 项否决</span>` : '<span class="st ok">无</span>'}</td>
+      <td class="micro" style="white-space:nowrap">${ago(p.updated_at)}</td>
+      <td style="white-space:nowrap" onclick="event.stopPropagation()">
+        <button class="btn sm" data-act="report" data-id="${p.id}">报告</button>
+        <label class="micro" style="margin-left:6px"><input type="checkbox" data-cmp="${p.id}"
+          ${state.compareIds.includes(p.id) ? 'checked' : ''}> 对比</label>
+      </td></tr>`;
+  }).join('');
+  const feedItems = state.projects.slice()
+    .sort((a, b) => b.updated_at - a.updated_at).slice(0, 8).map(p => {
+      const isNew = Math.abs(p.updated_at - p.created_at) < 5;
+      const dot = p.score.grade === 'A' ? 'var(--green)' : (p.score.grade === '否决' ? 'var(--red)' : 'var(--blue)');
+      return `<li><span class="fdot" style="background:${dot}"></span><div>
+        <div>${isNew ? '新建' : '更新'} <b>${esc(p.name || p.address || ('#' + p.id))}</b>
+        <span class="badge ${esc(p.score.grade)}" style="font-size:11px;min-width:22px;padding:0 6px">${esc(p.score.grade)}</span></div>
+        <div class="fx">${p.score.total} 分 · cash-to-close ${money(p.cash_to_close)}</div></div>
+        <span class="ft">${ago(p.updated_at)}</span></li>`;
+    }).join('');
+  app.innerHTML = `
+    <div class="zone">${insightHtml()}</div>
+    <div class="zone"><div class="kpis">
+      <div class="kpi" style="--kc:var(--brand)"><div class="k">在管项目</div><div class="v num">${k.n}</div><div class="s">住宅 / 商业双轨</div></div>
+      <div class="kpi" style="--kc:var(--green)"><div class="k">A 级项目</div><div class="v num" style="color:var(--green)">${k.a}</div><div class="s">≥80 分 · 日报头条</div></div>
+      <div class="kpi" style="--kc:var(--blue)"><div class="k">平均分</div><div class="v num">${k.avg == null ? '—' : k.avg.toFixed(1)}<small>/100</small></div><div class="s">全管线加权口径一致</div></div>
+      <div class="kpi" style="--kc:#f79009"><div class="k">总 cash-to-close</div><div class="v num">${money(k.cash)}</div><div class="s">全口径现金需求合计</div></div>
+      <div class="kpi" style="--kc:var(--red)"><div class="k">一票否决</div><div class="v num" style="color:${k.veto ? 'var(--red)' : 'inherit'}">${k.veto}</div><div class="s">任一硬否决 = 否决</div></div>
+    </div></div>
+    <div class="zone cols">
+      <div class="panel">
+        <div class="panel-h"><h2>交易管线</h2><span class="micro">${rows.length} 个项目</span>
+          <div class="tbl-tools">
+            <div class="seg" id="trackSeg">
+              <button data-track="residential" class="${state.track === 'residential' ? 'on' : ''}">住宅</button>
+              <button data-track="commercial" class="${state.track === 'commercial' ? 'on' : ''}">商业</button>
+            </div>
+            <input type="search" id="q" placeholder="搜索项目 / 地址…" value="${esc(state.query)}">
+            <button class="btn sm primary" data-act="new">＋ 新建</button>
+          </div></div>
+        <div class="panel-b tbl-wrap">
+          ${rows.length ? `<table class="data"><thead><tr>
+            <th>项目</th>${th('等级', 'score')}${th('总分', 'score', 1)}${th('月净现金流', 'cf', 1)}
+            ${th('DSCR', 'dscr', 1)}${th('CoC', 'coc', 1)}${th('cash-to-close', 'cash_to_close', 1)}
+            <th>否决</th>${th('更新', 'updated')}<th>操作</th>
+          </tr></thead><tbody>${body}</tbody></table>`
+          : `<div class="empty"><div class="big">🏚️</div>这个轨道还没有项目<br><span class="micro">粘贴房源链接一键搜集，或点右上"＋ 新建"手动录入</span></div>`}
+        </div>
+      </div>
+      <div class="rail">
+        <div class="panel"><div class="panel-h"><h2>实时动态</h2><span class="micro">本地记录</span></div>
+          <ul class="feed">${feedItems || '<li><span class="muted">暂无动态</span></li>'}</ul></div>
+        <div class="panel"><div class="panel-h"><h2>数据源</h2></div><div id="srcPanel">
+          <div class="src-row"><span>TopHap 公共记录</span><span class="micro">检测中…</span></div>
+          <div class="src-row"><span>全网公开页面搜集</span><span class="st ok">可用</span></div>
+          <div class="src-row"><span>PDF / 截图 intake</span><span class="st ok">可用</span></div>
+        </div></div>
+      </div>
+    </div>`;
+  const q = $('#q');
+  q.addEventListener('input', () => { state.query = q.value; renderDashboard(app); $('#q').focus();
+    const el = $('#q'); el.setSelectionRange(el.value.length, el.value.length); });
+}
+
+/* ================= 智能搜集（Hero） ================= */
+const INTAKE_STEPS = [
+  {id: 'parse', t: '解析输入', s: '识别链接 / 地址'},
+  {id: 'fetch', t: '抓取房源页', s: '公开页面直连'},
+  {id: 'seller', t: '提取卖方口径', s: '标注待验证'},
+  {id: 'indep', t: '全网独立搜集', s: '搜 county / 租金 / 新闻'},
+  {id: 'tophap', t: 'TopHap enrich', s: '公共记录（若已授权）'},
+  {id: 'merge', t: '合并字段', s: '独立源优先'},
+];
+/* intake 字段 → 核保表单映射（只做加法，口径零改动） */
+const INTAKE_MAP = {
+  residential: {price: 'asking_price', monthly_rent: 'monthly_rent', taxes_annual: 'taxes_annual', hoa_monthly: 'hoa_monthly'},
+  commercial: {price: 'asking_price', tax_annual: 'taxes_annual', building_sf: 'building_sf'},
+};
+
+async function runIntake(text, track) {
+  state.view = 'intake';
+  state.intake = {stage: 'running', steps: INTAKE_STEPS.map(s => ({...s, st: 'wait'})), result: null, error: null, track, query: text};
+  render();
+  // 进度动画：诚实标注"进行中"，不等后端分步回调
+  let i = 0;
+  const timer = setInterval(() => {
+    const it = state.intake;
+    if (!it || it.stage !== 'running') { clearInterval(timer); return; }
+    if (i < it.steps.length) {
+      it.steps.forEach((s, j) => { s.st = j < i ? 'done' : (j === i ? 'run' : 'wait'); });
+      paintSteps();
+      i++;
+    }
+  }, 2600);
+  try {
+    const mode = /^https?:\/\//i.test(text.trim()) ? 'url' : 'address';
+    const res = await api('POST', '/api/wb/intake/run', {mode, text});
+    clearInterval(timer);
+    if (res.error) {
+      state.intake.stage = 'error'; state.intake.error = res.error;
+      state.intake.steps.forEach(s => { s.st = 'fail'; });
+    } else {
+      state.intake.stage = 'done'; state.intake.result = res;
+      // 按真实 log 回填步骤状态
+      const logTxt = (res.log || []).map(l => (l.step + l.status + l.note)).join(' ');
+      const blocked = /blocked|拦截|禁止|拒绝抓取|forbidden|denied/i.test(logTxt);
+      state.intake.steps.forEach(s => {
+        if (s.id === 'fetch' && blocked && !(res.fields || []).length && !(res.seller_fields || []).length) s.st = 'fail';
+        else if (s.id === 'tophap' && /TopHap.*(skipped|失败|降级)/.test(logTxt)) s.st = 'skip';
+        else s.st = 'done';
+      });
+    }
+  } catch (e) {
+    clearInterval(timer);
+    state.intake.stage = 'error';
+    state.intake.error = '搜集请求失败：' + e.message;
+    state.intake.steps.forEach(s => { s.st = 'fail'; });
+  }
+  render();
+}
+
+function paintSteps() {
+  const el = $('#pipeSteps');
+  if (el && state.intake) el.innerHTML = stepsHtml(state.intake.steps);
+}
+function stepsHtml(steps) {
+  return steps.map(s => {
+    const icon = s.st === 'done' ? '✓' : s.st === 'run' ? '…' : s.st === 'fail' ? '✕' : s.st === 'skip' ? '–' : (INTAKE_STEPS.indexOf(INTAKE_STEPS.find(x => x.id === s.id)) + 1);
+    return `<div class="pstep ${s.st}"><div class="n">${icon}</div><div class="t">${s.t}</div><div class="s">${s.s}</div></div>`;
+  }).join('');
+}
+
+function buildDraft(track, res) {
+  const map = INTAKE_MAP[track];
+  const fields = res.fields || [];
+  const byKey = {}; fields.forEach(f => { byKey[f.key] = f; });
+  const values = {}, sources = {};
+  for (const [formKey, pipeKey] of Object.entries(map)) {
+    const f = byKey[pipeKey];
+    if (f && f.value != null && typeof f.value === 'number') {
+      values[formKey] = f.value; sources[formKey] = f;
+    }
+  }
+  if (track === 'residential' && byKey.monthly_rent) values.rent_source = 'estimated';
+  if (res.address) { values.address = res.address; values.name = res.address; }
+  else if (res.parsed && res.parsed.full) { values.address = res.parsed.full; values.name = res.parsed.full; }
+  return {values, sources};
+}
+
+function renderIntake(app) {
+  const it = state.intake;
+  if (!it) {
+    app.innerHTML = `<div class="panel" style="padding:34px 28px;max-width:760px;margin:20px auto">
+      <h2 class="sec-t">⚡ 智能搜集</h2>
+      <p class="muted" style="font-size:13.5px">在顶部输入框粘贴房源链接（Zillow / Redfin / LoopNet / Realtor）或输入地址，点"开始搜集"。
+      后端会自动抓取公开页面、做全网独立搜集、跑 TopHap 公共记录 enrich，每个字段都标注来源与可信度——抓不到就明说，绝不编数。</p>
+      <div class="kvline"><span class="kk">支持站点</span><span class="vv" style="font-weight:400">Zillow / Redfin / Realtor / LoopNet / county assessor（.gov）等公开页面</span></div>
+      <div class="kvline"><span class="kk">诚实铁律</span><span class="vv" style="font-weight:400">卖方口径一律标"待验证"；平台估值仅参考，不进收购价</span></div>
+      <div class="kvline"><span class="kk">反爬预期</span><span class="vv" style="font-weight:400">Zillow/Redfin 大概率 403 拦截——这是预期内的降级路径，会自动转手动补</span></div>
+    </div>`;
+    return;
+  }
+  let body = '';
+  if (it.stage === 'running') {
+    body = `<div class="pipe-steps" id="pipeSteps">${stepsHtml(it.steps)}</div>
+      <div class="empty"><span class="spinner"></span>正在全网搜集公开信息，约需 30–90 秒…<br>
+      <span class="micro">只碰公开页面；robots.txt 禁止的不碰；被反爬拦截立刻停手并记录</span></div>`;
+  } else if (it.stage === 'error') {
+    body = `<div class="pipe-steps">${stepsHtml(it.steps)}</div>
+      <div class="veto-banner bad"><b>搜集失败</b><div style="margin-top:6px">${esc(it.error)}</div>
+      <div class="micro" style="margin-top:6px">降级路径：手动输入地址跑"地址模式"，或直接进"＋ 新建项目"手动录入。</div></div>
+      <div class="toolbar"><button class="btn" data-act="intakeRetry">↻ 换地址模式重试</button>
+      <button class="btn primary" data-act="gotoForm">直接手动录入 →</button></div>`;
+  } else {
+    body = intakeResultHtml(it);
+  }
+  app.innerHTML = `<div class="zone"><div class="panel" style="padding:20px 22px">
+    <h2 class="sec-t">⚡ 智能搜集 <span class="micro">房源链接 / 地址 → 全网公开信息自动搜集</span></h2>${body}</div></div>`;
+}
+
+function intakeResultHtml(it) {
+  const res = it.result;
+  const fields = res.fields || [];
+  const manual = res.manual_needed || [];
+  const filledN = fields.filter(f => f.status !== 'manual_needed').length;
+  const sellerN = fields.filter(f => f.seller_claimed).length;
+  const addrLine = esc(res.address || (res.parsed && res.parsed.full) || it.query || '');
+  const fieldRows = fields.map(f => {
+    let disp = f.display || String(f.value);
+    if (Array.isArray(f.value)) disp = f.value.length + ' 条记录（见日志/新闻）';
+    else if (typeof f.value === 'object') disp = JSON.stringify(f.value).slice(0, 80);
+    return `<tr><td><b>${esc(f.label)}</b></td><td class="num"><b>${esc(disp)}</b></td>
+      <td class="micro">${esc(f.source || '')}<br>${esc(f.fetched_at || '')}</td>
+      <td>${confChip(f)}</td></tr>`;
+  }).join('');
+  const manualRows = manual.map(m =>
+    `<tr><td><b>${esc(m.label)}</b></td><td class="micro" colspan="2">${esc(m.note || '')}</td><td>${confChip({status: 'manual_needed'})}</td></tr>`).join('');
+  const logRows = (res.log || []).map(l => {
+    const cls = l.status === 'ok' ? 'ok' : (l.status === 'blocked' || l.status === 'failed' ? 'bad' : 'wr');
+    return `<div><span class="${cls}">[${esc(l.status)}]</span> ${esc(l.step)} <span style="color:#8ba3c2">${esc(l.note || '')}</span> <span style="color:#5b6b82">${esc(l.at || '')}</span></div>`;
+  }).join('');
+  const draft = it.draft;
+  return `
+    <div class="pipe-steps">${stepsHtml(it.steps)}</div>
+    <div class="insight ${filledN ? 'good' : 'warn'}"><div class="ic">${filledN ? '✅' : '⚠️'}</div><div>
+      <div class="t">${addrLine || '搜集完成'}：填入 ${filledN} 个字段${sellerN ? `（其中 ${sellerN} 个为卖方口径、待验证）` : ''}，${manual.length} 个需手动补</div>
+      <div class="d">${res.independent_note ? esc(res.independent_note) + '。' : ''}平台估值（zestimate）仅参考，不进收购价；抓不到的字段已标"需手动补"。</div></div>
+      <div class="act" style="display:flex;gap:8px">${filledN
+        ? `<button class="btn primary big" data-act="makeDraft">→ 生成核保草稿</button>`
+        : `<button class="btn primary" data-act="manualWithAddr">→ 手动录入（地址已带入）</button>`}</div></div>
+    <h3 class="sec-t">搜集字段 <span class="micro">每个字段：值 / 来源 / 可信度</span></h3>
+    <div class="tbl-wrap"><table class="data"><thead><tr><th>字段</th><th class="num">值</th><th>来源</th><th>可信度</th></tr></thead>
+    <tbody>${fieldRows}${manualRows}</tbody></table></div>
+    ${draft ? `<h3 class="sec-t" style="margin-top:18px">核保初筛 <span class="micro">草稿自动打分（未保存）</span></h3>
+      <div class="dhero" style="margin-bottom:0"><div class="dhero-top">
+        <span class="badge big ${esc(draft.score.grade)}">${esc(draft.score.grade)}</span>
+        <div><div class="score-big num">${draft.score.total}<small>/100</small></div></div>
+        <div><h1 style="font-size:16px">${esc(draft.name)}</h1><div class="addr">${esc(draft.address)}</div></div>
+        <div style="margin-left:auto;display:flex;gap:8px">
+          <button class="btn primary" data-act="saveDraft">保存为项目 →</button>
+          <button class="btn" data-act="editDraft">去表单微调</button></div>
+      </div>${draft.score.vetoes.length ? `<div class="veto-banner bad"><b>⛔ 一票否决（${draft.score.vetoes.length}）</b><ul>` +
+        draft.score.vetoes.map(v => `<li>${esc(v.message)}</li>`).join('') + '</ul></div>' : ''}
+      <div class="metrics" style="margin-top:14px">${(it.track === 'residential' ? RES_METRICS : COM_METRICS)
+        .filter(([, , , hero]) => hero).map(([label, key, kind]) =>
+        `<div class="metric hero"><div class="k">${label}</div><div class="v">${fmtVal(kind, draft.score.metrics[key])}</div></div>`).join('')}</div>
+      </div>
+      <p class="micro" style="margin-top:8px">自动填入的字段在表单里以绿色高亮＋来源标注；保存前请逐项核对，未补的字段用保守值。</p>` : ''}
+    <details class="fold"><summary>🔍 搜集过程日志（${(res.log || []).length} 步）<span class="micro">点击展开</span></summary>
+      <div class="fb"><div class="logbox">${logRows || '<span class="muted">无日志</span>'}</div></div></details>`;
+}
+
+async function makeDraft() {
+  const it = state.intake;
+  if (!it || !it.result) return;
+  const {values, sources} = buildDraft(it.track, it.result);
+  // 补全表单默认值后打分
+  const secs = it.track === 'residential' ? RES_SECTIONS : COM_SECTIONS;
+  const input = {risk_flags: []};
+  for (const s of secs) for (const f of s.fields) {
+    if (f.flag) continue;
+    if (values[f.key] !== undefined) input[f.key] = values[f.key];
+    else if (f.type === 'check') input[f.key] = !!f.def;
+    else if (f.type === 'number') input[f.key] = f.def === '' ? 0 : f.def;
+    else if (f.type === 'select') input[f.key] = f.def;
+    else input[f.key] = f.def ?? '';
+  }
+  if (it.track === 'commercial') input.tranches = [];
+  try {
+    const score = await api('POST', '/api/score', {track: it.track, name: values.name || '草稿', address: values.address || '', input});
+    it.draft = {input, score, sources, name: values.name || '草稿', address: values.address || ''};
+  } catch (e) {
+    it.draft = null;
+    alert('草稿打分失败：' + e.message + '\n可先去表单手动补全必填项。');
+  }
+  render();
+}
+
+/* ================= 表单 ================= */
+function fieldHtml(f, src) {
   const id = 'f_' + f.key;
+  const tag = src ? ` <span class="srctag">⚡ ${esc(src.display || src.value)} · ${esc(src.source || '')}</span>` : '';
   if (f.type === 'check')
-    return `<div class="field check"><label><input type="checkbox" id="${id}" ${f.def ? 'checked' : ''}> ${esc(f.label)}</label></div>`;
+    return `<div class="field check"><label><input type="checkbox" id="${id}" ${f.def ? 'checked' : ''}> ${esc(f.label)}${tag}</label>${f.hint ? `<div class="hint">${esc(f.hint)}</div>` : ''}</div>`;
   if (f.type === 'select') {
     const opts = f.options.map(([v, t]) => `<option value="${v}">${esc(t)}</option>`).join('');
-    return `<div class="field"><label>${esc(f.label)}</label><select id="${id}">${opts}</select>
+    return `<div class="field"><label>${esc(f.label)}${tag}</label><select id="${id}" class="${src ? 'autofill' : ''}">${opts}</select>
       ${f.hint ? `<div class="hint">${esc(f.hint)}</div>` : ''}</div>`;
   }
-  return `<div class="field"><label>${esc(f.label)}</label>
-    <input type="${f.type}" id="${id}" value="${esc(f.def ?? '')}" ${f.type === 'number' ? 'step="any"' : ''}>
+  return `<div class="field"><label>${esc(f.label)}${tag}</label>
+    <input type="${f.type}" id="${id}" value="${esc(f.def ?? '')}" ${f.type === 'number' ? 'step="any"' : ''} class="${src ? 'autofill' : ''}">
     ${f.hint ? `<div class="hint">${esc(f.hint)}</div>` : ''}</div>`;
 }
 
@@ -251,7 +703,7 @@ function collectForm() {
   return d;
 }
 
-function fillForm(data) {
+function fillForm(data, sources) {
   const secs = state.track === 'residential' ? RES_SECTIONS : COM_SECTIONS;
   const flat = {...data};
   if (state.track === 'commercial' && Array.isArray(data.tranches)) {
@@ -273,222 +725,198 @@ function fillForm(data) {
   }
 }
 
-/* ---------------- 评分展示 ---------------- */
-const RES_METRICS = [
-  ['月供 P&I', 'monthly_pi', 'money'], ['月 PITI', 'piti', 'money'],
-  ['月净现金流', 'cash_flow_monthly', 'moneysigned'], ['单门现金流', 'cash_flow_per_door', 'moneysigned'],
-  ['Cash-on-cash', 'cash_on_cash', 'pct'], ['DSCR', 'dscr', 'num'],
-  ['Cap rate', 'cap_rate', 'pct'], ['现金总投入', 'cash_invested', 'money'],
-  ['全口径现金需求 cash-to-close', 'cash_to_close', 'money'], ['交割净值', 'equity', 'moneysigned'],
-];
-const COM_METRICS = [
-  ['年 NOI', 'noi', 'money'], ['入场 cap', 'entry_cap', 'pct'],
-  ['Spread', 'spread_bps', 'bps'], ['DSCR', 'dscr', 'num'],
-  ['月净现金流', 'net_cf_monthly', 'moneysigned'], ['Cash-on-cash', 'cash_on_cash', 'pct'],
-  ['年还本付息', 'annual_debt_service', 'money'], ['现金总投入', 'cash_invested', 'money'],
-  ['全口径现金需求 cash-to-close', 'cash_to_close', 'money'], ['交割净值', 'equity', 'moneysigned'],
-];
-function fmtVal(kind, x) {
-  if (x == null) return '—';
-  if (kind === 'money') return money(x);
-  if (kind === 'moneysigned') return signed(x, money);
-  if (kind === 'pct') return pct1(x);
-  if (kind === 'bps') return Math.round(x) + 'bps';
-  return num2(x);
-}
-
-function scoreHtml(s, track) {
-  const defs = track === 'residential' ? RES_METRICS : COM_METRICS;
-  const veto = s.vetoes.length
-    ? `<div class="veto-banner"><b>⛔ 一票否决（${s.vetoes.length} 项）：</b><ul>` +
-      s.vetoes.map(v => `<li>${esc(v.message)}</li>`).join('') + '</ul></div>'
-    : `<div class="veto-banner" style="background:#eef7ee;border-color:#bfe3bf"><b style="color:var(--green)">✅ 无否决项</b></div>`;
-  const dg = (s.downgrades || []).length
-    ? `<div class="veto-banner" style="background:#fef6e7;border-color:#f0d9a8"><b style="color:#b45309">⚠️ 降级提示（封顶降级，非一票否决）：</b><ul>` +
-      s.downgrades.map(v => `<li>${esc(v.message)}</li>`).join('') + '</ul></div>'
-    : '';
-  const metrics = defs.map(([label, key, kind]) =>
-    `<div class="metric"><div class="k">${label}</div><div class="v">${fmtVal(kind, s.metrics[key])}</div></div>`).join('');
-  const dims = s.dimensions.map(dm => `
-    <div class="dim"><div class="head"><span>${esc(dm.label)}</span><span>${dm.points} / ${dm.weight} 分</span></div>
-    <div class="bar"><div style="width:${Math.min(100, dm.points / dm.weight * 100)}%"></div></div>
-    <div class="detail">${esc(dm.detail)}</div></div>`).join('');
-  const checks = s.checks.map(c =>
-    `<tr><td>${c.ok ? '✅' : '❌'} ${esc(c.label)}</td><td>${esc(c.note)}</td></tr>`).join('');
-  return `
-    <div class="card" style="margin-bottom:14px"><div class="row" style="margin-top:0">
-      <div><span class="badge ${esc(s.grade)}">${esc(s.grade)}</span>
-      <span class="score-num" style="font-size:16px;margin-left:10px"><b>${s.total}</b> / 100 分</span></div>
-    </div>${veto}${dg}</div>
-    <h2 class="sec">测算结果（保守全口径）</h2><div class="metrics">${metrics}</div>
-    <h2 class="sec">评分明细</h2>${dims}
-    <h2 class="sec">阈值对照</h2>
-    <table class="data"><tr><th>检查项</th><th>状态</th></tr>${checks}</table>`;
-}
-
-/* ---------------- 视图 ---------------- */
-function render() {
-  const app = $('#app');
-  if (state.view === 'list') renderList(app);
-  else if (state.view === 'form') renderForm(app);
-  else if (state.view === 'detail') renderDetail(app);
-  else if (state.view === 'compare') renderCompare(app);
-}
-
-function tabsHtml() {
-  return `<div class="tabs">
-    <button class="${state.track === 'residential' ? 'active' : ''}" data-track="residential">🏠 住宅项目</button>
-    <button class="${state.track === 'commercial' ? 'active' : ''}" data-track="commercial">🏢 商业项目</button>
-  </div>`;
-}
-
-async function loadProjects() {
-  const qs = '/api/projects?track=' + state.track + (state.sortCash ? '&sort=cash_to_close' : '');
-  state.projects = await api('GET', qs);
-}
-
-function renderList(app) {
-  const cards = state.projects.map(p => {
-    const s = p.score, m = s.metrics;
-    const cf = state.track === 'residential' ? m.cash_flow_per_door : m.net_cf_monthly;
-    return `<div class="card">
-      <h3>${esc(p.name) || '(未命名)'}</h3><div class="addr">${esc(p.address)}</div>
-      <div class="row"><span class="badge ${esc(s.grade)}">${esc(s.grade)}</span>
-        <span class="score-num"><b>${s.total}</b>/100</span></div>
-      <div class="kv">月净现金流 <b>${money(cf)}</b> · DSCR <b>${num2(s.metrics.dscr)}</b> · CoC <b>${pct1(s.metrics.cash_on_cash)}</b></div>
-      <div class="kv">cash-to-close 全口径现金需求 <b>${money(s.metrics.cash_to_close ?? s.metrics.total_cash_required)}</b></div>
-      ${s.vetoes.length ? `<div class="kv" style="color:var(--red)">⛔ ${s.vetoes.length} 项否决</div>` : ''}
-      ${(s.downgrades || []).length ? `<div class="kv" style="color:#b45309">⚠️ ${s.downgrades.length} 项降级</div>` : ''}
-      <div class="actions">
-        <button class="btn" data-act="open" data-id="${p.id}">打开</button>
-        <button class="btn" data-act="report" data-id="${p.id}">🖨️ 报告</button>
-        <button class="btn" data-act="edit" data-id="${p.id}">编辑</button>
-        <button class="btn danger" data-act="del" data-id="${p.id}">删除</button>
-        <label style="font-size:13px"><input type="checkbox" data-act="cmp" data-id="${p.id}"
-          ${state.compareIds.includes(p.id) ? 'checked' : ''}> 对比</label>
-      </div></div>`;
-  }).join('');
-  app.innerHTML = tabsHtml() + `
-    <div class="toolbar">
-      <button class="btn primary" data-act="new">＋ 新建项目</button>
-      <button class="btn" data-act="gocompare" ${state.compareIds.length < 2 ? 'disabled' : ''}>
-        📊 对比选中（${state.compareIds.length}/3）</button>
-      <button class="btn" data-act="sortcash">${state.sortCash ? '🔽 已按 cash-to-close 升序（点击取消）' : '💰 按 cash-to-close 升序'}</button>
-      <span style="font-size:13px;color:var(--muted);align-self:center">评分口径：${state.track === 'residential' ? 'buyer-box.md v2.1' : 'buyer-box-commercial.md v1.1'}</span>
-    </div>
-    ${cards ? `<div class="grid">${cards}</div>` : '<div class="empty">暂无项目，点击"新建项目"开始录入。</div>'}
-    <p class="note">分级：≥80 A（日报头条）· 65–79 B（日报收录）· 50–64 C（观察名单）· &lt;50 不收录 · 任一硬否决 = 否决。<br>
-    本工具为筛选辅助，不构成投资建议；真实交易须经持牌律师 / CPA / title company 审查。</p>`;
-}
-
 function renderForm(app) {
   const secs = state.track === 'residential' ? RES_SECTIONS : COM_SECTIONS;
-  const secsHtml = secs.map(s => `<div class="form-sec"><h3>${esc(s.title)}</h3>
-    <div class="fgrid">${s.fields.map(fieldHtml).join('')}</div></div>`).join('');
-  app.innerHTML = tabsHtml() + `
-    <div class="toolbar"><button class="btn" data-act="back">← 返回列表</button>
-      <span style="font-size:15px;font-weight:700;align-self:center">${state.editingId ? '编辑项目' : '新建项目'}（${state.track === 'residential' ? '住宅' : '商业'}）</span></div>
+  const sources = (state._fill && state._fill.sources) || {};
+  const secsHtml = secs.map(s => `<div class="form-sec"><h3>${esc(s.title)} <span class="cnt">${s.fields.length} 项</span></h3>
+    <div class="fgrid">${s.fields.map(f => fieldHtml(f, sources[f.key])).join('')}</div></div>`).join('');
+  const fromIntake = state._fill && state._fill.fromIntake;
+  app.innerHTML = `
+    <div class="toolbar"><button class="btn" data-act="back">← 返回仪表盘</button>
+      <div class="seg">
+        <button data-track="residential" class="${state.track === 'residential' ? 'on' : ''}">住宅</button>
+        <button data-track="commercial" class="${state.track === 'commercial' ? 'on' : ''}">商业</button>
+      </div>
+      <span style="font-size:14px;font-weight:700">${state.editingId ? '编辑项目' : '新建项目'}</span>
+      <span class="micro">评分口径：${state.track === 'residential' ? 'buyer-box v2.3' : 'commercial v1.3'}</span></div>
+    ${fromIntake ? `<div class="insight good"><div class="ic">⚡</div><div>
+      <div class="t">已从智能搜集自动填入 ${Object.keys(sources).length} 个字段</div>
+      <div class="d">绿色高亮的字段带来源标注；保存前请逐项核对，未补字段用保守值。卖方口径数字已标待验证，不直接采信。</div></div></div>` : ''}
     ${secsHtml}
-    <div class="toolbar">
-      <button class="btn" data-act="preview">⚡ 一键打分预览（不保存）</button>
-      <button class="btn primary" data-act="save">${state.editingId ? '保存修改' : '保存项目'}</button>
+    <div class="toolbar" style="position:sticky;bottom:0;background:rgba(242,245,249,.96);padding:10px 0">
+      <button class="btn big" data-act="preview">⚡ 一键打分预览（不保存）</button>
+      <button class="btn primary big" data-act="save">${state.editingId ? '保存修改' : '保存项目'}</button>
     </div>
     <div id="preview"></div>`;
-  if (state._fill) { fillForm(state._fill); state._fill = null; }
+  if (state._fill) { fillForm(state._fill.values || state._fill, sources); state._fill = null; }
+}
+
+/* ================= 详情 ================= */
+function heroMetrics(p) {
+  const m = p.score.metrics || {};
+  if (p.track === 'residential') return [
+    ['全口径现金需求', m.cash_to_close, 'money', 1],
+    ['月净现金流', m.cash_flow_monthly, 'moneysigned', 0],
+    ['DSCR', m.dscr, 'num', 0],
+    ['Cash-on-cash', m.cash_on_cash, 'pct', 0],
+  ];
+  return [
+    ['全口径现金需求', m.cash_to_close, 'money', 1],
+    ['年 NOI', m.noi, 'money', 0],
+    ['入场 cap', m.entry_cap, 'pct', 0],
+    ['DSCR', m.dscr, 'num', 0],
+  ];
 }
 
 async function renderDetail(app) {
   const p = state.detail;
-  app.innerHTML = tabsHtml() + `
-    <div class="toolbar"><button class="btn" data-act="back">← 返回列表</button>
+  const s = p.score;
+  const tabs = [['overview', '核保总览'], ['finance', '财务测算'], ['sens', '敏感性分析']];
+  let panel = '';
+  if (state.detailTab === 'overview' || state.detailTab === 'finance') {
+    panel = scoreHtml(s, p.track);
+  } else {
+    panel = '<div id="sens"><div class="empty"><span class="spinner"></span>敏感性分析加载中…</div></div>';
+  }
+  app.innerHTML = `
+    <div class="toolbar"><button class="btn" data-act="back">← 返回仪表盘</button><span class="spacer"></span>
       <button class="btn" data-act="report" data-id="${p.id}">🖨️ 打印报告</button>
       <button class="btn" data-act="edit" data-id="${p.id}">编辑</button>
       <button class="btn danger" data-act="del" data-id="${p.id}">删除</button></div>
-    <h2 style="margin:4px 0 2px">${esc(p.name) || '(未命名)'}</h2>
-    <div style="color:var(--muted);font-size:13px;margin-bottom:6px">${esc(p.address)} · ${esc(p.score.structure_label || p.score.asset_label || '')}</div>
-    <div id="scorebox">${scoreHtml(p.score, p.track)}</div>
-    <h2 class="sec">敏感性分析</h2><div id="sens"><div class="empty">加载中…</div></div>`;
-  try {
-    const sens = await api('POST', '/api/sensitivity',
-      {track: p.track, name: p.name, address: p.address, input: p.input});
-    $('#sens').innerHTML = sensHtml(sens, p.track);
-  } catch (e) { $('#sens').innerHTML = `<div class="empty">敏感性分析加载失败：${esc(e.message)}</div>`; }
+    <div class="dhero"><div class="dhero-top">
+      <span class="badge big ${esc(s.grade)}">${esc(s.grade)}</span>
+      <div class="score-big num">${s.total}<small>/100</small></div>
+      <div><h1>${esc(p.name) || '(未命名)'}</h1>
+        <div class="addr">${esc(p.address)} · ${esc(s.structure_label || s.asset_label || '')} · ${p.track === 'residential' ? '住宅' : '商业'}</div></div>
+    </div>
+    ${s.vetoes.length
+      ? `<div class="veto-banner bad"><b>⛔ 一票否决（${s.vetoes.length} 项）——直接结论：否决</b><ul>` +
+        s.vetoes.map(v => `<li>${esc(v.message)}</li>`).join('') + '</ul></div>'
+      : `<div class="veto-banner good"><b>✅ 无否决项</b><span class="muted"> —— 按总分定级：${esc(s.grade)} 级</span></div>`}
+    ${(s.downgrades || []).length ? `<div class="veto-banner warn"><b>⚠️ 降级提示</b><ul>` +
+      s.downgrades.map(v => `<li>${esc(v.message)}</li>`).join('') + '</ul></div>' : ''}
+    <div class="dhero-metrics">${heroMetrics(p).map(([k, v, kind]) =>
+      `<div class="hm"><div class="k">${k}</div><div class="v">${fmtVal(kind, v)}</div></div>`).join('')}</div>
+    </div>
+    <div class="dtabs">${tabs.map(([id, t]) =>
+      `<button data-dtab="${id}" class="${state.detailTab === id ? 'on' : ''}">${t}</button>`).join('')}</div>
+    <div id="dpanel">${panel}</div>`;
+  if (state.detailTab === 'sens') {
+    try {
+      const sens = await api('POST', '/api/sensitivity',
+        {track: p.track, name: p.name, address: p.address, input: p.input});
+      const el = $('#sens');
+      if (el) el.innerHTML = sensHtml(sens, p.track);
+    } catch (e) {
+      const el = $('#sens');
+      if (el) el.innerHTML = `<div class="empty">敏感性分析加载失败：${esc(e.message)}</div>`;
+    }
+  }
 }
 
-function sensHtml(sens, track) {
-  const rentCols = track === 'residential'
-    ? [['cash_flow_monthly', '月净现金流', 'moneysigned'], ['cash_flow_per_door', '单门现金流', 'moneysigned'],
-       ['cash_on_cash_pct', 'CoC %', 'rawpct'], ['dscr', 'DSCR', 'num']]
-    : [['net_cf_monthly', '月净现金流', 'moneysigned'], ['cash_on_cash_pct', 'CoC %', 'rawpct'],
-       ['dscr', 'DSCR', 'num'], ['entry_cap_pct', '入场 cap %', 'rawpct']];
-  const rateCols = track === 'residential'
-    ? [['cash_flow_monthly', '月净现金流', 'moneysigned'], ['cash_on_cash_pct', 'CoC %', 'rawpct'], ['dscr', 'DSCR', 'num']]
-    : [['net_cf_monthly', '月净现金流', 'moneysigned'], ['cash_on_cash_pct', 'CoC %', 'rawpct'], ['dscr', 'DSCR', 'num']];
-  const cell = (kind, v) => {
-    if (v == null) return '—';
-    if (kind === 'moneysigned') return signed(v, money);
-    if (kind === 'rawpct') return v.toFixed(1) + '%';
-    return num2(v);
-  };
-  const table = (title, rows, cols) => `
-    <h3 style="font-size:14px;margin:14px 0 4px">${title}</h3>
-    <table class="data"><tr><th>情景</th>${cols.map(c => `<th class="num">${c[1]}</th>`).join('')}</tr>
-    ${rows.map(r => `<tr class="${r.label === '+0%' ? 'base' : ''}"><td>${r.label}</td>` +
-      cols.map(c => `<td class="num">${cell(c[2], r[c[0]])}</td>`).join('') + '</tr>').join('')}</table>`;
-  return table('租金变动情景（±10%）', sens.rent_table, rentCols)
-       + table('利率变动情景（±2%）', sens.rate_table, rateCols);
-}
-
+/* ================= 对比 ================= */
 async function renderCompare(app) {
-  app.innerHTML = tabsHtml() + `<div class="toolbar"><button class="btn" data-act="back">← 返回列表</button></div>
-    <div id="cmp"><div class="empty">加载中…</div></div>`;
+  app.innerHTML = `<div class="toolbar"><button class="btn" data-act="back">← 返回仪表盘</button>
+    <span class="micro">勾选管线中的项目（最多 3 个）进入对比</span></div>
+    <div class="panel"><div class="panel-h"><h2>项目对比</h2></div>
+    <div class="panel-b tbl-wrap" id="cmp"><div class="empty"><span class="spinner"></span>加载中…</div></div></div>`;
+  if (!state.compareIds.length) {
+    $('#cmp').innerHTML = '<div class="empty">还没有选中项目<br><span class="micro">回到仪表盘，在管线表格右侧勾选"对比"</span></div>';
+    return;
+  }
   try {
     const items = await api('GET', '/api/compare?ids=' + state.compareIds.join(','));
+    const cfOf = p => p.track === 'residential' ? p.score.metrics.cash_flow_monthly : p.score.metrics.net_cf_monthly;
     const rows = [
-      ['项目', p => esc(p.name) || '(未命名)'], ['地址', p => esc(p.address)],
+      ['项目', p => `<b>${esc(p.name) || '(未命名)'}</b><div class="micro">${esc(p.address)}</div>`],
+      ['轨道', p => p.track === 'residential' ? '住宅' : '商业'],
       ['结构', p => esc(p.score.structure_label || p.score.asset_label || '')],
       ['等级', p => `<span class="badge ${esc(p.score.grade)}">${esc(p.score.grade)}</span>`],
-      ['总分', p => `<b>${p.score.total}</b>/100`],
-      ['月净现金流', p => money(state.track === 'residential' ? p.score.metrics.cash_flow_monthly : p.score.metrics.net_cf_monthly)],
-      ['DSCR', p => num2(p.score.metrics.dscr)],
-      ['Cash-on-cash', p => pct1(p.score.metrics.cash_on_cash)],
-      ['全口径现金需求', p => money(p.score.metrics.total_cash_required)],
-      ['否决项', p => p.score.vetoes.length ? `<span style="color:var(--red)">${p.score.vetoes.length} 项</span>` : '无'],
+      ['总分', p => `<b class="num" style="font-size:18px">${p.score.total}</b><span class="micro">/100</span>`],
+      ['月净现金流', p => { const v = cfOf(p); return `<span class="${v < 0 ? 'neg' : 'pos'} num"><b>${moneyS(v)}</b></span>`; }],
+      ['DSCR', p => `<span class="num">${num2(p.score.metrics.dscr)}</span>`],
+      ['Cash-on-cash', p => `<span class="num">${pct1(p.score.metrics.cash_on_cash)}</span>`],
+      ['cash-to-close', p => `<b class="num">${money(p.cash_to_close)}</b>`],
+      ['否决项', p => p.score.vetoes.length ? `<span class="st bad">${p.score.vetoes.length} 项</span>` : '<span class="st ok">无</span>'],
+      ['', p => `<button class="btn sm" data-act="open" data-id="${p.id}">打开 →</button>`],
     ];
-    $('#cmp').innerHTML = `<table class="data"><tr><th></th>${items.map(p => `<th>${esc(p.name) || '(未命名)'}</th>`).join('')}</tr>` +
-      rows.map(([label, fn]) => `<tr><th>${label}</th>${items.map(p => `<td>${fn(p)}</td>`).join('')}</tr>`).join('') + '</table>';
+    $('#cmp').innerHTML = `<table class="data cmp-table"><thead><tr><th></th>${items.map(p =>
+      `<th>${esc(p.name) || '(未命名)'}</th>`).join('')}</tr></thead><tbody>` +
+      rows.map(([label, fn]) => `<tr><td>${label}</td>${items.map(p => `<td>${fn(p)}</td>`).join('')}</tr>`).join('') +
+      '</tbody></table>';
   } catch (e) { $('#cmp').innerHTML = `<div class="empty">对比加载失败：${esc(e.message)}</div>`; }
 }
 
-/* ---------------- 事件 ---------------- */
+/* ================= 事件 ================= */
 document.addEventListener('click', async e => {
-  const tab = e.target.closest('[data-track]');
-  if (tab) {
-    state.track = tab.dataset.track; state.view = 'list'; state.compareIds = [];
-    await loadProjects(); render(); return;
+  const nav = e.target.closest('#nav button');
+  if (nav) {
+    state.view = nav.dataset.view;
+    if (state.view === 'dashboard') await loadProjects();
+    render(); return;
+  }
+  const seg = e.target.closest('.seg button');
+  if (seg && seg.dataset.track) {
+    state.track = seg.dataset.track; state.compareIds = [];
+    if (state.view === 'form' && !state.editingId) { /* 新建时切换轨道保留空表单 */ }
+    render(); return;
+  }
+  const dtab = e.target.closest('[data-dtab]');
+  if (dtab) { state.detailTab = dtab.dataset.dtab; render(); return; }
+  const th = e.target.closest('th.sortable');
+  if (th) {
+    const k = th.dataset.sort;
+    if (state.sortKey === k) state.sortDir *= -1;
+    else { state.sortKey = k; state.sortDir = k === 'cash_to_close' ? 1 : -1; }
+    render(); return;
+  }
+  const row = e.target.closest('tr.rowlink');
+  if (row && row.dataset.open) {
+    try {
+      const p = await api('GET', '/api/projects/' + row.dataset.open);
+      state.track = p.track; state.view = 'detail'; state.detail = p; state.detailTab = 'overview'; render();
+    } catch (err) { alert('打开失败：' + err.message); }
+    return;
   }
   const btn = e.target.closest('[data-act]');
   if (!btn) return;
   const act = btn.dataset.act, id = btn.dataset.id ? +btn.dataset.id : null;
   try {
-    if (act === 'new') { state.view = 'form'; state.editingId = null; state._fill = null; render(); }
-    else if (act === 'back') { state.view = 'list'; await loadProjects(); render(); }
+    if (act === 'focusIntake') { $('#ihInput').focus(); window.scrollTo(0, 0); }
+    else if (act === 'new') { state.view = 'form'; state.editingId = null; state._fill = null; render(); }
+    else if (act === 'gotoForm') { state.view = 'form'; state.editingId = null; state._fill = null; render(); }
+    else if (act === 'manualWithAddr') {
+      const it = state.intake, res = it.result || {};
+      const addr = res.address || (res.parsed && res.parsed.full) || it.query || '';
+      state.track = it.track; state.view = 'form'; state.editingId = null;
+      state._fill = {values: {name: addr, address: addr}, sources: {}}; render();
+    }
+    else if (act === 'back') { state.view = 'dashboard'; await loadProjects(); render(); }
+    else if (act === 'intakeRetry') { const v = $('#ihInput').value.trim(); if (v) runIntake(v, state.intake.track); }
     else if (act === 'edit') {
       const p = await api('GET', '/api/projects/' + id);
-      state.track = p.track; state.view = 'form'; state.editingId = id; state._fill = p.input; render();
+      state.track = p.track; state.view = 'form'; state.editingId = id;
+      state._fill = {values: p.input, sources: {}}; render();
     }
     else if (act === 'open') {
       const p = await api('GET', '/api/projects/' + id);
-      state.track = p.track; state.view = 'detail'; state.detail = p; render();
+      state.track = p.track; state.view = 'detail'; state.detail = p; state.detailTab = 'overview'; render();
     }
     else if (act === 'report') { window.open('/api/projects/' + id + '/report', '_blank'); }
     else if (act === 'del') {
-      if (confirm('确定删除该项目吗？')) { await api('DELETE', '/api/projects/' + id); state.view = 'list'; await loadProjects(); render(); }
+      if (confirm('确定删除该项目吗？')) {
+        await api('DELETE', '/api/projects/' + id);
+        state.compareIds = state.compareIds.filter(x => x !== id);
+        state.view = 'dashboard'; await loadProjects(); render();
+      }
     }
     else if (act === 'preview') {
       const input = collectForm();
-      const s = await api('POST', '/api/score', {track: state.track, name: '预览', address: '', input});
-      $('#preview').innerHTML = '<h2 class="sec">打分预览</h2>' + scoreHtml(s, state.track);
+      const s = await api('POST', '/api/score', {track: state.track, name: '预览', address: input.address || '', input});
+      $('#preview').innerHTML = '<h3 class="sec-t" style="margin-top:20px">打分预览 <span class="micro">未保存</span></h3>' +
+        `<div class="dhero" style="margin-bottom:14px"><div class="dhero-top">
+          <span class="badge big ${esc(s.grade)}">${esc(s.grade)}</span>
+          <div class="score-big num">${s.total}<small>/100</small></div></div></div>` + scoreHtml(s, state.track);
       $('#preview').scrollIntoView({behavior: 'smooth'});
     }
     else if (act === 'save') {
@@ -497,17 +925,28 @@ document.addEventListener('click', async e => {
       let p;
       if (state.editingId) p = await api('PUT', '/api/projects/' + state.editingId, payload);
       else p = await api('POST', '/api/projects', payload);
-      state.view = 'detail'; state.detail = p; render();
+      state.view = 'detail'; state.detail = p; state.detailTab = 'overview'; render();
     }
-    else if (act === 'gocompare') { state.view = 'compare'; render(); }
-    else if (act === 'sortcash') { state.sortCash = !state.sortCash; await loadProjects(); render(); }
+    else if (act === 'makeDraft') { await makeDraft(); }
+    else if (act === 'editDraft') {
+      const it = state.intake;
+      state.track = it.track; state.view = 'form'; state.editingId = null;
+      state._fill = {values: it.draft.input, sources: it.draft.sources, fromIntake: true};
+      render();
+    }
+    else if (act === 'saveDraft') {
+      const it = state.intake;
+      const p = await api('POST', '/api/projects',
+        {track: it.track, name: it.draft.name, address: it.draft.address, input: it.draft.input});
+      state.view = 'detail'; state.detail = p; state.detailTab = 'overview'; render();
+    }
   } catch (err) { alert('操作失败：' + err.message); }
 });
 
 document.addEventListener('change', e => {
-  const c = e.target.closest('[data-act="cmp"]');
+  const c = e.target.closest('[data-cmp]');
   if (!c) return;
-  const id = +c.dataset.id;
+  const id = +c.dataset.cmp;
   if (c.checked) {
     if (state.compareIds.length >= 3) { c.checked = false; alert('最多对比 3 个项目'); return; }
     state.compareIds.push(id);
@@ -515,13 +954,46 @@ document.addEventListener('change', e => {
   render();
 });
 
-/* ---------------- 启动 ---------------- */
+/* 顶部 Hero intake 提交 */
+function submitIntake() {
+  const v = $('#ihInput').value.trim();
+  if (!v) { $('#ihInput').focus(); return; }
+  runIntake(v, $('#ihTrack').value);
+}
+$('#ihGo').addEventListener('click', submitIntake);
+$('#ihInput').addEventListener('keydown', e => { if (e.key === 'Enter') submitIntake(); });
+
+/* ================= 启动 ================= */
 setInterval(() => {
   const el = $('#clock');
   if (el) el.textContent = new Date().toLocaleString('zh-CN', {hour12: false});
 }, 1000);
 
+async function checkTophap() {
+  const el = $('#tophapChip');
+  try {
+    const s = await api('GET', '/api/tophap/status', null, 8000);
+    const ok = s && (s.core_ready || s.ok);
+    el.className = 'tophap ' + (ok ? 'ok' : 'warn');
+    el.innerHTML = `<span class="dot"></span><span>TopHap ${ok ? '已连接' : '未就绪'}</span>`;
+    const sp = $('#srcPanel');
+    if (sp) sp.innerHTML = `
+      <div class="src-row"><span>TopHap 公共记录</span>${ok ? '<span class="st ok">已连接</span>' : '<span class="st warn">未授权/未启用</span>'}</div>
+      <div class="src-row"><span>全网公开页面搜集</span><span class="st ok">可用</span></div>
+      <div class="src-row"><span>PDF / 截图 intake</span><span class="st ok">可用</span></div>
+    `;
+  } catch (e) {
+    el.className = 'tophap';
+    el.innerHTML = '<span class="dot"></span><span>TopHap 未启用</span>';
+  }
+}
+
 (async function init() {
-  try { await loadProjects(); } catch (e) { $('#app').innerHTML = `<div class="empty">后端连接失败：${esc(e.message)}<br>请确认服务已启动。</div>`; return; }
+  try { await loadProjects(); }
+  catch (e) {
+    $('#app').innerHTML = `<div class="empty"><div class="big">🔌</div>后端连接失败：${esc(e.message)}<br><span class="micro">请确认服务已启动（127.0.0.1:8100）</span></div>`;
+    return;
+  }
   render();
+  checkTophap();
 })();

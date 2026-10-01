@@ -7,14 +7,38 @@
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-<header class="top">
-  <div>
-    <h1>🏙️ DealDesk · 房地产交易核保台</h1>
-    <div class="sub">vertciti 房地产收购部 · 住宅 / 商业双轨独立核保 · 评分口径 buyer-box v2.3 / commercial v1.3 · <a href="/workbench.html" style="color:#ffd75e">📊 全面分析工作台</a></div>
+<div class="layout">
+  <aside class="side" id="side">
+    <div class="brand"><span class="logo">DD</span><span class="bt">DealDesk<small>房地产交易核保台</small></span></div>
+    <nav class="nav" id="nav">
+      <button data-view="dashboard" class="on">◈ 仪表盘</button>
+      <button data-view="intake">⚡ 智能搜集</button>
+      <button data-view="form">＋ 新建项目</button>
+      <button data-view="compare">◫ 项目对比 <em id="cmpCount"></em></button>
+      <a href="/workbench.html" target="_blank">📊 全面分析工作台</a>
+    </nav>
+    <div class="side-foot">
+      <div class="tophap" id="tophapChip"><span class="dot"></span><span>TopHap 检测中…</span></div>
+      <div class="ver">评分口径 buyer-box v2.3 / commercial v1.3</div>
+    </div>
+  </aside>
+  <div class="main">
+    <header class="topbar">
+      <div class="intake-hero">
+        <span class="ih-label">⚡ 房源直达</span>
+        <input id="ihInput" type="text" placeholder="粘贴 Zillow / Redfin / LoopNet / Realtor 房源链接，或输入地址，一键搜集 → 自动填满仪表盘" autocomplete="off" spellcheck="false">
+        <select id="ihTrack" title="核保轨道">
+          <option value="residential">住宅</option>
+          <option value="commercial">商业</option>
+        </select>
+        <button class="btn primary" id="ihGo">开始搜集</button>
+      </div>
+      <div class="top-right"><span class="clock" id="clock"></span></div>
+    </header>
+    <main id="app"></main>
+    <footer class="foot">本工具为筛选辅助，不构成投资建议；真实交易须经持牌律师 / CPA / title company 审查。自动搜集字段均标注来源与可信度，卖方口径数字不直接采信。</footer>
   </div>
-  <div class="sub" id="clock"></div>
-</header>
-<main id="app"></main>
+</div>
 <script src="/app.js"></script>
 </body>
 </html>
