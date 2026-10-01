@@ -253,11 +253,11 @@ function fmtVal(kind, x) {
 function scoreHtml(s, track) {
   const defs = track === 'residential' ? RES_METRICS : COM_METRICS;
   const veto = s.vetoes.length
-    ? `<div class="veto-banner bad"><b>⛔ 一票否决（${s.vetoes.length} 项）</b><ul>` +
+    ? `<div class="veto-banner bad"><b>✕ 一票否决（${s.vetoes.length} 项）</b><ul>` +
       s.vetoes.map(v => `<li>${esc(v.message)}</li>`).join('') + '</ul></div>'
-    : `<div class="veto-banner good"><b>✅ 无否决项</b><span class="muted"> —— 进入分级流程</span></div>`;
+    : `<div class="veto-banner good"><b>✓ 无否决项</b><span class="muted"> —— 进入分级流程</span></div>`;
   const dg = (s.downgrades || []).length
-    ? `<div class="veto-banner warn"><b>⚠️ 降级提示（封顶降级，非一票否决）</b><ul>` +
+    ? `<div class="veto-banner warn"><b>▲ 降级提示（封顶降级，非一票否决）</b><ul>` +
       s.downgrades.map(v => `<li>${esc(v.message)}</li>`).join('') + '</ul></div>' : '';
   const metrics = defs.map(([label, key, kind, hero]) =>
     `<div class="metric${hero ? ' hero' : ''}"><div class="k">${label}</div><div class="v">${fmtVal(kind, s.metrics[key])}</div></div>`).join('');
@@ -326,6 +326,16 @@ function render() {
 
 async function loadProjects() {
   state.projects = await api('GET', '/api/projects');
+  refreshDemoBanner();
+}
+/* 演示数据横幅：仅当存在含"演示"的项目时展示 */
+function refreshDemoBanner() {
+  var b = document.getElementById('demoBanner');
+  if (!b) return;
+  var hasDemo = (state.projects || []).some(p => (p.name || '').indexOf('演示') >= 0);
+  var dismissed = false;
+  try { dismissed = localStorage.getItem('dd_demo_dismissed') === '1'; } catch (e) {}
+  b.hidden = !(hasDemo && !dismissed);
 }
 
 /* ================= 仪表盘 ================= */
@@ -340,22 +350,22 @@ function kpiData() {
 
 function insightHtml() {
   const k = kpiData();
-  if (!k.n) return `<div class="insight idle"><div class="ic">📭</div><div>
+  if (!k.n) return `<div class="insight idle"><div class="ic">○</div><div>
     <div class="t">管线是空的，还没有任何项目</div>
     <div class="d">在顶部粘贴一条房源链接（Zillow / Redfin / LoopNet / Realtor），一键搜集，仪表盘会自动填满。</div></div>
     <div class="act"><button class="btn primary" data-act="focusIntake">去搜集第一条</button></div></div>`;
   if (k.veto) {
     const names = state.projects.filter(p => p.score.grade === '否决' || (p.score.vetoes || []).length)
       .slice(0, 3).map(p => esc(p.name || p.address || ('#' + p.id))).join('、');
-    return `<div class="insight bad"><div class="ic">⛔</div><div>
+    return `<div class="insight bad"><div class="ic">✕</div><div>
     <div class="t">${k.veto} 个项目触发一票否决${k.a ? `，但有 ${k.a} 个 A 级项目可推进` : '，暂无 A 级项目'}</div>
     <div class="d">否决：${names}${k.veto > 3 ? ` 等 ${k.veto} 个` : ''}。否决项在详情页逐条列出，先处理否决再谈分级。</div></div></div>`;
   }
-  if (k.a) return `<div class="insight good"><div class="ic">🎯</div><div>
+  if (k.a) return `<div class="insight good"><div class="ic">◈</div><div>
     <div class="t">${k.a} 个 A 级项目在管线中，总全口径现金需求 ${money(k.cash)}</div>
     <div class="d">按 cash-to-close 升序排列，先看最便宜的——资金有限，贵的不先谈。</div></div></div>`;
   const b = state.projects.filter(p => p.score.grade === 'B').length;
-  return `<div class="insight warn"><div class="ic">👀</div><div>
+  return `<div class="insight warn"><div class="ic">◈</div><div>
     <div class="t">暂无 A 级项目，${b} 个 B 级可继续推进观察</div>
     <div class="d">B 级进日报收录；C 级只进观察名单。点击行进入详情看差在哪几分。</div></div></div>`;
 }
@@ -445,7 +455,7 @@ function renderDashboard(app) {
             ${th('DSCR', 'dscr', 1)}${th('CoC', 'coc', 1)}${th('cash-to-close', 'cash_to_close', 1)}
             <th>否决</th>${th('更新', 'updated')}<th>操作</th>
           </tr></thead><tbody>${body}</tbody></table>`
-          : `<div class="empty"><div class="big">🏚️</div>这个轨道还没有项目<br><span class="micro">粘贴房源链接一键搜集，或点右上"＋ 新建"手动录入</span></div>`}
+          : `<div class="empty"><div class="big">○</div>这个轨道还没有项目<br><span class="micro">粘贴房源链接一键搜集，或点右上"＋ 新建"手动录入</span></div>`}
         </div>
       </div>
       <div class="rail">
@@ -552,7 +562,7 @@ function renderIntake(app) {
   const it = state.intake;
   if (!it) {
     app.innerHTML = `<div class="panel" style="padding:34px 28px;max-width:760px;margin:20px auto">
-      <h2 class="sec-t">⚡ 智能搜集</h2>
+      <h2 class="sec-t">◆ 智能搜集</h2>
       <p class="muted" style="font-size:13.5px">在顶部输入框粘贴房源链接（Zillow / Redfin / LoopNet / Realtor）或输入地址，点"开始搜集"。
       后端会自动抓取公开页面、做全网独立搜集、跑 TopHap 公共记录 enrich，每个字段都标注来源与可信度——抓不到就明说，绝不编数。</p>
       <div class="kvline"><span class="kk">支持站点</span><span class="vv" style="font-weight:400">Zillow / Redfin / Realtor / LoopNet / county assessor（.gov）等公开页面</span></div>
@@ -576,7 +586,7 @@ function renderIntake(app) {
     body = intakeResultHtml(it);
   }
   app.innerHTML = `<div class="zone"><div class="panel" style="padding:20px 22px">
-    <h2 class="sec-t">⚡ 智能搜集 <span class="micro">房源链接 / 地址 → 全网公开信息自动搜集</span></h2>${body}</div></div>`;
+    <h2 class="sec-t">◆ 智能搜集 <span class="micro">房源链接 / 地址 → 全网公开信息自动搜集</span></h2>${body}</div></div>`;
 }
 
 function intakeResultHtml(it) {
@@ -603,7 +613,7 @@ function intakeResultHtml(it) {
   const draft = it.draft;
   return `
     <div class="pipe-steps">${stepsHtml(it.steps)}</div>
-    <div class="insight ${filledN ? 'good' : 'warn'}"><div class="ic">${filledN ? '✅' : '⚠️'}</div><div>
+    <div class="insight ${filledN ? 'good' : 'warn'}"><div class="ic">${filledN ? '✓' : '▲'}</div><div>
       <div class="t">${addrLine || '搜集完成'}：填入 ${filledN} 个字段${sellerN ? `（其中 ${sellerN} 个为卖方口径、待验证）` : ''}，${manual.length} 个需手动补</div>
       <div class="d">${res.independent_note ? esc(res.independent_note) + '。' : ''}平台估值（zestimate）仅参考，不进收购价；抓不到的字段已标"需手动补"。</div></div>
       <div class="act" style="display:flex;gap:8px">${filledN
@@ -620,14 +630,14 @@ function intakeResultHtml(it) {
         <div style="margin-left:auto;display:flex;gap:8px">
           <button class="btn primary" data-act="saveDraft">保存为项目 →</button>
           <button class="btn" data-act="editDraft">去表单微调</button></div>
-      </div>${draft.score.vetoes.length ? `<div class="veto-banner bad"><b>⛔ 一票否决（${draft.score.vetoes.length}）</b><ul>` +
+      </div>${draft.score.vetoes.length ? `<div class="veto-banner bad"><b>✕ 一票否决（${draft.score.vetoes.length}）</b><ul>` +
         draft.score.vetoes.map(v => `<li>${esc(v.message)}</li>`).join('') + '</ul></div>' : ''}
       <div class="metrics" style="margin-top:14px">${(it.track === 'residential' ? RES_METRICS : COM_METRICS)
         .filter(([, , , hero]) => hero).map(([label, key, kind]) =>
         `<div class="metric hero"><div class="k">${label}</div><div class="v">${fmtVal(kind, draft.score.metrics[key])}</div></div>`).join('')}</div>
       </div>
       <p class="micro" style="margin-top:8px">自动填入的字段在表单里以绿色高亮＋来源标注；保存前请逐项核对，未补的字段用保守值。</p>` : ''}
-    <details class="fold"><summary>🔍 搜集过程日志（${(res.log || []).length} 步）<span class="micro">点击展开</span></summary>
+    <details class="fold"><summary>搜集过程日志（${(res.log || []).length} 步）<span class="micro">点击展开</span></summary>
       <div class="fb"><div class="logbox">${logRows || '<span class="muted">无日志</span>'}</div></div></details>`;
 }
 
@@ -660,7 +670,7 @@ async function makeDraft() {
 /* ================= 表单 ================= */
 function fieldHtml(f, src) {
   const id = 'f_' + f.key;
-  const tag = src ? ` <span class="srctag">⚡ ${esc(src.display || src.value)} · ${esc(src.source || '')}</span>` : '';
+  const tag = src ? ` <span class="srctag">◆ ${esc(src.display || src.value)} · ${esc(src.source || '')}</span>` : '';
   if (f.type === 'check')
     return `<div class="field check"><label><input type="checkbox" id="${id}" ${f.def ? 'checked' : ''}> ${esc(f.label)}${tag}</label>${f.hint ? `<div class="hint">${esc(f.hint)}</div>` : ''}</div>`;
   if (f.type === 'select') {
@@ -739,12 +749,12 @@ function renderForm(app) {
       </div>
       <span style="font-size:14px;font-weight:700">${state.editingId ? '编辑项目' : '新建项目'}</span>
       <span class="micro">评分口径：${state.track === 'residential' ? 'buyer-box v2.3' : 'commercial v1.3'}</span></div>
-    ${fromIntake ? `<div class="insight good"><div class="ic">⚡</div><div>
+    ${fromIntake ? `<div class="insight good"><div class="ic">◆</div><div>
       <div class="t">已从智能搜集自动填入 ${Object.keys(sources).length} 个字段</div>
       <div class="d">绿色高亮的字段带来源标注；保存前请逐项核对，未补字段用保守值。卖方口径数字已标待验证，不直接采信。</div></div></div>` : ''}
     ${secsHtml}
     <div class="toolbar" style="position:sticky;bottom:0;background:rgba(242,245,249,.96);padding:10px 0">
-      <button class="btn big" data-act="preview">⚡ 一键打分预览（不保存）</button>
+      <button class="btn big" data-act="preview">◆ 一键打分预览（不保存）</button>
       <button class="btn primary big" data-act="save">${state.editingId ? '保存修改' : '保存项目'}</button>
     </div>
     <div id="preview"></div>`;
@@ -780,7 +790,7 @@ async function renderDetail(app) {
   }
   app.innerHTML = `
     <div class="toolbar"><button class="btn" data-act="back">← 返回仪表盘</button><span class="spacer"></span>
-      <button class="btn" data-act="report" data-id="${p.id}">🖨️ 打印报告</button>
+      <button class="btn" data-act="report" data-id="${p.id}">打印报告</button>
       <button class="btn" data-act="edit" data-id="${p.id}">编辑</button>
       <button class="btn danger" data-act="del" data-id="${p.id}">删除</button></div>
     <div class="dhero"><div class="dhero-top">
@@ -790,10 +800,10 @@ async function renderDetail(app) {
         <div class="addr">${esc(p.address)} · ${esc(s.structure_label || s.asset_label || '')} · ${p.track === 'residential' ? '住宅' : '商业'}</div></div>
     </div>
     ${s.vetoes.length
-      ? `<div class="veto-banner bad"><b>⛔ 一票否决（${s.vetoes.length} 项）——直接结论：否决</b><ul>` +
+      ? `<div class="veto-banner bad"><b>✕ 一票否决（${s.vetoes.length} 项）——直接结论：否决</b><ul>` +
         s.vetoes.map(v => `<li>${esc(v.message)}</li>`).join('') + '</ul></div>'
-      : `<div class="veto-banner good"><b>✅ 无否决项</b><span class="muted"> —— 按总分定级：${esc(s.grade)} 级</span></div>`}
-    ${(s.downgrades || []).length ? `<div class="veto-banner warn"><b>⚠️ 降级提示</b><ul>` +
+      : `<div class="veto-banner good"><b>✓ 无否决项</b><span class="muted"> —— 按总分定级：${esc(s.grade)} 级</span></div>`}
+    ${(s.downgrades || []).length ? `<div class="veto-banner warn"><b>▲ 降级提示</b><ul>` +
       s.downgrades.map(v => `<li>${esc(v.message)}</li>`).join('') + '</ul></div>' : ''}
     <div class="dhero-metrics">${heroMetrics(p).map(([k, v, kind]) =>
       `<div class="hm"><div class="k">${k}</div><div class="v">${fmtVal(kind, v)}</div></div>`).join('')}</div>
@@ -991,7 +1001,7 @@ async function checkTophap() {
 (async function init() {
   try { await loadProjects(); }
   catch (e) {
-    $('#app').innerHTML = `<div class="empty"><div class="big">🔌</div>后端连接失败：${esc(e.message)}<br><span class="micro">请确认服务已启动（127.0.0.1:8100）</span></div>`;
+    $('#app').innerHTML = `<div class="empty"><div class="big">○</div>后端连接失败：${esc(e.message)}<br><span class="micro">请确认服务已启动（127.0.0.1:8100）</span></div>`;
     return;
   }
   render();
