@@ -60,7 +60,7 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 
 ```bash
 rm -f dealdesk.db   # 避免开发副产品 DB 串扰
-.venv/bin/python -m pytest tests/ -q   # 137 个用例，本地全过
+.venv/bin/python -m pytest tests/ -q   # 159 个用例，本地全过
 ```
 
 ## 项目结构

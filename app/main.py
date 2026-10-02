@@ -423,6 +423,34 @@ async def wb_intake_pdf(file: UploadFile = File(...)):
             pass
 
 
+# ---------------- 商业核保 PDF intake：OM/flyer → 商业字段 → 自动填表 ----------------
+
+@app.post("/api/uw-commercial/intake/pdf")
+async def uw_commercial_intake_pdf(file: UploadFile = File(...)):
+    """商业 PDF intake：上传 OM/flyer/卖方材料 → 提取商业核保字段.
+
+    返回 fields[]（key 直接对应 uw-commercial.html 的 data-in 路径）
+    与 tenants[]（租约表行），全部标"卖方材料口径、待独立验证"。
+    """
+    name = file.filename or "upload.pdf"
+    if not name.lower().endswith(".pdf"):
+        raise HTTPException(400, "只接受 PDF 文件")
+    data = await file.read()
+    if len(data) > 20 * 1024 * 1024:
+        raise HTTPException(400, "PDF 超过 20MB 上限")
+    if len(data) < 100:
+        raise HTTPException(400, "文件过小或为空")
+    path = pdf_intake.save_upload(data, name)
+    try:
+        return pdf_intake.run_commercial_pdf_upload(path, name)
+    finally:
+        try:
+            import os
+            os.remove(path)
+        except Exception:
+            pass
+
+
 # ---------------- 截图 intake：房源页截图 → pending 队列 → cron 视觉提取 ----------------
 
 @app.post("/api/wb/intake/image")

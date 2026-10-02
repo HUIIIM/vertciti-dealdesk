@@ -198,8 +198,6 @@ def svg_cashflow(prep: dict | None) -> str:
     else:
         parts.append(f'<text x="{W-R}" y="{T+16}" text-anchor="end" font-size="12" '
                      f'fill="{RED}" {_SVG_FONT}>10 年内未回本（按当前现金流线性外推）</text>')
-    parts.append(f'<text x="{L}" y="{T-4}" font-size="11" fill="{MUTED}" {_SVG_FONT}>'
-                 f'累计净现金流（含初始投入 -{_fmt_money(prep["cash_invested"])} 起点）</text>')
     parts.append("</svg>")
     return "".join(parts)
 
@@ -288,3 +286,181 @@ def svg_dimensions(prep: list) -> str:
                      f'{_SVG_FONT}>{txt}</text>')
     parts.append("</svg>")
     return "".join(parts)
+
+
+# ---------------------------------------------------------------- Pillow 手绘 PNG（PDF 嵌入，2x 高清）
+try:
+    from PIL import Image, ImageDraw, ImageFont
+    _PIL_OK = True
+except Exception:  # pragma: no cover
+    _PIL_OK = False
+
+
+def _pil_font(size: int, scale: int = 2):
+    if not _PIL_OK:
+        raise RuntimeError("Pillow 不可用")
+    try:
+        return ImageFont.truetype(_FONT_PATH, size * scale)
+    except Exception:
+        return ImageFont.load_default()
+
+
+def _png_bytes(img) -> io.BytesIO:
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    buf.seek(0)
+    return buf
+
+
+def png_placeholder(title: str, scale: int = 2) -> io.BytesIO:
+    W, H = 760 * scale, 120 * scale
+    img = Image.new("RGB", (W, H), _RGB["#ffffff"])
+    d = ImageDraw.Draw(img)
+    d.rounded_rectangle([2, 2, W - 2, H - 2], radius=12, outline=_RGB[HAIRLINE],
+                        width=2 * scale)
+    f = _pil_font(15, scale)
+    d.text((W / 2, H / 2), f"— {title}：数据不足，暂无图表", font=f,
+           fill=_RGB[MUTED], anchor="mm")
+    return _png_bytes(img)
+
+
+def png_cashflow(prep: dict | None, scale: int = 2) -> io.BytesIO:
+    if not prep:
+        return png_placeholder("现金流回本测算", scale)
+    W, H = 760 * scale, 300 * scale
+    L, R, T, B = 64 * scale, 18 * scale, 18 * scale, 40 * scale
+    pw, ph = W - L - R, H - T - B
+    img = Image.new("RGB", (W, H), _RGB["#ffffff"])
+    d = ImageDraw.Draw(img)
+    cum = prep["cumulative"]
+    lo = min(0.0, min(cum))
+    hi = max(0.0, max(cum))
+    span = (hi - lo) or 1.0
+    lo -= span * 0.08
+    hi += span * 0.08
+
+    def X(i):
+        return L + i / 10 * pw
+
+    def Y(v):
+        return T + (1 - (v - lo) / (hi - lo)) * ph
+
+    f_tick, f_tag = _pil_font(11, scale), _pil_font(12, scale)
+    for k in range(5):
+        v = lo + (hi - lo) * k / 4
+        y = Y(v)
+        d.line([(L, y), (W - R, y)], fill=_RGB[HAIRLINE], width=scale)
+        d.text((L - 8 * scale, y), _fmt_k(v), font=f_tick, fill=_RGB[MUTED], anchor="rm")
+    if lo < 0 < hi:
+        y0 = Y(0)
+        for x in range(int(L), int(W - R), 12 * scale):
+            d.line([(x, y0), (min(x + 6 * scale, W - R), y0)], fill=_RGB[MUTED],
+                   width=scale)
+    for yr in (0, 2, 4, 6, 8, 10):
+        d.text((X(yr), H - 16 * scale), f"{yr} 年", font=f_tick, fill=_RGB[MUTED],
+               anchor="mm")
+    pts = [(X(i), Y(v)) for i, v in enumerate(cum)]
+    # 面积
+    d.polygon([(L, Y(0))] + pts + [(W - R, Y(0))], fill=(236, 243, 242))
+    d.line(pts, fill=_RGB[TEAL], width=int(2.5 * scale), joint="curve")
+    be = prep["breakeven"]
+    if be is not None:
+        i0 = int(be)
+        frac = be - i0
+        if i0 >= 10:
+            bx, bv = X(10), cum[10]
+        else:
+            bx = X(i0) + frac * (X(i0 + 1) - X(i0))
+            bv = cum[i0] + frac * (cum[i0 + 1] - cum[i0])
+        by = Y(bv)
+        r = 5 * scale
+        d.ellipse([bx - r, by - r, bx + r, by + r], fill=_RGB[TEAL])
+        tag = "首年即回本" if be == 0 else f"约 {be:.1f} 年回本"
+        tx = min(max(bx + 10 * scale, L + 60 * scale), W - R - 120 * scale)
+        d.text((tx, by - 12 * scale), tag, font=f_tag, fill=_RGB[TEAL], anchor="lm")
+    else:
+        d.text((W - R, T + 8 * scale), "10 年内未回本（按当前现金流线性外推）",
+               font=f_tag, fill=_RGB[RED], anchor="ra")
+    return _png_bytes(img)
+
+
+def _png_sens_panel(d, rows, title, ox, pw, T, B, H, gmin, gmax, scale):
+    top, bot = T, H - B
+    ph = bot - top
+    n = len(rows)
+    slot = pw / n
+    bw = slot * 0.62
+    f_t, f_v, f_l = _pil_font(13, scale), _pil_font(10, scale), _pil_font(11, scale)
+
+    def Y(v):
+        return top + (1 - (v - gmin) / (gmax - gmin)) * ph
+
+    d.text((ox + pw / 2, T - 22 * scale), title, font=f_t, fill=_RGB[INK], anchor="mm")
+    y0 = Y(0)
+    for x in range(int(ox), int(ox + pw), 12 * scale):
+        d.line([(x, y0), (min(x + 6 * scale, ox + pw), y0)], fill=_RGB[MUTED], width=scale)
+    for i, r in enumerate(rows):
+        cx = ox + slot * i + slot / 2
+        v = r["value"]
+        if v is None:
+            d.text((cx, (top + bot) / 2), "—", font=f_v, fill=_RGB[MUTED], anchor="mm")
+        else:
+            yv = Y(v)
+            y_top, y_bot = (yv, y0) if v >= 0 else (y0, yv)
+            color = _RGB[TEAL] if r["label"] == "基准" else (_RGB[RED] if v < 0 else _RGB[MUTED])
+            d.rounded_rectangle([cx - bw / 2, y_top, cx + bw / 2, max(y_bot, y_top + 2)],
+                                radius=3 * scale, fill=color)
+            ly = y_top - 8 * scale if v >= 0 else y_bot + 8 * scale
+            anch = "ma" if v >= 0 else "md"
+            d.text((cx, ly), _fmt_money(v), font=f_v, fill=_RGB[INK], anchor=anch)
+        d.text((cx, bot + 20 * scale), r["label"], font=f_l, fill=_RGB[MUTED], anchor="ma")
+
+
+def png_sensitivity(prep: dict | None, scale: int = 2) -> io.BytesIO:
+    if not prep:
+        return png_placeholder("敏感性分析", scale)
+    W, H = 760 * scale, 340 * scale
+    T, B = 52 * scale, 44 * scale
+    gap, side = 24 * scale, 24 * scale
+    pw = (W - side * 2 - gap) / 2
+    img = Image.new("RGB", (W, H), _RGB["#ffffff"])
+    d = ImageDraw.Draw(img)
+    vals = [r["value"] for r in prep["rent"] + prep["rate"] if r["value"] is not None]
+    gmin = min(0.0, min(vals))
+    gmax = max(0.0, max(vals))
+    span = (gmax - gmin) or 1.0
+    gmin -= span * 0.12
+    gmax += span * 0.12
+    _png_sens_panel(d, prep["rent"], "租金变动 → 月净现金流", side, pw, T, B, H,
+                    gmin, gmax, scale)
+    _png_sens_panel(d, prep["rate"], "利率变动 → 月净现金流", side + pw + gap, pw, T, B,
+                    H, gmin, gmax, scale)
+    return _png_bytes(img)
+
+
+def png_dimensions(prep: list, scale: int = 2) -> io.BytesIO:
+    if not prep:
+        return png_placeholder("评分构成", scale)
+    W = 760 * scale
+    top, row_h, bottom = 12 * scale, 46 * scale, 12 * scale
+    H = int(top + len(prep) * row_h + bottom)
+    label_w, val_w = 168 * scale, 120 * scale
+    tx0, tx1 = label_w + 8 * scale, W - val_w - 8 * scale
+    img = Image.new("RGB", (W, H), _RGB["#ffffff"])
+    d = ImageDraw.Draw(img)
+    f_l, f_v = _pil_font(13, scale), _pil_font(13, scale)
+    for i, r in enumerate(prep):
+        y = top + i * row_h
+        cy = y + row_h / 2
+        d.text((label_w - 8 * scale, cy), r["label"], font=f_l, fill=_RGB[INK],
+               anchor="rm")
+        d.rounded_rectangle([tx0, cy - 9 * scale, tx1, cy + 9 * scale],
+                            radius=4 * scale, fill=_RGB[TRACK_BG])
+        fw = (tx1 - tx0) * r["ratio"]
+        if fw > 1:
+            d.rounded_rectangle([tx0, cy - 9 * scale, tx0 + fw, cy + 9 * scale],
+                                radius=4 * scale, fill=_RGB[TEAL])
+        txt = ((f"{r['points']:.0f}" if float(r['points']).is_integer()
+                else f"{r['points']:.1f}") + f" / {r['weight']:.0f}")
+        d.text((tx1 + 10 * scale, cy), txt, font=f_v, fill=_RGB[INK], anchor="lm")
+    return _png_bytes(img)

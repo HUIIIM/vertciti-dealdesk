@@ -3,3 +3,4 @@ uvicorn[standard]>=0.30
 httpx>=0.27
 python-multipart>=0.0.18
 reportlab>=4.0
+Pillow>=10.0  # 报告图表：服务端手绘 PNG（pdf_report 嵌入），Vercel serverless 可用

@@ -278,6 +278,17 @@ table.t input.cell-in::placeholder { color: var(--tx3); font-size: 11px; font-fa
   .kv .cell:nth-child(-n+2) { border-top: 0; }
 }
 .c-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 36px; }
+/* ---- 智能录取条 ---- */
+.intake-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  border: 1px dashed var(--teal-line); border-radius: 8px; background: var(--teal-dim);
+  padding: 10px 14px; margin-bottom: 14px; }
+.intake-label { font-size: 12px; font-weight: 800; color: var(--teal); letter-spacing: .06em; }
+.intake-file { cursor: pointer; }
+.intake-hint { font-size: 12px; color: var(--muted); }
+.intake-status { font-size: 12.5px; font-weight: 700; margin-left: auto; }
+.intake-status.ok { color: var(--green); }
+.intake-status.err { color: var(--red); }
+.intake-status.busy { color: var(--amber); }
 .c-grid > * { min-width: 0; }
 </style>
 </head>
@@ -308,6 +319,16 @@ table.t input.cell-in::placeholder { color: var(--tx3); font-size: 11px; font-fa
 </header>
 
 <main class="desk">
+  <!-- 智能录取：PDF OM/flyer → 自动填表 -->
+  <div class="intake-bar" id="intakeBar">
+    <span class="intake-label">智能录取</span>
+    <label class="intake-file">
+      <input type="file" id="intakePdf" accept=".pdf,application/pdf" hidden>
+      <span class="btn sm">上传 PDF（OM / Flyer / 卖方材料）</span>
+    </label>
+    <span class="intake-hint">自动提取价格/面积/NOI/租户，填入下表；全部标"卖方口径、待验证"</span>
+    <span class="intake-status" id="intakeStatus"></span>
+  </div>
   <p class="note">任一输入格改动 → 整条链自动重算并闪烁。<b>琥珀色</b> = 机器算出；<span class="bdg">描边徽章</span> = 你的手工覆盖。留空即自动。</p>
 
   <!-- 一眼结论 -->

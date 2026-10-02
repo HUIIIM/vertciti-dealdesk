@@ -641,6 +641,65 @@ async function init() {
   window.addEventListener("beforeunload", (e) => {
     if (dirty) { e.preventDefault(); e.returnValue = ""; }
   });
+  // ---- 智能录取：PDF → 自动填表 ----
+  const intakeInput = $("#intakePdf");
+  const intakeStatus = $("#intakeStatus");
+  if (intakeInput) {
+    intakeInput.addEventListener("change", async (e) => {
+      const f = e.target.files[0];
+      if (!f) return;
+      setStatus("busy", "解析中…");
+      try {
+        const fd = new FormData();
+        fd.append("file", f, f.name);
+        const r = await fetch("/api/uw-commercial/intake/pdf", { method: "POST", body: fd });
+        const d = await r.json();
+        if (!r.ok || d.error) throw new Error(d.error || ("HTTP " + r.status));
+        let filled = 0, skipped = [];
+        // 填字段：key 直接对应 data-in 路径
+        for (const fld of (d.fields || [])) {
+          const el = document.querySelector('[data-in="' + fld.key + '"]');
+          if (el && fld.value != null) {
+            el.value = fld.value;
+            el.dispatchEvent(new Event("input", { bubbles: true }));
+            el.style.boxShadow = "0 0 0 2px var(--teal-line)";
+            setTimeout(() => { el.style.boxShadow = ""; }, 1800);
+            filled++;
+          } else {
+            skipped.push(fld.key + "（无对应输入项）");
+          }
+        }
+        // 填租户：tenants[] → rent roll 行（直接进 state.tenants，再 render）
+        const ts = d.tenants || [];
+        if (ts.length) {
+          for (const t of ts) {
+            state.tenants.push({
+              suite: t.suite || "", tenant: t.tenant || "",
+              sf: t.sf || 0, monthly_rent: t.monthly_rent || 0,
+              underwritten_annual: t.monthly_rent ? (t.monthly_rent * 12) : 0
+            });
+          }
+          markDirty();
+        }
+        renderAll();
+        const parts = [];
+        parts.push("已填 " + filled + " 个字段");
+        if (ts.length) parts.push(ts.length + " 个租户");
+        if (skipped.length) parts.push("未映射 " + skipped.length + " 项");
+        parts.push("（全部为卖方口径、待独立验证）");
+        setStatus("ok", parts.join("；"));
+      } catch (err) {
+        setStatus("err", "解析失败：" + err.message);
+      } finally {
+        e.target.value = "";
+      }
+    });
+  }
+  function setStatus(cls, msg) {
+    if (!intakeStatus) return;
+    intakeStatus.className = "intake-status " + cls;
+    intakeStatus.textContent = msg;
+  }
   // ?pid= 直接打开指定项目（从首页搜集转入）
   const pid = new URLSearchParams(location.search).get('pid');
   // 保存列表最后加载：API 失败也不影响本地输入和计算

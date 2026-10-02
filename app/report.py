@@ -5,6 +5,8 @@ from __future__ import annotations
 import html
 from datetime import datetime
 
+from . import charts, report_narrative, sensitivity
+
 GRADE_LABELS = {"A": "A 级（日报头条）", "B": "B 级（日报收录）", "C": "C 级（观察名单）",
                 "不收录": "不收录（<50 分）", "否决": "一票否决"}
 
@@ -80,6 +82,27 @@ def render(project: dict) -> str:
         f"<td>{html.escape(c['note'])}</td></tr>" for c in s["checks"]
     )
     struct = html.escape(s.get("structure_label", "") or s.get("asset_label", ""))
+    B = lambda t: f"<b>{html.escape(t)}</b>"
+    T = html.escape
+    lead_html = "".join(f"<p>{para}</p>" for para in
+                        report_narrative.lead_paragraphs(p, B, T))
+    concl_html = "".join(f"<p>{para}</p>" for para in
+                         report_narrative.conclusion_paragraphs(p, B, T))
+
+    # 敏感性分析（复用 sensitivity 引擎；失败则图表占位"—"）
+    try:
+        sens = sensitivity.run(track, p.get("input") or {})
+    except Exception:
+        sens = None
+    sens_prep = charts.prep_sensitivity(track, sens)
+    sens_rows = ""
+    if sens_prep:
+        for i in range(5):
+            r, t2 = sens_prep["rent"][i], sens_prep["rate"][i]
+            sens_rows += ("<tr>"
+                          f"<td>{html.escape(r['label'])}</td><td class='num'>{_money(r['value'])}</td>"
+                          f"<td>{html.escape(t2['label'])}</td><td class='num'>{_money(t2['value'])}</td>"
+                          "</tr>")
 
     return f"""<!DOCTYPE html>
 <html lang="zh-CN"><head><meta charset="utf-8">
@@ -96,6 +119,15 @@ def render(project: dict) -> str:
  .veto li {{ color: #c00; font-weight: 600; }} .ok {{ color: #0a7a2f; font-weight: 600; }}
  .downgrade li {{ color: #b45309; font-weight: 600; }}
  .meta {{ color: #555; font-size: 13px; }}
+ .lead {{ background: #f6f9fb; border-left: 4px solid #0f766e; padding: 12px 16px; margin: 18px 0 4px; font-size: 14.5px; line-height: 1.75; }}
+ .lead p {{ margin: 6px 0; }}
+ figure.chart {{ margin: 14px 0 6px; }}
+ figure.chart svg {{ display: block; }}
+ figcaption {{ font-size: 12.5px; color: #64748b; margin-top: 6px; line-height: 1.6; }}
+ .conclusion {{ background: #f6f9fb; border: 1px solid #dbe3ec; border-radius: 8px; padding: 12px 18px; margin: 10px 0; font-size: 14.5px; line-height: 1.8; }}
+ .conclusion p {{ margin: 8px 0; }}
+ td.num {{ text-align: right; font-variant-numeric: tabular-nums; }}
+ th.nw {{ white-space: nowrap; }}
  .disclaimer {{ font-size: 12px; color: #666; border-top: 1px solid #ccc; margin-top: 32px; padding-top: 8px; }}
  @media print {{ body {{ margin: 0; }} .noprint {{ display: none; }} }}
 </style></head><body>
@@ -110,15 +142,29 @@ def render(project: dict) -> str:
 {row("总分", f"<span class='grade {html.escape(grade)}'>{s['total']} / {html.escape(grade)}</span>")}
 {row("等级说明", GRADE_LABELS.get(grade, grade))}
 </table>
+<h2>导语</h2>
+<div class="lead">{lead_html}</div>
 <h2>一票否决检查</h2>
 {veto_html}
 {dg_html}
 <h2>测算结果（保守全口径）</h2>
 <table>{metric_rows}</table>
+<h2>现金流回本测算</h2>
+<figure class="chart">{charts.svg_cashflow(charts.prep_cashflow(track, m))}
+<figcaption>按当前{('月' if track=='residential' else '年')}净现金流线性外推 10 年（不含租金增长、再融资与资产增值）。起点为初始现金投入；数据缺失处标"—"。</figcaption></figure>
+<h2>敏感性分析</h2>
+<figure class="chart">{charts.svg_sensitivity(sens_prep)}
+<figcaption>租金 ±10%、利率 ±2% 五档对月净现金流的影响，全部用打分引擎重算（口径与测算结果一致）。深色柱为当前基准情景。</figcaption></figure>
+<table><tr><th>租金情景</th><th class="num nw">月净现金流</th><th>利率情景</th><th class="num nw">月净现金流</th></tr>{sens_rows}</table>
 <h2>评分明细（100 分制）</h2>
 <table><tr><th>维度</th><th>权重</th><th>得分</th><th>说明</th></tr>{dim_rows}</table>
+<h2>评分构成</h2>
+<figure class="chart">{charts.svg_dimensions(charts.prep_dimensions(s["dimensions"]))}
+<figcaption>各维度实际得分 / 权重。丢分最多的维度见下方结论。</figcaption></figure>
 <h2>阈值对照</h2>
 <table><tr><th>检查项</th><th>状态</th></tr>{check_rows}</table>
+<h2>结论与下一步</h2>
+<div class="conclusion">{concl_html}</div>
 <div class="disclaimer">
 本报告为筛选工具输出，不构成投资建议。所有"估算"数字以标注假设为准，未核实项不得作为决策依据。
 每笔真实交易签约/交割/报税前，必须经持牌本地房地产律师、CPA/税务师、title company 审查。

@@ -351,14 +351,14 @@ function kpiData() {
 function insightHtml() {
   const k = kpiData();
   if (!k.n) return `<div class="insight idle"><div class="ic">○</div><div>
-    <div class="t">管线是空的，还没有任何项目</div>
-    <div class="d">在顶部粘贴一条房源链接（Zillow / Redfin / LoopNet / Realtor），一键搜集，仪表盘会自动填满。</div></div>
+    <div class="t">管线还是空的——你的第一条 deal 在哪？</div>
+    <div class="d">在顶部粘贴一条房源链接（Zillow / Redfin / LoopNet / Realtor），一键搜集，剩下的交给 DealDesk。</div></div>
     <div class="act"><button class="btn primary" data-act="focusIntake">去搜集第一条</button></div></div>`;
   if (k.veto) {
     const names = state.projects.filter(p => p.score.grade === '否决' || (p.score.vetoes || []).length)
       .slice(0, 3).map(p => esc(p.name || p.address || ('#' + p.id))).join('、');
     return `<div class="insight bad"><div class="ic">✕</div><div>
-    <div class="t">${k.veto} 个项目触发一票否决${k.a ? `，但有 ${k.a} 个 A 级项目可推进` : '，暂无 A 级项目'}</div>
+    <div class="t">${k.veto} 个项目触发一票否决${k.a ? `，但有 ${k.a} 个 A 级项目可推进` : '，还没有 A 级项目'}</div>
     <div class="d">否决：${names}${k.veto > 3 ? ` 等 ${k.veto} 个` : ''}。否决项在详情页逐条列出，先处理否决再谈分级。</div></div></div>`;
   }
   if (k.a) return `<div class="insight good"><div class="ic">◈</div><div>
@@ -366,8 +366,8 @@ function insightHtml() {
     <div class="d">按 cash-to-close 升序排列，先看最便宜的——资金有限，贵的不先谈。</div></div></div>`;
   const b = state.projects.filter(p => p.score.grade === 'B').length;
   return `<div class="insight warn"><div class="ic">◈</div><div>
-    <div class="t">暂无 A 级项目，${b} 个 B 级可继续推进观察</div>
-    <div class="d">B 级进日报收录；C 级只进观察名单。点击行进入详情看差在哪几分。</div></div></div>`;
+    <div class="t">还没有 A 级项目，${b} 个 B 级在观察</div>
+    <div class="d">B 级进日报收录，C 级只进观察名单。点进详情看看，差的那几分能不能谈回来。</div></div></div>`;
 }
 
 function sortVal(p, key) {
@@ -455,7 +455,7 @@ function renderDashboard(app) {
             ${th('DSCR', 'dscr', 1)}${th('CoC', 'coc', 1)}${th('cash-to-close', 'cash_to_close', 1)}
             <th>否决</th>${th('更新', 'updated')}<th>操作</th>
           </tr></thead><tbody>${body}</tbody></table>`
-          : `<div class="empty"><div class="big">○</div>这个轨道还没有项目<br><span class="micro">粘贴房源链接一键搜集，或点右上"＋ 新建"手动录入</span></div>`}
+          : `<div class="empty"><div class="big">○</div>这个赛道还没有项目<br><span class="micro">粘贴一条房源链接一键搜集，或点右上角「＋ 新建」手动录入——三分钟就能看到第一份打分</span></div>`}
         </div>
       </div>
       <div class="rail">
@@ -896,7 +896,7 @@ async function renderCompare(app) {
     <div class="panel"><div class="panel-h"><h2>项目对比</h2></div>
     <div class="panel-b tbl-wrap" id="cmp"><div class="empty"><span class="spinner"></span>加载中…</div></div></div>`;
   if (!state.compareIds.length) {
-    $('#cmp').innerHTML = '<div class="empty">还没有选中项目<br><span class="micro">回到仪表盘，在管线表格右侧勾选"对比"</span></div>';
+    $('#cmp').innerHTML = '<div class="empty">还没选中要对比的项目<br><span class="micro">回仪表盘，在管线表格右侧勾选「对比」，最多四个并排看</span></div>';
     return;
   }
   try {
