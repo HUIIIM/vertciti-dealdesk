@@ -489,6 +489,8 @@ const INTAKE_MAP = {
 };
 
 async function runIntake(text, track) {
+  // 自动识别：LoopNet 是纯商业平台，链接直接按商业走
+  if (/loopnet\.com/i.test(text)) track = 'commercial';
   state.view = 'intake';
   state.intake = {stage: 'running', steps: INTAKE_STEPS.map(s => ({...s, st: 'wait'})), result: null, error: null, track, query: text};
   render();
@@ -520,6 +522,25 @@ async function runIntake(text, track) {
         else if (s.id === 'tophap' && /TopHap.*(skipped|失败|降级)/.test(logTxt)) s.st = 'skip';
         else s.st = 'done';
       });
+      // 商业：搜集完成即自动转入商业核保，无需手动点按钮
+      if (track === 'commercial') {
+        clearInterval(timer);
+        state.intake.stage = 'routing';
+        render();
+        try {
+          const uwInput = buildUwInput(res);
+          const filledN = (res.fields || []).filter(f => f.value != null && typeof f.value === 'number').length;
+          const p = await api('POST', '/api/uw/projects',
+            {name: (uwInput.property.name || '商业核保') + '（自动填入' + filledN + '项）', input: uwInput});
+          location.href = '/uw-commercial.html?pid=' + p.id;
+        } catch (e) {
+          // 转入失败：留在本页显示搜集结果，数据不丢
+          state.intake.stage = 'done';
+          state.intake.error = '自动转入失败（' + e.message + '），搜集结果保留在下方';
+        }
+        render();
+        return;
+      }
     }
   } catch (e) {
     clearInterval(timer);
@@ -576,6 +597,10 @@ function renderIntake(app) {
     body = `<div class="pipe-steps" id="pipeSteps">${stepsHtml(it.steps)}</div>
       <div class="empty"><span class="spinner"></span>正在全网搜集公开信息，约需 30–90 秒…<br>
       <span class="micro">只碰公开页面；robots.txt 禁止的不碰；被反爬拦截立刻停手并记录</span></div>`;
+  } else if (it.stage === 'routing') {
+    body = `<div class="pipe-steps">${stepsHtml(it.steps)}</div>
+      <div class="empty"><span class="spinner"></span>搜集完成，正在自动转入商业核保…<br>
+      <span class="micro">搜集到的字段已自动填入，缺失的进页面后手工补</span></div>`;
   } else if (it.stage === 'error') {
     body = `<div class="pipe-steps">${stepsHtml(it.steps)}</div>
       <div class="veto-banner bad"><b>搜集失败</b><div style="margin-top:6px">${esc(it.error)}</div>
@@ -616,10 +641,9 @@ function intakeResultHtml(it) {
     <div class="insight ${filledN ? 'good' : 'warn'}"><div class="ic">${filledN ? '✓' : '▲'}</div><div>
       <div class="t">${addrLine || '搜集完成'}：填入 ${filledN} 个字段${sellerN ? `（其中 ${sellerN} 个为卖方口径、待验证）` : ''}，${manual.length} 个需手动补</div>
       <div class="d">${res.independent_note ? esc(res.independent_note) + '。' : ''}平台估值（zestimate）仅参考，不进收购价；抓不到的字段已标"需手动补"。</div></div>
-      <div class="act" style="display:flex;gap:8px;flex-wrap:wrap">${filledN
+      <div class="act" style="display:flex;gap:8px">${filledN
         ? `<button class="btn primary big" data-act="makeDraft">→ 生成核保草稿</button>`
-        : `<button class="btn primary" data-act="manualWithAddr">→ 手动录入（地址已带入）</button>`}
-        ${it.track === 'commercial' && filledN ? `<button class="btn primary big" data-act="gotoUw" style="background:#0f766e">→ 进入商业核保（字段自动填入）</button>` : ''}</div></div>
+        : `<button class="btn primary" data-act="manualWithAddr">→ 手动录入（地址已带入）</button>`}</div></div>
     <h3 class="sec-t">搜集字段 <span class="micro">每个字段：值 / 来源 / 可信度</span></h3>
     <div class="tbl-wrap"><table class="data"><thead><tr><th>字段</th><th class="num">值</th><th>来源</th><th>可信度</th></tr></thead>
     <tbody>${fieldRows}${manualRows}</tbody></table></div>
@@ -984,17 +1008,6 @@ document.addEventListener('click', async e => {
       state.view = 'detail'; state.detail = p; state.detailTab = 'overview'; render();
     }
     else if (act === 'makeDraft') { await makeDraft(); }
-    else if (act === 'gotoUw') {
-      const it = state.intake;
-      try {
-        const uwInput = buildUwInput(it.result);
-        const filled = ['asking_price', 'building_sf', 'taxes_annual', 'year_built']
-          .filter(k => (it.result.fields || []).some(f => f.key === k && typeof f.value === 'number')).length;
-        const p = await api('POST', '/api/uw/projects',
-          {name: (uwInput.property.name || '商业核保') + '（搜集填入' + filled + '项）', input: uwInput});
-        window.open('/uw-commercial.html?pid=' + p.id, '_blank');
-      } catch (err) { alert('转入失败：' + err.message); }
-    }
     else if (act === 'editDraft') {
       const it = state.intake;
       state.track = it.track; state.view = 'form'; state.editingId = null;
