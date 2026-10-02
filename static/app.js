@@ -983,6 +983,9 @@ document.addEventListener('click', async e => {
       a.download = '';
       document.body.appendChild(a); a.click(); a.remove();
     }
+    else if (act === 'report') {
+      window.open('/api/projects/' + id + '/report', '_blank');
+    }
     else if (act === 'del') {
       if (confirm('确定删除该项目吗？')) {
         await api('DELETE', '/api/projects/' + id);

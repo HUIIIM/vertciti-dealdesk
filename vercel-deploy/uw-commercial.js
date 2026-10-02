@@ -727,7 +727,8 @@ async function init() {
       ["historical", "proforma"].forEach((cf) => {
         const cur = parseFloat((state[cf] && state[cf].property_tax) || 0);
         const lastAuto = taxAuto.values[cf];
-        if (cur && lastAuto != null && cur !== lastAuto) return; // 手改过，跳过
+        // cur 为空 → 填；cur 等于上次自动填的值 → 覆盖为新估算；其他（手改）→ 跳过
+        if (cur && cur !== lastAuto) return;
         if (!state[cf]) state[cf] = {};
         state[cf].property_tax = d.annual_tax;
         taxAuto.values[cf] = d.annual_tax;
