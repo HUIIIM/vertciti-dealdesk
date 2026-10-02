@@ -1,32 +1,66 @@
-# vertciti-dealdesk · 房地产交易核保台
+![DealDesk](docs/assets/hero.png)
 
-**vertciti 出品。Miao 的房地产运营工具** —— 把每笔房产 deal 的录入、打分、
-敏感性分析、对比、报告做成一条中文工作流，辅助筛选与决策。
+[![CI](https://github.com/HUIIIM/vertciti-dealdesk/actions/workflows/ci.yml/badge.svg)](https://github.com/HUIIIM/vertciti-dealdesk/actions/workflows/ci.yml)
+[![Secret scan](https://github.com/HUIIIM/vertciti-dealdesk/actions/workflows/gitleaks.yml/badge.svg)](https://github.com/HUIIIM/vertciti-dealdesk/actions/workflows/gitleaks.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-> 一句话：vertciti 正在为 AI agent 构建采购与协作基础设施；
-> DealDesk 是创始人自用的房地产运营工具，也是 vertciti 把"工具做扎实"
-> 的一种证明。
+# DealDesk · 房地产交易核保台
 
-## 这是什么
+**vertciti 出品，Miao 自用的房地产运营工具。30 秒看清一笔交易值不值得做。**
+
+录入一套房子的价格、租金、贷款 → DealDesk 按保守口径算出全口径现金需求、
+打分、敏感性分析，生成带图的中文核保报告。筛 deal，不靠感觉。
+
+![DealDesk demo](docs/assets/demo.gif)
+
+*上面：一笔 Queens 两家庭交易 → 仪表盘 B 级 68.7 分 → 一键打开带图核保报告。*
+
+## 快速开始 — 30 秒
+
+```bash
+./run.sh        # 自动建虚拟环境、装依赖、初始化数据库
+```
+
+浏览器打开 **http://127.0.0.1:8100**，点「新建项目」，3 分钟看到第一份打分。
+
+手动方式：
+
+```bash
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8100
+```
+
+## 它是怎么工作的
+
+![架构](docs/assets/architecture.png)
+
+输入交易 → 调研管线抓公开数据（TopHap 公共记录、可比成交、税费）→
+核保引擎建模（现金流、回本测算、敏感性、评分卡）→ 图表层画图 →
+输出 HTML 交互报告 + PDF 备忘录。全程中文，数据不出本机（SQLite）。
+
+## 核心功能
+
+![仪表盘](docs/assets/dashboard.png)
 
 - **交易录入**：住宅 / 商业双轨中文表单，费用与风险字段按保守口径预填
-- **一键打分**：双轨独立打分引擎，A / B / C / 不收录四档，
-  硬否决项（浮动利率、5 年内 balloon、无退出预案、pro-forma 数字等）红色置顶
-- **敏感性分析**：租金 ±10%、利率 ±2% 五档 what-if，看现金流 / CoC / DSCR /
-  入场 cap 变化
+- **一键打分**：双轨独立打分引擎，A / B / C / 不收录四档；硬否决项
+  （浮动利率、5 年内 balloon、无退出预案、pro-forma 数字等）红色置顶
+- **敏感性分析**：租金 ±10%、利率 ±2% 五档 what-if，看现金流 / CoC /
+  DSCR / 入场 cap 变化
+- **三张图讲清结论**：现金流回本测算、敏感性分析、评分构成
+  （HTML 内联 SVG，PDF 嵌入 PNG，零 matplotlib 依赖）
 - **项目对比**：最多 3 个项目并排对比
 - **全面分析工作台**（`/workbench.html`）：估值评估、可比成交、市场调查、
   六维市场报告；一键把测算结果送入打分引擎
 - **智能搜集 intake**：纯地址 / 房源链接 / PDF（flyer、OM）三选一，
   自动搜集公开房源、公共记录、租金、周边、历史价格
-- **中文打分报告**：可打印报告页（浏览器打印 → 另存为 PDF）
-- **本地项目库**：SQLite，数据不出本机
-- **全口径现金需求**：每笔 deal 自动汇总首付＋交割费＋首年 capex＋储备金，
-  支撑现金规划
+- **全口径现金需求**：每笔 deal 自动汇总首付＋交割费＋首年 capex＋储备金
+
+![报告图表](docs/assets/report-charts.png)
 
 ## 诚实约定
 
-这是筛选辅助工具，不构成投资建议。核心规则：
+这是筛选辅助工具，**不构成投资建议**。核心规则：
 
 - 每个字段标注来源＋抓取时间＋可信度；抓不到的标"需手动补"，绝不编数
 - 房源页 / PDF 的数字一律标"卖方口径、待验证"，独立验证先于任何结论
@@ -41,26 +75,11 @@ DealDesk 可接入 TopHap（公共房产记录聚合，MCP 协议）补充公共
 默认**关闭**；打开前工作台照常走公开搜集 pipeline。
 可信度标定：公共记录 = 高，算法估值 / CMA = 中（含区间），算法租金 = 低。
 
-## 快速开始
+## 运行测试
 
 ```bash
-./run.sh        # 自动建虚拟环境、装依赖、初始化数据库
-```
-
-浏览器打开 **http://127.0.0.1:8100**。
-
-手动方式：
-
-```bash
-python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8100
-```
-
-运行测试：
-
-```bash
-rm -f dealdesk.db   # 避免开发副产品 DB 串扰
-.venv/bin/python -m pytest tests/ -q   # 159 个用例，本地全过
+rm -f dealdesk.db   # 避免开发副产品 DB 串扰（服务运行时先停服务再删库）
+.venv/bin/python -m pytest tests/ -q   # 180+ 个用例
 ```
 
 ## 项目结构
@@ -69,7 +88,7 @@ rm -f dealdesk.db   # 避免开发副产品 DB 串扰
 dealdesk/
   app/            # FastAPI 后端：打分引擎、敏感性分析、SQLite 项目库、报告
   tools/          # 一次性脚本（如 TopHap OAuth 首次授权）
-  docs/           # 集成说明文档
+  docs/           # 集成说明文档 + assets
   static/         # 中文前端（无构建，纯 HTML/JS/CSS）
   tests/          # 单元测试
   run.sh          # 一键启动
@@ -84,16 +103,12 @@ dealdesk/
 
 ## 关于 vertciti
 
+vertciti 为 Miao 构建运营人生的个人 AI 基础设施；DealDesk 是其中
+"把工具做扎实"的一种证明。
+
 - 官网：[vertciti.com](https://vertciti.com)
 - 创始人 X：[@Miaojiahuii](https://x.com/Miaojiahuii)
-- 创始人 LinkedIn：[Jiahui Miao](https://www.linkedin.com/in/jiahui-miao-395b032b2)
-
-## 社区
-
-- GitHub Discussions：即将上线
-- Discord 社区：即将上线
-- Telegram 群组：即将上线
 
 ## 许可证
 
-MIT（默认值，最终以公司 GC 定夺为准）——见 [LICENSE](LICENSE)。
+MIT — 见 [LICENSE](LICENSE)。

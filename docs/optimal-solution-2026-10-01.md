@@ -90,3 +90,8 @@
 1. **生产 TopHap token 已过期**（2026-10-01 23:36 确认）：需浏览器跑一次 `tools/tophap_oauth_setup.py` 做 OAuth 授权 → refresh_token 落盘 → 自愈链路闭环。此前不要指望 token 自愈生效。
 2. **RentCast 需绑卡**：免费 Developer 计划激活要信用卡，董事长未定。链路已就绪（无 key 跳过不报错）。
 3. 本次所有改动只 commit 未 push（按约束）。
+
+## 2026-10-02 00:05 EDT 修正：TopHap 无 refresh_token
+- 实测确认：TopHap OAuth 只下发 1 小时 access_token，不下发 refresh_token。
+- 原"refresh_token 自动刷新"方案作废，改为：tophap-token-watch（每 30 分钟）检查剩余有效期，不足 20 分钟时走浏览器全自动重授权（URL 生成→Approve→code→换 token→推 Vercel→redeploy），已验证 4 次零人工。
+- 降级保障不变：token 过期期间 provider 链自动切 RentCast/网页/Census，不空白。

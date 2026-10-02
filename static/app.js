@@ -413,7 +413,7 @@ function renderDashboard(app) {
       <td class="num"><b>${money(p.cash_to_close)}</b></td>
       <td>${vetoN ? `<span class="st bad">${vetoN} 项否决</span>` : '<span class="st ok">无</span>'}</td>
       <td class="micro" style="white-space:nowrap">${ago(p.updated_at)}</td>
-      <td style="white-space:nowrap" onclick="event.stopPropagation()">
+      <td style="white-space:nowrap">
         <button class="btn sm" data-act="report" data-id="${p.id}">报告</button>
         <label class="micro" style="margin-left:6px"><input type="checkbox" data-cmp="${p.id}"
           ${state.compareIds.includes(p.id) ? 'checked' : ''}> 对比</label>
@@ -946,7 +946,7 @@ document.addEventListener('click', async e => {
     render(); return;
   }
   const row = e.target.closest('tr.rowlink');
-  if (row && row.dataset.open) {
+  if (row && row.dataset.open && !e.target.closest('[data-act]')) {
     try {
       const p = await api('GET', '/api/projects/' + row.dataset.open);
       state.track = p.track; state.view = 'detail'; state.detail = p; state.detailTab = 'overview'; render();
