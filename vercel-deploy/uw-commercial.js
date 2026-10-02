@@ -18,7 +18,7 @@ const EXPENSES = [
 ];
 
 // 税自动填来源（地址→州平均税率估算）；用户手改后清掉，badge 随之消失
-let taxAutoSource = null;
+let taxAuto = null; // {state, rate, source, values:{historical, proforma}} 逐字段记录自动填的值
 const f = (x, d = 0) => {
   const v = parseFloat(x);
   return Number.isFinite(v) ? v : d;
@@ -309,15 +309,15 @@ function renderRentTable(flash) {
     tr.innerHTML =
       `<td data-l="单元"><input class="cell-in sm" data-t="suite" data-i="${i}" value="${esc(r.suite)}"></td>` +
       `<td data-l="租户"><input class="cell-in" data-t="tenant" data-i="${i}" value="${esc(r.tenant)}" style="width:130px"></td>` +
-      `<td data-l="面积 SF"><input class="cell-in sm" type="number" data-t="sf" data-i="${i}" value="${num(r.sf)}"></td>` +
-      `<td data-l="月租（合同）"><input class="cell-in sm" type="number" data-t="monthly_rent" data-i="${i}" value="${num(r.monthly_rent)}"></td>` +
+      `<td data-l="面积 SF"><input class="cell-in sm" type="text" inputmode="decimal" data-num="1" data-t="sf" data-i="${i}" value="${num(r.sf)}"></td>` +
+      `<td data-l="月租（合同）"><input class="cell-in sm" type="text" inputmode="decimal" data-num="1" data-t="monthly_rent" data-i="${i}" value="${num(r.monthly_rent)}"></td>` +
       `<td data-l="月租/SF" class="calc" data-p="monthly_per_sf">${money2(r.monthly_per_sf)}</td>` +
       `<td data-l="年租" class="calc" data-p="annual_rent">${fmtMoney(r.annual_rent)}</td>` +
       `<td data-l="年租/SF" class="calc" data-p="annual_per_sf">${money2(r.annual_per_sf)}</td>` +
-      `<td data-l="包租年租"><input class="cell-in sm" type="number" data-t="underwritten_annual" data-i="${i}" value="${num(r.underwritten_annual)}" title="包租年租（预测口径用）"></td>` +
+      `<td data-l="包租年租"><input class="cell-in sm" type="text" inputmode="decimal" data-num="1" data-t="underwritten_annual" data-i="${i}" value="${num(r.underwritten_annual)}" title="包租年租（预测口径用）"></td>` +
       `<td data-l="包租/SF" class="calc" data-p="uw_per_sf">${money2(r.uw_per_sf)}</td>` +
-      `<td data-l="月 CAM"><input class="cell-in sm" type="number" data-t="monthly_cam" data-i="${i}" value="${num(r.monthly_cam)}" title="月 CAM（模板 T 列）"></td>` +
-      `<td data-l="月停车费"><input class="cell-in sm" type="number" data-t="monthly_parking" data-i="${i}" value="${num(r.monthly_parking)}" title="月停车费（模板 U 列）"></td>` +
+      `<td data-l="月 CAM"><input class="cell-in sm" type="text" inputmode="decimal" data-num="1" data-t="monthly_cam" data-i="${i}" value="${num(r.monthly_cam)}" title="月 CAM（模板 T 列）"></td>` +
+      `<td data-l="月停车费"><input class="cell-in sm" type="text" inputmode="decimal" data-num="1" data-t="monthly_parking" data-i="${i}" value="${num(r.monthly_parking)}" title="月停车费（模板 U 列）"></td>` +
       `<td data-l=""><button class="del-tenant" data-i="${i}" title="删除">×</button></td>`;
     tb.appendChild(tr);
   });
@@ -354,11 +354,11 @@ function cfTableHTML(sc, title, linkedNote) {
       else if (s === "manual") srcTag = ' <span class="tag" title="手工输入覆盖租户表">手工</span>';
       if (!v && (key === "cam_recovery" || key === "parking_income")) ph = ' placeholder="空=租户表自动"';
     }
-    if (key === "property_tax" && taxAutoSource && typeof taxAutoSource === "object") {
-      srcTag += ` <span class="tag live" title="${taxAutoSource.state} 州平均税率 ${(taxAutoSource.rate * 100).toFixed(2)}% 估算 · 待独立验证（${taxAutoSource.source}）">州平均估算</span>`;
+    if (key === "property_tax" && taxAuto && taxAuto.values[title] != null && state[title][key] === taxAuto.values[title]) {
+      srcTag += ` <span class="tag live" title="${taxAuto.state} 州平均税率 ${(taxAuto.rate * 100).toFixed(2)}% 估算 · 待独立验证（${taxAuto.source}）">州平均估算</span>`;
     }
     return `<tr><td class="lbl">${lbl}${srcTag}${isPct ? ' <span class="tag new">NEW</span>' : ""}</td>` +
-      `<td><input class="cell-in" type="number" data-cf="${title}" data-k="${key}" data-ispct="${isPct ? 1 : 0}" value="${disp}" step="any"${ph}></td></tr>`;
+      `<td><input class="cell-in" type="text" inputmode="decimal" data-cf="${title}" data-k="${key}" data-ispct="${isPct ? 1 : 0}" value="${disp}" step="any"${ph}></td></tr>`;
   };
   let h = "";
   h += row("基础租金 Base Rents", sc.base_rents, "money", { linked: true, title: linkedNote });
@@ -483,7 +483,7 @@ function bindInputs() {
       markDirty();
     } else if (el.dataset.t) {
       const i = +el.dataset.i, k = el.dataset.t;
-      let v = el.type === "number" ? (el.value === "" ? 0 : parseFloat(el.value)) : el.value;
+      let v = el.dataset.num ? (el.value === "" ? 0 : parseFloat(el.value)) : el.value;
       if (!state.tenants[i]) state.tenants[i] = {};
       state.tenants[i][k] = v;
       renderAll(true);
@@ -712,8 +712,6 @@ async function init() {
     const addr = (addrEl.value || "").trim();
     const price = parseFloat((document.querySelector('[data-in="analysis.purchase_price"]') || {}).value) || 0;
     if (!addr || !price) return;
-    // 用户手改过任一税字段就不覆盖
-    if (taxAutoSource === "manual") return;
     try {
       const r = await fetch("/api/tax/estimate", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -721,25 +719,28 @@ async function init() {
       });
       const d = await r.json();
       if (!d.annual_tax) return;
-      taxAutoSource = { state: d.state, rate: d.rate, source: d.source };
-      // 填历史和预测两个税字段；已有手填值（与估算不一致）的不覆盖
+      if (!taxAuto) taxAuto = { values: {} };
+      taxAuto.state = d.state; taxAuto.rate = d.rate; taxAuto.source = d.source;
+      // 逐字段：空值、或等于上次自动填的值（旧估算）→ 覆盖；用户手改成别的值 → 跳过
       // 注意：直接写 state，不 dispatch input（避免循环中 renderAll 把后面的 input 换掉）
       let changed = false;
       ["historical", "proforma"].forEach((cf) => {
         const cur = parseFloat((state[cf] && state[cf].property_tax) || 0);
-        if (cur && cur !== d.annual_tax) return; // 疑似手改，跳过
+        const lastAuto = taxAuto.values[cf];
+        if (cur && lastAuto != null && cur !== lastAuto) return; // 手改过，跳过
         if (!state[cf]) state[cf] = {};
         state[cf].property_tax = d.annual_tax;
+        taxAuto.values[cf] = d.annual_tax;
         changed = true;
       });
       if (changed) { renderAll(false); markDirty(); }
     } catch (e) { /* 静默降级 */ }
   }
-  // 标记手改：任一税字段被用户直接编辑时，来源变 manual
+  // 标记手改：用户直接编辑某税字段时，该字段的自动记录作废（badge 消失，后续自动填跳过该字段）
   document.addEventListener("input", (e) => {
     const el = e.target;
     if (el.matches && el.matches('input[data-k="property_tax"]') && !el.dataset.autofilling) {
-      taxAutoSource = "manual";
+      if (taxAuto && taxAuto.values) taxAuto.values[el.dataset.cf] = null;
     }
   }, true);
   const _addrEl = document.querySelector('[data-in="property.address"]');
