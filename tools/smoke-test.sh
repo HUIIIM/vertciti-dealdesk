@@ -22,6 +22,7 @@ pass=0
 total=${#ADDRS[@]}
 declare -a report_lines
 declare -a fail_detail
+fail_detail=()
 
 i=0
 for item in "${ADDRS[@]}"; do
