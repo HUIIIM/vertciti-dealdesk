@@ -157,7 +157,9 @@ def is_configured() -> bool:
 
 
 def write_dotenv(updates: dict) -> None:
-    """更新仓库 .env（gitignored）：原地替换已有键，不存在则追加。只写非长期密钥。"""
+    """更新仓库 .env（gitignored）：原地替换已有键，不存在则追加。只写非长期密钥。
+
+    写完强制 chmod 600（token 凭证文件不许组/他人可读）。"""
     path = dotenv_path()
     lines: list[str] = []
     if path.exists():
@@ -177,6 +179,10 @@ def write_dotenv(updates: dict) -> None:
         if k not in seen:
             out.append(f"{k}={v}")
     path.write_text("\n".join(out) + "\n")
+    try:
+        os.chmod(path, 0o600)
+    except OSError:
+        pass
 
 
 # ---------------- JSON-RPC 客户端 ----------------

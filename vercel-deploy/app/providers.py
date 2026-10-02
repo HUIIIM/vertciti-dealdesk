@@ -35,6 +35,7 @@ from pathlib import Path
 
 import httpx
 
+from . import cache as _cache
 from . import geocode
 
 # ---------------- RentCast ----------------
@@ -414,7 +415,8 @@ PROVIDER_ORDER = (TophapProvider, RentcastProvider, WebProvider, CensusProvider)
 
 
 def run_chain(address: str, log: list | None = None,
-              providers: list | None = None) -> dict:
+              providers: list | None = None,
+              use_cache: bool = True) -> dict:
     """多数据源 fallback 链。
 
     按 TopHap → RentCast → 公开网页 → Census 顺序尝试：
@@ -423,11 +425,30 @@ def run_chain(address: str, log: list | None = None,
     - 第一个返回有效数据的记为 primary_provider（"胜出"）
     - 全部失败：ok=False + 各源中文诊断，不静默空结果
 
+    缓存（use_cache=True 且 providers 为默认链时生效）：
+    - 入口命中未过期缓存 → 直接返回缓存数据（注入 "cached": True），不调任何源
+    - 链成功（ok=True）→ 写入缓存后返回（"cached": False）
+    - 全挂时有缓存（过期也行）→ 返回缓存数据（"stale": True，
+      diagnostics 追加说明），无缓存则原样返回诊断
+
     返回 {"ok", "fields", "primary_provider", "provider_results",
-          "diagnostics", "log"}。
+          "diagnostics", "log", "cached", "stale"?}。
     providers 参数供测试注入；默认按 PROVIDER_ORDER 实例化。
     """
     log = log if log is not None else []
+    cache_enabled = use_cache and providers is None
+    cached = _cache.get_cached(address) if cache_enabled else None
+
+    if cache_enabled and cached is not None and not cached["stale"]:
+        # 命中未过期缓存：直接返回，不调任何 provider
+        data = cached["data"]
+        age_h = (time.time() - cached["fetched_at"]) / 3600
+        data["cached"] = True
+        data.pop("stale", None)
+        _log_provider(log, "地址缓存", "hit", f"命中缓存（{age_h:.1f} 小时前）")
+        data["log"] = log
+        return data
+
     if providers is None:
         providers = [c() for c in PROVIDER_ORDER]
     merged: dict[str, dict] = {}
@@ -476,10 +497,25 @@ def run_chain(address: str, log: list | None = None,
     if not fields:
         diag = "；".join(f"{r['provider']}：{r['note']}" for r in results)
         _log_provider(log, "数据源链", "failed", "全部数据源失败：" + diag)
+        if cache_enabled and cached is not None:
+            # 全挂兜底：返回缓存数据（过期也行），标记 stale
+            data = cached["data"]
+            age_h = (time.time() - cached["fetched_at"]) / 3600
+            stale_note = f"各源失败，返回 {age_h:.1f} 小时前的缓存数据，可能过期"
+            data["stale"] = True
+            data["diagnostics"] = ((data.get("diagnostics") or "") + "；" + stale_note).lstrip("；")
+            _log_provider(log, "地址缓存", "stale", stale_note)
+            data["log"] = log
+            return data
         return {"ok": False, "fields": [], "primary_provider": None,
-                "provider_results": results, "diagnostics": diag, "log": log}
-    return {"ok": True, "fields": fields, "primary_provider": primary,
-            "provider_results": results, "diagnostics": "", "log": log}
+                "provider_results": results, "diagnostics": diag, "log": log,
+                "cached": False}
+    result = {"ok": True, "fields": fields, "primary_provider": primary,
+              "provider_results": results, "diagnostics": "", "log": log,
+              "cached": False}
+    if cache_enabled:
+        _cache.put_cached(address, result)
+    return result
 
 
 def token_watch_hint() -> str:

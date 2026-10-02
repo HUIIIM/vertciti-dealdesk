@@ -10,16 +10,21 @@
   6. 回调拿到 code → 换 access_token（+ expires_in）
   7. access_token / 绝对过期时间戳（TOPHAP_TOKEN_EXPIRES_AT，epoch 秒）/
      token_endpoint / client_id → .env（gitignored）
-     refresh_token 不持久化：Secure Vault 按平台设计是 opaque 的（存进的值
-     读不回），静默刷新此路不通；access token 过期后重跑本脚本即可（约 1 分钟）。
+     8. exchange_code 返回里若有 refresh_token → .env（TOPHAP_REFRESH_TOKEN），
+        供 app/token_watch.py 的 ensure_fresh_token() 自动刷新（<30 分钟到期时
+        用 refresh_token 换新 access_token；server 下发新的 refresh_token 时
+        做 rolling 更新）。Secure Vault 按平台设计是 opaque 的（读不回），
+        所以刷新凭证只存 .env（gitignored，权限 600），不进 Vault。
 
 用法：
   cd ~/workspace/vertcity/dealdesk && .venv/bin/python tools/tophap_oauth_setup.py
   # 若浏览器打不开 localhost 回调：加 --manual，按提示粘贴跳转 URL 或 code
 
 说明：
-  - .env 已 gitignore；access token 只进 .env，不进 git、不打印。
+  - .env 已 gitignore，权限 600；token 只进 .env，不进 git、不打印。
   - 本脚本不依赖 Secure Vault；vault 相关门槛已按平台 opaque 特性移除。
+  - 若授权服务器下发 refresh_token，一并持久化到 .env
+    （TOPHAP_REFRESH_TOKEN），app/token_watch.py 会用它自动刷新。
 """
 
 from __future__ import annotations
@@ -284,14 +289,21 @@ def main() -> None:
     log("拿到授权码，换 token…")
     tok = exchange_code(as_meta, client_id, client_secret, code, verifier)
 
-    # 直接写 .env（无 vault 门槛：Secure Vault opaque 读不回，静默刷新此路不通；
-    # refresh_token 不持久化，access token 过期后重跑本脚本即可）
+    # 直接写 .env（不走 Vault：Secure Vault 按平台设计是 opaque 的，读不回）。
+    # refresh_token 若下发则一并持久化（TOPHAP_REFRESH_TOKEN），供
+    # app/token_watch.py 自动刷新；若 server 没下发则跳过。
     updates = {
         "TOPHAP_MCP_URL": mcp,
         "TOPHAP_ACCESS_TOKEN": tok["access_token"],
         "TOPHAP_TOKEN_ENDPOINT": as_meta["token_endpoint"],
         "TOPHAP_CLIENT_ID": client_id,
     }
+    if tok.get("refresh_token"):
+        updates["TOPHAP_REFRESH_TOKEN"] = tok["refresh_token"]
+        log("授权服务器下发了 refresh_token，已写入 .env（TOPHAP_REFRESH_TOKEN）")
+    else:
+        log("授权服务器未下发 refresh_token（TopHap 目前仅下发 access_token）："
+            "将来下发后可再跑一次本脚本持久化，app/token_watch.py 才能自愈")
     if tok.get("expires_in"):
         try:
             updates["TOPHAP_TOKEN_EXPIRES_AT"] = str(

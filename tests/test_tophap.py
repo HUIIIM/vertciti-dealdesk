@@ -375,6 +375,14 @@ def test_pipeline_run_includes_tophap_when_enabled(monkeypatch):
 
 def test_pipeline_run_degrades_when_tophap_off(monkeypatch):
     # TopHap 未启用 + 网页被反爬拦 + 无 RentCast key → 只有 Census 保底产出
+    # 注：关掉地址缓存——同文件上一个测试已缓存同一地址的成功结果，
+    # 这里要测的是"无缓存时"的降级链。
+    import app.providers as pv
+    _real_run_chain = pv.run_chain
+    monkeypatch.setattr(
+        pv, "run_chain",
+        lambda address, log=None, providers=None:
+            _real_run_chain(address, log, providers, use_cache=False))
     monkeypatch.setattr(rp, "ddg_search", lambda q, log, max_results=8: [])
 
     def fake_fetch(url, log):
