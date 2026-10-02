@@ -3,100 +3,325 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>DealDesk · 商业核保工作台</title>
-<link rel="stylesheet" href="/style.css">
+<title>商业核保 · DealDesk</title>
 <style>
-.uw { max-width: 1240px; margin: 0 auto; padding: 12px 16px 80px; }
-.uw section.card { background: #fff; border: 1px solid #e2e2e2; border-radius: 10px; padding: 18px 20px; margin: 16px 0; }
-.uw h2.sec { font-size: 18px; margin: 0 0 4px; }
-.uw .sec-sub { color: #666; font-size: 13px; margin-bottom: 12px; }
-.uw .sec-sub .flow { color: #1a56db; font-weight: 700; }
-.uw .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px 14px; }
-.uw label.f { display: flex; flex-direction: column; font-size: 13px; color: #333; }
-.uw label.f input, .uw label.f select { margin-top: 4px; padding: 7px 9px; font-size: 14px; border: 1px solid #ccc; border-radius: 6px; background: #fff; }
-.uw label.f input:focus, .uw label.f select:focus { outline: 2px solid #1a56db33; border-color: #1a56db; }
-.uw table.t { width: 100%; border-collapse: collapse; font-size: 13.5px; margin: 10px 0; }
-.uw table.t th, .uw table.t td { border: 1px solid #ddd; padding: 6px 9px; text-align: right; }
-.uw table.t th:first-child, .uw table.t td:first-child { text-align: left; }
-.uw table.t th { background: #f5f5f5; font-size: 12.5px; }
-.uw table.t td.lbl { text-align: left; color: #333; }
-.uw table.t td.calc { background: #f0f4ff; font-weight: 600; }
-.uw table.t td.linked { background: #eef7ee; font-weight: 600; }
-.uw table.t tr.total td { background: #e8eefc; font-weight: 700; border-top: 2px solid #1a56db; }
-.uw table.t tr.noi td { background: #e6f4ea; font-weight: 700; }
-.uw table.t input.cell-in { width: 110px; padding: 5px 7px; font-size: 13.5px; border: 1px solid #ccc; border-radius: 5px; text-align: right; }
-.uw table.t input.cell-in.sm { width: 80px; }
-.uw .btn { background: #1a56db; color: #fff; border: 0; border-radius: 7px; padding: 9px 18px; font-size: 14px; cursor: pointer; margin: 6px 8px 6px 0; }
-.uw .btn.ghost { background: #eee; color: #222; }
-.uw .btn.danger { background: #c00; }
-.uw .btn.sm { padding: 5px 12px; font-size: 13px; }
-.uw .tag { display: inline-block; font-size: 12px; font-weight: 700; border-radius: 4px; padding: 2px 8px; margin-left: 8px; vertical-align: middle; }
-.uw .tag.new { background: #e6f4ea; color: #0a7a2f; }
-.uw .tag.live { background: #e8f0fe; color: #1a56db; }
-.uw .neg { color: #c00; font-weight: 700; } .uw .pos { color: #0a7a2f; font-weight: 700; }
-.uw .mono { font-family: ui-monospace, monospace; }
-.uw .kv { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; margin: 10px 0; }
-.uw .kv .cell { background: #f8f9fb; border: 1px solid #e5e5e5; border-radius: 7px; padding: 8px 11px; font-size: 12.5px; color: #555; }
-.uw .kv .cell b { display: block; font-size: 17px; margin-top: 2px; color: #111; }
-.uw .kv .cell.hl b { color: #1a56db; }
-.uw .topnav { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
-.uw .topnav a { color: #1a56db; font-size: 14px; }
-.uw .topnav select { padding: 7px 10px; font-size: 14px; border: 1px solid #ccc; border-radius: 6px; max-width: 280px; }
-/* 联动链 */
-.flowstrip { display: flex; align-items: stretch; gap: 0; margin: 12px 0; overflow-x: auto; }
-.fnode { flex: 1; min-width: 150px; background: #f8f9fb; border: 1px solid #e2e2e2; border-radius: 8px; padding: 10px 12px; font-size: 12.5px; }
-.fnode h4 { margin: 0 0 6px; font-size: 13px; color: #1a56db; }
-.fnode .fv { font-size: 16px; font-weight: 700; color: #111; font-family: ui-monospace, monospace; }
-.fnode .fl { color: #666; font-size: 11.5px; }
-/* 移动端：宽表用 wrapper 内部横滑，页面本身不溢出 */
-.tscroll { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 10px -2px; }
-.tscroll table.t { margin: 0; min-width: 560px; }
-.farrow { align-self: center; padding: 0 8px; color: #1a56db; font-size: 20px; font-weight: 700; white-space: nowrap; }
-/* 联动高亮：输入变化时，下游格子闪一下 */
-@keyframes uwflash { 0% { background: #fff3c4; } 100% { background: #f0f4ff; } }
-@keyframes uwflash2 { 0% { background: #fff3c4; } 100% { background: #eef7ee; } }
-td.flash { animation: uwflash 1.1s ease-out; }
-td.flash2 { animation: uwflash2 1.1s ease-out; }
-.src { font-size: 11px; color: #888; }
-.del-tenant { color: #c00; cursor: pointer; border: 0; background: none; font-size: 15px; }
-.uw .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-.uw .two-col > * { min-width: 0; } /* 防 grid 子项被宽表撑开 */
-@media (max-width: 800px) { .uw .two-col { grid-template-columns: 1fr; } }
+/* ============ DealDesk 商业核保 · 交易终端式深色工作台 ============ */
+:root {
+  --bg: #0e1319;        /* 墨黑底 */
+  --panel: #141b24;     /* 面板 */
+  --well: #1a2230;      /* 输入槽 */
+  --line: #2a3542;      /* 发丝线 */
+  --line-soft: #202a37;
+  --tx: #d3d9e1;        /* 柔灰白（非纯白，抗疲劳） */
+  --tx2: #8e98a7;       /* 次级标签 */
+  --tx3: #5f6a7a;       /* 微弱 */
+  --auto: #d9a648;      /* 琥珀 = 机器算出（唯一强调色） */
+  --auto-dim: rgba(217, 166, 72, 0.07);
+  --ok: #6fae6f;
+  --bad: #d97a68;
+  --font-tx: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  --font-num: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--tx);
+  font-family: var(--font-tx); font-size: 14px; line-height: 1.65;
+}
+a { color: var(--tx2); }
+::selection { background: rgba(217, 166, 72, 0.25); }
+:focus-visible { outline: 2px solid var(--auto); outline-offset: 2px; }
+
+/* ---- 指挥条（sticky） ---- */
+.cmdbar {
+  position: sticky; top: 0; z-index: 50;
+  background: var(--bg); border-bottom: 1px solid var(--line);
+}
+.cmdbar-in {
+  max-width: 1600px; margin: 0 auto; padding: 10px 20px;
+  display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+}
+.back { text-decoration: none; font-size: 13px; white-space: nowrap; }
+.back:hover { color: var(--tx); }
+.cmd-id { min-width: 0; }
+.cmd-name { font-size: 16px; font-weight: 700; color: var(--tx); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 320px; }
+.cmd-addr { font-size: 12px; color: var(--tx3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 320px; }
+.verdict {
+  font-family: var(--font-num); font-size: 13px; color: var(--tx2);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.verdict b { color: var(--auto); font-weight: 600; }
+.v-auto {
+  display: inline-block; font-size: 10px; letter-spacing: 0.08em;
+  border: 1px solid var(--auto); color: var(--auto);
+  padding: 1px 6px; border-radius: 3px; margin-right: 8px; vertical-align: 1px;
+}
+.cmd-ctl { margin-left: auto; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.cmd-ctl select {
+  background: var(--well); color: var(--tx); border: 1px solid var(--line);
+  border-radius: 3px; padding: 8px 10px; font-size: 13px; font-family: var(--font-tx);
+  max-width: 240px;
+}
+
+/* ---- 按钮：安静描边 ---- */
+.btn {
+  background: transparent; color: var(--tx); border: 1px solid var(--line);
+  border-radius: 3px; padding: 8px 16px; font-size: 13px; font-family: var(--font-tx);
+  cursor: pointer; white-space: nowrap;
+}
+.btn:hover { border-color: var(--tx3); background: var(--panel); }
+.btn.primary { border-color: var(--auto); color: var(--auto); }
+.btn.primary:hover { background: var(--auto-dim); }
+.btn.danger { border-color: #5a2e28; color: var(--bad); }
+.btn.sm { padding: 6px 12px; font-size: 12.5px; }
+
+/* ---- 主工作区 ---- */
+.desk { max-width: 1600px; margin: 0 auto; padding: 18px 20px 90px; }
+.note { color: var(--tx3); font-size: 12.5px; margin: 2px 0 16px; }
+.note b { color: var(--auto); font-weight: 600; }
+.note .bdg { color: var(--tx2); border: 1px solid var(--line); border-radius: 3px; padding: 0 5px; font-size: 11px; }
+
+/* ---- KPI 横条（一眼结论）：一条发丝线带，而非卡片阵 ---- */
+.kpis {
+  display: grid; grid-template-columns: repeat(6, 1fr);
+  border: 1px solid var(--line); border-radius: 3px; background: var(--panel);
+}
+.kpi { padding: 14px 16px 12px; border-left: 1px solid var(--line-soft); min-width: 0; }
+.kpi:first-child { border-left: 0; }
+.k-l { font-size: 11.5px; color: var(--tx2); margin-bottom: 4px; white-space: nowrap; }
+.k-v {
+  font-family: var(--font-num); font-size: 26px; font-weight: 600; color: var(--auto);
+  font-variant-numeric: tabular-nums; white-space: nowrap; letter-spacing: -0.01em;
+}
+.k-v.neg { color: var(--bad); }
+
+/* ---- 流水线读数 ---- */
+.pipe {
+  display: flex; align-items: stretch; gap: 0; margin: 14px 0 0;
+  border: 1px solid var(--line-soft); border-radius: 3px; background: var(--panel);
+  overflow-x: auto;
+}
+.pnode { flex: 1 0 auto; min-width: 140px; padding: 10px 14px; border-left: 1px solid var(--line-soft); }
+.pnode:first-child { border-left: 0; }
+.p-l { font-size: 11px; color: var(--tx3); }
+.p-v { font-family: var(--font-num); font-size: 16px; color: var(--tx); font-variant-numeric: tabular-nums; margin: 2px 0; }
+.p-v .hl { color: var(--auto); }
+.p-s { font-size: 10.5px; color: var(--tx3); }
+.parr { align-self: center; color: var(--tx3); padding: 0 6px; font-size: 14px; flex: 0 0 auto; }
+
+/* ---- 分区：发丝线分隔，无盒子 ---- */
+section.block { border-top: 1px solid var(--line); margin-top: 34px; padding-top: 16px; }
+.sec-h { display: flex; align-items: baseline; gap: 12px; margin: 0 0 4px; flex-wrap: wrap; }
+.sec-h h2 { font-size: 16px; font-weight: 700; margin: 0; color: var(--tx); }
+.sec-h .en { font-size: 11px; color: var(--tx3); letter-spacing: 0.06em; font-family: var(--font-num); }
+.sec-sub { color: var(--tx2); font-size: 12.5px; margin: 0 0 12px; max-width: 1000px; }
+.stage {
+  display: inline-block; width: 22px; height: 22px; line-height: 20px; text-align: center;
+  border: 1px solid var(--line); border-radius: 3px; font-size: 12px; color: var(--tx2);
+  font-family: var(--font-num); margin-right: 2px;
+}
+
+/* ---- 表单网格 ---- */
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px 16px; }
+label.f { display: flex; flex-direction: column; font-size: 12.5px; color: var(--tx2); gap: 5px; min-width: 0; }
+label.f input, label.f select {
+  background: var(--well); color: var(--tx); border: 1px solid var(--line);
+  border-radius: 3px; padding: 8px 10px; font-size: 14px; font-family: var(--font-num);
+  font-variant-numeric: tabular-nums; width: 100%;
+}
+label.f input::placeholder { color: var(--tx3); }
+label.f input:focus, label.f select:focus { outline: none; border-color: var(--auto); }
+label.f input[readonly] { background: var(--panel); color: var(--auto); border-style: dashed; }
+h3.sub { font-size: 13.5px; margin: 22px 0 10px; color: var(--tx); font-weight: 700; }
+.hint { font-size: 12px; color: var(--tx3); }
+.src { font-size: 10.5px; color: var(--tx3); font-weight: 400; }
+
+/* ---- 血缘徽章：描边，不喊叫 ---- */
+.tag {
+  display: inline-block; font-size: 10.5px; line-height: 1.5; font-weight: 400;
+  border: 1px solid var(--line); border-radius: 3px; padding: 0 6px; margin-left: 6px;
+  color: var(--tx2); vertical-align: 1px; white-space: nowrap;
+}
+.tag.live { border-color: rgba(217, 166, 72, 0.55); color: var(--auto); }
+.tag.new { border-color: var(--line); color: var(--tx3); }
+
+/* ---- 数据表 ---- */
+.tscroll { overflow-x: auto; margin: 8px 0; }
+table.t { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.t th, table.t td {
+  border-bottom: 1px solid var(--line-soft); padding: 9px 10px;
+  text-align: right; font-variant-numeric: tabular-nums;
+}
+table.t th:first-child, table.t td:first-child { text-align: left; }
+table.t thead th {
+  font-size: 11.5px; color: var(--tx2); font-weight: 600; white-space: nowrap;
+  border-bottom: 1px solid var(--line); background: var(--panel);
+  position: sticky; top: 0;
+}
+table.t td.lbl { text-align: left; color: var(--tx); font-family: var(--font-tx); }
+table.t td.calc { background: var(--auto-dim); color: var(--tx); font-family: var(--font-num); }
+table.t td.linked {
+  font-family: var(--font-num); font-weight: 600; color: var(--tx);
+  box-shadow: inset 2px 0 0 var(--auto);
+}
+table.t tr.total td {
+  border-top: 1px solid var(--line); background: var(--panel);
+  font-weight: 700; font-family: var(--font-num);
+}
+table.t tr.noi td { background: rgba(217, 166, 72, 0.10); font-weight: 700; font-family: var(--font-num); }
+table.t input.cell-in {
+  width: 104px; max-width: 100%; background: var(--well); color: var(--tx);
+  border: 1px solid var(--line); border-radius: 3px; padding: 7px 8px;
+  font-size: 13px; font-family: var(--font-num); font-variant-numeric: tabular-nums; text-align: right;
+}
+table.t input.cell-in.sm { width: 84px; }
+table.t input.cell-in:focus { outline: none; border-color: var(--auto); }
+table.t input.cell-in::placeholder { color: var(--tx3); font-size: 11px; font-family: var(--font-tx); }
+.del-tenant { color: var(--tx3); cursor: pointer; border: 0; background: none; font-size: 16px; padding: 6px 10px; }
+.del-tenant:hover { color: var(--bad); }
+
+/* ---- 双栏 ---- */
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 0 28px; }
+.two-col > * { min-width: 0; }
+.two-col > * + * { border-left: 1px solid var(--line-soft); padding-left: 28px; }
+.col-h { font-size: 13.5px; margin: 4px 0 2px; color: var(--tx); }
+
+/* ---- KV 读数 ---- */
+.kv { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 0; border: 1px solid var(--line-soft); border-radius: 3px; background: var(--panel); margin: 10px 0; }
+.kv .cell { padding: 10px 14px; border-left: 1px solid var(--line-soft); font-size: 11.5px; color: var(--tx2); min-width: 0; }
+.kv .cell:nth-child(6n+1) { border-left: 0; }
+.kv .cell b { display: block; font-family: var(--font-num); font-size: 17px; font-weight: 600; color: var(--tx); margin-top: 2px; font-variant-numeric: tabular-nums; }
+.kv .cell.hl b { color: var(--auto); }
+
+/* ---- 联动闪：唯一的功能性动效 ---- */
+@keyframes uwflash { 0% { background: rgba(217, 166, 72, 0.30); } 100% { background: rgba(217, 166, 72, 0.07); } }
+.flash { animation: uwflash 1s ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .flash { animation: none; }
+  * { scroll-behavior: auto !important; }
+}
+
+.neg { color: var(--bad); } .pos { color: var(--ok); }
+.mono { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+
+/* ============ 移动端：重组信息流，而非缩小桌面版 ============ */
+@media (max-width: 1100px) {
+  .kpis { grid-template-columns: repeat(3, 1fr); }
+  .kpi:nth-child(3n+1) { border-left: 0; }
+  .kpi { border-top: 1px solid var(--line-soft); }
+  .kpi:nth-child(-n+3) { border-top: 0; }
+}
+@media (max-width: 900px) {
+  .two-col { grid-template-columns: 1fr; }
+  .two-col > * + * { border-left: 0; padding-left: 0; border-top: 1px solid var(--line-soft); padding-top: 18px; margin-top: 6px; }
+  .c-grid { grid-template-columns: 1fr !important; }
+}
+@media (max-width: 760px) {
+  .desk { padding: 14px 14px 70px; }
+  .cmdbar-in { padding: 10px 14px; gap: 10px; }
+  .verdict { white-space: normal; font-size: 12px; }
+  .cmd-ctl { margin-left: 0; width: 100%; }
+  .cmd-ctl select { flex: 1; min-height: 44px; }
+  .btn, .btn.sm { min-height: 44px; display: inline-flex; align-items: center; }
+  .kpis { grid-template-columns: 1fr 1fr; }
+  .kpi:nth-child(3n+1) { border-left: 1px solid var(--line-soft); }
+  .kpi:nth-child(odd) { border-left: 0; }
+  .kpi { border-top: 1px solid var(--line-soft); }
+  .kpi:nth-child(-n+2) { border-top: 0; }
+  .k-v { font-size: 22px; }
+  /* 租户表 → 卡片：每租户一张卡，字段上下排布 */
+  #rentTable thead { display: none; }
+  #rentTable, #rentTable tbody, #rentTable tfoot { display: block; }
+  #rentTable tr.rw { display: block; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); margin: 0 0 12px; padding: 2px 0; }
+  #rentTable td {
+    display: flex; justify-content: space-between; align-items: center; gap: 12px;
+    border: 0; border-bottom: 1px solid var(--line-soft);
+    padding: 8px 14px; min-height: 48px; text-align: right;
+  }
+  #rentTable td::before { content: attr(data-l); color: var(--tx2); font-size: 12.5px; font-family: var(--font-tx); flex: 0 0 auto; }
+  #rentTable td:last-child { border-bottom: 0; justify-content: flex-end; }
+  #rentTable td:last-child::before { content: none; }
+  #rentTable td input.cell-in, #rentTable td input.cell-in.sm { width: 150px; min-height: 44px; font-size: 15px; }
+  #rentTable td.calc { background: transparent; }
+  #rentTable tfoot tr { display: block; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); padding: 2px 0; }
+  #rentTable tfoot td { display: flex; justify-content: space-between; align-items: center; border: 0; border-bottom: 1px solid var(--line-soft); padding: 10px 14px; font-size: 13px; }
+  #rentTable tfoot td::before { content: attr(data-l); color: var(--tx2); font-size: 12px; }
+  #rentTable tfoot td:last-child { border-bottom: 0; }
+  /* 双列表 → 全宽单列，无横向硬挤 */
+  .tscroll { overflow-x: visible; }
+  .tscroll table.t { min-width: 0; }
+  table.t input.cell-in { min-height: 44px; width: 130px; font-size: 15px; }
+  label.f input, label.f select { min-height: 44px; font-size: 15px; }
+  .kv { grid-template-columns: 1fr 1fr; }
+  .kv .cell:nth-child(6n+1) { border-left: 1px solid var(--line-soft); }
+  .kv .cell:nth-child(odd) { border-left: 0; }
+  .kv .cell { border-top: 1px solid var(--line-soft); }
+  .kv .cell:nth-child(-n+2) { border-top: 0; }
+}
+.c-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 36px; }
+.c-grid > * { min-width: 0; }
 </style>
 </head>
 <body>
-<header class="top">
-  <div class="topnav" style="max-width:1240px;margin:0 auto;padding:12px 16px;">
-    <div><a href="/">← DealDesk</a> <strong style="margin-left:10px;">商业核保工作台</strong>
-      <span class="tag live">Rent Roll → Cash Flow → Analysis 全联动</span></div>
-    <div>
+
+<!-- 指挥条 -->
+<header class="cmdbar">
+  <div class="cmdbar-in">
+    <a class="back" href="/">← DealDesk</a>
+    <div class="cmd-id">
+      <div class="cmd-name" id="cmdName">未命名物业</div>
+      <div class="cmd-addr" id="cmdAddr"></div>
+    </div>
+    <div class="verdict" id="verdict" title="随输入自动重算">
+      <span class="v-auto">AUTO</span>ROI <b><span data-calc="analysis.roi" data-fmt="pct"></span></b>
+      · IRR <b><span data-calc="analysis.exit.irr" data-fmt="pct"></span></b>
+      · DSCR <b><span data-calc="analysis.projected.dscr" data-fmt="num2"></span>×</b>
+      · 预测净现金流 <b><span data-calc="analysis.projected.net_cash_flow" data-fmt="money"></span></b>
+    </div>
+    <div class="cmd-ctl">
       <select id="projSel" title="已保存的核保项目"></select>
       <button class="btn sm" id="btnNew">新建</button>
-      <button class="btn sm" id="btnSave">保存</button>
-      <button class="btn sm ghost" id="btnExample">载入模板示例</button>
+      <button class="btn sm primary" id="btnSave">保存</button>
+      <button class="btn sm" id="btnExample">载入模板示例</button>
       <button class="btn sm danger" id="btnDel" style="display:none">删除</button>
     </div>
   </div>
 </header>
 
-<div class="uw">
-  <div class="disclaimer" style="background:#fff8e6;border:1px solid #f0c36d;border-radius:8px;padding:10px 14px;font-size:13px;color:#7a4a00;">
-    复刻自您的常用 underwriting 模板（三表联动）。改任意一个<strong>输入格</strong>，所有下游计算格会自动重算并闪烁提示。
-    <span class="tag new">NEW</span> 为模板之外新增的字段与指标。
+<main class="desk">
+  <p class="note">任一输入格改动 → 整条链自动重算并闪烁。<b>琥珀色</b> = 机器算出；<span class="bdg">描边徽章</span> = 你的手工覆盖。留空即自动。</p>
+
+  <!-- 一眼结论 -->
+  <div class="kpis" id="kpiStrip" aria-label="关键回报">
+    <div class="kpi"><div class="k-l">预测转售价值</div><div class="k-v"><span data-calc="analysis.projected_resale" data-fmt="money"></span></div></div>
+    <div class="kpi"><div class="k-l">税前净收益</div><div class="k-v"><span data-calc="analysis.net_gains" data-fmt="money"></span></div></div>
+    <div class="kpi"><div class="k-l">投资回报率 ROI</div><div class="k-v"><span data-calc="analysis.roi" data-fmt="pct"></span></div></div>
+    <div class="kpi"><div class="k-l">退出 IRR</div><div class="k-v"><span data-calc="analysis.exit.irr" data-fmt="pct"></span></div></div>
+    <div class="kpi"><div class="k-l">股本倍数</div><div class="k-v"><span data-calc="analysis.exit.equity_multiple" data-fmt="num2"></span>×</div></div>
+    <div class="kpi"><div class="k-l">预测净现金流/年</div><div class="k-v"><span data-calc="analysis.projected.net_cash_flow" data-fmt="money"></span></div></div>
   </div>
 
-  <!-- 联动链总览 -->
-  <section class="card">
-    <h2 class="sec">数据联动链 <span class="tag live">实时</span></h2>
-    <div class="sec-sub">改动任一输入，沿这条链逐级传导：<span class="flow">租户月租 → 年租金合计 → 现金流基础租金 → NOI → 贷款/回报</span></div>
-    <div class="flowstrip" id="flowstrip"></div>
-  </section>
+  <!-- 流水线读数 -->
+  <div class="pipe" id="flowstrip" aria-label="数据流水线">
+    <div class="pnode"><div class="p-l">A · 年租金合计</div><div class="p-v"><span class="hl"><span data-calc="rent_roll.total_annual_uw" data-fmt="money"></span></span></div><div class="p-s">包租口径</div></div>
+    <div class="parr">→</div>
+    <div class="pnode"><div class="p-l">B · 预测 NOI</div><div class="p-v"><span data-calc="proforma.noi" data-fmt="money"></span></div><div class="p-s">EGI − 费用</div></div>
+    <div class="parr">→</div>
+    <div class="pnode"><div class="p-l">B · Cap 率</div><div class="p-v"><span data-calc="proforma.cap_rate" data-fmt="pct"></span></div><div class="p-s">NOI ÷ 购买价</div></div>
+    <div class="parr">→</div>
+    <div class="pnode"><div class="p-l">C · 净现金流</div><div class="p-v"><span data-calc="analysis.projected.net_cash_flow" data-fmt="money"></span></div><div class="p-s">NOI − 还贷</div></div>
+    <div class="parr">→</div>
+    <div class="pnode"><div class="p-l">C · Cash-on-Cash</div><div class="p-v"><span data-calc="analysis.projected.cash_on_cash" data-fmt="pct"></span></div><div class="p-s">净现金流 ÷ 自有资金</div></div>
+    <div class="parr">→</div>
+    <div class="pnode"><div class="p-l">C · DSCR</div><div class="p-v"><span data-calc="analysis.projected.dscr" data-fmt="num2"></span>×</div><div class="p-s">NOI ÷ 年还贷</div></div>
+    <div class="parr">→</div>
+    <div class="pnode"><div class="p-l">C · 退出 IRR</div><div class="p-v"><span data-calc="analysis.exit.irr" data-fmt="pct"></span></div><div class="p-s"><span data-calc="analysis.exit.hold_years" data-fmt="num"></span> 年持有</div></div>
+  </div>
 
-  <!-- A. Rent Roll -->
-  <section class="card">
-    <h2 class="sec">A · 租金表 Rent Roll</h2>
-    <div class="sec-sub">输入：每户 <b>面积 / 月租（合同） / 包租年租</b>。年租 = 月租×12；合计自动流入
-      <span class="flow">B 现金流 · 基础租金</span>（历史←合同租金合计，预测←包租租金合计）。</div>
+  <!-- A · Rent Roll -->
+  <section class="block">
+    <div class="sec-h"><h2><span class="stage">A</span> 租金表</h2><span class="en">RENT ROLL</span></div>
+    <p class="sec-sub">每户填 <b>面积 / 月租（合同） / 包租年租</b>。年租 = 月租×12；合计自动流入 B 现金流基础租金（历史←合同租金合计，预测←包租租金合计）。</p>
     <div class="tscroll"><table class="t" id="rentTable">
       <thead><tr>
         <th>单元</th><th>租户</th><th>面积 SF</th><th>月租（合同）</th>
@@ -108,118 +333,120 @@ td.flash2 { animation: uwflash2 1.1s ease-out; }
       <tbody id="rentBody"></tbody>
       <tfoot id="rentFoot"></tfoot>
     </table></div>
-    <button class="btn sm ghost" id="btnAddTenant">＋ 加租户</button>
-    <div class="grid" style="margin-top:10px;max-width:520px;">
-      <label class="f">空置面积 SF <span class="tag new">NEW</span>
+    <button class="btn sm" id="btnAddTenant">＋ 加租户</button>
+    <div class="grid" style="margin-top:14px;max-width:560px;">
+      <label class="f">空置面积 SF
         <input type="number" data-in="vacant_sf" step="1" min="0"></label>
       <label class="f">可出租总面积 SF <span class="src">算</span>
         <input type="text" data-calc="rent_roll.total_sf_property" data-fmt="num" readonly></label>
       <label class="f">出租率 <span class="src">算</span>
         <input type="text" data-calc="rent_roll.occupancy" data-fmt="pct" readonly></label>
     </div>
-    <div class="hint" id="vacHint" style="margin-top:6px;"></div>
-    </div>
+    <div class="hint" id="vacHint" style="margin-top:8px;"></div>
   </section>
 
-  <!-- B. Cash Flow -->
-  <section class="card">
-    <h2 class="sec">B · 现金流 Cash Flow</h2>
-    <div class="sec-sub"><span class="flow">基础租金 ← A 租金表</span>；其余为输入。NOI = 有效总收入 − 总费用；
-      NOI 自动流入 <span class="flow">C 投资分析</span>。</div>
+  <!-- B · Cash Flow -->
+  <section class="block">
+    <div class="sec-h"><h2><span class="stage">B</span> 现金流</h2><span class="en">CASH FLOW</span></div>
+    <p class="sec-sub">基础租金 ← A 租金表；其余为输入。NOI = 有效总收入 − 总费用；NOI 自动流入 C 投资分析。</p>
     <div class="two-col">
-      <div><h3 style="font-size:15px;">历史 Historical <span class="tag live">← 合同租金</span></h3><div class="tscroll"><table class="t" id="cfHist"></table></div></div>
-      <div><h3 style="font-size:15px;">预测 Pro Forma <span class="tag live">← 包租租金</span></h3><div class="tscroll"><table class="t" id="cfPro"></table></div></div>
+      <div><h3 class="col-h">历史 Historical <span class="tag live">← 合同租金</span></h3><div class="tscroll"><table class="t" id="cfHist"></table></div></div>
+      <div><h3 class="col-h">预测 Pro Forma <span class="tag live">← 包租租金</span></h3><div class="tscroll"><table class="t" id="cfPro"></table></div></div>
     </div>
   </section>
 
-  <!-- C. Analysis -->
-  <section class="card">
-    <h2 class="sec">C · 投资分析 Analysis</h2>
-    <div class="sec-sub"><span class="flow">NOI ← B 现金流</span>；输入购买与贷款条件，回报自动重算。</div>
+  <!-- C · Analysis -->
+  <section class="block">
+    <div class="sec-h"><h2><span class="stage">C</span> 投资分析</h2><span class="en">ANALYSIS</span></div>
+    <p class="sec-sub">NOI ← B 现金流；输入购买与贷款条件，回报自动重算。</p>
 
-    <h3 style="font-size:15px;margin:14px 0 6px;">物业概况</h3>
-    <div class="grid">
-      <label class="f">物业名称<input data-in="property.name"></label>
-      <label class="f">地址<input data-in="property.address"></label>
-      <label class="f">城市<input data-in="property.city"></label>
-      <label class="f">州<input data-in="property.state"></label>
-      <label class="f">邮编<input data-in="property.zip"></label>
-      <label class="f">物业类型<input data-in="property.property_type"></label>
-      <label class="f">可租面积 SF<input type="number" data-in="property.net_rentable_sf" step="1" min="0"></label>
-      <label class="f">占地（英亩）<input type="number" data-in="property.land_acres" step="0.01" min="0"></label>
-      <label class="f">车位数<input type="number" data-in="property.parking_spaces" step="1" min="0"></label>
-      <label class="f">建造年份<input data-in="property.year_built"></label>
-      <label class="f">翻新年份 <span class="tag new">NEW</span><input data-in="property.year_renovated"></label>
-      <label class="f">县/郡 County<input data-in="property.county"></label>
-      <label class="f">楼栋数 <span class="tag new">NEW</span><input type="number" data-in="property.buildings" step="1" min="0"></label>
-      <label class="f">层数 <span class="tag new">NEW</span><input type="number" data-in="property.floors" step="1" min="0"></label>
-      <label class="f">出租率统计日期 <span class="tag new">NEW</span><input data-in="property.occupancy_as_of" placeholder="如 2026-10-01"></label>
-      <label class="f">车位 / 千SF <span class="src">算</span><input data-calc="property.parking_per_1000sf" data-fmt="num2" readonly></label>
-    </div>
-
-    <h3 style="font-size:15px;margin:14px 0 6px;">资金来源与用途 Source &amp; Use</h3>
-    <div class="grid">
-      <label class="f">购买价 $<input type="number" data-in="analysis.purchase_price" step="1000" min="0"></label>
-      <label class="f">(+) 建筑维修 $<input type="number" data-in="analysis.building_repairs" step="1000" min="0"></label>
-      <label class="f">(+) 资本储备 $<input type="number" data-in="analysis.capital_reserve" step="1000" min="0"></label>
-      <label class="f">(+) 贷款费用 $<input type="number" data-in="analysis.lender_fees" step="1000" min="0"></label>
-      <label class="f">(+) 交割费用 $<input type="number" data-in="analysis.closing_costs" step="1000" min="0"></label>
-      <label class="f">总投入 <span class="src">算</span><input data-calc="analysis.total_uses" data-fmt="money" readonly></label>
-      <label class="f">贷款金额 <span class="src">算</span><input data-calc="analysis.loan_bal" data-fmt="money" readonly></label>
-      <label class="f">需自有资金 <span class="src">算</span><input data-calc="analysis.net_liquidity" data-fmt="money" readonly></label>
-    </div>
-
-    <h3 style="font-size:15px;margin:14px 0 6px;">贷款条件</h3>
-    <div class="grid">
-      <label class="f">首付比例 %<input type="number" data-in="analysis.down_pct" data-pct="1" step="0.5" min="0" max="100"></label>
-      <label class="f">年利率 %<input type="number" data-in="analysis.rate" data-pct="1" step="0.125" min="0" max="30"></label>
-      <label class="f">还款方式 <span class="tag new">NEW</span>
-        <select data-in="analysis.amort_type">
-          <option value="IO">只还利息 IO（模板默认）</option>
-          <option value="AMORTIZING">等额本息 Amortizing</option>
-        </select></label>
-      <label class="f">摊销年数 <span class="tag new">NEW</span><input type="number" data-in="analysis.amort_years" step="1" min="1" max="50" value="30"></label>
-      <label class="f">年还贷额 <span class="src">算</span><input data-calc="analysis.annual_debt_service" data-fmt="money" readonly></label>
-      <label class="f">租金减免/抵免 $<input type="number" data-in="analysis.abatements" step="1000" min="0"></label>
-    </div>
-
-    <h3 style="font-size:15px;margin:14px 0 6px;">承保假设 <span class="tag new">模板手工口径</span></h3>
-    <p class="hint">模板里 F13/F15/I24 是手填的承保判断，不是公式。留空 = 自动取现金流实时值；手填 = 锁定为你的手工口径（F2 案例：预测 NOI 手填 616,000，与现金流 476,819 不同）。</p>
-    <div class="grid" style="max-width:720px;">
+    <h3 class="sub">承保假设 <span class="tag new">模板手工口径</span></h3>
+    <p class="hint" style="max-width:900px;">模板里 F13/F15/I24 是手填的承保判断，不是公式。留空 = 自动取现金流实时值；手填 = 锁定为你的手工口径。</p>
+    <div class="grid" style="max-width:760px;">
       <label class="f">在手 NOI (F13) $<input type="number" data-in="analysis.underwritten_noi" step="1000" min="0" placeholder="空=现金流"></label>
       <label class="f">预测 NOI (F15) $<input type="number" data-in="analysis.projected_noi" step="1000" min="0" placeholder="空=现金流"></label>
       <label class="f">现金流块在手 NOI (I24) $<input type="number" data-in="analysis.inplace_noi_cf" step="1000" min="0" placeholder="空=现金流"></label>
     </div>
-    <div style="margin:6px 0 0;"><button class="btn" id="btnSyncNoi" type="button">从现金流同步三项</button> <span class="hint" id="noiSrc"></span></div>
+    <div style="margin:10px 0 0;"><button class="btn sm" id="btnSyncNoi" type="button">从现金流同步三项</button> <span class="hint" id="noiSrc"></span></div>
 
-    <h3 style="font-size:15px;margin:14px 0 6px;">回报汇总</h3>
+    <div class="c-grid" style="margin-top:22px;">
+      <div>
+        <h3 class="sub" style="margin-top:0;">物业概况</h3>
+        <div class="grid">
+          <label class="f">物业名称<input data-in="property.name"></label>
+          <label class="f">地址<input data-in="property.address"></label>
+          <label class="f">城市<input data-in="property.city"></label>
+          <label class="f">州<input data-in="property.state"></label>
+          <label class="f">邮编<input data-in="property.zip"></label>
+          <label class="f">县/郡 County<input data-in="property.county"></label>
+          <label class="f">物业类型<input data-in="property.property_type"></label>
+          <label class="f">可租面积 SF<input type="number" data-in="property.net_rentable_sf" step="1" min="0"></label>
+          <label class="f">占地（英亩）<input type="number" data-in="property.land_acres" step="0.01" min="0"></label>
+          <label class="f">车位数<input type="number" data-in="property.parking_spaces" step="1" min="0"></label>
+          <label class="f">车位 / 千SF <span class="src">算</span><input data-calc="property.parking_per_1000sf" data-fmt="num2" readonly></label>
+          <label class="f">建造年份<input data-in="property.year_built"></label>
+          <label class="f">翻新年份<input data-in="property.year_renovated"></label>
+          <label class="f">楼栋数<input type="number" data-in="property.buildings" step="1" min="0"></label>
+          <label class="f">层数<input type="number" data-in="property.floors" step="1" min="0"></label>
+          <label class="f">出租率统计日期<input data-in="property.occupancy_as_of" placeholder="如 2026-10-01"></label>
+        </div>
+      </div>
+      <div>
+        <h3 class="sub" style="margin-top:0;">资金来源与用途</h3>
+        <div class="grid">
+          <label class="f">购买价 $<input type="number" data-in="analysis.purchase_price" step="1000" min="0"></label>
+          <label class="f">(+) 建筑维修 $<input type="number" data-in="analysis.building_repairs" step="1000" min="0"></label>
+          <label class="f">(+) 资本储备 $<input type="number" data-in="analysis.capital_reserve" step="1000" min="0"></label>
+          <label class="f">(+) 贷款费用 $<input type="number" data-in="analysis.lender_fees" step="1000" min="0"></label>
+          <label class="f">(+) 交割费用 $<input type="number" data-in="analysis.closing_costs" step="1000" min="0"></label>
+          <label class="f">总投入 <span class="src">算</span><input data-calc="analysis.total_uses" data-fmt="money" readonly></label>
+          <label class="f">贷款金额 <span class="src">算</span><input data-calc="analysis.loan_bal" data-fmt="money" readonly></label>
+          <label class="f">需自有资金 <span class="src">算</span><input data-calc="analysis.net_liquidity" data-fmt="money" readonly></label>
+        </div>
+        <h3 class="sub">贷款条件</h3>
+        <div class="grid">
+          <label class="f">首付比例 %<input type="number" data-in="analysis.down_pct" data-pct="1" step="0.5" min="0" max="100"></label>
+          <label class="f">年利率 %<input type="number" data-in="analysis.rate" data-pct="1" step="0.125" min="0" max="30"></label>
+          <label class="f">还款方式
+            <select data-in="analysis.amort_type">
+              <option value="IO">只还利息 IO（模板默认）</option>
+              <option value="AMORTIZING">等额本息 Amortizing</option>
+            </select></label>
+          <label class="f">摊销年数<input type="number" data-in="analysis.amort_years" step="1" min="1" max="50" value="30"></label>
+          <label class="f">年还贷额 <span class="src">算</span><input data-calc="analysis.annual_debt_service" data-fmt="money" readonly></label>
+          <label class="f">租金减免/抵免 $<input type="number" data-in="analysis.abatements" step="1000" min="0"></label>
+        </div>
+      </div>
+    </div>
+
+    <h3 class="sub">回报汇总</h3>
     <div class="kv" id="returnKvs"></div>
 
     <div class="two-col">
       <div>
-        <h3 style="font-size:15px;">预测口径现金回报 <span class="tag live">← 预测 NOI</span></h3>
+        <h3 class="col-h">预测口径现金回报 <span class="tag live">← 预测 NOI</span></h3>
         <div class="tscroll"><table class="t" id="cocPro"></table></div>
       </div>
       <div>
-        <h3 style="font-size:15px;">在手口径现金回报 <span class="tag live">← 历史 NOI</span></h3>
+        <h3 class="col-h">在手口径现金回报 <span class="tag live">← 历史 NOI</span></h3>
         <div class="tscroll"><table class="t" id="cocInp"></table></div>
       </div>
     </div>
 
-    <h3 style="font-size:15px;margin:14px 0 6px;">新增指标 <span class="tag new">NEW</span></h3>
+    <h3 class="sub">新增指标</h3>
     <div class="kv" id="newKvs"></div>
 
-    <h3 style="font-size:15px;margin:14px 0 6px;">持有退出分析 <span class="tag new">NEW</span></h3>
-    <div class="grid" style="max-width:720px;">
+    <h3 class="sub">持有退出分析</h3>
+    <div class="grid" style="max-width:760px;">
       <label class="f">持有年数<input type="number" data-in="analysis.hold_years" step="1" min="1" max="30"></label>
       <label class="f">NOI 年增长率 %<input type="number" data-in="analysis.noi_growth" data-pct="1" step="0.5"></label>
       <label class="f">市场 Cap 率 %<input type="number" data-in="analysis.market_cap_rate" data-pct="1" step="0.25" min="0.5"></label>
       <label class="f">退出 Cap 率 %<input type="number" data-in="analysis.exit_cap_rate" data-pct="1" step="0.25" min="0.5"></label>
-      <label class="f">退出费用 %<input data-calc="analysis.exit_fee_pct" data-fmt="pct" readonly title="模板固定 4%，按 Miao 决定锁定"></label>
+      <label class="f">退出费用 % <span class="src">模板固定 4%</span><input data-calc="analysis.exit_fee_pct" data-fmt="pct" readonly title="模板固定 4%，按 Miao 决定锁定"></label>
     </div>
     <div class="kv" id="exitKvs"></div>
   </section>
-</div>
+</main>
 
 <script src="/uw-commercial.js"></script>
 </body>

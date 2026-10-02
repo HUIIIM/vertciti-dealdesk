@@ -286,8 +286,8 @@ function renderAll(flash) {
     else {
       const changed = flash && prevVals[path] !== undefined && prevVals[path] !== txt;
       el.textContent = txt;
-      const td = el.closest("td");
-      if (changed && td) { td.classList.remove("flash"); void td.offsetWidth; td.classList.add("flash"); }
+      const host = el.closest("td") || el.parentElement;
+      if (changed && host) { host.classList.remove("flash"); void host.offsetWidth; host.classList.add("flash"); }
     }
     prevVals[path] = txt;
   });
@@ -295,7 +295,6 @@ function renderAll(flash) {
   renderCfTables();
   renderCocTables();
   renderKvs();
-  renderFlowstrip();
   restoreFocus(cap);
 }
 
@@ -304,28 +303,29 @@ function renderRentTable(flash) {
   tb.innerHTML = "";
   result.rent_roll.tenants.forEach((r, i) => {
     const tr = document.createElement("tr");
+    tr.className = "rw";
     tr.innerHTML =
-      `<td><input class="cell-in sm" data-t="suite" data-i="${i}" value="${esc(r.suite)}"></td>` +
-      `<td><input class="cell-in" data-t="tenant" data-i="${i}" value="${esc(r.tenant)}" style="width:130px"></td>` +
-      `<td><input class="cell-in sm" type="number" data-t="sf" data-i="${i}" value="${num(r.sf)}"></td>` +
-      `<td><input class="cell-in sm" type="number" data-t="monthly_rent" data-i="${i}" value="${num(r.monthly_rent)}"></td>` +
-      `<td class="calc" data-p="monthly_per_sf">${money2(r.monthly_per_sf)}</td>` +
-      `<td class="calc" data-p="annual_rent">${fmtMoney(r.annual_rent)}</td>` +
-      `<td class="calc" data-p="annual_per_sf">${money2(r.annual_per_sf)}</td>` +
-      `<td><input class="cell-in sm" type="number" data-t="underwritten_annual" data-i="${i}" value="${num(r.underwritten_annual)}" title="包租年租（预测口径用）"></td>` +
-      `<td class="calc" data-p="uw_per_sf">${money2(r.uw_per_sf)}</td>` +
-      `<td><input class="cell-in sm" type="number" data-t="monthly_cam" data-i="${i}" value="${num(r.monthly_cam)}" title="月 CAM（模板 T 列）"></td>` +
-      `<td><input class="cell-in sm" type="number" data-t="monthly_parking" data-i="${i}" value="${num(r.monthly_parking)}" title="月停车费（模板 U 列）"></td>` +
-      `<td><button class="del-tenant" data-i="${i}" title="删除">×</button></td>`;
+      `<td data-l="单元"><input class="cell-in sm" data-t="suite" data-i="${i}" value="${esc(r.suite)}"></td>` +
+      `<td data-l="租户"><input class="cell-in" data-t="tenant" data-i="${i}" value="${esc(r.tenant)}" style="width:130px"></td>` +
+      `<td data-l="面积 SF"><input class="cell-in sm" type="number" data-t="sf" data-i="${i}" value="${num(r.sf)}"></td>` +
+      `<td data-l="月租（合同）"><input class="cell-in sm" type="number" data-t="monthly_rent" data-i="${i}" value="${num(r.monthly_rent)}"></td>` +
+      `<td data-l="月租/SF" class="calc" data-p="monthly_per_sf">${money2(r.monthly_per_sf)}</td>` +
+      `<td data-l="年租" class="calc" data-p="annual_rent">${fmtMoney(r.annual_rent)}</td>` +
+      `<td data-l="年租/SF" class="calc" data-p="annual_per_sf">${money2(r.annual_per_sf)}</td>` +
+      `<td data-l="包租年租"><input class="cell-in sm" type="number" data-t="underwritten_annual" data-i="${i}" value="${num(r.underwritten_annual)}" title="包租年租（预测口径用）"></td>` +
+      `<td data-l="包租/SF" class="calc" data-p="uw_per_sf">${money2(r.uw_per_sf)}</td>` +
+      `<td data-l="月 CAM"><input class="cell-in sm" type="number" data-t="monthly_cam" data-i="${i}" value="${num(r.monthly_cam)}" title="月 CAM（模板 T 列）"></td>` +
+      `<td data-l="月停车费"><input class="cell-in sm" type="number" data-t="monthly_parking" data-i="${i}" value="${num(r.monthly_parking)}" title="月停车费（模板 U 列）"></td>` +
+      `<td data-l=""><button class="del-tenant" data-i="${i}" title="删除">×</button></td>`;
     tb.appendChild(tr);
   });
   const rr = result.rent_roll;
   $("#rentFoot").innerHTML =
-    `<tr class="total"><td colspan="2">合计</td><td>${fmtNum(rr.total_sf_existing)}</td>` +
-    `<td>${fmtMoney(rr.total_monthly)}</td><td></td><td class="linked" title="→ B 现金流 · 历史基础租金">${fmtMoney(rr.total_annual_lease)}</td>` +
-    `<td></td><td class="linked" title="→ B 现金流 · 预测基础租金">${fmtMoney(rr.total_annual_uw)}</td><td></td>` +
-    `<td class="linked" title="→ B/C 现金流 · CAM 回收（模板 T 列）">${fmtMoney(rr.total_annual_cam)}</td>` +
-    `<td class="linked" title="→ B/C 现金流 · 停车收入（模板 U 列）">${fmtMoney(rr.total_annual_parking)}</td><td></td></tr>`;
+    `<tr class="total"><td data-l="" colspan="2">合计</td><td data-l="面积 SF">${fmtNum(rr.total_sf_existing)}</td>` +
+    `<td data-l="月租合计">${fmtMoney(rr.total_monthly)}</td><td data-l=""></td><td data-l="年租合计" class="linked" title="→ B 现金流 · 历史基础租金">${fmtMoney(rr.total_annual_lease)}</td>` +
+    `<td data-l=""></td><td data-l="包租合计" class="linked" title="→ B 现金流 · 预测基础租金">${fmtMoney(rr.total_annual_uw)}</td><td data-l=""></td>` +
+    `<td data-l="CAM 年合计" class="linked" title="→ B/C 现金流 · CAM 回收（模板 T 列）">${fmtMoney(rr.total_annual_cam)}</td>` +
+    `<td data-l="停车年合计" class="linked" title="→ B/C 现金流 · 停车收入（模板 U 列）">${fmtMoney(rr.total_annual_parking)}</td><td data-l=""></td></tr>`;
   // 空置率建议：空置面积隐含比例
   const vacEl = $("#vacHint");
   if (vacEl) {
@@ -435,6 +435,10 @@ function renderKvs() {
     kvCard("股本倍数", ex.equity_multiple, "num2", true);
   const emEl = $$("#exitKvs .cell b");
   if (emEl[5]) emEl[5].textContent = Number.isFinite(ex.equity_multiple) ? ex.equity_multiple.toFixed(2) + "×" : "—";
+  // 指挥条：物业身份（state 输入，非计算值）
+  const cn = $("#cmdName"), ca = $("#cmdAddr"), pp = state.property || {};
+  if (cn) cn.textContent = pp.name || "未命名物业";
+  if (ca) ca.textContent = [pp.address, pp.city, pp.state, pp.zip].filter(Boolean).join(" ");
   // 承保假设血缘
   const src = an.noi_sources || {};
   const tag = (s) => s === "manual" ? "手工锁定" : "现金流实时";
@@ -442,20 +446,6 @@ function renderKvs() {
   if (el) el.textContent = `当前口径：F13 ${tag(src.underwritten_noi)} · F15 ${tag(src.projected_noi)} · I24 ${tag(src.inplace_noi_cf)}`;
 }
 function fmtDscr(v) { return Number.isFinite(v) ? v.toFixed(3) + "×" : "—"; }
-
-function renderFlowstrip() {
-  const rr = result.rent_roll, an = result.analysis, pro = result.proforma;
-  const node = (t, v, l) => `<div class="fnode"><h4>${t}</h4><div class="fv">${v}</div><div class="fl">${l}</div></div>`;
-  const arr = `<div class="farrow">→</div>`;
-  $("#flowstrip").innerHTML =
-    node("A · 年租金合计", fmtMoney(rr.total_annual_uw), "包租口径") + arr +
-    node("B · 预测 NOI", fmtMoney(pro.noi), "EGI − 费用") + arr +
-    node("B · Cap 率", fmtPct(pro.cap_rate), "NOI ÷ 购买价") + arr +
-    node("C · 净现金流", fmtMoney(an.projected.net_cash_flow), "NOI − 还贷") + arr +
-    node("C · Cash-on-Cash", fmtPct(an.projected.cash_on_cash), "净现金流 ÷ 自有资金") + arr +
-    node("C · DSCR", fmtDscr(an.projected.dscr), "NOI ÷ 年还贷") + arr +
-    node("C · 退出 IRR", fmtPct(an.exit.irr), an.exit.hold_years + " 年持有");
-}
 
 /* ---------------- helpers ---------------- */
 const esc = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
