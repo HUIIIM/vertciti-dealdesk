@@ -93,6 +93,36 @@ def health():
     return {"ok": True, "service": "dealdesk"}
 
 
+@app.post("/api/tax/estimate")
+def tax_estimate(payload: dict):
+    """地址 → 州 → 州平均税率 → 年房产税估算.
+
+    body: {"address": "...", "price": 18500000}
+    返回: {"state": "NY", "rate": 0.013, "annual_tax": 240500, ...}
+    查不到州或税率时返回 {"state": None, ...}，前端不填数、不报错。
+    口径：州平均税率估算，待独立验证（county 实际税率可差 ±50%）。
+    """
+    from . import geocode as _geocode
+    from .data import state_tax_rates as _tax
+    address = (payload.get("address") or "").strip()
+    try:
+        price = float(payload.get("price") or 0)
+    except (TypeError, ValueError):
+        price = 0
+    g = _geocode.geocode_state(address)
+    rate = _tax.get_rate(g["state"]) if g["state"] else None
+    annual = round(price * rate) if (rate and price > 0) else None
+    return {
+        "state": g["state"],
+        "rate": rate,
+        "annual_tax": annual,
+        "matched_address": g["matched_address"],
+        "source": _tax.SOURCE,
+        "source_url": _tax.SOURCE_URL,
+        "confidence": _tax.CALIBRATION_NOTE,
+    }
+
+
 @app.get("/api/tophap/status")
 def tophap_status():
     """TopHap 数据源状态：开关 / 授权 / 连通性 / tool 面（OAuth 授权后的校验入口）。"""

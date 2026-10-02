@@ -453,8 +453,34 @@ WB.initDropzone = function () {
 };
 
 /* ---------- 初始化 ---------- */
+/* 地址 → 州平均税率 → 自动填年房产税（realyzer 思路，静态表+零key实现） */
+WB.autoFillTax = async function () {
+  const addrEl = document.getElementById('p-address');
+  const taxEl = document.getElementById('p-tax');
+  if (!addrEl || !taxEl) return;
+  const addr = addrEl.value.trim();
+  const price = parseFloat(document.getElementById('p-asking').value) || 0;
+  if (!addr || !price) return;
+  if (taxEl.dataset.autofilled === '1' && taxEl.value) return; // 用户手改过，不覆盖
+  try {
+    const r = await fetch('/api/tax/estimate', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ address: addr, price })
+    });
+    const d = await r.json();
+    if (d.annual_tax) {
+      taxEl.value = d.annual_tax;
+      taxEl.dataset.autofilled = '1';
+      taxEl.title = `${d.state} 州平均税率 ${(d.rate * 100).toFixed(2)}% 估算 · 待独立验证（${d.source}）`;
+      if (typeof WB.recalc === 'function') WB.recalc();
+    }
+  } catch (e) { /* 静默降级：不填，不打断 */ }
+};
+
 WB.init = async function () {
   WB.renderComps(); WB.renderDims(); WB.initDropzone(); WB.refreshScreenshots();
+  const _addrEl = document.getElementById('p-address');
+  if (_addrEl) _addrEl.addEventListener('blur', WB.autoFillTax);
   try {
     const r = await fetch('/api/wb/markets'); WB.markets = await r.json();
     const opts = WB.markets.markets.map(m => `<option value="${m.key}">${esc(m.label)}（${esc(m.geo)}）</option>`).join('');

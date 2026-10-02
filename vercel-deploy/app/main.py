@@ -93,6 +93,36 @@ def health():
     return {"ok": True, "service": "dealdesk"}
 
 
+@app.post("/api/tax/estimate")
+def tax_estimate(payload: dict):
+    """地址 → 州 → 州平均税率 → 年房产税估算.
+
+    body: {"address": "...", "price": 18500000}
+    返回: {"state": "NY", "rate": 0.013, "annual_tax": 240500, ...}
+    查不到州或税率时返回 {"state": None, ...}，前端不填数、不报错。
+    口径：州平均税率估算，待独立验证（county 实际税率可差 ±50%）。
+    """
+    from . import geocode as _geocode
+    from .data import state_tax_rates as _tax
+    address = (payload.get("address") or "").strip()
+    try:
+        price = float(payload.get("price") or 0)
+    except (TypeError, ValueError):
+        price = 0
+    g = _geocode.geocode_state(address)
+    rate = _tax.get_rate(g["state"]) if g["state"] else None
+    annual = round(price * rate) if (rate and price > 0) else None
+    return {
+        "state": g["state"],
+        "rate": rate,
+        "annual_tax": annual,
+        "matched_address": g["matched_address"],
+        "source": _tax.SOURCE,
+        "source_url": _tax.SOURCE_URL,
+        "confidence": _tax.CALIBRATION_NOTE,
+    }
+
+
 @app.get("/api/tophap/status")
 def tophap_status():
     """TopHap 数据源状态：开关 / 授权 / 连通性 / tool 面（OAuth 授权后的校验入口）。"""
@@ -415,6 +445,34 @@ async def wb_intake_pdf(file: UploadFile = File(...)):
     path = pdf_intake.save_upload(data, name)
     try:
         return pdf_intake.run_pdf_upload(path, name)
+    finally:
+        try:
+            import os
+            os.remove(path)
+        except Exception:
+            pass
+
+
+# ---------------- 商业核保 PDF intake：OM/flyer → 商业字段 → 自动填表 ----------------
+
+@app.post("/api/uw-commercial/intake/pdf")
+async def uw_commercial_intake_pdf(file: UploadFile = File(...)):
+    """商业 PDF intake：上传 OM/flyer/卖方材料 → 提取商业核保字段.
+
+    返回 fields[]（key 直接对应 uw-commercial.html 的 data-in 路径）
+    与 tenants[]（租约表行），全部标"卖方材料口径、待独立验证"。
+    """
+    name = file.filename or "upload.pdf"
+    if not name.lower().endswith(".pdf"):
+        raise HTTPException(400, "只接受 PDF 文件")
+    data = await file.read()
+    if len(data) > 20 * 1024 * 1024:
+        raise HTTPException(400, "PDF 超过 20MB 上限")
+    if len(data) < 100:
+        raise HTTPException(400, "文件过小或为空")
+    path = pdf_intake.save_upload(data, name)
+    try:
+        return pdf_intake.run_commercial_pdf_upload(path, name)
     finally:
         try:
             import os

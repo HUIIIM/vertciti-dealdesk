@@ -700,6 +700,31 @@ async function init() {
     intakeStatus.className = "intake-status " + cls;
     intakeStatus.textContent = msg;
   }
+  // ---- 地址 → 州平均税率 → 自动填房产税（realyzer 思路，静态表+零key实现） ----
+  async function autoFillTax() {
+    const addrEl = document.querySelector('[data-in="property.address"]');
+    const taxEl = document.querySelector('input[data-k="property_tax"]');
+    if (!addrEl || !taxEl) return;
+    const addr = (addrEl.value || "").trim();
+    const price = parseFloat((document.querySelector('[data-in="analysis.purchase_price"]') || {}).value) || 0;
+    if (!addr || !price) return;
+    if (taxEl.dataset.autofilled === "1" && taxEl.value) return; // 用户手改过，不覆盖
+    try {
+      const r = await fetch("/api/tax/estimate", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ address: addr, price })
+      });
+      const d = await r.json();
+      if (d.annual_tax) {
+        taxEl.value = d.annual_tax;
+        taxEl.dataset.autofilled = "1";
+        taxEl.title = `${d.state} 州平均税率 ${(d.rate * 100).toFixed(2)}% 估算 · 待独立验证（${d.source}）`;
+        taxEl.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+    } catch (e) { /* 静默降级 */ }
+  }
+  const _addrEl = document.querySelector('[data-in="property.address"]');
+  if (_addrEl) _addrEl.addEventListener("blur", autoFillTax);
   // ?pid= 直接打开指定项目（从首页搜集转入）
   const pid = new URLSearchParams(location.search).get('pid');
   // 保存列表最后加载：API 失败也不影响本地输入和计算
