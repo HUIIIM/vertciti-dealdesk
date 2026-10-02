@@ -452,6 +452,19 @@ const esc = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</
 const num = (v) => (v === 0 || v == null ? "" : Math.round(v * 100) / 100);
 const money2 = (v) => (Number.isFinite(v) ? "$" + v.toFixed(2) : "—");
 
+
+/* AI 自动感：输入变化时，机器计算值做一次呼吸脉冲 */
+let _pulseT = null;
+function pulseAuto() {
+  const m = document.querySelector("main");
+  if (!m) return;
+  m.classList.remove("uw-recalc");
+  void m.offsetWidth; /* restart animation */
+  m.classList.add("uw-recalc");
+  clearTimeout(_pulseT);
+  _pulseT = setTimeout(() => m.classList.remove("uw-recalc"), 550);
+}
+
 /* ---------------- events ---------------- */
 function bindInputs() {
   document.addEventListener("input", (e) => {
@@ -461,6 +474,7 @@ function bindInputs() {
       if (el.dataset.pct) v = f(v) / 100;
       setPath(state, el.dataset.in, v);
       renderAll(true);
+      pulseAuto();
       markDirty();
     } else if (el.dataset.t) {
       const i = +el.dataset.i, k = el.dataset.t;
@@ -468,6 +482,7 @@ function bindInputs() {
       if (!state.tenants[i]) state.tenants[i] = {};
       state.tenants[i][k] = v;
       renderAll(true);
+      pulseAuto();
       markDirty();
     } else if (el.dataset.cf) {
       const key = el.dataset.k;
@@ -476,6 +491,7 @@ function bindInputs() {
       state[el.dataset.cf][key] = v;
       // 只重算数字，不重建输入框（避免光标跳）
       renderAll(true);
+      pulseAuto();
       markDirty();
     }
   });

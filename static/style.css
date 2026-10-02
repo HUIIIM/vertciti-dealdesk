@@ -2,7 +2,7 @@
    "Ink Terminal" —— Bloomberg 的信息密度 + Linear 的精致度 + BlackRock 的机构气质
    层级语言：
    L0 展示数字：56-68px / 800 / -0.02em —— 评分、核心现金数字，一眼定调
-   L1 分区标题：13px / 700 / micro caps —— 分区 zoning
+   L1 分区标题：12px / 600 / uppercase / 0.08em —— 分区 zoning（Linear 区块标签体）
    L2 KPI 数字：28-32px / 800 / tabular —— 卡片关键指标
    L3 数据正文：13px —— 高密度表格/字段
    L4 次要元信息：11px muted —— 来源、时间、hint
@@ -29,10 +29,10 @@
   --blue: #60a5fa;  --blue-dim: rgba(96, 165, 250, .10);  --blue-line: rgba(96, 165, 250, .30);
   --amber: #fbbf24; --amber-dim: rgba(251, 191, 36, .10);  --amber-line: rgba(251, 191, 36, .32);
   --red: #f87171;   --red-dim: rgba(248, 113, 113, .10);   --red-line: rgba(248, 113, 113, .32);
-  --radius: 10px;
+  --radius: 6px;
 }
 * { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; }
+html { -webkit-text-size-adjust: 100%; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
 body {
   font-family: "Inter", -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
   background:
@@ -166,8 +166,8 @@ body {
 .btn.big { padding: 12px 26px; font-size: 15px; }
 
 .card { background: var(--surface); border: 1px solid var(--line-soft); border-radius: var(--radius); }
-.sec-t { font-size: 13px; font-weight: 700; margin: 0 0 12px; display: flex; align-items: center; gap: 8px;
-  letter-spacing: .02em; color: var(--ink); }
+.sec-t { font-size: 12px; font-weight: 600; margin: 0 0 12px; display: flex; align-items: center; gap: 8px;
+  letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 .sec-t .more { margin-left: auto; font-size: 12px; font-weight: 400; color: var(--muted); }
 .zone { margin-bottom: 20px; }
 .micro { font-size: 11px; color: var(--faint); letter-spacing: .04em; }

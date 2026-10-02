@@ -111,6 +111,25 @@ a { color: var(--tx2); }
 
 /* ---- 分区：发丝线分隔，无盒子 ---- */
 section.block { border-top: 1px solid var(--line); margin-top: 34px; padding-top: 16px; }
+/* ---- 横向三栏（桌面 ≥1400px）：A → B → C 数据流向从左到右 ---- */
+.uw-flow { display: block; }
+@media (min-width: 1400px) {
+  .uw-flow { display: grid; grid-template-columns: minmax(400px, 1.05fr) minmax(440px, 1.15fr) minmax(400px, 1fr); gap: 0; align-items: start; }
+  .uw-flow section.block { border-top: 0; border-left: 1px solid var(--line); margin-top: 0; padding: 4px 22px 0; position: relative; }
+  .uw-flow section.block:first-child { border-left: 0; padding-left: 2px; }
+  /* 数据流向指示：栏间箭头 */
+  .uw-flow section.block.flow-b::before, .uw-flow section.block.flow-c::before {
+    content: "→"; position: absolute; left: -11px; top: 8px; width: 20px; height: 20px;
+    background: var(--bg); border: 1px solid var(--teal-line); border-radius: 50%;
+    color: var(--teal); font-size: 11px; display: flex; align-items: center; justify-content: center;
+  }
+  .uw-flow .sec-sub { font-size: 12px; }
+  .uw-flow .grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+}
+/* ---- AI 自动感：重算脉冲 ---- */
+@keyframes uw-pulse { 0% { opacity: 1; } 50% { opacity: .45; } 100% { opacity: 1; } }
+.uw-recalc .p-v .hl, .uw-recalc [data-calc] { animation: uw-pulse .5s ease; }
+@media (prefers-reduced-motion: reduce) { .uw-recalc .p-v .hl, .uw-recalc [data-calc] { animation: none; } }
 .sec-h { display: flex; align-items: baseline; gap: 12px; margin: 0 0 4px; flex-wrap: wrap; }
 .sec-h h2 { font-size: 16px; font-weight: 700; margin: 0; color: var(--tx); }
 .sec-h .en { font-size: 11px; color: var(--tx3); letter-spacing: 0.06em; font-family: var(--font-num); }
@@ -318,8 +337,10 @@ table.t input.cell-in::placeholder { color: var(--tx3); font-size: 11px; font-fa
     <div class="pnode"><div class="p-l">C · 退出 IRR</div><div class="p-v"><span data-calc="analysis.exit.irr" data-fmt="pct"></span></div><div class="p-s"><span data-calc="analysis.exit.hold_years" data-fmt="num"></span> 年持有</div></div>
   </div>
 
+  <!-- 横向三栏：A 租约 → B 现金流 → C 投资分析（桌面端） -->
+  <div class="uw-flow">
   <!-- A · Rent Roll -->
-  <section class="block">
+  <section class="block flow-a">
     <div class="sec-h"><h2><span class="stage">A</span> 租金表</h2><span class="en">RENT ROLL</span></div>
     <p class="sec-sub">每户填 <b>面积 / 月租（合同） / 包租年租</b>。年租 = 月租×12；合计自动流入 B 现金流基础租金（历史←合同租金合计，预测←包租租金合计）。</p>
     <div class="tscroll"><table class="t" id="rentTable">
@@ -346,7 +367,7 @@ table.t input.cell-in::placeholder { color: var(--tx3); font-size: 11px; font-fa
   </section>
 
   <!-- B · Cash Flow -->
-  <section class="block">
+  <section class="block flow-b">
     <div class="sec-h"><h2><span class="stage">B</span> 现金流</h2><span class="en">CASH FLOW</span></div>
     <p class="sec-sub">基础租金 ← A 租金表；其余为输入。NOI = 有效总收入 − 总费用；NOI 自动流入 C 投资分析。</p>
     <div class="two-col">
@@ -356,7 +377,7 @@ table.t input.cell-in::placeholder { color: var(--tx3); font-size: 11px; font-fa
   </section>
 
   <!-- C · Analysis -->
-  <section class="block">
+  <section class="block flow-c">
     <div class="sec-h"><h2><span class="stage">C</span> 投资分析</h2><span class="en">ANALYSIS</span></div>
     <p class="sec-sub">NOI ← B 现金流；输入购买与贷款条件，回报自动重算。</p>
 
@@ -446,6 +467,7 @@ table.t input.cell-in::placeholder { color: var(--tx3); font-size: 11px; font-fa
     </div>
     <div class="kv" id="exitKvs"></div>
   </section>
+  </div><!-- /uw-flow -->
 </main>
 
 <script src="/uw-commercial.js"></script>
