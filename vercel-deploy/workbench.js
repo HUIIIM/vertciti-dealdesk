@@ -469,9 +469,23 @@ WB.autoFillTax = async function () {
     });
     const d = await r.json();
     if (d.annual_tax) {
+      taxEl.dataset.autofilling = '1';
       taxEl.value = d.annual_tax;
+      delete taxEl.dataset.autofilling;
       taxEl.dataset.autofilled = '1';
-      taxEl.title = `${d.state} 州平均税率 ${(d.rate * 100).toFixed(2)}% 估算 · 待独立验证（${d.source}）`;
+      const tip = `${d.state} 州平均税率 ${(d.rate * 100).toFixed(2)}% 估算 · 待独立验证（${d.source}）`;
+      taxEl.title = tip;
+      // 可见 badge（title 只在悬停时显示，badge 常显）
+      let badge = document.getElementById('p-tax-badge');
+      if (!badge) {
+        badge = document.createElement('span');
+        badge.id = 'p-tax-badge';
+        badge.className = 'tag live';
+        badge.style.marginLeft = '6px';
+        taxEl.parentElement.appendChild(badge);
+      }
+      badge.textContent = '州平均估算';
+      badge.title = tip;
       if (typeof WB.recalc === 'function') WB.recalc();
     }
   } catch (e) { /* 静默降级：不填，不打断 */ }
@@ -481,6 +495,13 @@ WB.init = async function () {
   WB.renderComps(); WB.renderDims(); WB.initDropzone(); WB.refreshScreenshots();
   const _addrEl = document.getElementById('p-address');
   if (_addrEl) _addrEl.addEventListener('blur', WB.autoFillTax);
+  const _taxEl = document.getElementById('p-tax');
+  if (_taxEl) _taxEl.addEventListener('input', () => {
+    if (_taxEl.dataset.autofilling) return;
+    _taxEl.dataset.autofilled = '';
+    const b = document.getElementById('p-tax-badge');
+    if (b) b.remove();
+  });
   try {
     const r = await fetch('/api/wb/markets'); WB.markets = await r.json();
     const opts = WB.markets.markets.map(m => `<option value="${m.key}">${esc(m.label)}（${esc(m.geo)}）</option>`).join('');

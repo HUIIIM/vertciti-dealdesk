@@ -17,6 +17,8 @@ const EXPENSES = [
   ["landscape", "景观绿化 Landscape"],
 ];
 
+// 税自动填来源（地址→州平均税率估算）；用户手改后清掉，badge 随之消失
+let taxAutoSource = null;
 const f = (x, d = 0) => {
   const v = parseFloat(x);
   return Number.isFinite(v) ? v : d;
@@ -351,6 +353,9 @@ function cfTableHTML(sc, title, linkedNote) {
       if (s === "rent_roll") srcTag = ' <span class="tag live" title="自动取自租户表 T/U 列年合计">租户表自动</span>';
       else if (s === "manual") srcTag = ' <span class="tag" title="手工输入覆盖租户表">手工</span>';
       if (!v && (key === "cam_recovery" || key === "parking_income")) ph = ' placeholder="空=租户表自动"';
+    }
+    if (key === "property_tax" && taxAutoSource) {
+      srcTag += ` <span class="tag live" title="${taxAutoSource.state} 州平均税率 ${(taxAutoSource.rate * 100).toFixed(2)}% 估算 · 待独立验证（${taxAutoSource.source}）">州平均估算</span>`;
     }
     return `<tr><td class="lbl">${lbl}${srcTag}${isPct ? ' <span class="tag new">NEW</span>' : ""}</td>` +
       `<td><input class="cell-in" type="number" data-cf="${title}" data-k="${key}" data-ispct="${isPct ? 1 : 0}" value="${disp}" step="any"${ph}></td></tr>`;
@@ -703,26 +708,39 @@ async function init() {
   // ---- 地址 → 州平均税率 → 自动填房产税（realyzer 思路，静态表+零key实现） ----
   async function autoFillTax() {
     const addrEl = document.querySelector('[data-in="property.address"]');
-    const taxEl = document.querySelector('input[data-k="property_tax"]');
-    if (!addrEl || !taxEl) return;
+    if (!addrEl) return;
     const addr = (addrEl.value || "").trim();
     const price = parseFloat((document.querySelector('[data-in="analysis.purchase_price"]') || {}).value) || 0;
     if (!addr || !price) return;
-    if (taxEl.dataset.autofilled === "1" && taxEl.value) return; // 用户手改过，不覆盖
+    // 用户手改过任一税字段就不覆盖
+    if (taxAutoSource === "manual") return;
     try {
       const r = await fetch("/api/tax/estimate", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ address: addr, price })
       });
       const d = await r.json();
-      if (d.annual_tax) {
+      if (!d.annual_tax) return;
+      taxAutoSource = { state: d.state, rate: d.rate, source: d.source };
+      // 填历史和预测两个税字段；已有手填值（与估算不一致）的不覆盖
+      document.querySelectorAll('input[data-k="property_tax"]').forEach((taxEl) => {
+        const cur = parseFloat(taxEl.value) || 0;
+        if (cur && cur !== d.annual_tax) return; // 疑似手改，跳过
+        taxEl.dataset.autofilling = "1";
         taxEl.value = d.annual_tax;
-        taxEl.dataset.autofilled = "1";
-        taxEl.title = `${d.state} 州平均税率 ${(d.rate * 100).toFixed(2)}% 估算 · 待独立验证（${d.source}）`;
         taxEl.dispatchEvent(new Event("input", { bubbles: true }));
-      }
+        delete taxEl.dataset.autofilling;
+      });
+      renderAll(false);
     } catch (e) { /* 静默降级 */ }
   }
+  // 标记手改：任一税字段被用户直接编辑时，来源变 manual
+  document.addEventListener("input", (e) => {
+    const el = e.target;
+    if (el.matches && el.matches('input[data-k="property_tax"]') && !el.dataset.autofilling) {
+      taxAutoSource = "manual";
+    }
+  }, true);
   const _addrEl = document.querySelector('[data-in="property.address"]');
   if (_addrEl) _addrEl.addEventListener("blur", autoFillTax);
   // ?pid= 直接打开指定项目（从首页搜集转入）
