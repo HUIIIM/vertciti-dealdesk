@@ -363,6 +363,10 @@ def test_pipeline_run_includes_tophap_when_enabled(monkeypatch):
                         lambda address, log=None: {"ok": True, "fields": th_fields,
                                                    "tool_used": "find_property_by_address",
                                                    "note": "ok"})
+    import app.providers as pv
+    monkeypatch.setattr(pv.geocode, "geocode_state",
+                        lambda a: {"state": None, "matched_address": None,
+                                   "lat": None, "lng": None})
     d = rp.run_address_pipeline("123 Main St, Tampa, FL 33602")
     by_key = {f["key"]: f for f in d["fields"]}
     assert by_key["tax_assessed_value"]["source"] == "TopHap MCP"
@@ -370,15 +374,22 @@ def test_pipeline_run_includes_tophap_when_enabled(monkeypatch):
 
 
 def test_pipeline_run_degrades_when_tophap_off(monkeypatch):
+    # TopHap 未启用 + 网页被反爬拦 + 无 RentCast key → 只有 Census 保底产出
     monkeypatch.setattr(rp, "ddg_search", lambda q, log, max_results=8: [])
 
     def fake_fetch(url, log):
         rp._log(log, "抓取", "blocked", "HTTP 403")
         return {"ok": False, "note": "blocked", "blocked": True}
     monkeypatch.setattr(rp, "fetch_page", fake_fetch)
+    import app.providers as pv
+    monkeypatch.setattr(pv.geocode, "geocode_state",
+                        lambda a: {"state": "FL", "matched_address": "m",
+                                   "lat": None, "lng": None})
     d = rp.run_address_pipeline("123 Main St, Tampa, FL 33602")
-    assert d["fields"] == []
-    assert "tophap_enrich_status" not in {f["key"] for f in d["fields"]}
+    by_key = {f["key"] for f in d["fields"]}
+    assert "tophap_enrich_status" not in by_key
+    assert by_key == {"state_confirmed"}  # 只有 Census 保底
+    assert d["primary_provider"] == "Census"
     assert len(d["manual_needed"]) > 0
 
 

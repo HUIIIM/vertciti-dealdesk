@@ -23,6 +23,8 @@ from datetime import datetime
 
 import httpx
 
+from . import providers
+
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/126.0 Safari/537.36")
 BOT_NAME = "DealDeskBot"
@@ -380,35 +382,15 @@ def _candidate_priority(url: str) -> int:
     return 9
 
 
-# ---------- TopHap enrich（懒导入：避免 app/tophap.py 与本模块循环 import） ----------
-
-def _tophap_enrich_address(address: str, log: list | None) -> dict:
-    try:
-        from . import tophap
-    except Exception as e:  # noqa: BLE001
-        _log(log, "TopHap", "skipped", f"适配器加载失败（已降级）: {str(e)[:120]}")
-        return {"ok": False, "fields": [], "note": "TopHap 适配器加载失败，已降级"}
-    try:
-        return tophap.enrich_address(address, log)
-    except Exception as e:  # noqa: BLE001
-        _log(log, "TopHap", "failed", f"enrich 内部异常（已降级）: {str(e)[:120]}")
-        return {"ok": False, "fields": [], "note": "TopHap enrich 内部异常，已降级"}
-
-
-def _tophap_summary_field(th: dict) -> dict:
-    return {"key": "tophap_enrich_status", "label": "TopHap 数据源状态",
-            "value": th.get("tool_used") or "tophap", "display": th.get("note", ""),
-            "source": "DealDesk（系统标记）", "source_url": "",
-            "fetched_at": _now(), "confidence": "高",
-            "seller_claimed": False, "claim_label": "",
-            "note": "TopHap 公共记录 enrich 完成；字段级来源/可信度以各自字段为准",
-            "status": "filled"}
-
-
 # ---------- pipeline 入口 ----------
 
-def run_address_pipeline(address: str, log: list | None = None) -> dict:
-    """纯地址 → 全网搜集。"""
+def run_web_collection(address: str, log: list | None = None) -> dict:
+    """公开网页搜集：DDG 搜索 + 抓取 + 字段抽取（含市场新闻字段）。
+
+    供 providers.WebProvider 调用（多数据源链的一环）。
+    返回 {"fields": [...], "parsed": {...}, "log": log}。
+    失败时 fields 为空 + 日志记录原因，不抛异常。
+    """
     log = log if log is not None else []
     parsed = parse_address(address)
     city_state = f"{parsed['city']} {parsed['state']}".strip()
@@ -446,33 +428,6 @@ def run_address_pipeline(address: str, log: list | None = None) -> dict:
             news.append({"title": c["title"][:120], "url": c["url"]})
 
     fields = merge_fields(all_fields)
-    # TopHap 公共记录 enrich：已授权且可用时并入合并（高/中/低可信度由 merge_fields 原有规则比较）
-    th = _tophap_enrich_address(parsed.get("full") or address, log)
-    if th["ok"]:
-        fields = merge_fields(fields + th["fields"])
-        fields.append(_tophap_summary_field(th))
-    elif th.get("note"):
-        _log(log, "TopHap", "skipped", th["note"])
-    # Census 兜底：TopHap 失败时，至少用免费 geocoder 确认州，保证"随便输个地址都有东西"
-    if not th["ok"]:
-        try:
-            from . import geocode as _geocode
-            g = _geocode.geocode_state(parsed.get("full") or address)
-            if g["state"]:
-                at = _now()
-                fields.append({
-                    "key": "state_confirmed", "label": "州（地理编码确认）",
-                    "value": g["state"], "display": g["state"],
-                    "source": "U.S. Census Geocoder", "source_url": "",
-                    "fetched_at": at, "confidence": "高",
-                    "seller_claimed": False, "claim_label": "",
-                    "note": f"匹配地址：{g['matched_address'] or '—'}；TopHap 不可用时的兜底",
-                    "status": "filled"})
-                _log(log, "Census兜底", "ok", f"州={g['state']}（TopHap 失败时的保底）")
-            else:
-                _log(log, "Census兜底", "failed", "Census 也未匹配到该地址")
-        except Exception as e:  # noqa: BLE001
-            _log(log, "Census兜底", "failed", f"异常：{str(e)[:100]}")
     if news:
         fields.append({"key": "market_news", "label": "市场新闻/供需信号",
                        "value": news[:6],
@@ -481,15 +436,35 @@ def run_address_pipeline(address: str, log: list | None = None) -> dict:
                        "fetched_at": _now(), "confidence": "低",
                        "seller_claimed": False, "claim_label": "",
                        "note": "新闻标题不代表事实核实", "status": "filled"})
+    return {"fields": fields, "parsed": parsed, "log": log}
+
+
+def run_address_pipeline(address: str, log: list | None = None) -> dict:
+    """纯地址 → 多数据源 fallback 链搜集（TopHap → RentCast → 公开网页 → Census 保底）。
+
+    字段按优先级合并（TopHap > RentCast > 网页 > Census），每个字段自带来源标注；
+    全部数据源失败时返回各源中文诊断（diagnostics），不静默空结果。
+    """
+    log = log if log is not None else []
+    parsed = parse_address(address)
+    chain = providers.run_chain(parsed.get("full") or address, log)
+    fields = chain["fields"]
 
     keys = {f["key"] for f in fields}
     manual = [{"key": k, "label": FIELD_LABELS[k], "status": "manual_needed",
                "note": "全网未抓到可靠值，需手动补"}
               for k in FIELD_LABELS if k not in keys
               and k not in ("market_news", "price_history", "zestimate")]
-    return {"mode": "address", "address": parsed["full"], "parsed": parsed,
-            "fields": fields, "manual_needed": manual, "log": log,
-            "fetched_at": _now()}
+    result = {"mode": "address", "address": parsed["full"], "parsed": parsed,
+              "fields": fields, "manual_needed": manual, "log": log,
+              "fetched_at": _now(),
+              "primary_provider": chain["primary_provider"],
+              "provider_chain": chain["provider_results"]}
+    if not chain["ok"]:
+        # 全部数据源失败：中文诊断，不静默
+        result["diagnostics"] = chain["diagnostics"]
+        _log(log, "地址搜集", "failed", "全部数据源失败：" + chain["diagnostics"])
+    return result
 
 
 def run_url_pipeline(url: str, log: list | None = None) -> dict:
