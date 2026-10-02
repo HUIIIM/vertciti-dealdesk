@@ -29,14 +29,23 @@ _FONTS_REGISTERED = False
 
 
 def _register_fonts() -> None:
-    global _FONTS_REGISTERED
+    global _FONTS_REGISTERED, FONT
     if _FONTS_REGISTERED:
         return
-    pdfmetrics.registerFont(TTFont("WQY", os.path.join(_FONT_DIR, "WQY-MicroHei.ttf")))
+    fp = os.path.join(_FONT_DIR, "WQY-MicroHei.ttf")
+    if os.path.exists(fp):
+        try:
+            pdfmetrics.registerFont(TTFont("WQY", fp))
+            FONT = "WQY"
+        except Exception:
+            FONT = "Helvetica"  # 注册失败降级
+    else:
+        # serverless 未打包字体时降级为内置字体，保证 PDF 不崩（中文显示为方框）
+        FONT = "Helvetica"
     _FONTS_REGISTERED = True
 
 
-FONT = "WQY"
+FONT = "WQY"  # _register_fonts() 会按实际可用情况重设
 
 
 # ---------------------------------------------------------------- 配色（v3 机构气质，打印友好浅底）
@@ -104,32 +113,32 @@ def _key_metrics(track: str, m: dict) -> list[tuple[str, str]]:
 
 # ---------------------------------------------------------------- 样式
 def _styles() -> dict:
-    base = {"fontName": "WQY", "textColor": INK, "leading": 15}
+    base = {"fontName": FONT, "textColor": INK, "leading": 15}
     return {
-        "h1": ParagraphStyle("h1", fontName="WQY", fontSize=20,
+        "h1": ParagraphStyle("h1", fontName=FONT, fontSize=20,
                              leading=26, textColor=INK, spaceAfter=2),
-        "subtitle": ParagraphStyle("subtitle", fontName="WQY", fontSize=9.5,
+        "subtitle": ParagraphStyle("subtitle", fontName=FONT, fontSize=9.5,
                                    leading=13, textColor=MUTED),
-        "section": ParagraphStyle("section", fontName="WQY", fontSize=12,
+        "section": ParagraphStyle("section", fontName=FONT, fontSize=12,
                                  leading=16, textColor=INK, spaceBefore=14, spaceAfter=6,
                                  borderPadding=(0, 0, 4, 0)),
-        "body": ParagraphStyle("body", fontName="WQY", fontSize=9.5,
+        "body": ParagraphStyle("body", fontName=FONT, fontSize=9.5,
                                leading=14, textColor=INK),
-        "small": ParagraphStyle("small", fontName="WQY", fontSize=8.5,
+        "small": ParagraphStyle("small", fontName=FONT, fontSize=8.5,
                                 leading=12, textColor=MUTED),
-        "metric_label": ParagraphStyle("ml", fontName="WQY", fontSize=8,
+        "metric_label": ParagraphStyle("ml", fontName=FONT, fontSize=8,
                                       leading=11, textColor=MUTED),
-        "metric_value": ParagraphStyle("mv", fontName="WQY", fontSize=13,
+        "metric_value": ParagraphStyle("mv", fontName=FONT, fontSize=13,
                                       leading=16, textColor=INK),
-        "score_num": ParagraphStyle("sn", fontName="WQY", fontSize=44,
+        "score_num": ParagraphStyle("sn", fontName=FONT, fontSize=44,
                                     leading=44, textColor=INK),
-        "verdict": ParagraphStyle("vd", fontName="WQY", fontSize=11,
+        "verdict": ParagraphStyle("vd", fontName=FONT, fontSize=11,
                                   leading=15, textColor=INK),
-        "cell": ParagraphStyle("cell", fontName="WQY", fontSize=9,
+        "cell": ParagraphStyle("cell", fontName=FONT, fontSize=9,
                                leading=12.5, textColor=INK),
-        "cell_b": ParagraphStyle("cellb", fontName="WQY", fontSize=9,
+        "cell_b": ParagraphStyle("cellb", fontName=FONT, fontSize=9,
                                  leading=12.5, textColor=INK),
-        "cell_m": ParagraphStyle("cellm", fontName="WQY", fontSize=8.5,
+        "cell_m": ParagraphStyle("cellm", fontName=FONT, fontSize=8.5,
                                  leading=11.5, textColor=MUTED),
     }
 
@@ -138,19 +147,19 @@ def _styles() -> dict:
 def _header_footer(canvas, doc):
     canvas.saveState()
     # 页眉
-    canvas.setFont("WQY", 8)
+    canvas.setFont(FONT, 8)
     canvas.setFillColor(INK)
     canvas.drawString(MARGIN, PAGE_H - 13 * mm, "DEALDESK")
-    canvas.setFont("WQY", 7.5)
+    canvas.setFont(FONT, 7.5)
     canvas.setFillColor(MUTED)
     canvas.drawString(MARGIN + 62, PAGE_H - 13 * mm, "vertciti 房地产收购部 · 投资筛选备忘录")
-    canvas.setFont("WQY", 7.5)
+    canvas.setFont(FONT, 7.5)
     canvas.drawRightString(PAGE_W - MARGIN, PAGE_H - 13 * mm, doc.report_date)
     canvas.setStrokeColor(HAIRLINE)
     canvas.setLineWidth(0.6)
     canvas.line(MARGIN, PAGE_H - 15.2 * mm, PAGE_W - MARGIN, PAGE_H - 15.2 * mm)
     # 页脚
-    canvas.setFont("WQY", 7)
+    canvas.setFont(FONT, 7)
     canvas.setFillColor(MUTED)
     footer = "本报告为筛选工具输出，不构成投资建议。每笔真实交易签约 / 交割 / 报税前，必须经持牌本地房地产律师、CPA / 税务师、title company 审查。"
     canvas.drawCentredString(PAGE_W / 2, 12 * mm, footer)
@@ -187,7 +196,7 @@ def _verdict_panel(st: dict, s: dict) -> Table:
                   f"<font size=14 color=\"#64748b\"> / 100</font>", st["score_num"]),
     ]
     badge = Table([[Paragraph(f"<b>{grade}</b>",
-                              ParagraphStyle("bd", fontName="WQY",
+                              ParagraphStyle("bd", fontName=FONT,
                                              fontSize=15, leading=18,
                                              textColor=gc, alignment=1))]],
                   colWidths=[64])
