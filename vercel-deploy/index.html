@@ -13,7 +13,6 @@
 <div class="layout">
   <aside class="side" id="side">
     <div class="brand"><span class="logo">D</span><span class="bt">DealDesk<small>房地产交易核保台</small></span></div>
-    <div class="nav-search"><input id="navSearch" type="text" placeholder="搜索功能… 试试输入「商业」" autocomplete="off"></div>
     <nav class="nav" id="nav">
       <button data-view="dashboard" class="on"><span class="ni">◈</span>仪表盘</button>
       <button data-view="intake"><span class="ni">⬡</span>智能搜集</button>
@@ -31,11 +30,10 @@
     <header class="topbar">
       <div class="intake-hero">
         <span class="ih-label">房源直达</span>
-        <input id="ihInput" type="text" placeholder="粘贴 Zillow / Redfin / LoopNet / Realtor 房源链接，或输入地址，一键搜集 → 自动填满仪表盘" autocomplete="off" spellcheck="false">
-        <select id="ihTrack" title="核保轨道">
-          <option value="residential">住宅</option>
-          <option value="commercial">商业</option>
-        </select>
+        <div class="ih-wrap">
+          <input id="ihInput" type="text" placeholder="粘贴链接、输入地址或命令 · Paste a link, address, or command…" autocomplete="off" spellcheck="false" role="combobox" aria-expanded="false" aria-controls="ihChip" aria-autocomplete="list">
+          <div id="ihChip" class="ih-chip" hidden role="listbox" aria-live="polite"></div>
+        </div>
         <button class="btn primary" id="ihGo">开始搜集</button>
       </div>
       <div class="top-right"><span class="clock" id="clock"></span></div>
@@ -55,26 +53,6 @@ document.getElementById('demoClose').addEventListener('click', function () {
   document.getElementById('demoBanner').hidden = true;
   try { localStorage.setItem('dd_demo_dismissed', '1'); } catch (e) {}
 });
-/* 侧栏快速跳转：输入关键词过滤导航，回车直达首个匹配 */
-(function () {
-  var inp = document.getElementById('navSearch');
-  if (!inp) return;
-  function items() {
-    return Array.prototype.slice.call(document.querySelectorAll('#nav button, #nav a'));
-  }
-  function filter() {
-    var q = inp.value.trim().toLowerCase();
-    items().forEach(function (el) {
-      el.style.display = (!q || el.textContent.toLowerCase().indexOf(q) !== -1) ? '' : 'none';
-    });
-  }
-  inp.addEventListener('input', filter);
-  inp.addEventListener('keydown', function (e) {
-    if (e.key !== 'Enter') return;
-    var hit = items().filter(function (el) { return el.style.display !== 'none'; })[0];
-    if (hit) hit.click();
-  });
-})();
 </script>
 <script src="/app.js"></script>
 </body>

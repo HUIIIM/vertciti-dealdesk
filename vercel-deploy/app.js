@@ -1034,14 +1034,125 @@ document.addEventListener('change', e => {
   render();
 });
 
-/* 顶部 Hero intake 提交 */
-function submitIntake() {
-  const v = $('#ihInput').value.trim();
-  if (!v) { $('#ihInput').focus(); return; }
-  runIntake(v, $('#ihTrack').value);
+/* ================= 统一智能输入：意图检测 + chip =================
+   检测层级 T1 URL 主机白名单 → T2 双语命令 → T3 地址。
+   检测只展示意图（chip），粘贴永不自动执行；Enter/点击才确认。IME 拼写中不检测不提交。 */
+const IH_COM_HOSTS = ['loopnet.com', 'crexi.com', 'costar.com'];
+const IH_RES_HOSTS = ['zillow.com', 'redfin.com', 'realtor.com'];
+const IH_CMD_COM = ['商业', '商业核保', '商用', 'commercial'];
+const IH_CMD_RES = ['住宅', '住宅核保', 'residential'];
+function ihNorm(s) {
+  return (s || '')
+    .replace(/[！-～]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)) // 全角→半角
+    .replace(/　/g, ' ')
+    .trim();
 }
-$('#ihGo').addEventListener('click', submitIntake);
-$('#ihInput').addEventListener('keydown', e => { if (e.key === 'Enter') submitIntake(); });
+function ihHostOf(t) {
+  const m = /^https?:\/\/([^\/\s?#]+)/i.exec(t.trim());
+  return m ? m[1].toLowerCase().replace(/^www\./, '') : '';
+}
+function detectIntent(raw) {
+  const t = ihNorm(raw);
+  if (!t) return null;
+  const low = t.toLowerCase();
+  const host = ihHostOf(t);
+  if (host) {
+    if (IH_COM_HOSTS.some(h => host === h || host.endsWith('.' + h))) return {kind: 'com-url', host, raw: t};
+    if (IH_RES_HOSTS.some(h => host === h || host.endsWith('.' + h))) return {kind: 'res-url', host, raw: t};
+    return {kind: 'url-unknown', host, raw: t};
+  }
+  if (IH_CMD_COM.indexOf(low) !== -1) return {kind: 'cmd-com', raw: t};
+  if (IH_CMD_RES.indexOf(low) !== -1) return {kind: 'cmd-res', raw: t};
+  return {kind: 'address', raw: t, addrTrack: 'residential'};
+}
+let ihDet = null;
+function dismissIhChip() { ihDet = null; renderIhChip(); }
+function renderIhChip() {
+  const chip = $('#ihChip'), input = $('#ihInput'), go = $('#ihGo');
+  if (!chip) return;
+  if (!ihDet) {
+    chip.hidden = true; chip.innerHTML = '';
+    input.setAttribute('aria-expanded', 'false');
+    go.textContent = '开始搜集';
+    return;
+  }
+  input.setAttribute('aria-expanded', 'true');
+  const d = ihDet;
+  const xBtn = '<button class="cx" data-act="x" aria-label="取消">×</button>';
+  let inner = '', goLabel = '开始搜集';
+  if (d.kind === 'com-url') {
+    goLabel = '开始搜集 → 商业';
+    inner = `<div class="ck">🏢 <span class="badge com">商业房源</span></div><div class="cd">${esc(d.host)} · 检测到商业房源 → 将进入商业核保</div><div class="ca"><button class="btn primary" data-act="go">开始搜集</button>${xBtn}</div>`;
+  } else if (d.kind === 'res-url') {
+    inner = `<div class="ck">🏠 <span class="badge res">住宅房源</span></div><div class="cd">${esc(d.host)} · 检测到住宅房源 → 将进入住宅核保</div><div class="ca"><button class="btn primary" data-act="go">开始搜集</button>${xBtn}</div>`;
+  } else if (d.kind === 'url-unknown') {
+    inner = `<div class="ck">🔗 <span class="badge cmd">链接</span></div><div class="cd">${esc(d.host)} · 未识别出房源平台，将按地址搜集</div><div class="ca"><button class="btn primary" data-act="go">按地址搜集</button>${xBtn}</div>`;
+  } else if (d.kind === 'cmd-com') {
+    goLabel = '进入商业核保';
+    inner = `<div class="ck">⚡ <span class="badge cmd">命令</span></div><div class="cd">进入商业核保工作台</div><div class="ca"><button class="btn primary" data-act="go">进入</button>${xBtn}</div>`;
+  } else if (d.kind === 'cmd-res') {
+    inner = `<div class="ck">⚡ <span class="badge cmd">命令</span></div><div class="cd">住宅核保工作台即本页，已在当前页面</div><div class="ca">${xBtn}</div>`;
+  } else {
+    inner = `<div class="ck">📍 <span class="badge res">地址</span></div><div class="cd">将按地址搜集房源公开信息</div><div class="ca"><button class="btn primary" data-act="go-res">住宅搜集</button><button class="btn" data-act="go-com">商业搜集</button>${xBtn}</div>`;
+  }
+  chip.innerHTML = inner;
+  chip.hidden = false;
+  go.textContent = goLabel;
+}
+function ihPrimary() {
+  const inp = $('#ihInput');
+  const d = ihDet;
+  dismissIhChip();
+  if (!d) {
+    const t = ihNorm(inp.value);
+    if (!t) { inp.focus(); return; }
+    runIntake(t, 'residential');
+    return;
+  }
+  if (d.kind === 'com-url') runIntake(d.raw, 'commercial');
+  else if (d.kind === 'res-url' || d.kind === 'url-unknown') runIntake(d.raw, 'residential');
+  else if (d.kind === 'cmd-com') location.href = '/uw-commercial.html';
+  else if (d.kind === 'cmd-res') window.scrollTo({top: 0, behavior: 'smooth'});
+  else if (d.kind === 'address') runIntake(d.raw, d.addrTrack || 'residential');
+}
+let ihDeb = null;
+function ihDetectSoon() {
+  clearTimeout(ihDeb);
+  ihDeb = setTimeout(() => { ihDet = detectIntent($('#ihInput').value); renderIhChip(); }, 120);
+}
+$('#ihGo').addEventListener('click', ihPrimary);
+$('#ihInput').addEventListener('input', e => {
+  if (e.isComposing) return; // IME 拼写中不检测
+  ihDetectSoon();
+});
+$('#ihInput').addEventListener('compositionend', ihDetectSoon);
+$('#ihInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    if (e.isComposing || e.keyCode === 229) return; // IME 确认选词不提交（Safari/WebKit 兼容）
+    e.preventDefault();
+    ihPrimary();
+  } else if (e.key === 'Escape') {
+    dismissIhChip();
+  }
+});
+$('#ihChip').addEventListener('click', e => {
+  const b = e.target.closest('[data-act]');
+  if (!b) return;
+  const act = b.dataset.act;
+  if (act === 'x') { dismissIhChip(); $('#ihInput').focus(); return; }
+  if (act === 'go-com' && ihDet && ihDet.kind === 'address') ihDet.addrTrack = 'commercial';
+  if (act === 'go-res' && ihDet && ihDet.kind === 'address') ihDet.addrTrack = 'residential';
+  ihPrimary();
+});
+/* Cmd+K / Ctrl+K 聚焦同一输入框（桌面端次级加速键，非第二搜索框） */
+document.addEventListener('keydown', e => {
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+    const inp = $('#ihInput');
+    if (!inp) return;
+    e.preventDefault();
+    inp.focus(); inp.select();
+  }
+});
 
 /* ================= 启动 ================= */
 setInterval(() => {
