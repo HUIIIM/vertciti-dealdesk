@@ -7,58 +7,70 @@
 <link rel="stylesheet" href="/style.css">
 <style>
 .wb { max-width: 1180px; margin: 0 auto; padding: 12px 16px 60px; }
-.wb section.card { background: #fff; border: 1px solid #e2e2e2; border-radius: 10px; padding: 18px 20px; margin: 16px 0; }
-.wb h2.sec { font-size: 18px; margin: 0 0 4px; }
-.wb .sec-sub { color: #666; font-size: 13px; margin-bottom: 12px; }
+header.top { max-width: 1180px; margin: 0 auto; padding: 18px 16px 6px; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+header.top .sub { color: var(--muted); font-size: 12.5px; margin-top: 6px; }
+.wb section.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 20px; margin: 16px 0; }
+.wb h1 { font-size: 22px; font-weight: 800; letter-spacing: -0.01em; margin: 8px 0 4px; }
+.wb h2.sec { font-size: 15px; font-weight: 800; margin: 0 0 4px; letter-spacing: 0.02em; }
+.wb .sec-sub { color: var(--muted); font-size: 13px; margin-bottom: 12px; }
 .wb .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(215px, 1fr)); gap: 10px 14px; }
-.wb label.f { display: flex; flex-direction: column; font-size: 13px; color: #333; }
-.wb label.f input, .wb label.f select, .wb label.f textarea { margin-top: 4px; padding: 7px 9px; font-size: 14px; border: 1px solid #ccc; border-radius: 6px; }
-.wb table.t { width: 100%; border-collapse: collapse; font-size: 13.5px; margin: 10px 0; }
-.wb table.t th, .wb table.t td { border: 1px solid #ddd; padding: 6px 9px; text-align: left; }
-.wb table.t th { background: #f5f5f5; }
-.wb .btn { background: #1a56db; color: #fff; border: 0; border-radius: 7px; padding: 9px 18px; font-size: 14px; cursor: pointer; margin: 6px 8px 6px 0; }
-.wb .btn.ghost { background: #eee; color: #222; }
-.wb .btn.warn { background: #b45309; }
-.wb .tag { display: inline-block; font-size: 12px; font-weight: 700; border-radius: 4px; padding: 2px 8px; margin-left: 8px; vertical-align: middle; }
-.wb .tag.est { background: #e8f0fe; color: #1a56db; }
-.wb .tag.fc { background: #fef3e2; color: #b45309; }
-.wb .disclaimer { background: #fff8e6; border: 1px solid #f0c36d; border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #7a4a00; margin: 10px 0; }
-.wb .neg { color: #c00; font-weight: 700; } .wb .pos { color: #0a7a2f; font-weight: 700; }
-.wb .mono { font-family: ui-monospace, monospace; font-size: 12.5px; }
+.wb label.f { display: flex; flex-direction: column; font-size: 12.5px; color: var(--ink2); font-weight: 600; }
+.wb label.f input, .wb label.f select, .wb label.f textarea { margin-top: 5px; padding: 9px 11px; font-size: 14px; background: var(--bg1); border: 1px solid var(--line); border-radius: 8px; color: var(--ink); font-family: inherit; }
+.wb label.f input:focus, .wb label.f select:focus { outline: none; border-color: var(--teal-deep); box-shadow: 0 0 0 3px rgba(45,212,191,.14); }
+.wb label.f input::placeholder { color: var(--faint); }
+.wb table.t { width: 100%; border-collapse: collapse; font-size: 13px; margin: 10px 0; }
+.wb table.t th, .wb table.t td { border: 1px solid var(--line-soft); padding: 7px 10px; text-align: left; }
+.wb table.t th { background: var(--surface2); color: var(--ink2); font-weight: 700; font-size: 12px; }
+.wb table.t td { font-variant-numeric: tabular-nums; }
+.wb .btn { background: var(--teal); color: #042f2b; border: 0; border-radius: 8px; padding: 10px 20px; font-size: 14px; font-weight: 700; cursor: pointer; margin: 6px 8px 6px 0; font-family: inherit; }
+.wb .btn:hover { filter: brightness(1.08); }
+.wb .btn.ghost { background: transparent; color: var(--ink2); border: 1px solid var(--line); }
+.wb .btn.ghost:hover { border-color: var(--teal-deep); color: var(--ink); }
+.wb .btn.warn { background: var(--amber); color: #3a2a00; }
+.wb .tag { display: inline-block; font-size: 11.5px; font-weight: 700; border-radius: 20px; padding: 2px 10px; margin-left: 8px; vertical-align: middle; }
+.wb .tag.est { background: var(--teal-dim); color: var(--teal); border: 1px solid var(--teal-line); }
+.wb .tag.fc { background: var(--amber-dim); color: var(--amber); border: 1px solid rgba(251,191,36,.3); }
+.wb .disclaimer { background: var(--amber-dim); border: 1px solid rgba(251,191,36,.3); border-radius: 8px; padding: 10px 14px; font-size: 13px; color: var(--amber); margin: 10px 0; }
+.wb .neg { color: var(--red); font-weight: 700; } .wb .pos { color: var(--green); font-weight: 700; }
+.wb .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
 .wb .kv { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; margin: 10px 0; }
-.wb .kv .cell { background: #f8f9fb; border: 1px solid #e5e5e5; border-radius: 7px; padding: 8px 11px; font-size: 13px; }
-.wb .kv .cell b { display: block; font-size: 17px; margin-top: 2px; }
-.wb textarea.code { width: 100%; min-height: 90px; font-family: ui-monospace, monospace; font-size: 12.5px; }
+.wb .kv .cell { background: var(--bg1); border: 1px solid var(--line-soft); border-radius: 8px; padding: 10px 13px; font-size: 12.5px; color: var(--muted); }
+.wb .kv .cell b { display: block; font-size: 19px; margin-top: 3px; color: var(--ink); font-variant-numeric: tabular-nums; font-weight: 800; }
+.wb textarea.code { width: 100%; min-height: 90px; font-family: ui-monospace, monospace; font-size: 12.5px; background: var(--bg1); border: 1px solid var(--line); border-radius: 8px; color: var(--ink); padding: 10px; }
 .wb .bar-row { display: flex; align-items: center; gap: 8px; font-size: 13px; margin: 4px 0; }
-.wb .bar { height: 16px; border-radius: 3px; background: #1a56db; min-width: 2px; }
-.wb .bar.neg { background: #c00; }
-.wb .bar-lbl { width: 130px; color: #444; }
-.wb .bar-val { width: 90px; font-weight: 700; }
-.wb .src { font-size: 12px; color: #777; }
-.wb svg.chart { width: 100%; height: 220px; background: #fafbfc; border: 1px solid #e5e5e5; border-radius: 6px; }
+.wb .bar { height: 16px; border-radius: 3px; background: var(--teal-deep); min-width: 2px; }
+.wb .bar.neg { background: var(--red); }
+.wb .bar-lbl { width: 130px; color: var(--ink2); }
+.wb .bar-val { width: 90px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.wb .src { font-size: 12px; color: var(--muted); }
+.wb svg.chart { width: 100%; height: 220px; background: var(--bg1); border: 1px solid var(--line-soft); border-radius: 8px; }
 .wb .topnav { display: flex; justify-content: space-between; align-items: center; }
-.wb .topnav a { color: #1a56db; font-size: 14px; }
+.wb .topnav a { color: var(--teal); font-size: 14px; text-decoration: none; }
 .wb .dim-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 @media (max-width: 700px) { .wb .dim-grid { grid-template-columns: 1fr; } }
-.wb .dim { border: 1px solid #e2e2e2; border-radius: 8px; padding: 10px 12px; }
+.wb .dim { border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; background: var(--bg1); }
 .wb .dim h4 { margin: 0 0 6px; font-size: 14px; }
-.wb .dim input { width: 100%; margin: 4px 0; padding: 6px 8px; font-size: 13px; border: 1px solid #ccc; border-radius: 6px; }
-#dropzone.over { border-color: #1a56db; background: #e8f0fe; transform: scale(1.01); }
-.badge { display: inline-block; font-size: 11.5px; font-weight: 700; border-radius: 4px; padding: 2px 7px; }
-.badge.seller { background: #fef3e2; color: #b45309; }
-.badge.manual { background: #f1f1f1; color: #666; }
-.badge.high { background: #e6f4ea; color: #0a7a2f; }
-.badge.mid { background: #e8f0fe; color: #1a56db; }
-.badge.low { background: #f1f1f1; color: #666; }
-.logline { font-size: 12.5px; color: #555; padding: 3px 0; border-bottom: 1px dotted #e5e5e5; }
-.logline .st-ok { color: #0a7a2f; font-weight: 700; } .logline .st-blocked { color: #c00; font-weight: 700; }
-.logline .st-failed { color: #b45309; font-weight: 700; } .logline .st-skipped { color: #888; font-weight: 700; }
+.wb .dim input { width: 100%; margin: 4px 0; padding: 8px 10px; font-size: 13px; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; color: var(--ink); }
+/* 文件拖放区：深色自定义 */
+#dropzone { border: 1.5px dashed var(--teal-line); border-radius: 10px; background: var(--teal-dim); padding: 28px 20px; text-align: center; cursor: pointer; transition: border-color .15s, background .15s; margin-bottom: 14px; }
+#dropzone:hover { border-color: var(--teal); }
+#dropzone.over { border-color: var(--teal); background: rgba(45,212,191,.14); transform: scale(1.005); }
+#dropzone .dz-t { font-size: 15px; font-weight: 700; color: var(--ink); }
+#dropzone .dz-s { font-size: 12.5px; color: var(--muted); margin-top: 6px; }
+.badge { display: inline-block; font-size: 11.5px; font-weight: 700; border-radius: 20px; padding: 2px 9px; }
+.badge.seller { background: var(--amber-dim); color: var(--amber); }
+.badge.manual { background: rgba(148,163,184,.12); color: var(--muted); }
+.badge.high { background: var(--green-dim); color: var(--green); }
+/* 原生 file input 美化 */
+.wb input[type="file"] { font-size: 13px; color: var(--muted); }
+.wb input[type="file"]::file-selector-button { background: var(--surface2); color: var(--ink); border: 1px solid var(--line); border-radius: 7px; padding: 8px 14px; font-size: 13px; font-weight: 600; cursor: pointer; margin-right: 10px; font-family: inherit; }
+.wb input[type="file"]::file-selector-button:hover { border-color: var(--teal-deep); }
 </style>
 </head>
 <body>
 <header class="top">
   <div>
-    <h1>📊 全面分析工作台</h1>
+    <h1>全面分析工作台</h1>
     <div class="sub">vertciti 房地产收购部 · 录入 → 测算 → 估值 → 涨幅 → 预测 → 周边 → 市场调查，一站式</div>
   </div>
   <div class="sub"><a href="/" style="color:#ffd75e">← 返回打分台</a></div>
@@ -68,9 +80,9 @@
 <section class="card" id="sec-intake">
   <h2 class="sec">⓪ 智能搜集 <span class="tag est">四合一入口</span></h2>
   <div class="sec-sub">地址 / 房源链接 / PDF / 房源页截图 任选其一 —— pipeline 自动全网搜集并填表。每个字段标注来源＋抓取时间＋可信度；抓不到的标"需手动补"；卖方数字标"卖方口径、待验证"；截图由视觉提取（约10分钟内）。</div>
-  <div id="dropzone" style="border:2px dashed #9db4e8;border-radius:10px;padding:26px;text-align:center;color:#445;background:#f6f9ff;margin-bottom:12px;transition:all .15s">
-    <div style="font-size:16px">📥 把 <b>PDF</b> / <b>房源页截图</b>（png/jpg）拖到这里；或从浏览器地址栏把<b>房源链接</b>拖进来</div>
-    <div class="src" style="margin-top:6px">拖入后即时显示并开始解析 pipeline（截图走视觉提取，约10分钟）</div>
+  <div id="dropzone">
+    <div class="dz-t">把 <b>PDF</b> / <b>房源页截图</b>（png/jpg）拖到这里；或从浏览器地址栏把<b>房源链接</b>拖进来</div>
+    <div class="dz-s">拖入后即时显示并开始解析 pipeline（截图走视觉提取，约10分钟）</div>
   </div>
   <div class="grid">
     <label class="f">① 纯地址<input id="in-address" placeholder="如 123 Main St, Tampa, FL 33602"></label>
@@ -78,11 +90,11 @@
     <label class="f">③ PDF（flyer / OM / 卖方材料）<input id="in-pdf" type="file" accept=".pdf,application/pdf"></label>
     <label class="f">④ 房源页截图<input id="in-img" type="file" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"></label>
   </div>
-  <button class="btn" onclick="WB.intakeAddress()">🔍 地址搜集</button>
-  <button class="btn" onclick="WB.intakeUrl()">🔗 链接解析＋搜集</button>
-  <button class="btn ghost" onclick="WB.intakePdf()">📄 解析 PDF</button>
-  <button class="btn ghost" onclick="WB.intakeImage()">🖼️ 上传截图</button>
-  <button class="btn ghost" onclick="WB.refreshScreenshots()">🔄 刷新截图提取结果</button>
+  <button class="btn" onclick="WB.intakeAddress()">地址搜集</button>
+  <button class="btn" onclick="WB.intakeUrl()">链接解析＋搜集</button>
+  <button class="btn ghost" onclick="WB.intakePdf()">解析 PDF</button>
+  <button class="btn ghost" onclick="WB.intakeImage()">上传截图</button>
+  <button class="btn ghost" onclick="WB.refreshScreenshots()">刷新截图提取结果</button>
   <span class="src" id="intake-status"></span>
   <div id="intake-results"></div>
   <div id="screenshot-tasks"></div>
@@ -116,7 +128,7 @@
     <label class="f">初期维修 $<input id="p-repairs" type="number" min="0" value="0"></label>
     <label class="f">储备月数（按 PITI）<input id="p-resv" type="number" min="0" value="0"></label>
   </div>
-  <button class="btn" onclick="WB.calcMetrics()">📐 测算</button>
+  <button class="btn" onclick="WB.calcMetrics()">测算</button>
   <div id="metrics-out"></div>
 </section>
 
@@ -138,7 +150,7 @@
   <div style="margin-top:8px">
     <div class="src">CSV 导入（表头）：<span class="mono" id="csv-template"></span></div>
     <textarea class="code" id="csv-input" placeholder="粘贴 CSV（含表头）后点导入"></textarea><br>
-    <button class="btn ghost" onclick="WB.importCsv()">📥 导入 CSV</button>
+    <button class="btn ghost" onclick="WB.importCsv()">导入 CSV</button>
     <span class="src" id="csv-msg"></span>
   </div>
   <div id="comps-table"></div>
@@ -148,7 +160,7 @@
     <label class="f">cap rate %<input id="v-cap" type="number" min="0" step="0.01" placeholder="6"></label>
     <label class="f">调和权重：比较法占比 %<input id="v-w" type="number" min="0" max="100" value="50"></label>
   </div>
-  <button class="btn" onclick="WB.valuate()">⚖️ 综合估值</button>
+  <button class="btn" onclick="WB.valuate()">综合估值</button>
   <div id="val-out"></div>
 </section>
 
@@ -162,27 +174,27 @@
   <h4>自定义指数序列（粘贴你自己的数据画曲线）</h4>
   <div class="src">格式：每行 <span class="mono">季度,指数值</span>，如 <span class="mono">2025Q2,512.77</span>（逗号分隔，不含表头）</div>
   <textarea class="code" id="series-input" placeholder="2025Q2,512.77&#10;2025Q3,510.78"></textarea><br>
-  <button class="btn ghost" onclick="WB.customSeries()">📈 画涨幅曲线</button>
+  <button class="btn ghost" onclick="WB.customSeries()">画涨幅曲线</button>
   <div id="series-out"></div>
 </section>
 
 <section class="card" id="sec-fc">
   <h2 class="sec">④ 未来三年预测<span class="tag fc">情景预测</span></h2>
-  <div class="disclaimer">⚠️ <b>预测是情景假设，不是承诺。</b>下面三个情景的年涨幅假设均可手动修改；结果仅用于压力测试思路，不构成任何收益承诺。</div>
+  <div class="disclaimer"><b>预测是情景假设，不是承诺。</b>下面三个情景的年涨幅假设均可手动修改；结果仅用于压力测试思路，不构成任何收益承诺。</div>
   <div class="grid">
     <label class="f">基准价值 $（默认=调和估值）<input id="f-base" type="number" min="0"></label>
     <label class="f">保守情景年涨幅 %<input id="f-c" type="number" step="0.5" value="1"></label>
     <label class="f">基准情景年涨幅 %<input id="f-b" type="number" step="0.5" value="3"></label>
     <label class="f">乐观情景年涨幅 %<input id="f-o" type="number" step="0.5" value="5"></label>
   </div>
-  <button class="btn warn" onclick="WB.forecast()">🔮 生成三年情景预测</button>
+  <button class="btn warn" onclick="WB.forecast()">生成三年情景预测</button>
   <div id="fc-out"></div>
 </section>
 
 <section class="card" id="sec-nearby">
   <h2 class="sec">⑤ 周边价格</h2>
   <div class="sec-sub">汇总第 ② 步录入的可比案例：价格 / $/SF / 面积 / 距离。数据全部来自你的录入，未录入=无数据，绝不编造。</div>
-  <button class="btn ghost" onclick="WB.nearby()">🔄 汇总周边价格</button>
+  <button class="btn ghost" onclick="WB.nearby()">汇总周边价格</button>
   <div id="nearby-out"><p class="src">尚未汇总。请先在第 ② 步添加可比案例。</p></div>
 </section>
 
@@ -196,8 +208,8 @@
   <div style="margin-top:10px">
     <label class="f">补充说明<textarea id="r-extra" rows="2" style="padding:7px 9px;border:1px solid #ccc;border-radius:6px"></textarea></label>
   </div>
-  <button class="btn" onclick="WB.research()">📝 生成市场调查</button>
-  <button class="btn ghost" onclick="WB.researchReport()">🖨️ 可打印报告（新窗口）</button>
+  <button class="btn" onclick="WB.research()">生成市场调查</button>
+  <button class="btn ghost" onclick="WB.researchReport()">可打印报告（新窗口）</button>
   <div id="research-out"></div>
   <h4>公开数据源（点击直达原文）</h4>
   <div id="sources-out"></div>
@@ -209,7 +221,7 @@
   <label class="f" style="max-width:320px">赛道
     <select id="s-track"><option value="residential">住宅</option><option value="commercial">商业</option></select>
   </label><br>
-  <button class="btn" onclick="WB.score()">🎯 打分</button>
+  <button class="btn" onclick="WB.score()">打分</button>
   <div id="score-out"></div>
 </section>
 

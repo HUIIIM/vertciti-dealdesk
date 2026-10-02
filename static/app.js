@@ -855,7 +855,7 @@ async function renderDetail(app) {
   }
   app.innerHTML = `
     <div class="toolbar"><button class="btn" data-act="back">← 返回仪表盘</button><span class="spacer"></span>
-      <button class="btn primary" data-act="pdf" data-id="${p.id}">⬇ 生成 PDF 报告</button>
+      <button class="btn primary" data-act="pdf" data-id="${p.id}">生成 PDF 报告</button>
       <button class="btn" data-act="edit" data-id="${p.id}">编辑</button>
       <button class="btn danger" data-act="del" data-id="${p.id}">删除</button></div>
     <div class="dhero"><div class="dhero-top">
@@ -1082,18 +1082,18 @@ function renderIhChip() {
   let inner = '', goLabel = '开始搜集';
   if (d.kind === 'com-url') {
     goLabel = '开始搜集 → 商业';
-    inner = `<div class="ck">🏢 <span class="badge com">商业房源</span></div><div class="cd">${esc(d.host)} · 检测到商业房源 → 将进入商业核保</div><div class="ca"><button class="btn primary" data-act="go">开始搜集</button>${xBtn}</div>`;
+    inner = `<div class="ck"><span class="badge com">商业房源</span></div><div class="cd">${esc(d.host)} · 检测到商业房源 → 将进入商业核保</div><div class="ca"><button class="btn primary" data-act="go">开始搜集</button>${xBtn}</div>`;
   } else if (d.kind === 'res-url') {
-    inner = `<div class="ck">🏠 <span class="badge res">住宅房源</span></div><div class="cd">${esc(d.host)} · 检测到住宅房源 → 将进入住宅核保</div><div class="ca"><button class="btn primary" data-act="go">开始搜集</button>${xBtn}</div>`;
+    inner = `<div class="ck"><span class="badge res">住宅房源</span></div><div class="cd">${esc(d.host)} · 检测到住宅房源 → 将进入住宅核保</div><div class="ca"><button class="btn primary" data-act="go">开始搜集</button>${xBtn}</div>`;
   } else if (d.kind === 'url-unknown') {
-    inner = `<div class="ck">🔗 <span class="badge cmd">链接</span></div><div class="cd">${esc(d.host)} · 未识别出房源平台，将按地址搜集</div><div class="ca"><button class="btn primary" data-act="go">按地址搜集</button>${xBtn}</div>`;
+    inner = `<div class="ck"><span class="badge cmd">链接</span></div><div class="cd">${esc(d.host)} · 未识别出房源平台，将按地址搜集</div><div class="ca"><button class="btn primary" data-act="go">按地址搜集</button>${xBtn}</div>`;
   } else if (d.kind === 'cmd-com') {
     goLabel = '进入商业核保';
-    inner = `<div class="ck">⚡ <span class="badge cmd">命令</span></div><div class="cd">进入商业核保工作台</div><div class="ca"><button class="btn primary" data-act="go">进入</button>${xBtn}</div>`;
+    inner = `<div class="ck"><span class="badge cmd">命令</span></div><div class="cd">进入商业核保工作台</div><div class="ca"><button class="btn primary" data-act="go">进入</button>${xBtn}</div>`;
   } else if (d.kind === 'cmd-res') {
-    inner = `<div class="ck">⚡ <span class="badge cmd">命令</span></div><div class="cd">住宅核保工作台即本页，已在当前页面</div><div class="ca">${xBtn}</div>`;
+    inner = `<div class="ck"><span class="badge cmd">命令</span></div><div class="cd">住宅核保工作台即本页，已在当前页面</div><div class="ca">${xBtn}</div>`;
   } else {
-    inner = `<div class="ck">📍 <span class="badge res">地址</span></div><div class="cd">将按地址搜集房源公开信息</div><div class="ca"><button class="btn primary" data-act="go-res">住宅搜集</button><button class="btn" data-act="go-com">商业搜集</button>${xBtn}</div>`;
+    inner = `<div class="ck"><span class="badge res">地址</span></div><div class="cd">将按地址搜集房源公开信息</div><div class="ca"><button class="btn primary" data-act="go-res">住宅搜集</button><button class="btn" data-act="go-com">商业搜集</button>${xBtn}</div>`;
   }
   chip.innerHTML = inner;
   chip.hidden = false;
