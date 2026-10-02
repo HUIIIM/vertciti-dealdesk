@@ -354,7 +354,7 @@ function cfTableHTML(sc, title, linkedNote) {
       else if (s === "manual") srcTag = ' <span class="tag" title="手工输入覆盖租户表">手工</span>';
       if (!v && (key === "cam_recovery" || key === "parking_income")) ph = ' placeholder="空=租户表自动"';
     }
-    if (key === "property_tax" && taxAutoSource) {
+    if (key === "property_tax" && taxAutoSource && typeof taxAutoSource === "object") {
       srcTag += ` <span class="tag live" title="${taxAutoSource.state} 州平均税率 ${(taxAutoSource.rate * 100).toFixed(2)}% 估算 · 待独立验证（${taxAutoSource.source}）">州平均估算</span>`;
     }
     return `<tr><td class="lbl">${lbl}${srcTag}${isPct ? ' <span class="tag new">NEW</span>' : ""}</td>` +
@@ -723,15 +723,16 @@ async function init() {
       if (!d.annual_tax) return;
       taxAutoSource = { state: d.state, rate: d.rate, source: d.source };
       // 填历史和预测两个税字段；已有手填值（与估算不一致）的不覆盖
-      document.querySelectorAll('input[data-k="property_tax"]').forEach((taxEl) => {
-        const cur = parseFloat(taxEl.value) || 0;
+      // 注意：直接写 state，不 dispatch input（避免循环中 renderAll 把后面的 input 换掉）
+      let changed = false;
+      ["historical", "proforma"].forEach((cf) => {
+        const cur = parseFloat((state[cf] && state[cf].property_tax) || 0);
         if (cur && cur !== d.annual_tax) return; // 疑似手改，跳过
-        taxEl.dataset.autofilling = "1";
-        taxEl.value = d.annual_tax;
-        taxEl.dispatchEvent(new Event("input", { bubbles: true }));
-        delete taxEl.dataset.autofilling;
+        if (!state[cf]) state[cf] = {};
+        state[cf].property_tax = d.annual_tax;
+        changed = true;
       });
-      renderAll(false);
+      if (changed) { renderAll(false); markDirty(); }
     } catch (e) { /* 静默降级 */ }
   }
   // 标记手改：任一税字段被用户直接编辑时，来源变 manual
@@ -743,6 +744,8 @@ async function init() {
   }, true);
   const _addrEl = document.querySelector('[data-in="property.address"]');
   if (_addrEl) _addrEl.addEventListener("blur", autoFillTax);
+  const _priceEl = document.querySelector('[data-in="analysis.purchase_price"]');
+  if (_priceEl) _priceEl.addEventListener("blur", autoFillTax);
   // ?pid= 直接打开指定项目（从首页搜集转入）
   const pid = new URLSearchParams(location.search).get('pid');
   // 保存列表最后加载：API 失败也不影响本地输入和计算
