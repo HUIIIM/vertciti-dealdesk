@@ -73,11 +73,11 @@ localhost 回调拿 code → 换 token。
 |---|---|
 | access_token（短期） | `.env` → `TOPHAP_ACCESS_TOKEN`（gitignored） |
 | token_endpoint / client_id / expires_in（非敏感） | `.env` |
-| refresh_token（长期） | **只进 Secure Vault**；存入失败脚本直接中止（exit 2），`.env` 也不写 |
-| client_secret（如 server 下发） | 只进 Secure Vault |
+| refresh_token（长期） | **不持久化**（2026-09-29 变更：Secure Vault 按平台设计是 opaque 的，存进的值读不回，静默刷新此路不通） |
+| client_secret（如 server 下发） | 不持久化 |
 
-日常运行时：401 → 用 vault 里的 refresh token 自动换一次 access token 并重试一次；
-换不到 → 降级回 DDG pipeline，日志记中文原因并提示重跑授权脚本。
+日常运行时：401 → 直接降级回 DDG pipeline，日志记中文原因并提示重跑授权脚本
+（`tools/tophap_oauth_setup.py`，需浏览器里点 Approve）。不再尝试 refresh。
 
 ## 6. 降级矩阵
 
@@ -85,16 +85,41 @@ localhost 回调拿 code → 换 token。
 |---|---|
 | `TOPHAP_ENABLED != 1` | 不调 TopHap，pipeline 与原来完全一致 |
 | 无 access token | 记 skipped 日志，降级；note 指向授权脚本 |
-| 401（token 过期） | vault refresh → 重试一次 → 仍失败则降级并提示重授权 |
+| 401（token 过期） | 直接降级并提示重授权（2026-09-29 起不再尝试 refresh，见上） |
 | 403 / 429 / 超时 / 连接失败 | 中文记日志，降级 |
 | tools/list 缺核心 tool | 缺失环节跳过，其余继续 |
 | find 无 property_id | 整链降级（无法定位） |
 | 单个 tool 返回异常结构 | 该环节跳过，不崩整链 |
 
+## 6.5 生产环境 token 轮换 SOP（2026-10-01 补充）
+
+token 为短期（约 1 小时有效期）。过期后：
+1. 本机跑 `.venv/bin/python tools/tophap_oauth_setup.py --manual`，浏览器点 Approve 拿新 token（写入本机 `.env`）
+2. 用脚本把新 token 推到 Vercel 环境变量：
+   ```
+   cd ~/workspace/vertcity/dealdesk && .venv/bin/python - <<'EOF'
+   import sys, os
+   sys.path.insert(0, os.path.expanduser("~/workspace/skills/vercel/bin"))
+   from vc_lib import api
+   env = dict(l.split("=", 1) for l in open(".env") if "=" in l and not l.startswith("#"))
+   TEAM = "team_QxXqQxZFY4NehOJd76UjkIXn"; PROJECT = "prj_8yRsROvVeOyk31En55tOSV1yRIFz"
+   existing = api("GET", f"/v10/projects/{PROJECT}/env?teamId={TEAM}")
+   for key in ["TOPHAP_ACCESS_TOKEN", "TOPHAP_TOKEN_EXPIRES_AT", "TOPHAP_ENABLED"]:
+       for e in existing.get("envs", []):
+           if e["key"] == key:
+               api("DELETE", f"/v10/projects/{PROJECT}/env/{e['id']}?teamId={TEAM}")
+       api("POST", f"/v10/projects/{PROJECT}/env?teamId={TEAM}",
+           {"key": key, "value": env.get(key, "").strip(), "type": "encrypted",
+            "target": ["production", "preview"]})
+   EOF
+   ```
+3. 重新部署（`vc-deploy`），新环境变量才生效
+4. 监控：`tools/tophap_token_watch.py` 可被 cron 每天调用，过期前 24h 告警（exit 1）
+
 ## 7. 安全约束
 
 - 密钥绝不硬编码；`.env` 已 gitignore。
-- refresh_token / client_secret 永不落盘、永不打印、永不进日志。
+- refresh_token / client_secret 不持久化（Vault opaque 读不回）、永不打印、永不进日志。
 - git 只做本地 commit，不 push（等一次性 token）。
 - 本文档中"实测"仅指 2026-09-28 浏览器实地验证的 9 个 tool 名与 OAuth 形态；
   参数 schema 与返回结构标注为待验证，不伪装成实测。

@@ -453,6 +453,26 @@ def run_address_pipeline(address: str, log: list | None = None) -> dict:
         fields.append(_tophap_summary_field(th))
     elif th.get("note"):
         _log(log, "TopHap", "skipped", th["note"])
+    # Census 兜底：TopHap 失败时，至少用免费 geocoder 确认州，保证"随便输个地址都有东西"
+    if not th["ok"]:
+        try:
+            from . import geocode as _geocode
+            g = _geocode.geocode_state(parsed.get("full") or address)
+            if g["state"]:
+                at = _now()
+                fields.append({
+                    "key": "state_confirmed", "label": "州（地理编码确认）",
+                    "value": g["state"], "display": g["state"],
+                    "source": "U.S. Census Geocoder", "source_url": "",
+                    "fetched_at": at, "confidence": "高",
+                    "seller_claimed": False, "claim_label": "",
+                    "note": f"匹配地址：{g['matched_address'] or '—'}；TopHap 不可用时的兜底",
+                    "status": "filled"})
+                _log(log, "Census兜底", "ok", f"州={g['state']}（TopHap 失败时的保底）")
+            else:
+                _log(log, "Census兜底", "failed", "Census 也未匹配到该地址")
+        except Exception as e:  # noqa: BLE001
+            _log(log, "Census兜底", "failed", f"异常：{str(e)[:100]}")
     if news:
         fields.append({"key": "market_news", "label": "市场新闻/供需信号",
                        "value": news[:6],

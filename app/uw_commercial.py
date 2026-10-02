@@ -45,6 +45,8 @@ def _div(a, b) -> float:
 def compute_rent_roll(tenants: list[dict], vacant_sf: float = 0.0) -> dict:
     rows = []
     for t in tenants or []:
+        if not isinstance(t, dict):
+            continue  # 脏行（字符串/数字/null）跳过，不 500
         sf = _f(t.get("sf"))
         monthly = _f(t.get("monthly_rent"))
         annual = monthly * 12.0
@@ -287,6 +289,7 @@ def compute_exit(a: dict, pro: dict, loan_bal: float, rate: float,
                  net_liquidity: float, purchase: float) -> dict:
     """Hold-period exit: sale proceeds, IRR, equity multiple. NEW."""
     hold_years = int(round(_f(a.get("hold_years"), 5)))
+    hold_years = max(1, min(hold_years, 50))  # 钳制 1-50 年：防极大值 DoS
     noi_growth = _f(a.get("noi_growth"), 0.02)
     exit_cap = _f(a.get("exit_cap_rate"), 0.05)
     exit_fee_pct = 0.04  # 模板固定 4%（2026-10-01 Miao 决定锁定，不开放调节）

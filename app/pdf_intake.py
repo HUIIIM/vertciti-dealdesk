@@ -34,13 +34,16 @@ def extract_text(pdf_path: str) -> tuple[str, str]:
     try:
         out = pdf_path + ".txt"
         r = subprocess.run(["pdftotext", "-layout", pdf_path, out],
-                           capture_output=True, timeout=60)
+                           capture_output=True, timeout=60,
+                           stdin=subprocess.DEVNULL)  # 加密 PDF 不等待密码输入
         if r.returncode != 0 or not os.path.exists(out):
-            return "", f"pdftotext 失败（exit {r.returncode}）：{r.stderr.decode()[:150]}"
+            return "", f"pdftotext 失败（exit {r.returncode}）：{r.stderr.decode(errors='ignore')[:150]}"
         with open(out, encoding="utf-8", errors="ignore") as f:
             text = f.read()
         os.remove(out)
-        text = re.sub(r"\s+", " ", text).strip()
+        # 只折叠行内空白、保留换行：地址正则依赖 re.M 的 ^ 锚点，话术切分依赖 \n
+        lines = [re.sub(r"[ \t\u00a0]+", " ", ln).strip() for ln in text.splitlines()]
+        text = "\n".join(ln for ln in lines if ln)
         if len(text) < 50:
             return "", "PDF 提取出的文本过少（可能是扫描件无文本层），请手动录入"
         return text, ""
