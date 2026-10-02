@@ -13,6 +13,7 @@
 <div class="layout">
   <aside class="side" id="side">
     <div class="brand"><span class="logo">D</span><span class="bt">DealDesk<small>房地产交易核保台</small></span></div>
+    <div class="nav-search"><input id="navSearch" type="text" placeholder="搜索功能… 试试输入「商业」" autocomplete="off"></div>
     <nav class="nav" id="nav">
       <button data-view="dashboard" class="on"><span class="ni">◈</span>仪表盘</button>
       <button data-view="intake"><span class="ni">⬡</span>智能搜集</button>
@@ -54,6 +55,26 @@ document.getElementById('demoClose').addEventListener('click', function () {
   document.getElementById('demoBanner').hidden = true;
   try { localStorage.setItem('dd_demo_dismissed', '1'); } catch (e) {}
 });
+/* 侧栏快速跳转：输入关键词过滤导航，回车直达首个匹配 */
+(function () {
+  var inp = document.getElementById('navSearch');
+  if (!inp) return;
+  function items() {
+    return Array.prototype.slice.call(document.querySelectorAll('#nav button, #nav a'));
+  }
+  function filter() {
+    var q = inp.value.trim().toLowerCase();
+    items().forEach(function (el) {
+      el.style.display = (!q || el.textContent.toLowerCase().indexOf(q) !== -1) ? '' : 'none';
+    });
+  }
+  inp.addEventListener('input', filter);
+  inp.addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter') return;
+    var hit = items().filter(function (el) { return el.style.display !== 'none'; })[0];
+    if (hit) hit.click();
+  });
+})();
 </script>
 <script src="/app.js"></script>
 </body>

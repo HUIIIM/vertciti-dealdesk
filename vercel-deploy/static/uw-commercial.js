@@ -567,18 +567,21 @@ function syncInputs() {
 
 async function init() {
   bindInputs();
-  await refreshList();
-  const tpl = await api("/api/uw/template");
-  state = tpl.example_39_main;   // 默认载入模板示例，所见即所得
+  // 默认空白：用户自己输入信息，自动跳出计算结果
+  state = blankState();
   curId = null; curName = "";
   syncInputs();
   renderAll(false);
 
   $("#btnExample").addEventListener("click", async () => {
-    const t = await api("/api/uw/template");
-    state = t.example_39_main;
-    curId = null;
-    syncInputs(); renderAll(false); markDirty();
+    try {
+      const t = await api("/api/uw/template");
+      state = t.example_39_main;
+      curId = null;
+      syncInputs(); renderAll(false); markDirty();
+    } catch (e) {
+      alert("模板示例加载失败（网络/服务异常），请稍后重试");
+    }
   });
   $("#btnNew").addEventListener("click", () => {
     state = blankState(); curId = null; curName = "";
@@ -596,14 +599,18 @@ async function init() {
     const name = curName || (state.property && state.property.name) || "未命名核保项目";
     const nm = prompt("项目名称", name);
     if (nm == null) return;
-    if (curId) {
-      await api("/api/uw/projects/" + curId, "PUT", { name: nm, input: state });
-    } else {
-      const p = await api("/api/uw/projects", "POST", { name: nm, input: state });
-      curId = p.id;
+    try {
+      if (curId) {
+        await api("/api/uw/projects/" + curId, "PUT", { name: nm, input: state });
+      } else {
+        const p = await api("/api/uw/projects", "POST", { name: nm, input: state });
+        curId = p.id;
+      }
+      curName = nm; dirty = false; $("#btnSave").textContent = "保存";
+      refreshList(String(curId));
+    } catch (e) {
+      alert("保存失败（网络/服务异常），输入的内容还在页面上，请稍后重试");
     }
-    curName = nm; dirty = false; $("#btnSave").textContent = "保存";
-    refreshList(String(curId));
   });
   $("#btnDel").addEventListener("click", async () => {
     if (!curId || !confirm("删除该核保项目？")) return;
@@ -618,6 +625,8 @@ async function init() {
   window.addEventListener("beforeunload", (e) => {
     if (dirty) { e.preventDefault(); e.returnValue = ""; }
   });
+  // 保存列表最后加载：API 失败也不影响本地输入和计算
+  try { await refreshList(); } catch (e) { /* 离线模式：仅本地计算可用 */ }
 }
 
 document.addEventListener("DOMContentLoaded", init);
