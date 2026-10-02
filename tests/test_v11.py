@@ -1,9 +1,9 @@
-"""DealDesk v1.1 口径补丁测试（标准库 unittest）.
+"""DealDesk v1.1 口径补丁测试（pytest）.
 
 覆盖：住宅 subject-to 首付评分 v2.1 / office 专项核保 / hotel 专项核保 /
 cash-to-close 一级字段 / value-add 70% 预租 A 级门禁 / 短期抛售一票否决 /
 API Pydantic 严格校验中文错误 / 列表按 cash-to-close 升序。
-运行：.venv/bin/python -m unittest discover -s tests -v
+运行：.venv/bin/python -m pytest tests/ -q
 """
 
 import os
