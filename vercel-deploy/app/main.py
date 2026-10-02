@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import math
 import os
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, ValidationError
@@ -63,6 +64,30 @@ def validate_input(track: str, data: dict) -> dict:
     except ValidationError as exc:
         raise HTTPException(422, "输入校验失败：" + _zh_error_message(exc))
 
+def _check_upload_size(request: Request, limit: int, label: str) -> None:
+    """上传前 Content-Length 预检：超限直接 413，避免全量读入内存 OOM。
+
+    Content-Length 缺失/不可信时跳过预检（后由实际读取长度兜底）。
+    """
+    try:
+        cl = request.headers.get("content-length")
+        if cl and int(cl) > limit:
+            # 用 400 而非 413：与下游 save_* 的"超限"错误码保持一致，前端错误处理不用改
+            raise HTTPException(400, f"{label}超过大小上限（{limit // 1024 // 1024}MB），已拒绝接收")
+    except HTTPException:
+        raise
+    except Exception:
+        pass
+
+
+def _validate(model, data, label: str = "输入"):
+    """手动 model_validate 的统一包装：ValidationError → 422 中文（不 500）。"""
+    try:
+        return model.model_validate(data)
+    except ValidationError as exc:
+        raise HTTPException(422, f"{label}校验失败：" + _zh_error_message(exc))
+
+
 app = FastAPI(title="DealDesk", description="vertciti 房地产交易核保台")
 
 
@@ -94,7 +119,7 @@ def health():
 
 
 @app.post("/api/tax/estimate")
-def tax_estimate(payload: dict):
+def tax_estimate(payload: dict | None = None):
     """地址 → 州 → 州平均税率 → 年房产税估算.
 
     body: {"address": "...", "price": 18500000}
@@ -104,13 +129,25 @@ def tax_estimate(payload: dict):
     """
     from . import geocode as _geocode
     from .data import state_tax_rates as _tax
-    address = (payload.get("address") or "").strip()
+    payload = payload or {}
+    raw_addr = payload.get("address") or ""
+    if not isinstance(raw_addr, str):
+        raise HTTPException(422, "address 必须是字符串")
+    address = raw_addr.strip()
+    if len(address) > 200:
+        raise HTTPException(422, "地址过长（最多 200 字符）")
     try:
         price = float(payload.get("price") or 0)
     except (TypeError, ValueError):
         price = 0
-    g = _geocode.geocode_state(address)
-    rate = _tax.get_rate(g["state"]) if g["state"] else None
+    if not math.isfinite(price) or price < 0:
+        raise HTTPException(422, "price 必须是非负有限数字")
+    try:
+        g = _geocode.geocode_state(address)
+    except Exception as e:  # noqa: BLE001
+        # geocode 异常不 500：按"查不到"降级
+        g = {"state": None, "matched_address": None}
+    rate = _tax.get_rate(g["state"]) if g.get("state") else None
     annual = round(price * rate) if (rate and price > 0) else None
     return {
         "state": g["state"],
@@ -203,7 +240,10 @@ def uw_template():
 def uw_compute(payload: dict):
     """实时计算：输入 -> 全链路结果（Rent Roll -> Cash Flow -> Analysis）。"""
     data = payload.get("input", payload)
-    return uw_commercial.compute_all(data)
+    try:
+        return uw_commercial.compute_all(data)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(500, f"计算失败：{str(e)[:200]}")
 
 
 @app.get("/api/uw/projects")
@@ -339,15 +379,15 @@ def wb_markets():
 
 @app.post("/api/wb/metrics")
 def wb_metrics(payload: dict):
-    prop = WbProperty.model_validate(payload.get("property", payload))
+    prop = _validate(WbProperty, payload.get("property", payload), "房产")
     return {"property": prop.model_dump(), "metrics": workbench.property_metrics(prop)}
 
 
 @app.post("/api/wb/valuate")
 def wb_valuate(req: _WbValuateReq):
-    prop = WbProperty.model_validate(req.property)
+    prop = _validate(WbProperty, req.property, "房产")
     metrics = workbench.property_metrics(prop)
-    comps = [WbComp.model_validate(c) for c in req.comps]
+    comps = [_validate(WbComp, c, "可比") for c in req.comps]
     comps_val = workbench.valuate_comps(comps)
     noi = req.income_noi_annual if req.income_noi_annual is not None else metrics["noi_annual"]
     income_val = workbench.valuate_income(noi, req.income_cap_rate_pct or 0)
@@ -364,7 +404,7 @@ def wb_valuate(req: _WbValuateReq):
 
 @app.post("/api/wb/forecast")
 def wb_forecast(req: _WbForecastReq):
-    scenarios = [WbScenario.model_validate(s) for s in req.scenarios] or [
+    scenarios = [_validate(WbScenario, s, "情景") for s in req.scenarios] or [
         WbScenario(name="conservative", label="保守", annual_rate_pct=1.0),
         WbScenario(name="base", label="基准", annual_rate_pct=3.0),
         WbScenario(name="optimistic", label="乐观", annual_rate_pct=5.0),
@@ -387,7 +427,7 @@ def wb_score(req: _WbScoreReq):
     """工作台一键打分：字段映射到现有核保模型，走现有打分引擎（逻辑零改动）."""
     if req.track not in ("residential", "commercial"):
         raise HTTPException(400, f"unknown track: {req.track}")
-    prop = WbProperty.model_validate(req.property)
+    prop = _validate(WbProperty, req.property, "房产")
     mapped = workbench.to_scoring_input(prop, req.track)
     return {"score": score_input(req.track, mapped), "mapped_input": mapped,
             "note": "打分口径：住宅 buyer-box v2.3 / 商业 buyer-box-commercial v1.3（现有引擎）"}
@@ -395,13 +435,13 @@ def wb_score(req: _WbScoreReq):
 
 @app.post("/api/wb/research")
 def wb_research(req: _WbResearchReq):
-    r = WbResearch.model_validate(req.research)
+    r = _validate(WbResearch, req.research, "研究")
     return workbench.research_payload(r, req.valuation, req.forecast)
 
 
 @app.post("/api/wb/research/report", response_class=HTMLResponse)
 def wb_research_report(req: _WbResearchReq):
-    r = WbResearch.model_validate(req.research)
+    r = _validate(WbResearch, req.research, "研究")
     return workbench.render_research_report(workbench.research_payload(r, req.valuation, req.forecast))
 
 
@@ -429,7 +469,7 @@ def wb_intake_run(req: _WbIntakeReq):
 
 
 @app.post("/api/wb/intake/pdf")
-async def wb_intake_pdf(file: UploadFile = File(...)):
+async def wb_intake_pdf(request: Request, file: UploadFile = File(...)):
     """PDF intake：上传房源 flyer/OM/卖方材料 → 文本提取 → 结构化字段.
 
     全部字段标"卖方材料口径、待独立验证"。
@@ -437,11 +477,14 @@ async def wb_intake_pdf(file: UploadFile = File(...)):
     name = file.filename or "upload.pdf"
     if not name.lower().endswith(".pdf"):
         raise HTTPException(400, "只接受 PDF 文件")
+    _check_upload_size(request, 20 * 1024 * 1024, "PDF")
     data = await file.read()
     if len(data) > 20 * 1024 * 1024:
         raise HTTPException(400, "PDF 超过 20MB 上限")
     if len(data) < 100:
         raise HTTPException(400, "文件过小或为空")
+    if not data[:5] == b"%PDF-":
+        raise HTTPException(400, "文件不是有效的 PDF（缺少 PDF 魔数），请检查文件")
     path = pdf_intake.save_upload(data, name)
     try:
         return pdf_intake.run_pdf_upload(path, name)
@@ -456,7 +499,7 @@ async def wb_intake_pdf(file: UploadFile = File(...)):
 # ---------------- 商业核保 PDF intake：OM/flyer → 商业字段 → 自动填表 ----------------
 
 @app.post("/api/uw-commercial/intake/pdf")
-async def uw_commercial_intake_pdf(file: UploadFile = File(...)):
+async def uw_commercial_intake_pdf(request: Request, file: UploadFile = File(...)):
     """商业 PDF intake：上传 OM/flyer/卖方材料 → 提取商业核保字段.
 
     返回 fields[]（key 直接对应 uw-commercial.html 的 data-in 路径）
@@ -465,11 +508,14 @@ async def uw_commercial_intake_pdf(file: UploadFile = File(...)):
     name = file.filename or "upload.pdf"
     if not name.lower().endswith(".pdf"):
         raise HTTPException(400, "只接受 PDF 文件")
+    _check_upload_size(request, 20 * 1024 * 1024, "PDF")
     data = await file.read()
     if len(data) > 20 * 1024 * 1024:
         raise HTTPException(400, "PDF 超过 20MB 上限")
     if len(data) < 100:
         raise HTTPException(400, "文件过小或为空")
+    if not data[:5] == b"%PDF-":
+        raise HTTPException(400, "文件不是有效的 PDF（缺少 PDF 魔数），请检查文件")
     path = pdf_intake.save_upload(data, name)
     try:
         return pdf_intake.run_commercial_pdf_upload(path, name)
@@ -484,7 +530,7 @@ async def uw_commercial_intake_pdf(file: UploadFile = File(...)):
 # ---------------- 截图 intake：房源页截图 → pending 队列 → cron 视觉提取 ----------------
 
 @app.post("/api/wb/intake/image")
-async def wb_intake_image(file: UploadFile = File(...)):
+async def wb_intake_image(request: Request, file: UploadFile = File(...)):
     """截图 intake：上传房源页截图（png/jpg/webp）→ 存入 pending 队列.
 
     视觉提取由定时 watcher 完成（约10分钟内），结果经
@@ -492,6 +538,7 @@ async def wb_intake_image(file: UploadFile = File(...)):
     全部字段标"截图提取、待验证"。
     """
     name = file.filename or "screenshot.png"
+    _check_upload_size(request, 15 * 1024 * 1024, "截图")
     data = await file.read()
     try:
         return image_intake.save_screenshot(data, name)

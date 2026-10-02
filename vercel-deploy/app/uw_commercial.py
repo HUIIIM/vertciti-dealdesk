@@ -45,10 +45,15 @@ def _div(a, b) -> float:
 def compute_rent_roll(tenants: list[dict], vacant_sf: float = 0.0) -> dict:
     rows = []
     for t in tenants or []:
+        if not isinstance(t, dict):
+            continue  # 脏行（字符串/数字/null）跳过，不 500
         sf = _f(t.get("sf"))
         monthly = _f(t.get("monthly_rent"))
         annual = monthly * 12.0
         uw_annual = _f(t.get("underwritten_annual"), annual)
+        # 模板 T/U 列：租户级月 CAM / 月停车费（两实例均空置未用，现接通）
+        m_cam = _f(t.get("monthly_cam"))
+        m_pkg = _f(t.get("monthly_parking"))
         rows.append({
             "suite": t.get("suite", ""),
             "tenant": t.get("tenant", ""),
@@ -59,11 +64,17 @@ def compute_rent_roll(tenants: list[dict], vacant_sf: float = 0.0) -> dict:
             "annual_per_sf": _div(annual, sf),
             "underwritten_annual": uw_annual,
             "uw_per_sf": _div(uw_annual, sf),
+            "monthly_cam": m_cam,
+            "monthly_parking": m_pkg,
+            "annual_cam": m_cam * 12.0,
+            "annual_parking": m_pkg * 12.0,
         })
     total_sf = sum(r["sf"] for r in rows)
     total_monthly = sum(r["monthly_rent"] for r in rows)
     total_annual_lease = sum(r["annual_rent"] for r in rows)   # -> Cash Flow Historical
     total_annual_uw = sum(r["underwritten_annual"] for r in rows)  # -> Cash Flow Pro Forma
+    total_annual_cam = sum(r["annual_cam"] for r in rows)      # -> Cash Flow CAM（模板 T 列）
+    total_annual_parking = sum(r["annual_parking"] for r in rows)  # -> Cash Flow Parking（模板 U 列）
     vacant_sf = _f(vacant_sf)
     prop_sf = total_sf + vacant_sf
     for r in rows:
@@ -75,6 +86,8 @@ def compute_rent_roll(tenants: list[dict], vacant_sf: float = 0.0) -> dict:
         "total_monthly": total_monthly,
         "total_annual_lease": total_annual_lease,   # = 'Rent Roll'!G-total
         "total_annual_uw": total_annual_uw,         # = 'Rent Roll'!K-total
+        "total_annual_cam": total_annual_cam,       # = 'Rent Roll'!T-total
+        "total_annual_parking": total_annual_parking,  # = 'Rent Roll'!U-total
         "vacant_sf": vacant_sf,
         "total_sf_property": prop_sf,
         "occupancy": _div(total_sf, prop_sf),
@@ -85,16 +98,20 @@ def compute_rent_roll(tenants: list[dict], vacant_sf: float = 0.0) -> dict:
 EXPENSE_KEYS = [
     "service_contracts", "cam", "general_admin", "repairs_maintenance",
     "janitor", "security", "utilities", "payroll", "management_fee",
-    "property_tax", "insurance",
+    "property_tax", "insurance", "landscape",  # landscape: F2 模板实例特有
 ]
 
 
 def compute_scenario(inp: dict, base_rents: float, net_sf: float,
-                     purchase_price: float) -> dict:
+                     purchase_price: float, auto_cam: float = 0.0,
+                     auto_parking: float = 0.0) -> dict:
     """One Cash Flow column (Historical or Pro Forma)."""
     inp = inp or {}
-    cam_rec = _f(inp.get("cam_recovery"))
-    parking = _f(inp.get("parking_income"))
+    # 模板血缘：T/U 列求和应流入此处；两实例均手填。空=自动取租户表明细，手填=覆盖。
+    cam_manual = _f(inp.get("cam_recovery"))
+    pkg_manual = _f(inp.get("parking_income"))
+    cam_rec = cam_manual or _f(auto_cam)
+    parking = pkg_manual or _f(auto_parking)
     other = _f(inp.get("other_income"))
     total_potential = base_rents + cam_rec + parking + other
     vacancy_pct = _f(inp.get("vacancy_pct"))          # NEW (template hardcoded 0)
@@ -115,6 +132,10 @@ def compute_scenario(inp: dict, base_rents: float, net_sf: float,
         "cam_recovery": cam_rec,
         "parking_income": parking,
         "other_income": other,
+        "income_sources": {
+            "cam_recovery": "manual" if cam_manual else ("rent_roll" if _f(auto_cam) else "none"),
+            "parking_income": "manual" if pkg_manual else ("rent_roll" if _f(auto_parking) else "none"),
+        },
         "total_potential": total_potential,
         "vacancy_pct": vacancy_pct,
         "vacancy_loss": vacancy_loss,
@@ -187,13 +208,14 @@ def compute_analysis(a: dict, hist: dict, pro: dict) -> dict:
     financed = -loan_bal                                  # template: =-C23
     net_liquidity = total_uses + financed                 # template: =SUM(C13:C17)+C20
 
-    inplace_noi = hist["noi"]        # was hardcoded 1,000,000 in template
-    projected_noi = pro["noi"]       # was hardcoded 2,000,000 in template
+    inplace_noi = _f(a.get("underwritten_noi")) or hist["noi"]   # F13 手工，空=取现金流
+    projected_noi = _f(a.get("projected_noi")) or pro["noi"]     # F15 手工，空=取现金流
+    inplace_noi_cf = _f(a.get("inplace_noi_cf")) or hist["noi"]  # I24 手工，空=取现金流
     inplace_cap = _div(inplace_noi, purchase)             # template: =F13/C13
     market_cap = _f(a.get("market_cap_rate"))
     projected_resale = _div(projected_noi, market_cap)   # template: =F15/F16
     acquisition_fees = repairs + reserve + lender_fees + closing  # =SUM(C14:C17)
-    exit_fee_pct = _f(a.get("exit_fee_pct"), 0.04)
+    exit_fee_pct = 0.04  # 模板固定 4%（2026-10-01 Miao 决定锁定，不开放调节）
     exit_fees = projected_resale * exit_fee_pct          # template: =F17*0.04
     net_gains = projected_resale - (purchase + acquisition_fees + exit_fees)
     roi = _div(net_gains, net_liquidity)                 # template: =F20/C21
@@ -213,7 +235,7 @@ def compute_analysis(a: dict, hist: dict, pro: dict) -> dict:
         }
 
     proj = coc(projected_noi, pro["other_income"])
-    inp = coc(inplace_noi, hist["other_income"])
+    inp = coc(inplace_noi_cf, hist["other_income"])  # I24 口径（F2 证明可与 F13 不同）
 
     # NEW: break-even occupancy (pro forma basis)
     breakeven_occ = _div(pro["total_expenses"] + annual_debt,
@@ -241,6 +263,13 @@ def compute_analysis(a: dict, hist: dict, pro: dict) -> dict:
         "inplace_noi": inplace_noi,
         "inplace_cap": inplace_cap,
         "projected_noi": projected_noi,
+        "inplace_noi_cf": inplace_noi_cf,
+        # 血缘标记：手工锁定 vs 现金流实时
+        "noi_sources": {
+            "underwritten_noi": "manual" if _f(a.get("underwritten_noi")) else "cashflow",
+            "projected_noi": "manual" if _f(a.get("projected_noi")) else "cashflow",
+            "inplace_noi_cf": "manual" if _f(a.get("inplace_noi_cf")) else "cashflow",
+        },
         "market_cap_rate": market_cap,
         "projected_resale": projected_resale,
         "acquisition_fees": acquisition_fees,
@@ -260,9 +289,10 @@ def compute_exit(a: dict, pro: dict, loan_bal: float, rate: float,
                  net_liquidity: float, purchase: float) -> dict:
     """Hold-period exit: sale proceeds, IRR, equity multiple. NEW."""
     hold_years = int(round(_f(a.get("hold_years"), 5)))
+    hold_years = max(1, min(hold_years, 50))  # 钳制 1-50 年：防极大值 DoS
     noi_growth = _f(a.get("noi_growth"), 0.02)
     exit_cap = _f(a.get("exit_cap_rate"), 0.05)
-    exit_fee_pct = _f(a.get("exit_fee_pct"), 0.04)
+    exit_fee_pct = 0.04  # 模板固定 4%（2026-10-01 Miao 决定锁定，不开放调节）
     abatements = _f(a.get("abatements"))
     if hold_years <= 0 or net_liquidity <= 0:
         return {"hold_years": hold_years, "irr": 0.0, "equity_multiple": 0.0,
@@ -324,6 +354,7 @@ def default_inputs() -> dict:
             "county": "", "property_type": "Retail", "net_rentable_sf": 0,
             "land_acres": 0, "parking_spaces": 0, "year_built": "",
             "year_renovated": "", "buildings": "", "floors": "",
+            "occupancy_as_of": "",
         },
         "tenants": [],
         "vacant_sf": 0,
@@ -343,8 +374,13 @@ def default_inputs() -> dict:
             "purchase_price": 0, "building_repairs": 0, "capital_reserve": 0,
             "lender_fees": 0, "closing_costs": 0,
             "down_pct": 0.30, "rate": 0.06, "amort_type": "IO",
-            "amort_years": 30, "market_cap_rate": 0.04, "exit_fee_pct": 0.04,
+            "amort_years": 30, "market_cap_rate": 0.04,
             "abatements": 0,
+            # 模板血缘：F13/F15/F24/I24 是手工承保假设（非公式）。
+            # 空=None 时自动取 Cash Flow 实时值；一旦手填就锁定为手工口径。
+            "underwritten_noi": None,   # F13 在手 NOI（驱动在手 Cap）
+            "projected_noi": None,      # F15 预测 NOI（驱动转售价值）
+            "inplace_noi_cf": None,     # I24 现金流块的在手 NOI
             "hold_years": 5, "noi_growth": 0.02, "exit_cap_rate": 0.05,
         },
     }
@@ -376,7 +412,7 @@ def example_39_main() -> dict:
     d["analysis"].update({
         "purchase_price": 42000000, "lender_fees": 420000,
         "closing_costs": 864000, "down_pct": 0.30, "rate": 0.06,
-        "amort_type": "IO", "market_cap_rate": 0.04, "exit_fee_pct": 0.04,
+        "amort_type": "IO", "market_cap_rate": 0.04,
     })
     return d
 
@@ -388,9 +424,11 @@ def compute_all(data: dict) -> dict:
     rent = compute_rent_roll(data.get("tenants"), data.get("vacant_sf", 0))
     purchase = _f((data.get("analysis") or {}).get("purchase_price"))
     hist = compute_scenario(data.get("historical"), rent["total_annual_lease"],
-                            net_sf, purchase)
+                            net_sf, purchase,
+                            rent["total_annual_cam"], rent["total_annual_parking"])
     pro = compute_scenario(data.get("proforma"), rent["total_annual_uw"],
-                           net_sf, purchase)
+                           net_sf, purchase,
+                           rent["total_annual_cam"], rent["total_annual_parking"])
     analysis = compute_analysis(data.get("analysis"), hist, pro)
     # per-SF headline metrics (NEW)
     per_sf = {
@@ -400,8 +438,11 @@ def compute_all(data: dict) -> dict:
         "expense_per_sf": _div(pro["total_expenses"], net_sf),
         "noi_per_sf": _div(pro["noi"], net_sf),
     }
+    # template-faithful computed property metric: =F6/(F4/1000)
+    prop_out = dict(prop)
+    prop_out["parking_per_1000sf"] = _div(_f(prop.get("parking_spaces")), net_sf / 1000.0)
     return {
-        "property": prop,
+        "property": prop_out,
         "rent_roll": rent,
         "historical": hist,
         "proforma": pro,

@@ -658,6 +658,9 @@ def _enrich_chain(address: str, log: list) -> tuple[list[dict], str]:
             fields += _map_detail(d)
             used.append(TOOL_DETAIL)
             rp._log(log, "TopHap", "ok", f"物业档案映射 {len(fields) - n0} 个字段")
+        except MCPAuthError:
+            # 401/403：token 中途过期，整链终止（不吞成"跳过"）
+            raise
         except MCPError as e:
             rp._log(log, "TopHap", "skipped", f"get_property_detail 跳过：{str(e)[:100]}")
 
@@ -668,6 +671,8 @@ def _enrich_chain(address: str, log: list) -> tuple[list[dict], str]:
             fields += _map_insights(ins)
             used.append(TOOL_INSIGHTS)
             rp._log(log, "TopHap", "ok", f"物业洞察映射 {len(fields) - n0} 个字段")
+        except MCPAuthError:
+            raise
         except MCPError as e:
             rp._log(log, "TopHap", "skipped", f"get_property_insights 跳过：{str(e)[:100]}")
 
@@ -678,6 +683,8 @@ def _enrich_chain(address: str, log: list) -> tuple[list[dict], str]:
             fields += _map_cma(cma)
             used.append(TOOL_CMA)
             rp._log(log, "TopHap", "ok", f"CMA 映射 {len(fields) - n0} 个字段")
+        except MCPAuthError:
+            raise
         except MCPError as e:
             rp._log(log, "TopHap", "skipped", f"get_property_cma 跳过：{str(e)[:100]}")
 
@@ -717,6 +724,13 @@ def enrich_address(address: str, log: list | None = None) -> dict:
                 "完成一次 OAuth 授权（浏览器里点 Approve），已降级走原 pipeline")
         return {"ok": False, "fields": [],
                 "note": "未配置授权：跑 tools/tophap_oauth_setup.py 完成一次 OAuth 授权"}
+    # 过期预检（60 秒缓冲）：过期直接降级，不浪费多次 RPC 才发现 401
+    exp = token_expires_at()
+    if exp is not None and exp - 60 <= int(time.time()):
+        rp._log(log, "TopHap", "skipped",
+                "token 已过期（预检）：需重跑 tools/tophap_oauth_setup.py 完成一次 OAuth 授权，已降级")
+        return {"ok": False, "fields": [],
+                "note": "TopHap token 已过期：需重跑授权脚本（浏览器点 Approve），已降级走原 pipeline"}
     address = (address or "").strip()
     if not address:
         return {"ok": False, "fields": [], "note": "地址为空"}
@@ -745,6 +759,34 @@ def token_expires_at() -> int | None:
 def is_token_expired() -> bool:
     exp = token_expires_at()
     return exp is not None and exp <= int(time.time())
+
+
+def token_expires_in_hours() -> float | None:
+    """token 剩余有效小时数；无过期时间戳时返回 None（未知）。
+
+    供监控 cron 调用：< 24h 时写警告日志，提醒人工重跑 OAuth 授权。
+    注意：不要自动重授权——那需要浏览器里点 Approve，必须人工触发。
+    """
+    exp = token_expires_at()
+    if exp is None:
+        return None
+    return (exp - int(time.time())) / 3600.0
+
+
+def token_expiry_report() -> dict:
+    """给监控用的结构化报告：剩余小时数 + 状态 + 建议动作（中文）。"""
+    hours = token_expires_in_hours()
+    if hours is None:
+        return {"hours_left": None, "status": "unknown",
+                "action": "无 TOPHAP_TOKEN_EXPIRES_AT，无法判断有效期；建议重跑授权脚本"}
+    if hours <= 0:
+        return {"hours_left": round(hours, 1), "status": "expired",
+                "action": "token 已过期：跑 tools/tophap_oauth_setup.py 完成一次 OAuth 授权"}
+    if hours < 24:
+        return {"hours_left": round(hours, 1), "status": "expiring_soon",
+                "action": f"token 将在 {hours:.1f} 小时后过期：尽快重跑授权脚本（需浏览器点 Approve）"}
+    return {"hours_left": round(hours, 1), "status": "ok",
+            "action": "token 有效，无需操作"}
 
 
 def status() -> dict:

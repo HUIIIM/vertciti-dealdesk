@@ -6,17 +6,29 @@
 from __future__ import annotations
 
 
+def _safe_pow(base: float, exp: int) -> float | None:
+    """安全幂：溢出返回 None（调用方降级），不抛 OverflowError."""
+    try:
+        return base ** exp
+    except OverflowError:
+        return None
+
+
 def monthly_payment(principal: float, annual_rate_pct: float, years: float) -> float:
     """F1: 等额本息月供. annual_rate_pct 用百分制 (如 6.5 表示 6.5%)."""
     if principal <= 0 or years <= 0:
         return 0.0
+    # 利率钳制到 [0, 100]%：防误填 10000 导致幂溢出
+    annual_rate_pct = max(0.0, min(float(annual_rate_pct or 0), 100.0))
     r = annual_rate_pct / 100.0 / 12.0
     n = int(round(years * 12))
     if n <= 0:
         return 0.0
     if r == 0:
         return principal / n
-    factor = (1 + r) ** n
+    factor = _safe_pow(1 + r, n)
+    if factor is None or factor == 1:
+        return 0.0
     return principal * r * factor / (factor - 1)
 
 
@@ -35,7 +47,10 @@ def remaining_balance(principal: float, annual_rate_pct: float, years: float,
     pmt = monthly_payment(principal, annual_rate_pct, years)
     if r == 0:
         return principal - pmt * k
-    return principal * (1 + r) ** k - pmt * (((1 + r) ** k - 1) / r)
+    f1 = _safe_pow(1 + r, k)
+    if f1 is None:
+        return 0.0
+    return principal * f1 - pmt * ((f1 - 1) / r)
 
 
 def wrap_analysis(underlying_balance: float, underlying_rate_pct: float,

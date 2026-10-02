@@ -18,8 +18,11 @@ from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.platypus import (BaseDocTemplate, Frame, PageTemplate, Paragraph,
-                                Spacer, Table, TableStyle)
+from reportlab.platypus import (BaseDocTemplate, Frame, Image as RLImage,
+                                PageTemplate, Paragraph, Spacer, Table,
+                                TableStyle)
+
+from . import charts, report_narrative, sensitivity
 
 # ---------------------------------------------------------------- 字体
 # 文泉驿微米黑子集（原生 TrueType，ReportLab 可读；3MB，Vercel 友好）。
@@ -372,6 +375,24 @@ def _checks_table(st: dict, checks: list) -> Table:
 
 
 # ---------------------------------------------------------------- 主入口
+def _esc(t) -> str:
+    return str(t).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def _chart_flowables(png_buf, caption: str, st: dict) -> list:
+    """Pillow PNG → ReportLab Image（等比缩到内容宽度）+ 图注。"""
+    from PIL import Image as _PILImage
+    png_buf.seek(0)
+    with _PILImage.open(png_buf) as im:
+        w, h = im.size
+    iw = CONTENT_W
+    ih = iw * h / w
+    png_buf.seek(0)
+    return [RLImage(png_buf, width=iw, height=ih),
+            Paragraph(caption, st["small"]),
+            Spacer(1, 4)]
+
+
 def build_pdf(project: dict) -> bytes:
     """生成投资筛选备忘录 PDF，返回字节串。"""
     _register_fonts()
@@ -404,6 +425,20 @@ def build_pdf(project: dict) -> bytes:
     story.append(Paragraph(meta_line, st["subtitle"]))
     story.append(Spacer(1, 6))
 
+    # 导语
+    B = lambda t: f"<b>{_esc(t)}</b>"  # noqa: E731
+    T = _esc
+    for para in report_narrative.lead_paragraphs(p, B, T):
+        story.append(Paragraph(para, st["body"]))
+        story.append(Spacer(1, 3))
+
+    # 敏感性数据源（失败则图表占位"—"）
+    try:
+        sens = sensitivity.run(track, p.get("input") or {})
+    except Exception:
+        sens = None
+    cf_unit = "月" if track == "residential" else "年"
+
     # L0 结论面板
     story.append(_verdict_panel(st, s))
     story.append(Spacer(1, 4))
@@ -411,6 +446,13 @@ def build_pdf(project: dict) -> bytes:
     # 核心指标
     story.append(_section_title(st, "核心指标（保守全口径）"))
     story.append(_metrics_grid(st, track, m))
+
+    # 现金流回本测算
+    story.append(_section_title(st, "现金流回本测算"))
+    story.extend(_chart_flowables(
+        charts.png_cashflow(charts.prep_cashflow(track, m)),
+        f"按当前{cf_unit}净现金流线性外推 10 年（不含租金增长、再融资与资产增值）。"
+        "起点为初始现金投入；数据缺失处标“—”。", st))
 
     # 一票否决
     story.extend(_check_list(st, "一票否决检查", s.get("vetoes") or [], "#15803d"))
@@ -436,9 +478,28 @@ def build_pdf(project: dict) -> bytes:
     story.append(_section_title(st, "评分明细（100 分制）"))
     story.append(_dimensions_table(st, s["dimensions"]))
 
+    # 评分构成
+    story.append(_section_title(st, "评分构成"))
+    story.extend(_chart_flowables(
+        charts.png_dimensions(charts.prep_dimensions(s["dimensions"])),
+        "各维度实际得分 / 权重。丢分最多的维度见“结论与下一步”。", st))
+
+    # 敏感性分析
+    story.append(_section_title(st, "敏感性分析"))
+    story.extend(_chart_flowables(
+        charts.png_sensitivity(charts.prep_sensitivity(track, sens)),
+        "租金 ±10%、利率 ±2% 五档对月净现金流的影响，全部用打分引擎重算"
+        "（口径与核心指标一致）。深色柱为当前基准情景。", st))
+
     # 阈值对照
     story.append(_section_title(st, "阈值对照"))
     story.append(_checks_table(st, s.get("checks") or []))
+
+    # 结论与下一步
+    story.append(_section_title(st, "结论与下一步"))
+    for para in report_narrative.conclusion_paragraphs(p, B, T):
+        story.append(Paragraph(para, st["body"]))
+        story.append(Spacer(1, 3))
 
     # 口径注脚
     story.append(Spacer(1, 10))
