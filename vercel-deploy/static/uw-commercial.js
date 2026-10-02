@@ -625,8 +625,13 @@ async function init() {
   window.addEventListener("beforeunload", (e) => {
     if (dirty) { e.preventDefault(); e.returnValue = ""; }
   });
+  // ?pid= 直接打开指定项目（从首页搜集转入）
+  const pid = new URLSearchParams(location.search).get('pid');
   // 保存列表最后加载：API 失败也不影响本地输入和计算
-  try { await refreshList(); } catch (e) { /* 离线模式：仅本地计算可用 */ }
+  try { await refreshList(pid || undefined); } catch (e) { /* 离线模式：仅本地计算可用 */ }
+  if (pid) {
+    try { await loadProject(pid); } catch (e) { /* 项目不存在则保持空白 */ }
+  }
 }
 
 document.addEventListener("DOMContentLoaded", init);

@@ -616,9 +616,10 @@ function intakeResultHtml(it) {
     <div class="insight ${filledN ? 'good' : 'warn'}"><div class="ic">${filledN ? '✓' : '▲'}</div><div>
       <div class="t">${addrLine || '搜集完成'}：填入 ${filledN} 个字段${sellerN ? `（其中 ${sellerN} 个为卖方口径、待验证）` : ''}，${manual.length} 个需手动补</div>
       <div class="d">${res.independent_note ? esc(res.independent_note) + '。' : ''}平台估值（zestimate）仅参考，不进收购价；抓不到的字段已标"需手动补"。</div></div>
-      <div class="act" style="display:flex;gap:8px">${filledN
+      <div class="act" style="display:flex;gap:8px;flex-wrap:wrap">${filledN
         ? `<button class="btn primary big" data-act="makeDraft">→ 生成核保草稿</button>`
-        : `<button class="btn primary" data-act="manualWithAddr">→ 手动录入（地址已带入）</button>`}</div></div>
+        : `<button class="btn primary" data-act="manualWithAddr">→ 手动录入（地址已带入）</button>`}
+        ${it.track === 'commercial' && filledN ? `<button class="btn primary big" data-act="gotoUw" style="background:#0f766e">→ 进入商业核保（字段自动填入）</button>` : ''}</div></div>
     <h3 class="sec-t">搜集字段 <span class="micro">每个字段：值 / 来源 / 可信度</span></h3>
     <div class="tbl-wrap"><table class="data"><thead><tr><th>字段</th><th class="num">值</th><th>来源</th><th>可信度</th></tr></thead>
     <tbody>${fieldRows}${manualRows}</tbody></table></div>
@@ -641,8 +642,48 @@ function intakeResultHtml(it) {
       <div class="fb"><div class="logbox">${logRows || '<span class="muted">无日志</span>'}</div></div></details>`;
 }
 
-async function makeDraft() {
-  const it = state.intake;
+/* 搜集结果 → 商业核保输入：能对上的全自动填入，对不上的留空手工补 */
+function buildUwInput(res) {
+  const byKey = {};
+  (res.fields || []).forEach(f => { byKey[f.key] = f; });
+  const num = k => { const f = byKey[k]; return (f && typeof f.value === 'number') ? f.value : 0; };
+  const str = k => { const f = byKey[k]; return (f && f.value != null) ? String(f.value) : ''; };
+  const addr = res.address || ((res.parsed && res.parsed.full) || '');
+  const parsed = res.parsed || {};
+  const tax = num('taxes_annual');
+  const scenario = () => ({
+    cam_recovery: 0, parking_income: 0, other_income: 0, vacancy_pct: 0,
+    tenant_improvements: 0, capex: 0, leasing_commissions: 0,
+    service_contracts: 0, cam: 0, general_admin: 0, repairs_maintenance: 0,
+    janitor: 0, security: 0, utilities: 0, payroll: 0, management_fee: 0,
+    property_tax: tax, insurance: 0, landscape: 0,
+  });
+  return {
+    property: {
+      name: addr, address: addr,
+      city: parsed.city || '', state: parsed.state || '', zip: parsed.zip || '',
+      county: '', property_type: 'Retail',
+      net_rentable_sf: num('building_sf'),
+      land_acres: num('lot_sf') ? Math.round(num('lot_sf') / 43560 * 100) / 100 : 0,
+      parking_spaces: 0, year_built: num('year_built') || '',
+      year_renovated: '', buildings: '', floors: '', occupancy_as_of: '',
+    },
+    tenants: [],
+    vacant_sf: 0,
+    historical: scenario(),
+    proforma: scenario(),
+    analysis: {
+      purchase_price: num('asking_price'),
+      building_repairs: 0, capital_reserve: 0, lender_fees: 0, closing_costs: 0,
+      down_pct: 0.3, rate: 0.06, amort_type: 'IO', amort_years: 30,
+      market_cap_rate: 0.04, abatements: 0,
+      underwritten_noi: null, projected_noi: null, inplace_noi_cf: null,
+      hold_years: 5, noi_growth: 0.02, exit_cap_rate: 0.05,
+    },
+  };
+}
+
+async function makeDraft() {  const it = state.intake;
   if (!it || !it.result) return;
   const {values, sources} = buildDraft(it.track, it.result);
   // 补全表单默认值后打分
@@ -943,6 +984,17 @@ document.addEventListener('click', async e => {
       state.view = 'detail'; state.detail = p; state.detailTab = 'overview'; render();
     }
     else if (act === 'makeDraft') { await makeDraft(); }
+    else if (act === 'gotoUw') {
+      const it = state.intake;
+      try {
+        const uwInput = buildUwInput(it.result);
+        const filled = ['asking_price', 'building_sf', 'taxes_annual', 'year_built']
+          .filter(k => (it.result.fields || []).some(f => f.key === k && typeof f.value === 'number')).length;
+        const p = await api('POST', '/api/uw/projects',
+          {name: (uwInput.property.name || '商业核保') + '（搜集填入' + filled + '项）', input: uwInput});
+        window.open('/uw-commercial.html?pid=' + p.id, '_blank');
+      } catch (err) { alert('转入失败：' + err.message); }
+    }
     else if (act === 'editDraft') {
       const it = state.intake;
       state.track = it.track; state.view = 'form'; state.editingId = null;
