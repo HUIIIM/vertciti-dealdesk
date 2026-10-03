@@ -273,7 +273,20 @@ WB.renderIntake = function (d) {
   if (d.error && !(d.fields || []).length) {
     $('#intake-results').innerHTML = `<p class="neg">搜集失败：${esc(d.error)}</p>`;
   } else {
-    const rows = (d.fields || []).map(f => {
+    const _fields = (d.fields || []).filter(f => f.key !== 'property_photos');
+    const _photoF = (d.fields || []).find(f => f.key === 'property_photos');
+    const _photos = (_photoF && Array.isArray(_photoF.value)) ? _photoF.value.slice(0, 6) : [];
+    const _shortSrc = u => String(u || '').replace(/\s*页面$/, '').replace(/^www\./, '');
+    const photoHtml = _photos.length
+      ? `<div style="display:flex;justify-content:flex-end;margin-bottom:2px;"><span class="badge seller">平台照片、仅供外观参考</span></div>`
+        + `<div class="photo-strip">`
+        + _photos.map(q => `<div class="photo-item"><a href="${esc(q.url)}" target="_blank" rel="noopener">`
+          + `<img src="${esc(q.url)}" loading="lazy" referrerpolicy="no-referrer" alt="房源照片"`
+          + ` onerror="this.closest('.photo-item').style.display='none'"></a>`
+          + `<div class="photo-cap">${esc(_shortSrc(q.source))} · ${esc(String(q.fetched_at || '').slice(5))}</div></div>`).join('')
+        + `</div>`
+      : `<p class="no-photo">该地址暂无公开房源照片（TopHap/RentCast 为公共记录不含图片；挂牌网站有反爬限制）</p>`;
+    const rows = _fields.map(f => {
       let disp = esc(f.display || '');
       if (f.key === 'market_news' && Array.isArray(f.value)) {
         disp = '<ul style="margin:4px 0;padding-left:18px">' + f.value.map(n =>
@@ -292,6 +305,7 @@ WB.renderIntake = function (d) {
     const notice = d.claim_notice ? `<div class="disclaimer">⚠️ ${esc(d.claim_notice)}</div>`
       : (d.independent_note ? `<p class="src">ℹ️ ${esc(d.independent_note)}</p>` : '');
     $('#intake-results').innerHTML = `${notice}
+      ${photoHtml}
       <table class="t"><tr><th>字段</th><th>值</th><th>来源</th><th>抓取时间</th><th>可信度</th><th>状态</th></tr>${rows}${manual}</table>
       ${(d.fields || []).length ? `<button class="btn" onclick="WB.fillForm()">📝 一键填入下方表单</button> <span class="src">卖方口径字段会填入但保留"待验证"提示</span>` : ''}`;
   }

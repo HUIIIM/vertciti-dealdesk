@@ -748,6 +748,31 @@ async function init() {
   if (_addrEl) _addrEl.addEventListener("blur", autoFillTax);
   const _priceEl = document.querySelector('[data-in="analysis.purchase_price"]');
   if (_priceEl) _priceEl.addEventListener("blur", autoFillTax);
+  // ---- 外观小图：地址变更时取公开房源照片首张（160px），无图整块不渲染 ----
+  async function fetchPhotos() {
+    const box = document.getElementById("propPhoto");
+    if (!box) return;
+    const addr = ((_addrEl && _addrEl.value) || "").trim();
+    if (addr.length < 10) { box.style.display = "none"; box.innerHTML = ""; return; }
+    try {
+      const r = await fetch("/api/wb/photos?address=" + encodeURIComponent(addr));
+      const d = await r.json();
+      const q = (d.photos || [])[0];
+      if (!q || !q.url) { box.style.display = "none"; box.innerHTML = ""; return; }
+      const src = (((q.source || "").replace(/\s*页面$/, "").replace(/^www\./, "")) + " · " + (q.fetched_at || "")).trim();
+      box.innerHTML = "";
+      const a = document.createElement("a");
+      a.href = q.url; a.target = "_blank"; a.rel = "noopener"; a.title = src;
+      const img = document.createElement("img");
+      img.src = q.url; img.width = 160; img.loading = "lazy";
+      img.referrerPolicy = "no-referrer"; img.alt = "外观";
+      img.style.borderRadius = "8px"; img.style.display = "block";
+      img.onerror = () => { box.style.display = "none"; box.innerHTML = ""; };
+      a.appendChild(img); box.appendChild(a);
+      box.style.display = "block";
+    } catch (e) { box.style.display = "none"; }
+  }
+  if (_addrEl) _addrEl.addEventListener("blur", fetchPhotos);
   // ---- 智能录取：截图 → 视觉提取 → 自动填表 ----
   // 截图 key → data-in 路径映射（与 pdf_intake 字段命名对齐）
   const IMG_KEYMAP = {

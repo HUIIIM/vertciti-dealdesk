@@ -164,7 +164,8 @@ def fetch_page(url: str, log: list) -> dict:
         _log(log, f"抓取 {url[:80]}", "blocked", note)
         return {"ok": False, "note": note, "blocked": True}
     _log(log, f"抓取 {url[:80]}", "ok", f"HTTP 200，{len(text)} 字符")
-    return {"ok": True, "text": text, "final_url": str(r.url), "note": ""}
+    return {"ok": True, "text": text, "html": r.text,
+            "final_url": str(r.url), "note": ""}
 
 
 def html_to_text(html_doc: str) -> str:
@@ -175,6 +176,83 @@ def html_to_text(html_doc: str) -> str:
 
 
 # ---------------- DuckDuckGo 搜索 ----------------
+
+_OG_IMG_RE = re.compile(
+    r'<meta\s+[^>]*?(?:property|name)\s*=\s*["\'](?:og:image|twitter:image)["\']'
+    r'[^>]*?content\s*=\s*["\']([^"\']+)["\']', re.IGNORECASE)
+_OG_IMG_REV = re.compile(
+    r'<meta\s+[^>]*?content\s*=\s*["\']([^"\']+)["\']'
+    r'[^>]*?(?:property|name)\s*=\s*["\'](?:og:image|twitter:image)["\']', re.IGNORECASE)
+_IMG_SRC_RE = re.compile(
+    r'<link\s+[^>]*?rel\s*=\s*["\']image_src["\'][^>]*?'
+    r'href\s*=\s*["\']([^"\']+)["\']', re.IGNORECASE)
+_JUNK_IMG_RE = re.compile(r'logo|favicon|sprite|/icon|placeholder|blank|pixel|1x1', re.IGNORECASE)
+
+
+def extract_images(html: str, source_url: str, per_page: int = 3) -> list[dict]:
+    """从页面 HTML 提取 og:image 系图片（设计稿 2.2：主图必提 + 同页最多 2 张）。
+
+    只返回 URL（不下载），每张带来源域名 + 抓取时间。TopHap/RentCast/Census
+    经实测无图片字段，不从它们挖图；唯一图源是公开网页 og:image。
+    """
+    if not html or not source_url:
+        return []
+    host = (urllib.parse.urlparse(source_url).hostname or "").lower()
+    seen: set[str] = set()
+    out: list[dict] = []
+
+    def _add(url: str, caption: str) -> None:
+        if not url or url.startswith("data:"):
+            return
+        u = urllib.parse.urljoin(source_url, url.strip())
+        if not u.startswith(("http://", "https://")):
+            return
+        if _JUNK_IMG_RE.search(u):
+            return
+        if u in seen:
+            return
+        seen.add(u)
+        out.append({"url": u, "source": f"{host} 页面", "source_url": source_url,
+                    "fetched_at": _now(), "caption": caption})
+
+    added_main = False
+    for pat in (_OG_IMG_RE, _OG_IMG_REV):  # og:image 主图必提（两种属性顺序）
+        for m in pat.finditer(html):
+            if len(out) >= per_page:
+                break
+            if "og:image" in m.group(0).lower() and not added_main:
+                _add(m.group(1), "挂牌主图")
+                added_main = True
+            elif "og:image" not in m.group(0).lower():
+                _add(m.group(1), "页面图片")  # twitter:image 算补充
+        if len(out) >= per_page:
+            break
+    for m in _IMG_SRC_RE.finditer(html):  # 同页再补
+        if len(out) >= per_page:
+            break
+        _add(m.group(1), "页面图片")
+    return out[:per_page]
+
+
+def _photos_field(photos: list[dict]) -> dict:
+    """property_photos 字段（设计稿 2.3 格式）。"""
+    hosts: list[str] = []
+    for q in photos:
+        h = (urllib.parse.urlparse(q.get("source_url") or "").hostname or "").lower()
+        h = h[4:] if h.startswith("www.") else h
+        if h and h not in hosts:
+            hosts.append(h)
+    return {
+        "key": "property_photos", "label": "房源照片",
+        "value": photos,
+        "display": f"{len(photos)} 张（{'、'.join(hosts[:3]) or '未知来源'}）",
+        "source": "公开网页", "source_url": "",
+        "fetched_at": _now(), "confidence": "中",
+        "seller_claimed": True, "claim_label": "平台照片、仅供外观参考",
+        "note": "挂牌平台公开图片，可能为精修/旧照，不代表现状；以实地看房为准",
+        "status": "filled",
+    }
+
 
 def ddg_unwrap(href: str) -> str:
     """解开 DDG 跳转链接 //duckduckgo.com/l/?uddg=<encoded>&..."""
@@ -410,6 +488,7 @@ def run_web_collection(address: str, log: list | None = None) -> dict:
     candidates.sort(key=lambda r: _candidate_priority(r["url"]))
 
     all_fields, news = [], []
+    photos, photo_seen = [], set()
     fetches = 0
     for c in candidates:
         if fetches >= MAX_FETCHES:
@@ -424,10 +503,17 @@ def run_web_collection(address: str, log: list | None = None) -> dict:
         fetches += 1
         src_name = f"{host} 页面"
         all_fields += extract_fields(page["text"], src_name, page["final_url"])
+        for img in extract_images(page.get("html", ""), page["final_url"]):
+            if img["url"] not in photo_seen and len(photos) < 6:
+                photo_seen.add(img["url"])
+                photos.append(img)
         if "news" in c["url"] or fetches <= 2:
             news.append({"title": c["title"][:120], "url": c["url"]})
 
     fields = merge_fields(all_fields)
+    if photos:
+        fields.append(_photos_field(photos))
+        _log(log, "提取房源照片", "ok", f"{len(photos)} 张（og:image）")
     if news:
         fields.append({"key": "market_news", "label": "市场新闻/供需信号",
                        "value": news[:6],
@@ -486,22 +572,84 @@ def run_url_pipeline(url: str, log: list | None = None) -> dict:
     address = addr_m.group(1).strip() if addr_m else ""
     _log(log, "提取房源地址", "ok" if address else "failed",
          address or "页面未找到规范地址，请手动输入地址再跑地址模式")
+    seller_photos = extract_images(page.get("html", ""), page["final_url"])
     result = {"mode": "url", "url": page["final_url"], "address": address,
               "seller_fields": seller_fields, "log": log, "fetched_at": _now()}
     if address:
         indep = run_address_pipeline(address, log)
         # 独立源优先；卖方声称保留备注
         merged = merge_fields(indep["fields"] + seller_fields)
+        # 照片合并：用户粘贴链接的图优先，去重，最多 6 张（设计稿 2.2）
+        indep_photos = []
+        for f in indep["fields"]:
+            if f.get("key") == "property_photos" and isinstance(f.get("value"), list):
+                indep_photos = f["value"]
+        combined, cseen = [], set()
+        for q in (seller_photos + indep_photos):
+            u = q.get("url")
+            if u and u not in cseen:
+                cseen.add(u)
+                combined.append(q)
+        merged = [f for f in merged if f.get("key") != "property_photos"]
+        if combined:
+            merged.append(_photos_field(combined[:6]))
+            _log(log, "提取房源照片", "ok",
+                 f"{len(combined[:6])} 张（粘贴链接优先）")
         result["fields"] = merged
         result["manual_needed"] = indep["manual_needed"]
         result["independent_note"] = "独立搜集结果优先；卖方口径数字已标注待验证"
     else:
         result["fields"] = seller_fields
+        if seller_photos:
+            result["fields"] = seller_fields + [_photos_field(seller_photos[:6])]
+            _log(log, "提取房源照片", "ok", f"{len(seller_photos[:6])} 张（房源链接页）")
         result["manual_needed"] = [
             {"key": k, "label": FIELD_LABELS[k], "status": "manual_needed",
              "note": "未提取到地址，无法做独立搜集；请手动输入地址"}
             for k in ("building_sf", "taxes_annual", "monthly_rent")]
     return result
+
+
+def run_photos_pipeline(address: str, log: list | None = None) -> dict:
+    """轻量取图：商业页 A 栏"外观"小图专用。
+
+    先查 24h 地址缓存（命中直接返回照片，约 0.7s）；未命中则做一次轻量抓取
+    （DDG 搜地址 → 最多抓 3 页 → 只提 og:image），不写缓存、不跑全量字段抽取。
+    返回 {"photos": [...], "cached": bool}。
+    """
+    from . import cache as _cache
+    log = log if log is not None else []
+    addr = (address or "").strip()
+    if not addr:
+        return {"photos": [], "cached": False}
+    try:
+        cached = _cache.get_cached(addr)
+    except Exception:  # noqa: BLE001
+        cached = None
+    if cached and not cached.get("stale"):
+        for f in (cached["data"].get("fields") or []):
+            if f.get("key") == "property_photos" and isinstance(f.get("value"), list):
+                _log(log, "照片缓存", "hit", f"{len(f['value'])} 张")
+                return {"photos": f["value"], "cached": True}
+    photos, seen = [], set()
+    try:
+        for r in ddg_search(f'"{addr}"', log, max_results=5):
+            if len(photos) >= 3:
+                break
+            host = (urllib.parse.urlparse(r["url"]).hostname or "").lower()
+            if any(b in host for b in ("facebook.com", "linkedin.com", "youtube.com")):
+                continue
+            page = fetch_page(r["url"], log)
+            if not page.get("ok"):
+                continue
+            for img in extract_images(page.get("html", ""), page["final_url"]):
+                if img["url"] not in seen:
+                    seen.add(img["url"])
+                    photos.append(img)
+    except Exception as e:  # noqa: BLE001
+        _log(log, "轻量取图", "failed", str(e)[:100])
+    _log(log, "轻量取图", "ok" if photos else "empty", f"{len(photos)} 张")
+    return {"photos": photos[:6], "cached": False}
 
 
 def run(mode: str, text: str) -> dict:

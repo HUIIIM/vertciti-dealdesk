@@ -417,7 +417,10 @@ table.t input.cell-in::placeholder { color: var(--tx3); font-size: 11px; font-fa
 
     <div class="c-grid" style="margin-top:22px;">
       <div>
-        <h3 class="sub" style="margin-top:0;">物业概况</h3>
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
+          <h3 class="sub" style="margin-top:0;">物业概况</h3>
+          <div id="propPhoto" style="display:none;"></div>
+        </div>
         <div class="grid">
           <label class="f">物业名称<input data-in="property.name"></label>
           <label class="f">地址<input data-in="property.address"></label>

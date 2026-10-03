@@ -453,6 +453,15 @@ class _WbIntakeReq(BaseModel):
     text: str = ""
 
 
+@app.get("/api/wb/photos")
+def wb_photos(address: str = ""):
+    """轻量取图：商业页 A 栏"外观"小图用。先查 24h 地址缓存，未命中做轻量 og:image 抓取。"""
+    try:
+        return research_pipeline.run_photos_pipeline(address)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(500, f"取图失败：{str(e)[:200]}")
+
+
 @app.post("/api/wb/intake/run")
 def wb_intake_run(req: _WbIntakeReq):
     """智能搜集：纯地址或房源链接 → 全网公开信息自动搜集.
