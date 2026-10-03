@@ -1,1 +1,14 @@
-{"forwardPorts":[8100],"image":"mcr.microsoft.com/devcontainers/python:3.12","name":"DealDesk","portsAttributes":{"8100":{"label":"DealDesk","onAutoForward":"openPreview"}},"postCreateCommand":"pip install -q -r requirements.txt","postStartCommand":"bash .devcontainer/start.sh"}
+{
+  "name": "DealDesk",
+  "image": "mcr.microsoft.com/devcontainers/python:3.12-bookworm",
+  "customizations": {
+    "vscode": {
+      "extensions": ["ms-python.python", "ms-python.vscode-pylance"]
+    }
+  },
+  "forwardPorts": [8100],
+  "portsAttributes": { "8100": { "label": "DealDesk", "onAutoForward": "openPreview" } },
+  "postCreateCommand": "pip install -q -r requirements.txt && bash .devcontainer/healthcheck.sh python",
+  "postStartCommand": "bash .devcontainer/start.sh",
+  "remoteUser": "vscode"
+}

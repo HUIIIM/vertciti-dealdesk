@@ -748,6 +748,76 @@ async function init() {
   if (_addrEl) _addrEl.addEventListener("blur", autoFillTax);
   const _priceEl = document.querySelector('[data-in="analysis.purchase_price"]');
   if (_priceEl) _priceEl.addEventListener("blur", autoFillTax);
+  // ---- 智能录取：截图 → 视觉提取 → 自动填表 ----
+  // 截图 key → data-in 路径映射（与 pdf_intake 字段命名对齐）
+  const IMG_KEYMAP = {
+    address: "property.address",
+    asking_price: "analysis.purchase_price",
+    building_sf: "property.net_rentable_sf",
+    year_built: "property.year_built",
+    property_type: "property.property_type",
+  };
+  const intakeImg = $("#intakeImg");
+  if (intakeImg) {
+    intakeImg.addEventListener("change", async (e) => {
+      const f = e.target.files[0];
+      e.target.value = "";
+      if (!f) return;
+      setStatus("busy", "截图上传中…");
+      try {
+        const fd = new FormData();
+        fd.append("file", f, f.name);
+        const r = await fetch("/api/wb/intake/image", { method: "POST", body: fd });
+        const d = await r.json();
+        if (!r.ok || d.error) throw new Error(d.error || ("HTTP " + r.status));
+        const taskId = d.task_id;
+        setStatus("busy", "视觉提取中（约10分钟），可先做别的…");
+        // 轮询提取结果：每 30s 查一次，最多 14 分钟
+        let extracted = null;
+        for (let i = 0; i < 28; i++) {
+          await new Promise((res) => setTimeout(res, 30000));
+          try {
+            const rr = await fetch("/api/wb/intake/image/result/" + taskId);
+            const dd = await rr.json();
+            if (dd && dd.fields && dd.fields.length) { extracted = dd; break; }
+          } catch (_) { /* 继续轮询 */ }
+        }
+        if (!extracted) {
+          setStatus("busy", "提取仍在排队，稍后在工作台截图任务中查看");
+          return;
+        }
+        let filled = 0; const skipped = [];
+        for (const fld of (extracted.fields || [])) {
+          const path = IMG_KEYMAP[fld.key];
+          // 税走 data-cf/data-k，其余走 data-in
+          if (fld.key === "taxes_annual" && fld.value) {
+            for (const cf of ["historical", "proforma"]) {
+              if (!state[cf]) state[cf] = {};
+              state[cf].property_tax = parseFloat(fld.value) || 0;
+            }
+            filled++;
+            continue;
+          }
+          if (!path) { skipped.push(fld.key); continue; }
+          const el = document.querySelector('[data-in="' + path + '"]');
+          if (el && fld.value != null && fld.value !== "") {
+            el.value = fld.value;
+            el.dispatchEvent(new Event("input", { bubbles: true }));
+            el.style.boxShadow = "0 0 0 2px var(--teal-line)";
+            setTimeout(() => { el.style.boxShadow = ""; }, 1800);
+            filled++;
+          } else { skipped.push(fld.key); }
+        }
+        renderAll(false); markDirty();
+        const parts = ["截图已填 " + filled + " 个字段"];
+        if (skipped.length) parts.push("未映射 " + skipped.length + " 项");
+        parts.push("（全部为截图提取口径、待独立验证）");
+        setStatus("ok", parts.join("；"));
+      } catch (err) {
+        setStatus("err", "截图处理失败：" + err.message);
+      }
+    });
+  }
   // ?pid= 直接打开指定项目（从首页搜集转入）
   const pid = new URLSearchParams(location.search).get('pid');
   // 保存列表最后加载：API 失败也不影响本地输入和计算

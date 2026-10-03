@@ -7,19 +7,38 @@
 ## 待做（按优先级）
 
 1. [ ] 报告导出：Manny Khoshbin 经典版 + DealDesk 增强版（含 DSCR/IRR/保本出租率/退出分析），商业页一键导出当前未保存状态
-2. [ ] 商业页粘贴文本智能录取：粘贴 OM/flyer 文本 → 自动提取价格/面积/NOI/租户 → 填表（标卖方口径待验证）
-3. [ ] 商业页截图/图片录取：上传房源截图 → OCR/视觉提取 → 填表
-4. [ ] 扫描版 PDF OCR：图片型 PDF 先 OCR 再走现有提取链路，明确提示"OCR 口径"
-5. [ ] 移动端 390px + 平板布局 QA：商业页三栏在小屏不溢出、可操作
-6. [ ] Provider 并行调用：TopHap/RentCast/网页并行跑，取最快有效结果（现在串行慢）
-7. [ ] 生产 PDF 解析换纯 Python 库（D2）：Vercel 无 poppler → 切 pypdf/pdfplumber 零系统依赖进 requirements.txt，消除"生产永远传不了 PDF"
-8. [ ] 误导性数字口径（D3/D4，D460 CEO 已定）：`_div` 零分母 / `_irr` 无解返回 None，前端统一渲染"N/A"（禁显示 0.00/0%）
-9. [ ] `monthly_payment` 与 `amort_payment` 百分制/小数制口径统一（埋雷）：审计发现两者利率口径不一致，静默错数风险
-10. [ ] `fetch_page` 页面大小上限（大页面内存风险，P0 上传 OOM 同类）：预检 Content-Length/截断读取
+2. [ ] **Comps 独立模块**（学自 Crexi/CoStar/Dealpath，竞品研究 2026-10-02 Top1）：A 页旁新增 Comps 栏——结构化 comps 表（地址/成交价/日期/cap rate/$/SF/距离/来源必填）+ 三态标签（sold/under contract/for sale）+ 顶部统计条（n/中位 $/SF/四分位/分布直方图，纯前端）+ attach/pass（采用进估值依据/丢弃记理由）。验收：450 W 44th 能拉出 ≥3 条 comps（含来源标签），统计条数字与表格一致
+3. [ ] **一键 Tear Sheet**（学自 Dealpath，Top2）：intake 完成后自动生成 deal 一页纸——关键字段（价格/NOI/cap rate/全口径现金需求/月供/DSCR）+ 3 条 highlights + 1 条下一步建议；进 PDF 备忘录封面页。验收：任一已 intake deal 一键生成，不翻三栏可做 go/no-go
+4. [ ] **Intake 数据质量门**（学自 Dealpath/Cherre，Top3）：固定字段 schema（分 deal 类型版本）+ 每字段来源/页码/置信度 + validators.py 规则层（偏离 warn、不一致 fail），fail 清零才能进 underwriting；低置信标黄。验收：喂一份前后矛盾的 OM，fail 项正确拦截并标黄
+5. [ ] 商业页粘贴文本智能录取：粘贴 OM/flyer 文本 → 自动提取价格/面积/NOI/租户 → 填表（标卖方口径待验证）
+6. [ ] **Ownership 穿透树**（学自 Reonomy，Top4）：intake 自动生成 LLC→真人→可信度树（SoS 公开查询 + TopHap ownership + 标注 verified/待验证）；联系方式只走 verified 来源。验收：450 W 44th 显示完整穿透链，任一推断字段带[待验证]
+7. [ ] **Sell-readiness 卖方动机分**（学自 Reonomy，Top5）：0-100 规则分（持有>10年+25、maturity<24mo+30、refinance+15、lien/violation+20、同 zip 销售率↑+10），intake 输出字段，附每项信号来源。验收：3 个已知 deal 打分排序与人工判断一致
+8. [ ] 生产 PDF 解析换纯 Python 库（D2）：Vercel 无 poppler → 切 pypdf/pdfplumber 零系统依赖进 requirements.txt，消除"生产永远传不了 PDF"
+9. [ ] 误导性数字口径（D3/D4，D460 CEO 已定）：`_div` 零分母 / `_irr` 无解返回 None，前端统一渲染"N/A"（禁显示 0.00/0%）
+10. [ ] `monthly_payment` 与 `amort_payment` 百分制/小数制口径统一（埋雷）：审计发现两者利率口径不一致，静默错数风险
 11. [ ] RentCast 激活：等董事长绑卡后接入 fallback 链实测（外部阻塞，不占每日名额）
+
+## 暂缓（被 Top5 挤掉，未丢弃，消化完按序取回）
+
+- 商业页截图/图片录取：上传房源截图 → OCR/视觉提取 → 填表
+- 扫描版 PDF OCR：图片型 PDF 先 OCR 再走现有提取链路，明确提示"OCR 口径"
+- 移动端 390px + 平板布局 QA：商业页三栏在小屏不溢出、可操作
+- Provider 并行调用：TopHap/RentCast/网页并行跑（缓存已缓解，优先级下降）
+- `fetch_page` 页面大小上限（大页面内存风险，P0 上传 OOM 同类）
+
+## 后续迭代候选（竞品研究未进 Top5，排大版本/长期）
+
+- Canonical deal schema + connector 注册表（学自 Cherre，架构重构）
+- 轻量 entity resolution：多源字段冲突 flag 而非静默取第一个（学自 Cherre）
+- Buy-box 自动打分：Miao"资金很少"硬约束写成可配置 YAML（学自 Dealpath）
+- DealDesk MCP Server：pipeline/comps/承销结果暴露给 Miao 自然语言查询（学自 Dealpath，N=1 主线长期项）
+- In-context 估值栏：C 页顶部 cap rate/$/SF/GRM 一键反推（学自 Crexi，可并入 comps 二期）
+- Deal watchlist：跟踪中 deal 每周重跑估值，漂移推送（学自 Crexi/Reonomy）
+- 债务时间线：C 页债务到期小节（学自 Crexi，可并入 tear sheet 二期）
 
 ## 已完成
 
+- 2026-10-02：竞品学习 5 家（Dealpath/Crexi/Reonomy/Cherre/CoStar）→ gap 清单 13 项 → Top5 并入本台账。报告：`docs/competitive-study-2026-10-02.md`
 - 2026-10-02：可靠性专队剩余项收尾验收——18 项修复全部确认已部署生产，抽查回归通过。证据：生产 `tax/estimate` 非字符串/inf/空 body → 422/422/200；伪造 PDF 上传 → 400；真实地址（450 W 44th St）→ 27 字段、TopHap MCP 主源；pytest 192 passed（1 deselect pre-existing）；`tophap-token-watch`（30m）+ `dealdesk-smoke-test`（每日）两 cron 均绿。未修复 P2×12 中：地址缓存、token 巡检已由最优解项目落地并生产验证；DDG 限流/fetch_page 上限/pipeline 总耗时上限/robots 异常缓存/merge 备注丢失/日志截断/geocode 超时/discover_tools 重复 initialize/partialMatch 检查/down_pct 歧义，仍在日常迭代池（本次已取 3 项补入待做 7/9/10）
 - 2026-10-02：地址结果缓存 24h 落地并生产验证（最优解项目）：生产重复查询 7363ms → 671ms，同 26 字段 TopHap 主源
 - 2026-10-02：TopHap token 巡检升级为 30 分钟自愈链路（原每日巡检作废）：refresh_token 落盘 + cron 自动续期 + 同步 Vercel 环境变量 + 触发重部署；生产 token 实时 fresh（08:25 cron 成功），1 小时有效期问题闭环
