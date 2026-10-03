@@ -10,7 +10,7 @@ from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, ValidationError
 
-from . import db, image_intake, pdf_intake, pdf_report, report, research_pipeline, scoring_commercial, scoring_residential, sensitivity, uw_commercial, workbench
+from . import db, image_intake, pdf_intake, pdf_report, pdf_uw, report, research_pipeline, scoring_commercial, scoring_residential, sensitivity, uw_commercial, workbench
 from .data import hpi
 from .models import CommercialInput, ProjectCreate, ResidentialInput
 from .workbench import WbComp, WbProperty, WbResearch, WbScenario
@@ -244,6 +244,30 @@ def uw_compute(payload: dict):
         return uw_commercial.compute_all(data)
     except Exception as e:  # noqa: BLE001
         raise HTTPException(500, f"计算失败：{str(e)[:200]}")
+
+
+@app.post("/api/uw/report")
+def uw_report(payload: dict):
+    """商业核保报告导出：当前（未保存也行）输入 -> 经典版/增强版 PDF。
+    variant: classic（Manny Khoshbin 模板版式）| enhanced（DealDesk 增强版：
+    DSCR/IRR/盈亏平衡/持有退出）。"""
+    variant = str(payload.get("variant", "classic") or "classic").lower()
+    if variant not in ("classic", "enhanced"):
+        raise HTTPException(400, f"unknown variant: {variant!r}")
+    data = payload.get("input", payload)
+    try:
+        r = uw_commercial.compute_all(data)
+        pdf_bytes = pdf_uw.build_uw_pdf(r, variant)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(500, f"报告生成失败：{str(e)[:200]}")
+    name = (r.get("property", {}) or {}).get("name") or "deal"
+    slug = "".join(c if c.isalnum() else "-" for c in name)[:30] or "deal"
+    safe_ascii = f"DealDesk-uw-{variant}-{slug}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={safe_ascii}"},
+    )
 
 
 @app.get("/api/uw/projects")
