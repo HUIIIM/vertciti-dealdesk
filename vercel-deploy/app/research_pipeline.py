@@ -187,6 +187,22 @@ _IMG_SRC_RE = re.compile(
     r'<link\s+[^>]*?rel\s*=\s*["\']image_src["\'][^>]*?'
     r'href\s*=\s*["\']([^"\']+)["\']', re.IGNORECASE)
 _JUNK_IMG_RE = re.compile(r'logo|favicon|sprite|/icon|placeholder|blank|pixel|1x1', re.IGNORECASE)
+# 只从真正的房源/挂牌站取图：非房源站的 og:image（新闻配图/头像/企业图）一律不要，
+# 宁可无图（诚实空态）也不展示"假图"。
+_LISTING_HOSTS = (
+    "realtor.com", "redfin.com", "zillow.com", "homes.com", "loopnet.com",
+    "crexi.com", "apartments.com", "apartmentlist.com", "realtor.ca",
+    "compass.com", "coldwellbanker.com", "remax.com", "kw.com", "sothebysrealty.com",
+    "century21.com", "bhhs.com", "movoto.com", "trulia.com", "landwatch.com",
+    "landandfarm.com", "crelxi", "cityfeet.com", "showcase.com", "cozycozy",
+)
+# 人像/头像/经纪人照片一律过滤（看着最"假"的来源）
+_FACE_IMG_RE = re.compile(r'headshot|agent-|/agents?/|avatar|profile|team-|staff|broker-', re.IGNORECASE)
+
+
+def _is_listing_host(host: str) -> bool:
+    h = (host or "").lower()
+    return any(lh in h for lh in _LISTING_HOSTS)
 
 
 def extract_images(html: str, source_url: str, per_page: int = 3) -> list[dict]:
@@ -201,6 +217,8 @@ def extract_images(html: str, source_url: str, per_page: int = 3) -> list[dict]:
     seen: set[str] = set()
     out: list[dict] = []
 
+    if not _is_listing_host(host):
+        return []  # 非房源站：直接不要图，宁缺毋假
     def _add(url: str, caption: str) -> None:
         if not url or url.startswith("data:"):
             return
@@ -209,6 +227,8 @@ def extract_images(html: str, source_url: str, per_page: int = 3) -> list[dict]:
             return
         if _JUNK_IMG_RE.search(u):
             return
+        if _FACE_IMG_RE.search(u):
+            return  # 经纪人/人像照不要
         if u in seen:
             return
         seen.add(u)
@@ -633,12 +653,18 @@ def run_photos_pipeline(address: str, log: list | None = None) -> dict:
                 return {"photos": f["value"], "cached": True}
     photos, seen = [], set()
     try:
-        for r in ddg_search(f'"{addr}"', log, max_results=5):
+        results = list(ddg_search(f'"{addr}"', log, max_results=8))
+        # 房源站优先：先抓挂牌站，非房源站不抓（省配额、杜绝假图）
+        results.sort(key=lambda r: 0 if _is_listing_host(
+            (urllib.parse.urlparse(r["url"]).hostname or "").lower()) else 1)
+        for r in results:
             if len(photos) >= 3:
                 break
             host = (urllib.parse.urlparse(r["url"]).hostname or "").lower()
             if any(b in host for b in ("facebook.com", "linkedin.com", "youtube.com")):
                 continue
+            if not _is_listing_host(host):
+                continue  # 非房源站：不抓，宁缺毋假
             page = fetch_page(r["url"], log)
             if not page.get("ok"):
                 continue
