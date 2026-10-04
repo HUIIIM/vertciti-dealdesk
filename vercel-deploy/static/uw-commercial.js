@@ -640,6 +640,32 @@ async function init() {
     syncInputs(); renderAll(false);
     refreshList();
   });
+  // ---- 报告导出：当前页面 state（未保存也行）-> 服务端 PDF 下载 ----
+  async function exportReport(variant, btn) {
+    const label = btn.textContent;
+    btn.disabled = true; btn.textContent = "生成中…";
+    try {
+      const r = await fetch("/api/uw/report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ input: state, variant }),
+      });
+      if (!r.ok) throw new Error("API " + r.status);
+      const blob = await r.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      const nm = (state.property && state.property.name) || "deal";
+      a.download = `DealDesk-商业核保-${variant === "classic" ? "经典版" : "增强版"}-${nm}.pdf`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    } catch (e) {
+      alert("报告生成失败（网络/服务异常），请稍后重试");
+    } finally {
+      btn.disabled = false; btn.textContent = label;
+    }
+  }
+  $("#btnReportClassic").addEventListener("click", (e) => exportReport("classic", e.currentTarget));
+  $("#btnReportEnhanced").addEventListener("click", (e) => exportReport("enhanced", e.currentTarget));
   $("#projSel").addEventListener("change", (e) => {
     if (e.target.value) loadProject(e.target.value);
   });
