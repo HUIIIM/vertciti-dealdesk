@@ -8,6 +8,10 @@
 #   TOPHAP_ACCESS_TOKEN / TOPHAP_TOKEN_EXPIRES_AT（production），然后
 #   vc-deploy 重新部署 vercel-deploy/ 目录。
 #
+# --push：跳过 ensure_fresh_token，直接把 .env 当前值推到 Vercel 并 redeploy。
+#   用于"已走浏览器手动重授权、.env 已是新 token"的情形（此时 ensure_fresh_token
+#   会判"还够用"而跳过推送）。token-watch cron 的步骤 2d 必须用此模式。
+#
 # 注意：token 明文只在 python 进程内存与 .env（600）里流转，
 # 本脚本的日志一律不打印 token 值。
 set -euo pipefail
@@ -21,6 +25,14 @@ if [ ! -x "$PY" ]; then
   echo "[tophap-auto-refresh] 找不到 $PY，中止" >&2
   exit 2
 fi
+
+PUSH_ONLY=0
+if [ "${1:-}" = "--push" ]; then
+  PUSH_ONLY=1
+  echo "[tophap-auto-refresh] --push 模式：跳过 ensure_fresh_token，直接推送 .env 当前值"
+fi
+
+if [ "$PUSH_ONLY" = "0" ]; then
 
 RESULT_JSON="$("$PY" - <<'EOF'
 import json, sys
@@ -39,8 +51,9 @@ if [ "$REFRESHED" != "1" ]; then
 fi
 
 echo "[tophap-auto-refresh] $REASON"
+fi # PUSH_ONLY=0
 
-# 刷新成功：把 .env 里的新值推到 Vercel（python 内读 .env，不经 shell 变量）
+# （--push 或刷新成功）把 .env 里的值推到 Vercel（python 内读 .env，不经 shell 变量）
 "$PY" - <<EOF
 import sys
 sys.path.insert(0, "$VC_LIB_DIR")
@@ -51,7 +64,7 @@ PROJECT = "vertciti-dealdesk"
 TEAM_SLUG = "vertciti"
 KEYS = ("TOPHAP_ACCESS_TOKEN", "TOPHAP_TOKEN_EXPIRES_AT")
 
-# .env 直接读（ensure_fresh_token 刚写过，是最新值）
+# .env 直接读（ensure_fresh_token 刚写过，或 --push 模式下是手动重授权的新值）
 env_map = {}
 with open("$REPO_ROOT/.env") as f:
     for line in f:
