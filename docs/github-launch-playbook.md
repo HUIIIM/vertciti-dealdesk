@@ -204,7 +204,7 @@ GitHub 反作弊会降权，HN 会封号。慢就是快。
 - 链接是 nofollow（不直接带来 SEO），价值 = 当天流量 + 被 newsletter/榜单收录的二次传播。
 - **给 DealDesk 的建议：暂缓。** 等满足三个条件再上：① 在线 demo 稳定跑顺；
   ② GitHub 200+ star（有社会证明）；③ 准备好英文 landing 文案和 demo 视频。
-  PH 当第二波弹药，而不是首发渠道。**（待董事长拍板，见第 6 章）**
+  PH 当第二波弹药，而不是首发渠道。**（D460/D505：智囊团快审→CEO 终裁，见第 6 章；不再等董事长拍板）**
 
 来源：yerdaulet-damir/awesome-solo-ai 的 2026 发射渠道复盘；
 dealpatrol/repofuse 的 Developer SaaS Growth Brief；
@@ -252,7 +252,7 @@ mxcorpin 的 Ossium vs Product Hunt 对比
 - **缺 Roadmap**：加一节"路线图"（下一步做什么），让人知道项目活着、往哪走。
 - **缺 FAQ**：3-5 个真问题（"和 Excel 比优势在哪？""数据准吗？""支持美国以外的房产吗？"）。
 - **缺对比表**：DealDesk vs 纯 Excel vs 房源网站估值，一张小表讲清定位。
-- **[待 GC/董事长确认]** README 现有一句"vertciti 正在为 AI agent 构建采购与协作基础设施"——
+- **[待 GC 会签确认；D460/D505 后不再经董事长]** README 现有一句"vertciti 正在为 AI agent 构建采购与协作基础设施"——
   "采购基础设施"表述与 D313 之后 N=1 主线（已撤销 AI 代采购线）有张力，
   建议改为 N=1 纯口径（如"vertciti 只做一件事：运营创始人的人生；DealDesk 是这套
   人生操作系统里负责房地产的部分"），改法待批。
@@ -416,7 +416,7 @@ GitHub 操作清单：
 | 3 | N=1 口径 | GC | README/release notes/About 全文禁词零命中（4.3 清单） |
 | 4 | 内容门禁 | CPO | README 5 件套齐（3.2）、demo GIF 可播、social preview 正常 |
 | 5 | 法务 | GC | LICENSE=MIT（待 GC 终定）、ATTRIBUTION 完整、免责声明就位 |
-| 6 | 创始人终裁 | 董事长 | 一句话：发 / 不发 |
+| 6 | CEO 终裁 | CEO | 四闸＋GC 会签全过即发（D460/D508：不再经董事长） |
 
 任一不过 → 公开延期，T-0 顺延。**这是铁律，不许"差不多就发"。**
 
@@ -442,12 +442,12 @@ T+7：发复盘帖（star 数、流量来源、学到的东西）——第二波
 
 ---
 
-## 6. 待董事长拍板的事项
+## 6. 待定事项（D460/D508：智囊团快审→CEO 终裁，不再经董事长）
 
-1. **Product Hunt 上不上**：建议暂缓（见 2.4），等 200+ star + demo 跑顺后当第二波弹药。拍板：上 / 不上 / 以后再议。
-2. **Telegram 群名**：候选：`DealDesk 用户交流群` / `DealDesk 中文核保群` / `vertciti · DealDesk`。拍板一个（群建好后群名难改）。
-3. **Discord 要不要**：README 写了"Discord 社区：即将上线"。建议第一阶段只做 Telegram（中文用户主阵地）+ GitHub Discussions（开发者），Discord 暂缓——三个群运营不过来等于三个死群。拍板：做 / 暂缓。
-4. **Release 版本号**：建议 v1.0.0（见 3.4）。备选 v0.1.0（更保守）。拍板一个。
+1. **Product Hunt 上不上**：建议暂缓（见 2.4），等 200+ star + demo 跑顺后当第二波弹药。决断（CEO）：上 / 不上 / 以后再议。
+2. **Telegram 群名**：候选：`DealDesk 用户交流群` / `DealDesk 中文核保群` / `vertciti · DealDesk`。决断（CEO）一个（群建好后群名难改）。
+3. **Discord 要不要**：README 写了"Discord 社区：即将上线"。建议第一阶段只做 Telegram（中文用户主阵地）+ GitHub Discussions（开发者），Discord 暂缓——三个群运营不过来等于三个死群。决断（CEO）：做 / 暂缓。
+4. **Release 版本号**：建议 v1.0.0（见 3.4）。备选 v0.1.0（更保守）。决断（CEO）一个。
 5. **README 那句"采购基础设施"**：改 N=1 纯口径还是保留？（见 3.2 灰区）拍板改法。
 6. **英文 Issue/PR 接不接**：仓库是中文项目，来了英文 issue 是回英文还是请对方用中文？建议：回英文（开源礼仪），代码注释保持中英双语关键处。拍板。
 7. **在线 demo 方案**：Vercel 公开部署（推荐，长期稳定）vs Codespace preview（临时）。拍板。
