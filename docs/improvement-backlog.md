@@ -6,23 +6,22 @@
 
 ## 待做（按优先级）
 
-1. [ ] 报告导出：Manny Khoshbin 经典版 + DealDesk 增强版（含 DSCR/IRR/保本出租率/退出分析），商业页一键导出当前未保存状态
-2. [ ] **Comps 独立模块**（学自 Crexi/CoStar/Dealpath，竞品研究 2026-10-02 Top1）：A 页旁新增 Comps 栏——结构化 comps 表（地址/成交价/日期/cap rate/$/SF/距离/来源必填）+ 三态标签（sold/under contract/for sale）+ 顶部统计条（n/中位 $/SF/四分位/分布直方图，纯前端）+ attach/pass（采用进估值依据/丢弃记理由）。验收：450 W 44th 能拉出 ≥3 条 comps（含来源标签），统计条数字与表格一致
-3. [ ] **一键 Tear Sheet**（学自 Dealpath，Top2）：intake 完成后自动生成 deal 一页纸——关键字段（价格/NOI/cap rate/全口径现金需求/月供/DSCR）+ 3 条 highlights + 1 条下一步建议；进 PDF 备忘录封面页。验收：任一已 intake deal 一键生成，不翻三栏可做 go/no-go
-4. [ ] **Intake 数据质量门**（学自 Dealpath/Cherre，Top3）：固定字段 schema（分 deal 类型版本）+ 每字段来源/页码/置信度 + validators.py 规则层（偏离 warn、不一致 fail），fail 清零才能进 underwriting；低置信标黄。验收：喂一份前后矛盾的 OM，fail 项正确拦截并标黄
-5. [ ] 商业页粘贴文本智能录取：粘贴 OM/flyer 文本 → 自动提取价格/面积/NOI/租户 → 填表（标卖方口径待验证）
-6. [ ] **Ownership 穿透树**（学自 Reonomy，Top4）：intake 自动生成 LLC→真人→可信度树（SoS 公开查询 + TopHap ownership + 标注 verified/待验证）；联系方式只走 verified 来源。验收：450 W 44th 显示完整穿透链，任一推断字段带[待验证]
-7. [ ] **Sell-readiness 卖方动机分**（学自 Reonomy，Top5）：0-100 规则分（持有>10年+25、maturity<24mo+30、refinance+15、lien/violation+20、同 zip 销售率↑+10），intake 输出字段，附每项信号来源。验收：3 个已知 deal 打分排序与人工判断一致
-8. [ ] 生产 PDF 解析换纯 Python 库（D2）：Vercel 无 poppler → 切 pypdf/pdfplumber 零系统依赖进 requirements.txt，消除"生产永远传不了 PDF"
-9. [ ] 误导性数字口径（D3/D4，D460 CEO 已定）：`_div` 零分母 / `_irr` 无解返回 None，前端统一渲染"N/A"（禁显示 0.00/0%）
-10. [ ] `monthly_payment` 与 `amort_payment` 百分制/小数制口径统一（埋雷）：审计发现两者利率口径不一致，静默错数风险
+1. [ ] **一键 Tear Sheet**（学自 Dealpath，Top2）：intake 完成后自动生成 deal 一页纸——关键字段（价格/NOI/cap rate/全口径现金需求/月供/DSCR）+ 3 条 highlights + 1 条下一步建议；进 PDF 备忘录封面页。验收：任一已 intake deal 一键生成，不翻三栏可做 go/no-go
+2. [ ] **Intake 数据质量门**（学自 Dealpath/Cherre，Top3）：固定字段 schema（分 deal 类型版本）+ 每字段来源/页码/置信度 + validators.py 规则层（偏离 warn、不一致 fail），fail 清零才能进 underwriting；低置信标黄。验收：喂一份前后矛盾的 OM，fail 项正确拦截并标黄
+3. [ ] 商业页粘贴文本智能录取：粘贴 OM/flyer 文本 → 自动提取价格/面积/NOI/租户 → 填表（标卖方口径待验证）
+4. [ ] **Ownership 穿透树**（学自 Reonomy，Top4）：intake 自动生成 LLC→真人→可信度树（SoS 公开查询 + TopHap ownership + 标注 verified/待验证）；联系方式只走 verified 来源。验收：450 W 44th 显示完整穿透链，任一推断字段带[待验证]
+5. [ ] **Sell-readiness 卖方动机分**（学自 Reonomy，Top5）：0-100 规则分（持有>10年+25、maturity<24mo+30、refinance+15、lien/violation+20、同 zip 销售率↑+10），intake 输出字段，附每项信号来源。验收：3 个已知 deal 打分排序与人工判断一致
+6. [ ] 生产 PDF 解析换纯 Python 库（D2）：Vercel 无 poppler → 切 pypdf/pdfplumber 零系统依赖进 requirements.txt，消除"生产永远传不了 PDF"
+7. [ ] 误导性数字口径（D3/D4，D460 CEO 已定）：`_div` 零分母 / `_irr` 无解返回 None，前端统一渲染"N/A"（禁显示 0.00/0%）
+8. [ ] `monthly_payment` 与 `amort_payment` 百分制/小数制口径统一（埋雷）：审计发现两者利率口径不一致，静默错数风险
+9. [ ] 商业页 390px 移动端 QA：新增"导出经典版/增强版"两按钮后 cmd-ctl 在 390px 是否溢出/可操作；商业页三栏在小屏不溢出。验收：真机/真浏览器 390px 逐项目检通过
+10. [ ] 商业页截图/图片录取（暂缓项回补）：上传房源截图 → OCR/视觉提取 → 填表（标卖方口径待验证）。验收：上传一张真实房源截图，价格/面积/租金字段正确提取并标待验证
 11. [ ] RentCast 激活：等董事长绑卡后接入 fallback 链实测（外部阻塞，不占每日名额）
 
 ## 暂缓（被 Top5 挤掉，未丢弃，消化完按序取回）
 
-- 商业页截图/图片录取：上传房源截图 → OCR/视觉提取 → 填表
 - 扫描版 PDF OCR：图片型 PDF 先 OCR 再走现有提取链路，明确提示"OCR 口径"
-- 移动端 390px + 平板布局 QA：商业页三栏在小屏不溢出、可操作
+- （移动端 390px QA 已升为待做第 10 项，含新导出按钮的 cmd-ctl 溢出检查）
 - Provider 并行调用：TopHap/RentCast/网页并行跑（缓存已缓解，优先级下降）
 - `fetch_page` 页面大小上限（大页面内存风险，P0 上传 OOM 同类）
 
@@ -38,6 +37,8 @@
 
 ## 已完成
 
+- 2026-10-04：Comps 独立模块上线（原台账第 1 项）。A 页新增②可比成交栏：TopHap CMA 一键拉取（新端点 POST /api/wb/comps/pull）+ 结构化表（三态标签 sold/under contract/for sale、成交价/日期/cap rate/$/SF/距离/来源必填）+ 顶部统计条（n/中位 $/SF/Q1/Q3/分布直方图，纯前端）+ attach/pass（丢弃须填理由）；估值/周边汇总只用已采用案例。证据：pytest 212 passed（11 新）+ 生产真浏览器 E2E：450 W 44th St 拉取 10 条 comps（全部来源标签 TopHap CMA · recorded sales），统计条 n=10/中位 $740/Q1 $484/Q3 $1078 与表格独立复算完全一致，丢弃/重新采用联动重算正确。证据文件：goals/vertcity-build-out/hidden_files/dealdesk-improvement-2026-10-04/
+- 2026-10-03：商业核保报告导出双版本落地（原台账第 1 项）。经典版=1:1 复刻 Manny Khoshbin 模板三表（PROPERTY OVERVIEW/Analysis/Cash Flow/Rent Roll，全部由引擎实时重算）；增强版=DealDesk 指标（DSCR×2/盈亏平衡出租率/IRR/股本倍数/持有期现金流+退出分析）；新端点 POST /api/uw/report（variant=classic|enhanced），商业页新增"导出经典版 PDF / 导出增强版 PDF"两按钮，一键导出当前未保存 state。附带修复：此前 vercel-deploy/app/pdf_uw.py 是未接线孤儿草稿（无端点无按钮无测试）——本次补齐字体容错（serverless 无字体不崩）、HTML 转义、NaN/None→"--"诚实标注、删死代码。证据：pytest 201 passed（1 deselect pre-existing test_address_pipeline_degradation）+ 9 新用例；生产 dpl_8WQHS4UDrA2hAdKJtcAKdu2hrJBB：真 deal（450 W 44th St, $4.35M）classic 3 页/enhanced 1 页 200+application/pdf，文本层含物业名/金额/DSCR/IRR/盈亏平衡出租率/持有期现金流，非法 variant 400。证据文件：goals/vertcity-build-out/hidden_files/dealdesk-improvement-2026-10-03/
 - 2026-10-02：竞品学习 5 家（Dealpath/Crexi/Reonomy/Cherre/CoStar）→ gap 清单 13 项 → Top5 并入本台账。报告：`docs/competitive-study-2026-10-02.md`
 - 2026-10-02：可靠性专队剩余项收尾验收——18 项修复全部确认已部署生产，抽查回归通过。证据：生产 `tax/estimate` 非字符串/inf/空 body → 422/422/200；伪造 PDF 上传 → 400；真实地址（450 W 44th St）→ 27 字段、TopHap MCP 主源；pytest 192 passed（1 deselect pre-existing）；`tophap-token-watch`（30m）+ `dealdesk-smoke-test`（每日）两 cron 均绿。未修复 P2×12 中：地址缓存、token 巡检已由最优解项目落地并生产验证；DDG 限流/fetch_page 上限/pipeline 总耗时上限/robots 异常缓存/merge 备注丢失/日志截断/geocode 超时/discover_tools 重复 initialize/partialMatch 检查/down_pct 歧义，仍在日常迭代池（本次已取 3 项补入待做 7/9/10）
 - 2026-10-02：地址结果缓存 24h 落地并生产验证（最优解项目）：生产重复查询 7363ms → 671ms，同 26 字段 TopHap 主源
