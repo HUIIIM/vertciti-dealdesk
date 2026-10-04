@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import math
 import os
+import re
+from datetime import date
+import io
 
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, Response
@@ -11,6 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 from . import db, image_intake, pdf_intake, pdf_report, pdf_uw, report, research_pipeline, scoring_commercial, scoring_residential, sensitivity, uw_commercial, workbench
+from . import commercial_plus, condition_adjust, confidence as conf_mod, excel_uw, verdict as verdict_mod
 from .data import hpi
 from .models import CommercialInput, ProjectCreate, ResidentialInput
 from .workbench import WbComp, WbProperty, WbResearch, WbScenario
@@ -216,8 +220,66 @@ def score_only(payload: ProjectCreate):
 
 
 @app.post("/api/sensitivity")
-def run_sensitivity(payload: ProjectCreate):
-    return sensitivity.run(payload.track, payload.input)
+def run_sensitivity(payload: dict):
+    """档位参数化：payload 可带 tiers{rate_bps, vacancy_pp, rent_pct, combo}；
+    不带 tiers 时保持 legacy 五档（旧链路零改动）。"""
+    track = payload.get("track")
+    data = payload.get("input", payload)
+    return sensitivity.run(track, data, payload.get("tiers"))
+
+
+# ---------------- Phase 3 新引擎：verdict / confidence / condition ----------------
+
+class _VerdictReq(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    track: str = "residential"
+    score: dict = {}
+    confidence: int = 0
+    evidence: dict = {}
+
+
+@app.post("/api/verdict")
+def api_verdict(req: _VerdictReq):
+    """verdict 三档引擎：住宅 值得买/再看看/别碰；商业 BUY/HOLD/PASS."""
+    try:
+        return verdict_mod.verdict(req.track, req.score, req.confidence, req.evidence)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+class _ConfidenceReq(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    track: str = "residential"
+    comps: list = []
+    evidence: dict = {}
+
+
+@app.post("/api/confidence")
+def api_confidence(req: _ConfidenceReq):
+    """Confidence Score 0-100（证据质量分，非推荐强度），公式公开."""
+    try:
+        return conf_mod.compute(req.track, req.comps, req.evidence)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+class _ConditionReq(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    subject_tier: str = "Average"
+    comp_tier: str = "Average"
+    comp_price: float = 0
+    basis: str = ""
+    rate: float | None = None
+
+
+@app.post("/api/condition/adjust")
+def api_condition_adjust(req: _ConditionReq):
+    """Condition Adjustment 五档规则：无依据不做调整."""
+    try:
+        return condition_adjust.adjust(req.subject_tier, req.comp_tier,
+                                       req.comp_price, req.basis, req.rate)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
 
 
 # ---------------- 商业核保工作台 (UW) ----------------
@@ -610,6 +672,174 @@ def wb_intake_extracted(task_id: str):
         raise HTTPException(404, "提取结果尚未生成，请稍后刷新")
     except ValueError as e:
         raise HTTPException(400, str(e))
+
+
+# ---------------- 商业核保增补（接 compute_all，零逻辑改动） ----------------
+
+@app.post("/api/uw/compute-plus")
+def uw_compute_plus(payload: dict):
+    """compute_all() ＋ 增补：Debt Yield / DSCR 双轨 / NOI 银行调整桥 /
+    LTV 双算 / 压力测试 / rent roll 摘要 / P0 缺口."""
+    data = payload.get("input", payload)
+    try:
+        return commercial_plus.compute_plus(
+            data,
+            loan_amount=payload.get("loan_amount"),
+            valuation_range=payload.get("valuation_range"),
+            market_vacancy_pct=payload.get("market_vacancy_pct"),
+            with_stress=bool(payload.get("with_stress", True)),
+        )
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(500, f"计算失败：{str(e)[:200]}")
+
+
+def _deal_slug(text: str) -> str:
+    """文件名 slug：中文地址用拼音；纯符号时回退短 hash."""
+    import hashlib
+    from pypinyin import lazy_pinyin
+    t = (text or "").strip()
+    parts = []
+    for ch in t:
+        if ch.isascii() and ch.isalnum():
+            parts.append(ch.lower())
+        elif "\u4e00" <= ch <= "\u9fff":
+            parts.extend(lazy_pinyin(ch))
+        elif ch in (" ", "-", "_"):
+            parts.append("-")
+    slug = re.sub(r"-+", "-", "".join(parts)).strip("-")[:40]
+    if not slug:
+        slug = hashlib.md5(t.encode()).hexdigest()[:8]
+    return slug
+
+
+@app.post("/api/uw/report/xlsx")
+def uw_report_xlsx(payload: dict):
+    """商业核保明细 Excel：总览/现金流/comps/假设；DSCR/IRR 用原生公式."""
+    data = payload.get("input", payload)
+    comps = payload.get("comps") or []
+    try:
+        r = uw_commercial.compute_all(data)
+        xbytes = excel_uw.build_uw_xlsx(r, data, comps=comps)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(500, f"报告生成失败：{str(e)[:200]}")
+    prop = r.get("property") or {}
+    slug = _deal_slug(prop.get("address") or prop.get("name") or "deal")
+    stamp = date.today().strftime("%Y%m%d")
+    fname = f"dealdesk_{slug}_{stamp}.xlsx"
+    from urllib.parse import quote
+    return Response(
+        content=xbytes,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition":
+                 f"attachment; filename={fname}; filename*=UTF-8''{quote(fname)}"},
+    )
+
+
+@app.get("/api/uw/rentroll/template.xlsx")
+def rentroll_template():
+    """rent roll 导入模板（Excel）：逐租户行，用户填完上传."""
+    from openpyxl import Workbook
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "rent_roll"
+    headers = ["单元", "租户", "面积SF", "月租金$", "租约开始(YYYY-MM-DD)",
+               "租约结束(YYYY-MM-DD)", "年递增%", "费用结构(NNN/Gross/ModGross)"]
+    ws.append(headers)
+    ws.append(["101", "示例租户", 1200, 3500, "2024-01-01", "2027-12-31", 3, "NNN"])
+    for i, w in enumerate([10, 20, 12, 12, 22, 22, 10, 26], start=1):
+        ws.column_dimensions[chr(64 + i)].width = w
+    import io
+    buf = io.BytesIO()
+    wb.save(buf)
+    return Response(
+        content=buf.getvalue(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=dealdesk_rentroll_template.xlsx"},
+    )
+
+
+@app.post("/api/uw/rentroll/parse")
+async def rentroll_parse(request: Request, file: UploadFile | None = File(None)):
+    """rent roll 导入：上传 Excel 模板 或 body 粘贴 {"rows": [...]}.
+
+    返回 uw 租户行格式（suite/tenant/sf/monthly_rent/lease_start/lease_end/
+    escalation/expense_structure），可直接塞进 compute input.tenants。
+    无 rent roll 时商业 verdict 最高 HOLD（由 verdict 引擎执行）。
+    """
+    rows: list[dict] = []
+    if file is not None:
+        _check_upload_size(request, 5 * 1024 * 1024, "rent roll")
+        data = await file.read()
+        if len(data) > 5 * 1024 * 1024:
+            raise HTTPException(400, "文件超过 5MB 上限")
+        try:
+            from openpyxl import load_workbook
+            wb = load_workbook(io.BytesIO(data), data_only=True)
+            ws = wb.active
+            vals = list(ws.iter_rows(values_only=True))
+        except Exception as e:  # noqa: BLE001
+            raise HTTPException(400, f"Excel 解析失败：{str(e)[:120]}")
+        if len(vals) < 2:
+            raise HTTPException(400, "模板为空（至少需要表头＋1 行）")
+        header = [str(h or "").strip() for h in vals[0]]
+        def col(*names):
+            for n in names:
+                if n in header:
+                    return header.index(n)
+            return None
+        c_suite = col("单元", "suite"); c_tenant = col("租户", "tenant")
+        c_sf = col("面积SF", "sf"); c_rent = col("月租金$", "月租金", "monthly_rent")
+        c_start = col("租约开始(YYYY-MM-DD)", "租约开始", "lease_start")
+        c_end = col("租约结束(YYYY-MM-DD)", "租约结束", "lease_end")
+        c_esc = col("年递增%", "escalation"); c_exp = col("费用结构(NNN/Gross/ModGross)", "费用结构")
+        for line in vals[1:]:
+            if not any(line):
+                continue
+            get = lambda c: line[c] if c is not None and c < len(line) else ""
+            rows.append({
+                "suite": str(get(c_suite) or ""), "tenant": str(get(c_tenant) or ""),
+                "sf": get(c_sf) or 0, "monthly_rent": get(c_rent) or 0,
+                "lease_start": str(get(c_start) or "")[:10],
+                "lease_end": str(get(c_end) or "")[:10],
+                "escalation": str(get(c_esc) or ""),
+                "expense_structure": str(get(c_exp) or ""),
+            })
+    else:
+        body = await request.json()
+        for r0 in (body.get("rows") or []):
+            if isinstance(r0, dict):
+                rows.append(r0)
+    tenants = []
+    for r0 in rows:
+        try:
+            tenants.append({
+                "suite": str(r0.get("suite", "")),
+                "tenant": str(r0.get("tenant", "")),
+                "sf": float(r0.get("sf") or 0),
+                "monthly_rent": float(r0.get("monthly_rent") or 0),
+                "lease_start": str(r0.get("lease_start", ""))[:10],
+                "lease_end": str(r0.get("lease_end", ""))[:10],
+                "escalation": str(r0.get("escalation", "")),
+                "expense_structure": str(r0.get("expense_structure", "")),
+            })
+        except (TypeError, ValueError):
+            continue
+    return {
+        "tenants": tenants,
+        "count": len(tenants),
+        "total_monthly": round(sum(t["monthly_rent"] for t in tenants), 2),
+        "note": "租约明细待补充" if not tenants else "已导入，可进 compute_all().tenants",
+    }
+
+
+# ---------------- 统一 dashboard 路由 ----------------
+@app.get("/d", response_class=HTMLResponse)
+def dashboard_page():
+    """统一 dashboard（spec §2）：/d?addr=…&type=res|com."""
+    path = os.path.join(STATIC_DIR, "d.html")
+    if not os.path.exists(path):
+        raise HTTPException(404, "dashboard 未构建")
+    return HTMLResponse(open(path, encoding="utf-8").read())
 
 
 app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
