@@ -32,6 +32,11 @@ header.top .sub { color: var(--muted); font-size: 12.5px; margin-top: 6px; }
 .wb .tag.fc { background: var(--amber-dim); color: var(--amber); border: 1px solid rgba(251,191,36,.3); }
 .wb .disclaimer { background: var(--amber-dim); border: 1px solid rgba(251,191,36,.3); border-radius: 8px; padding: 10px 14px; font-size: 13px; color: var(--amber); margin: 10px 0; }
 .wb .neg { color: var(--red); font-weight: 700; } .wb .pos { color: var(--green); font-weight: 700; }
+.wb .photo-strip { display: flex; gap: 8px; overflow-x: auto; padding: 4px 2px 8px; margin: 6px 0 10px; }
+.wb .photo-item { flex: 0 0 auto; }
+.wb .photo-item img { height: 120px; width: auto; border-radius: 8px; display: block; background: var(--bg1); }
+.wb .photo-cap { font-size: 11px; color: var(--muted); margin-top: 3px; white-space: nowrap; }
+.wb .no-photo { font-size: 12px; color: var(--muted); margin: 6px 0 10px; }
 .wb .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
 .wb .kv { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; margin: 10px 0; }
 .wb .kv .cell { background: var(--bg1); border: 1px solid var(--line-soft); border-radius: 8px; padding: 10px 13px; font-size: 12.5px; color: var(--muted); }
@@ -65,6 +70,17 @@ header.top .sub { color: var(--muted); font-size: 12.5px; margin-top: 6px; }
 .wb input[type="file"] { font-size: 13px; color: var(--muted); }
 .wb input[type="file"]::file-selector-button { background: var(--surface2); color: var(--ink); border: 1px solid var(--line); border-radius: 7px; padding: 8px 14px; font-size: 13px; font-weight: 600; cursor: pointer; margin-right: 10px; font-family: inherit; }
 .wb input[type="file"]::file-selector-button:hover { border-color: var(--teal-deep); }
+/* Comps 模块：统计条/三态标签/丢弃行/直方图 */
+.wb .tag.fs { background: rgba(96,165,250,.14); color: #7cb3fb; border: 1px solid rgba(96,165,250,.35); }
+.wb .statbar { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.wb .statbar .cell { background: var(--bg1); border: 1px solid var(--line-soft); border-radius: 8px; padding: 8px 13px; font-size: 12px; color: var(--muted); }
+.wb .statbar .cell b { display: block; font-size: 17px; margin-top: 2px; color: var(--ink); font-variant-numeric: tabular-nums; font-weight: 800; }
+.wb svg.hist { width: 100%; height: 120px; background: var(--bg1); border: 1px solid var(--line-soft); border-radius: 8px; }
+.wb table.t tr.passed td { opacity: .55; background: rgba(148,163,184,.06); }
+.wb .passbox { display: flex; gap: 6px; align-items: center; margin-top: 4px; }
+.wb .passbox input { padding: 6px 9px; font-size: 12.5px; background: var(--bg1); border: 1px solid var(--line); border-radius: 6px; color: var(--ink); width: 180px; font-family: inherit; }
+.wb .btn.xs { padding: 5px 10px; font-size: 12px; margin: 2px 4px 2px 0; }
+.wb .src-badge { display: inline-block; font-size: 11px; color: var(--muted); background: rgba(148,163,184,.12); border-radius: 4px; padding: 1px 7px; white-space: nowrap; }
 </style>
 </head>
 <body>
@@ -132,17 +148,26 @@ header.top .sub { color: var(--muted); font-size: 12.5px; margin-top: 6px; }
   <div id="metrics-out"></div>
 </section>
 
-<section class="card" id="sec-val">
-  <h2 class="sec">② 估值<span class="tag est">估算</span></h2>
-  <div class="sec-sub">比较法（手动录入可比成交/挂牌，或 CSV 导入）＋ 收益法（NOI / cap rate）→ 调和估值。所有结果均为估算，不是承诺价格。</div>
-  <h4>可比案例</h4>
+<section class="card" id="sec-comps">
+  <h2 class="sec">② 可比成交 Comps <span class="tag est">估算</span></h2>
+  <div class="sec-sub">一键从 TopHap CMA 拉取可比成交（recorded sales 口径），或手动录入。统计条基于<strong>已采用</strong>案例实时计算；丢弃须填理由；所有价格均为公开记录，不构成承诺。</div>
+  <h4>一键拉取</h4>
+  <div class="grid" style="grid-template-columns: 1fr auto;">
+    <label class="f">标的地址<input id="c-pull-address" placeholder="如 450 W 44th St, New York, NY 10036"></label>
+    <label class="f">&nbsp;<button class="btn" onclick="WB.pullComps()">🔎 拉取可比成交</button></label>
+  </div>
+  <span class="src" id="pull-status"></span>
+  <h4>手动录入</h4>
   <div class="grid">
     <label class="f">地址<input id="c-address" placeholder="可比地址"></label>
-    <label class="f">状态<select id="c-status"><option value="sold">已成交 sold</option><option value="active">在售挂牌 active</option></select></label>
+    <label class="f">状态<select id="c-status"><option value="sold">已成交 sold</option><option value="under_contract">已签约 under contract</option><option value="for_sale">在售挂牌 for sale</option></select></label>
     <label class="f">价格 $<input id="c-price" type="number" min="0"></label>
+    <label class="f">成交/挂牌日期<input id="c-date" type="date"></label>
     <label class="f">面积 SF<input id="c-sf" type="number" min="0"></label>
     <label class="f">距离（英里）<input id="c-dist" type="number" min="0" step="0.1" value="0"></label>
     <label class="f">调整 %（可±）<input id="c-adj" type="number" step="0.5" value="0"></label>
+    <label class="f">年 NOI $（可选，算 cap rate）<input id="c-noi" type="number" min="0"></label>
+    <label class="f">来源（必填）<input id="c-source" placeholder="如 手动录入 / CoStar / Redfin"></label>
     <label class="f">备注<input id="c-note" placeholder="如：需大修 / 新装修"></label>
   </div>
   <button class="btn ghost" onclick="WB.addComp()">＋ 添加可比</button>
@@ -153,7 +178,14 @@ header.top .sub { color: var(--muted); font-size: 12.5px; margin-top: 6px; }
     <button class="btn ghost" onclick="WB.importCsv()">导入 CSV</button>
     <span class="src" id="csv-msg"></span>
   </div>
+  <div id="comps-stats"></div>
   <div id="comps-table"></div>
+  <p class="src">三态口径：已成交=登记成交价；已签约=签约价（仅参考）；在售挂牌=挂牌价（仅参考）。估值/统计只用<strong>已采用</strong>案例。</p>
+</section>
+
+<section class="card" id="sec-val">
+  <h2 class="sec">③ 估值<span class="tag est">估算</span></h2>
+  <div class="sec-sub">比较法（Comps 栏已采用案例，距离倒数加权）＋ 收益法（NOI / cap rate）→ 调和估值。所有结果均为估算，不是承诺价格。</div>
   <h4>收益法</h4>
   <div class="grid">
     <label class="f">年 NOI $（留空=用上面测算值）<input id="v-noi" type="number" min="0"></label>
@@ -165,7 +197,7 @@ header.top .sub { color: var(--muted); font-size: 12.5px; margin-top: 6px; }
 </section>
 
 <section class="card" id="sec-hpi">
-  <h2 class="sec">③ 历史涨幅</h2>
+  <h2 class="sec">④ 历史涨幅</h2>
   <div class="sec-sub">嵌入的公开房价指数数据（FHFA / FRED / NAR / BLS，本会话逐条核验）。指数是指数，不是房价；各市场序列新旧不同，已分别标注。</div>
   <label class="f" style="max-width:320px">选择市场
     <select id="hpi-market"></select>
@@ -179,7 +211,7 @@ header.top .sub { color: var(--muted); font-size: 12.5px; margin-top: 6px; }
 </section>
 
 <section class="card" id="sec-fc">
-  <h2 class="sec">④ 未来三年预测<span class="tag fc">情景预测</span></h2>
+  <h2 class="sec">⑤ 未来三年预测<span class="tag fc">情景预测</span></h2>
   <div class="disclaimer"><b>预测是情景假设，不是承诺。</b>下面三个情景的年涨幅假设均可手动修改；结果仅用于压力测试思路，不构成任何收益承诺。</div>
   <div class="grid">
     <label class="f">基准价值 $（默认=调和估值）<input id="f-base" type="number" min="0"></label>
@@ -192,14 +224,14 @@ header.top .sub { color: var(--muted); font-size: 12.5px; margin-top: 6px; }
 </section>
 
 <section class="card" id="sec-nearby">
-  <h2 class="sec">⑤ 周边价格</h2>
-  <div class="sec-sub">汇总第 ② 步录入的可比案例：价格 / $/SF / 面积 / 距离。数据全部来自你的录入，未录入=无数据，绝不编造。</div>
+  <h2 class="sec">⑥ 周边价格</h2>
+  <div class="sec-sub">汇总 Comps 栏中<strong>已采用</strong>的可比案例：价格 / $/SF / 面积 / 距离。数据来自 Comps 栏录入或 TopHap CMA 拉取，未录入=无数据，绝不编造。</div>
   <button class="btn ghost" onclick="WB.nearby()">汇总周边价格</button>
-  <div id="nearby-out"><p class="src">尚未汇总。请先在第 ② 步添加可比案例。</p></div>
+  <div id="nearby-out"><p class="src">尚未汇总。请先在 Comps 栏拉取或添加可比案例。</p></div>
 </section>
 
 <section class="card" id="sec-research">
-  <h2 class="sec">⑥ 市场调查</h2>
+  <h2 class="sec">⑦ 市场调查</h2>
   <div class="sec-sub">六个维度：供给 / 需求 / 空置 / 租金趋势 / 人口 / 就业。每项填内容＋来源链接（有来源才算"已核实"）。一键生成可打印报告。</div>
   <label class="f" style="max-width:320px">调查覆盖市场
     <select id="r-market"></select>
@@ -216,7 +248,7 @@ header.top .sub { color: var(--muted); font-size: 12.5px; margin-top: 6px; }
 </section>
 
 <section class="card" id="sec-score">
-  <h2 class="sec">⑦ 一键打分</h2>
+  <h2 class="sec">⑧ 一键打分</h2>
   <div class="sec-sub">把本工作台录入的物业映射到现有核保引擎打分（住宅 buyer-box v2.3 / 商业 v1.3）。映射只填字段，打分逻辑零改动。</div>
   <label class="f" style="max-width:320px">赛道
     <select id="s-track"><option value="residential">住宅</option><option value="commercial">商业</option></select>

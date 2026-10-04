@@ -13,7 +13,7 @@ import io
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from . import finance
 from .data import hpi
@@ -96,15 +96,42 @@ def property_metrics(p: WbProperty) -> dict:
 
 # ---------------- 可比成交 / 挂牌估值 ----------------
 
+COMP_STATUSES = ("sold", "under_contract", "for_sale")
+COMP_STATUS_LABELS = {"sold": "已成交", "under_contract": "已签约", "for_sale": "在售挂牌"}
+COMP_STATUS_NOTE = "sold=已成交（登记成交价），under_contract=已签约（签约价，供参考），for_sale=在售挂牌（挂牌价，仅参考）"
+
+
+def normalize_comp_status(v) -> str:
+    """可比状态归一化：兼容旧 active→for_sale，未知→sold。"""
+    v = str(v or "sold").strip().lower()
+    if v == "active":
+        return "for_sale"
+    return v if v in COMP_STATUSES else "sold"
+
+
 class WbComp(BaseModel):
     model_config = ConfigDict(extra="ignore")
     address: str = ""
-    status: str = "sold"  # sold | active
+    status: str = "sold"  # sold | under_contract | for_sale（兼容旧 active）
     price: float = Field(gt=0)
+    sale_date: str = ""   # 成交/签约/挂牌日期
     sf: float = Field(default=0, ge=0)
     distance_miles: float = Field(default=0, ge=0)
     adjustment_pct: float = Field(default=0, description="调整 %（百分制，可正可负）")
+    noi_annual: float = Field(default=0, ge=0,
+                              description="可比年 NOI（可选，>0 则算出 cap rate）")
+    source: str = ""      # 来源（必填，前端强制）
     note: str = ""
+
+    @field_validator("status")
+    @classmethod
+    def _norm_status(cls, v):
+        return normalize_comp_status(v)
+
+    @property
+    def cap_rate(self):
+        """可比 cap rate = NOI/年 / 价格；无 NOI 时为 None（前端渲染 N/A）。"""
+        return (self.noi_annual / self.price) if self.noi_annual and self.price else None
 
 
 def _r2(x):
@@ -147,7 +174,7 @@ def valuate_comps(comps: list[WbComp]) -> dict:
             "min": _r2(min(psfs)), "max": _r2(max(psfs)),
             "avg": _r2(sum(psfs) / len(psfs)),
         } if psfs else None,
-        "note": "权重=1/(1+距离英里)；status=sold 为已成交，active 为在售挂牌（仅参考）",
+        "note": "权重=1/(1+距离英里)；" + COMP_STATUS_NOTE,
     }
 
 
@@ -255,12 +282,13 @@ def series_stats(points: list[dict]) -> dict:
 
 # ---------------- CSV 解析（周边成交导入） ----------------
 
-COMP_CSV_COLUMNS = ["address", "status", "price", "sf", "distance_miles",
-                    "adjustment_pct", "note"]
+COMP_CSV_COLUMNS = ["address", "status", "price", "sale_date", "sf", "distance_miles",
+                    "adjustment_pct", "noi_annual", "source", "note"]
 
 
 def parse_comps_csv(text: str) -> dict:
-    """解析周边成交 CSV（表头见 COMP_CSV_COLUMNS；price 必填）."""
+    """解析周边成交 CSV（表头见 COMP_CSV_COLUMNS；price 必填；source 建议填）。
+    status 归一化（兼容旧 active→for_sale）。"""
     reader = csv.DictReader(io.StringIO(text.strip()))
     rows, errors = [], []
     for i, r in enumerate(reader, start=2):
@@ -270,11 +298,14 @@ def parse_comps_csv(text: str) -> dict:
                 raise ValueError("price 必须 > 0")
             rows.append({
                 "address": (r.get("address") or "").strip(),
-                "status": (r.get("status") or "sold").strip().lower(),
+                "status": normalize_comp_status(r.get("status") or "sold"),
                 "price": price,
+                "sale_date": (r.get("sale_date") or "").strip(),
                 "sf": float(str(r.get("sf") or 0).replace(",", "") or 0),
                 "distance_miles": float(str(r.get("distance_miles") or 0) or 0),
                 "adjustment_pct": float(str(r.get("adjustment_pct") or 0) or 0),
+                "noi_annual": float(str(r.get("noi_annual") or 0) or 0),
+                "source": (r.get("source") or "").strip(),
                 "note": (r.get("note") or "").strip(),
             })
         except Exception as e:  # noqa: BLE001
@@ -282,6 +313,70 @@ def parse_comps_csv(text: str) -> dict:
     return {"rows": rows, "errors": errors,
             "columns": COMP_CSV_COLUMNS,
             "template": ",".join(COMP_CSV_COLUMNS)}
+
+
+# ---------------- 可比成交一键拉取（TopHap CMA） ----------------
+
+COMPS_PULL_SOURCE = "TopHap CMA · recorded sales"
+
+
+def pull_comps(address: str) -> dict:
+    """按地址从 TopHap CMA 拉取可比成交（recorded sales 口径）。
+
+    返回 {"ok": True, rows, count, source, fetched_at, note}，
+    失败返回 {"ok": False, "error"}。每条来源必填、status=sold。"""
+    from . import tophap  # 延迟导入：避免与 research_pipeline 循环导入
+    address = (address or "").strip()
+    if not address:
+        return {"ok": False, "error": "地址为空"}
+    r = tophap.enrich_address(address)
+    if not r.get("ok"):
+        return {"ok": False, "error": r.get("note") or "TopHap 拉取失败"}
+    fetched_at = datetime.now().strftime("%Y-%m-%d %H:%M")
+    rows = []
+    for f in r.get("fields", []):
+        if f.get("key") != "tophap_comps":
+            continue
+        for c in (f.get("value") or []):
+            if not isinstance(c, dict):
+                continue
+            try:
+                price = float(c.get("price") or 0)
+            except (TypeError, ValueError):
+                price = 0
+            if price <= 0:
+                continue
+            sf = float(c.get("sqft") or 0)
+            ppsf = c.get("price_per_sqft")
+            if ppsf is None and sf > 0:
+                ppsf = price / sf
+            extra = []
+            if c.get("year_built"):
+                extra.append(f"建于 {int(float(c['year_built']))} 年")
+            if c.get("beds"):
+                extra.append(f"{int(float(c['beds']))} 卧")
+            if c.get("baths"):
+                extra.append(f"{int(float(c['baths']))} 卫")
+            rows.append({
+                "address": str(c.get("address") or ""),
+                "status": "sold",
+                "price": price,
+                "sale_date": str(c.get("date") or ""),
+                "sf": sf,
+                "price_per_sf": round(ppsf, 2) if ppsf else None,
+                "distance_miles": float(c.get("distance_mi") or 0),
+                "adjustment_pct": 0.0,
+                "noi_annual": 0.0,
+                "source": COMPS_PULL_SOURCE,
+                "note": "；".join(extra),
+                "fetched_at": fetched_at,
+            })
+    if not rows:
+        return {"ok": False,
+                "error": "TopHap CMA 未返回可比成交（该地址可能无近期 recorded sales）"}
+    return {"ok": True, "rows": rows, "count": len(rows),
+            "source": COMPS_PULL_SOURCE, "fetched_at": fetched_at,
+            "note": f"{len(rows)} 条可比成交（recorded sales 口径）；价格为登记成交价，非卖方报价"}
 
 
 # ---------------- 市场调查 ----------------

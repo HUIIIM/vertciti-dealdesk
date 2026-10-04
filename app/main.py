@@ -375,6 +375,11 @@ class _WbCsvReq(BaseModel):
     csv: str = ""
 
 
+class _WbCompsPullReq(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    address: str = ""
+
+
 class _WbScoreReq(BaseModel):
     model_config = ConfigDict(extra="ignore")
     track: str = "residential"
@@ -444,6 +449,17 @@ def wb_series(req: _WbSeriesReq):
 @app.post("/api/wb/comps/parse")
 def wb_comps_parse(req: _WbCsvReq):
     return workbench.parse_comps_csv(req.csv)
+
+
+@app.post("/api/wb/comps/pull")
+def wb_comps_pull(req: _WbCompsPullReq):
+    """按地址从 TopHap CMA 一键拉取可比成交（recorded sales 口径）。"""
+    if not (req.address or "").strip():
+        raise HTTPException(422, "地址不能为空")
+    r = workbench.pull_comps(req.address)
+    if not r.get("ok"):
+        raise HTTPException(502, f"拉取失败：{r.get('error')}")
+    return r
 
 
 @app.post("/api/wb/score")

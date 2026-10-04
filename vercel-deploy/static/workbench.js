@@ -54,34 +54,156 @@ WB.calcMetrics = async function () {
   } catch (e) { $('#metrics-out').innerHTML = `<p class="neg">测算失败：${esc(e.message)}</p>`; }
 };
 
-/* ---------- 可比案例 ---------- */
-WB.renderComps = function () {
-  const rows = WB.comps.map((c, i) =>
-    `<tr><td>${esc(c.address) || '—'}</td><td>${c.status === 'sold' ? '已成交' : '在售'}</td>`
-    + `<td>${money(c.price)}</td><td>${c.sf || '—'}</td>`
-    + `<td>${c.sf ? '$' + (c.price / c.sf).toFixed(0) : '—'}</td>`
-    + `<td>${c.distance_miles}</td><td>${c.adjustment_pct}%</td>`
-    + `<td>${esc(c.note)}</td><td><button class="btn ghost" onclick="WB.delComp(${i})">删</button></td></tr>`).join('');
-  $('#comps-table').innerHTML = WB.comps.length
-    ? `<table class="t"><tr><th>地址</th><th>状态</th><th>价格</th><th>SF</th><th>$/SF</th><th>距离(英里)</th><th>调整%</th><th>备注</th><th></th></tr>${rows}</table>`
-    : `<p class="src">暂无可比案例。</p>`;
+/* ---------- 可比成交 Comps（独立模块） ---------- */
+const COMP_STATUS = {
+  sold:          {label: '已成交', cls: 'est'},
+  under_contract:{label: '已签约', cls: 'fc'},
+  for_sale:      {label: '在售挂牌', cls: 'fs'},
 };
+const compStatusTag = s => {
+  const m = COMP_STATUS[s] || COMP_STATUS.sold;
+  return `<span class="tag ${m.cls}">${m.label}</span>`;
+};
+const compPpsf = c => {
+  if (c.price_per_sf) return Number(c.price_per_sf);
+  return c.sf ? c.price / c.sf : null;
+};
+const compCapRate = c => (c.noi_annual > 0 && c.price > 0)
+  ? (c.noi_annual / c.price * 100).toFixed(2) + '%' : '—';
+
+function medianOf(sorted) {
+  const n = sorted.length;
+  if (!n) return null;
+  return n % 2 ? sorted[(n - 1) / 2] : (sorted[n / 2 - 1] + sorted[n / 2]) / 2;
+}
+
+/* 纯函数：可比统计（中位 $/SF / 四分位 / 分布直方图分箱）。
+ * 输入：价格/SF 数组（已过滤）；Tukey 铰链法求四分位；输出 null=无有效数据。 */
+function compStatsOf(ppsfs) {
+  const v = ppsfs.filter(x => x != null && isFinite(x) && x > 0).sort((a, b) => a - b);
+  const n = v.length;
+  if (!n) return null;
+  const median = medianOf(v);
+  const lo = v.slice(0, Math.floor(n / 2)), hi = v.slice(Math.ceil(n / 2));
+  const q1 = medianOf(lo) ?? median, q3 = medianOf(hi) ?? median;
+  const mn = v[0], mx = v[v.length - 1];
+  const nb = 8, bins = [];
+  for (let i = 0; i < nb; i++) {
+    const a = mn + (mx - mn) * i / nb, b = mn + (mx - mn) * (i + 1) / nb;
+    const cnt = v.filter(x => (i === nb - 1 ? x <= b : x < b) && x >= a).length;
+    bins.push({lo: a, hi: b, count: cnt});
+  }
+  return {n, median, q1, q3, min: mn, max: mx, bins};
+}
+WB.compStatsOf = compStatsOf; // 供 node 自检调用
+
+WB.renderComps = function () {
+  const attached = WB.comps.filter(c => c.attached !== false);
+  const ppsfs = attached.map(compPpsf).filter(x => x != null);
+  const st = compStatsOf(ppsfs);
+  let hist = '';
+  if (st) {
+    const W = 560, H = 110, P = 8;
+    const mxc = Math.max(...st.bins.map(b => b.count), 1);
+    const bw = (W - 2 * P) / st.bins.length;
+    const bars = st.bins.map((b, i) => {
+      const h = Math.max(2, (H - 2 * P) * b.count / mxc);
+      const x = P + i * bw;
+      return `<rect x="${(x + 1).toFixed(1)}" y="${(H - P - h).toFixed(1)}" width="${(bw - 2).toFixed(1)}" height="${h.toFixed(1)}" fill="#2dd4bf" rx="2">`
+        + `<title>$${b.lo.toFixed(0)}–$${b.hi.toFixed(0)}/SF：${b.count} 个</title></rect>`
+        + `<text x="${(x + bw / 2).toFixed(1)}" y="${(H - 2).toFixed(1)}" font-size="9" text-anchor="middle" fill="#8a94a6">${b.count}</text>`;
+    }).join('');
+    hist = `<div style="margin-top:8px"><div class="src">$/SF 分布（已采用案例，${st.n} 个）</div>`
+      + `<svg class="hist" viewBox="0 0 ${W} ${H}">${bars}</svg></div>`;
+  }
+  $('#comps-stats').innerHTML = st
+    ? `<div class="statbar">`
+      + `<div class="cell">已采用案例<b>${st.n}</b></div>`
+      + `<div class="cell">中位 $/SF<b>$${st.median.toFixed(0)}</b></div>`
+      + `<div class="cell">Q1（25%）<b>$${st.q1.toFixed(0)}</b></div>`
+      + `<div class="cell">Q3（75%）<b>$${st.q3.toFixed(0)}</b></div>`
+      + `<div class="cell">区间<b>$${st.min.toFixed(0)} – $${st.max.toFixed(0)}</b></div>`
+      + `</div>` + hist
+    : `<p class="src">统计条：暂无已采用且带面积的案例。</p>`;
+
+  const rows = WB.comps.map((c, i) => {
+    const passed = c.attached === false;
+    const ops = passed
+      ? `<button class="btn xs ghost" onclick="WB.attachComp(${i})">重新采用</button><br><span class="src">丢弃理由：${esc(c.pass_reason || '未填')}</span>`
+      : (WB._passIdx === i
+        ? `<div class="passbox"><input id="pass-reason-${i}" placeholder="丢弃理由（必填）"><button class="btn xs warn" onclick="WB.confirmPassComp(${i})">确认丢弃</button><button class="btn xs ghost" onclick="WB.cancelPass()">取消</button></div>`
+        : `<button class="btn xs ghost" onclick="WB.attachPassAsk(${i})">丢弃</button>`);
+    return `<tr class="${passed ? 'passed' : ''}"><td>${esc(c.address) || '—'}</td>`
+      + `<td>${compStatusTag(c.status)}${passed ? ' <span class="src-badge">已丢弃</span>' : ''}</td>`
+      + `<td>${money(c.price)}</td><td>${esc(c.sale_date || '—')}</td>`
+      + `<td>${compCapRate(c)}</td>`
+      + `<td>${(() => { const p = compPpsf(c); return p ? '$' + p.toFixed(0) : '—'; })()}</td>`
+      + `<td>${c.distance_miles} 英里</td>`
+      + `<td>${c.source ? `<span class="src-badge">${esc(c.source)}</span>` : '<span class="neg">缺来源</span>'}</td>`
+      + `<td>${c.adjustment_pct}%</td><td>${esc(c.note || '')}</td>`
+      + `<td>${ops}<br><button class="btn xs ghost" onclick="WB.delComp(${i})">删</button></td></tr>`;
+  }).join('');
+  $('#comps-table').innerHTML = WB.comps.length
+    ? `<table class="t"><tr><th>地址</th><th>状态</th><th>价格</th><th>日期</th><th>cap rate</th><th>$/SF</th><th>距离</th><th>来源</th><th>调整%</th><th>备注</th><th>操作</th></tr>${rows}</table>`
+    : `<p class="src">暂无可比案例：点「拉取可比成交」或手动添加。</p>`;
+};
+WB.attachComp = i => { WB.comps[i].attached = true; delete WB.comps[i].pass_reason; WB._passIdx = -1; WB.renderComps(); };
+WB.attachPassAsk = i => { WB._passIdx = i; WB.renderComps(); const el = $('#pass-reason-' + i); if (el) el.focus(); };
+WB.cancelPass = () => { WB._passIdx = -1; WB.renderComps(); };
+WB.confirmPassComp = i => {
+  const v = ($('#pass-reason-' + i) || {}).value || '';
+  if (!v.trim()) { alert('请填写丢弃理由'); return; }
+  WB.comps[i].attached = false; WB.comps[i].pass_reason = v.trim(); WB._passIdx = -1; WB.renderComps();
+};
+WB.delComp = i => { WB.comps.splice(i, 1); WB.renderComps(); };
+WB.clearComps = () => { WB.comps = []; WB._passIdx = -1; WB.renderComps(); };
+WB._passIdx = -1;
+
 WB.addComp = function () {
   const price = num('c-price');
   if (!price) { alert('请填写价格'); return; }
+  const source = $('#c-source').value.trim();
+  if (!source) { alert('请填写来源（必填）'); return; }
   WB.comps.push({address: $('#c-address').value, status: $('#c-status').value, price,
-    sf: num('c-sf'), distance_miles: num('c-dist'), adjustment_pct: num('c-adj'), note: $('#c-note').value});
-  ['c-address','c-price','c-sf','c-dist','c-note'].forEach(id => $('#' + id).value = '');
-  $('#c-adj').value = 0; WB.renderComps();
+    sale_date: $('#c-date').value, sf: num('c-sf'), distance_miles: num('c-dist'),
+    adjustment_pct: num('c-adj'), noi_annual: num('c-noi'), source, note: $('#c-note').value,
+    attached: true});
+  ['c-address','c-price','c-date','c-sf','c-dist','c-note','c-source','c-noi'].forEach(id => $('#' + id).value = '');
+  $('#c-adj').value = 0; $('#c-source').value = '';
+  WB.renderComps();
 };
-WB.delComp = i => { WB.comps.splice(i, 1); WB.renderComps(); };
-WB.clearComps = () => { WB.comps = []; WB.renderComps(); };
+
+WB.pullComps = async function () {
+  let addr = $('#c-pull-address').value.trim();
+  if (!addr) { addr = $('#p-address').value.trim(); $('#c-pull-address').value = addr; }
+  if (!addr) { alert('请先输入标的地址'); return; }
+  const btn = document.querySelector('#sec-comps .btn');
+  $('#pull-status').textContent = '⏳ 从 TopHap CMA 拉取可比成交中（约 30–90 秒）…';
+  try {
+    const d = await post('/api/wb/comps/pull', {address: addr});
+    const seen = new Set(WB.comps.map(c => `${c.address}|${c.price}|${c.sale_date}`));
+    let added = 0;
+    for (const r of (d.rows || [])) {
+      const key = `${r.address}|${r.price}|${r.sale_date}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      WB.comps.push(Object.assign({}, r, {attached: true}));
+      added++;
+    }
+    WB.renderComps();
+    $('#pull-status').innerHTML = `✅ 拉取 <b>${d.rows.length}</b> 条（${esc(d.source)}，${esc(d.fetched_at)}），新增 ${added} 条。<span class="src">${esc(d.note)}</span>`;
+  } catch (e) {
+    $('#pull-status').innerHTML = `<span class="neg">拉取失败：${esc(e.message)}</span>`;
+  }
+};
+
 WB.importCsv = async function () {
   const t = $('#csv-input').value;
   if (!t.trim()) { $('#csv-msg').textContent = '请先粘贴 CSV'; return; }
   try {
     const d = await post('/api/wb/comps/parse', {csv: t});
-    WB.comps = WB.comps.concat(d.rows); WB.renderComps();
+    WB.comps = WB.comps.concat(d.rows.map(r => Object.assign({}, r, {attached: true})));
+    WB.renderComps();
     $('#csv-msg').textContent = `导入 ${d.rows.length} 条` + (d.errors.length ? `，${d.errors.length} 行失败：` + d.errors.slice(0, 3).join('；') : '');
   } catch (e) { $('#csv-msg').textContent = '导入失败：' + e.message; }
 };
@@ -89,8 +211,9 @@ WB.importCsv = async function () {
 WB.valuate = async function () {
   try {
     const noi = $('#v-noi').value === '' ? null : num('v-noi');
+    const attached = WB.comps.filter(c => c.attached !== false);
     const d = await post('/api/wb/valuate', {
-      property: propPayload(), comps: WB.comps,
+      property: propPayload(), comps: attached,
       income_noi_annual: noi, income_cap_rate_pct: num('v-cap') || null,
       comp_weight: num('v-w') / 100,
     });
@@ -102,7 +225,7 @@ WB.valuate = async function () {
       <table class="t"><tr><th>方法</th><th>价值</th><th>说明</th></tr>${crow}${irow}
       <tr><td><b>调和估值</b></td><td><b>${r.reconciled == null ? '—' : money(r.reconciled)}</b></td><td>${esc(r.note || '')}</td></tr></table>
       <p class="src">估算区间：${r.range ? money(r.range[0]) + ' – ' + money(r.range[1]) : '—'}。以上均为估算，不是承诺价格。</p>
-      <div class="disclaimer">比较法权重按 1/(1+距离英里) 计算；在售挂牌（active）仅供参考，不等同于成交价。</div>`;
+      <div class="disclaimer">比较法权重按 1/(1+距离英里) 计算，仅用 Comps 栏<strong>已采用</strong>案例；已签约（under contract）为签约价、在售挂牌（for sale）为挂牌价，均仅供参考。</div>`;
     const bv = $('#f-base'); if (!bv.value && r.reconciled) bv.value = Math.round(r.reconciled);
   } catch (e) { $('#val-out').innerHTML = `<p class="neg">估值失败：${esc(e.message)}</p>`; }
 };
@@ -203,13 +326,15 @@ WB.forecast = async function () {
 
 /* ---------- 周边价格 ---------- */
 WB.nearby = function () {
-  if (!WB.comps.length) { $('#nearby-out').innerHTML = '<p class="src">暂无可比案例，请先在第②步添加。</p>'; return; }
-  const rows = WB.comps.map(c => `<tr><td>${esc(c.address) || '—'}</td><td>${c.status === 'sold' ? '已成交' : '在售'}</td><td>${money(c.price)}</td><td>${c.sf ? '$' + (c.price / c.sf).toFixed(0) : '—'}</td><td>${c.sf || '—'}</td><td>${c.distance_miles} 英里</td></tr>`).join('');
-  const sold = WB.comps.filter(c => c.status === 'sold' && c.sf);
-  const avg = sold.length ? sold.reduce((a, c) => a + c.price / c.sf, 0) / sold.length : null;
+  const attached = WB.comps.filter(c => c.attached !== false);
+  if (!attached.length) { $('#nearby-out').innerHTML = '<p class="src">暂无已采用的可比案例，请先在 Comps 栏拉取或添加。</p>'; return; }
+  const rows = attached.map(c => `<tr><td>${esc(c.address) || '—'}</td><td>${(COMP_STATUS[c.status] || COMP_STATUS.sold).label}</td><td>${money(c.price)}</td><td>${(() => { const p = compPpsf(c); return p ? '$' + p.toFixed(0) : '—'; })()}</td><td>${c.sf || '—'}</td><td>${c.distance_miles} 英里</td></tr>`).join('');
+  const sold = attached.filter(c => c.status === 'sold');
+  const ppsfs = sold.map(compPpsf).filter(x => x != null);
+  const avg = ppsfs.length ? ppsfs.reduce((a, b) => a + b, 0) / ppsfs.length : null;
   $('#nearby-out').innerHTML = `<table class="t"><tr><th>地址</th><th>状态</th><th>价格</th><th>$/SF</th><th>面积SF</th><th>距离</th></tr>${rows}</table>
-    <p>已成交案例平均 <b>${avg ? '$' + avg.toFixed(0) + ' /SF' : '—'}</b>（${sold.length} 个有面积的已成交案例）</p>
-    <p class="src">数据来源：用户录入${WB.comps.some(c => c.status === 'active') ? '（含在售挂牌，仅参考）' : ''}。未录入=无数据。</p>`;
+    <p>已成交案例平均 <b>${avg ? '$' + avg.toFixed(0) + ' /SF' : '—'}</b>（${sold.length} 个已成交，${ppsfs.length} 个有面积）</p>
+    <p class="src">数据来源：Comps 栏已采用案例${attached.some(c => c.status !== 'sold') ? '（含已签约/在售挂牌，仅参考）' : ''}。未录入=无数据。</p>`;
 };
 
 /* ---------- 市场调查 ---------- */
@@ -523,7 +648,7 @@ WB.init = async function () {
     $('#hpi-market').value = 'phoenix'; $('#r-market').value = 'tampa';
     $('#hpi-market').onchange = WB.renderMarket;
     WB.renderMarket();
-    $('#csv-template').textContent = 'address,status,price,sf,distance_miles,adjustment_pct,note';
+    $('#csv-template').textContent = 'address,status,price,sale_date,sf,distance_miles,adjustment_pct,noi_annual,source,note';
     $('#sources-out').innerHTML = `<table class="t"><tr><th>名称</th><th>链接</th><th>说明</th></tr>`
       + WB.markets.public_sources.map(s => `<tr><td>${esc(s.name)}</td><td><a href="${esc(s.url)}" target="_blank">${esc(s.url)}</a></td><td>${esc(s.note)}</td></tr>`).join('') + `</table>
       <p class="src">发布：${esc(WB.markets.release)}（${esc(WB.markets.release_date)}前后）</p>`;
