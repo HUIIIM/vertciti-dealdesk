@@ -231,3 +231,85 @@ def build_uw_xlsx(result: dict, inputs: dict, comps: list | None = None,
     buf = io.BytesIO()
     wb.save(buf)
     return buf.getvalue()
+
+
+def build_res_xlsx(score: dict, inputs: dict, address: str,
+                   verdict: dict | None = None, confidence: dict | None = None,
+                   comps: list | None = None) -> bytes:
+    """住宅核保明细 Excel：总览 / 现金流 / comps / 假设."""
+    m = (score or {}).get("metrics") or {}
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "总览"
+    _hdr(ws, 1, ["项目", "数值", "说明"])
+    r = 2
+    r = _section(ws, r, "物业")
+    for label, val in (("地址", address or ""), ("收购价 $", _f((inputs or {}).get("price"))),
+                       ("报告日期", date.today().isoformat()),
+                       ("口径", "筛选辅助工具，不构成投资建议")):
+        _row(ws, r, label, val, None, MONEY2 if isinstance(val, float) else None); r += 1
+    r = _section(ws, r, "结论")
+    if verdict:
+        _row(ws, r, "verdict", verdict.get("verdict", ""), verdict.get("one_liner", "")); r += 1
+    if confidence:
+        _row(ws, r, "Confidence", confidence.get("score", ""),
+             "证据质量分，非推荐强度", None); r += 1
+    r = _section(ws, r, "关键指标")
+    for label, key, fmt, note in (
+            ("月现金流 $", "cash_flow_monthly", MONEY2, ""),
+            ("现金回报率 CoC", "cash_on_cash", PCT, "年净现金流 ÷ 全口径现金投入"),
+            ("月供 PITI $", "piti", MONEY2, ""),
+            ("DSCR", "dscr", "0.00", ""),
+            ("全口径现金需求 $", "cash_to_close", MONEY2, "首付＋交割＋储备金"),
+            ("空置假设", None, None, f"{_f((inputs or {}).get('vacancy_pct'))}%")):
+        v = _f(m.get(key)) if key else None
+        _row(ws, r, label, v, note, fmt); r += 1
+    ws.column_dimensions["A"].width = 26
+    ws.column_dimensions["B"].width = 22
+    ws.column_dimensions["C"].width = 44
+
+    cf = wb.create_sheet("现金流")
+    _hdr(cf, 1, ["项目", "月 $", "年 $"])
+    rent_m = _f((inputs or {}).get("monthly_rent"))
+    egi_m = _f(m.get("egi"))
+    rows = [("租金总收入", rent_m), ("有效总收入 EGI", egi_m),
+            ("营业费用", _f(m.get("opex"))), ("月供 PITI", _f(m.get("piti"))),
+            ("净现金流", _f(m.get("cash_flow_monthly")))]
+    rr = 2
+    for label, mv in rows:
+        _row(cf, rr, label, mv, mv * 12, fmt_b=MONEY2); rr += 1
+    cf.column_dimensions["A"].width = 22
+    cf.column_dimensions["B"].width = 16
+    cf.column_dimensions["C"].width = 16
+
+    cp = wb.create_sheet("comps")
+    _hdr(cp, 1, ["地址", "成交日", "成交价 $", "面积 SF", "$/SF", "来源"])
+    r = 2
+    for c in (comps or []):
+        cp.cell(row=r, column=1, value=c.get("address", "")).font = BODY_FONT
+        cp.cell(row=r, column=2, value=str(c.get("sale_date", ""))).font = BODY_FONT
+        for col, key in ((3, "price"), (4, "sf"), (5, "price_per_sf")):
+            cell = cp.cell(row=r, column=col, value=_f(c.get(key)))
+            cell.number_format = MONEY2; cell.font = BODY_FONT
+        cp.cell(row=r, column=6, value=c.get("source", "")).font = BODY_FONT
+        r += 1
+    if r == 2:
+        cp.merge_cells("A2:F2"); cp["A2"] = "暂无 comps"; cp["A2"].font = BODY_FONT
+
+    ax = wb.create_sheet("假设")
+    _hdr(ax, 1, ["假设项", "值", "备注"])
+    r = 2
+    for k, v in (inputs or {}).items():
+        if isinstance(v, (dict, list)):
+            continue
+        ax.cell(row=r, column=1, value=str(k)).font = BODY_FONT
+        cell = ax.cell(row=r, column=2, value=v if isinstance(v, (int, float)) else str(v))
+        cell.font = BODY_FONT
+        ax.cell(row=r, column=3, value="用户输入").font = BODY_FONT
+        r += 1
+    for i, w in enumerate([26, 22, 30], start=1):
+        ax.column_dimensions[get_column_letter(i)].width = w
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()

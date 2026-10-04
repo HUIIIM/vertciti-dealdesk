@@ -234,7 +234,7 @@ class _VerdictReq(BaseModel):
     model_config = ConfigDict(extra="ignore")
     track: str = "residential"
     score: dict = {}
-    confidence: int = 0
+    confidence: float = 0
     evidence: dict = {}
 
 
@@ -830,6 +830,72 @@ async def rentroll_parse(request: Request, file: UploadFile | None = File(None))
         "total_monthly": round(sum(t["monthly_rent"] for t in tenants), 2),
         "note": "租约明细待补充" if not tenants else "已导入，可进 compute_all().tenants",
     }
+
+
+# ---------------- 统一 dashboard 导出：备忘录 PDF / 住宅 Excel ----------------
+
+class _MemoReq(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    track: str = "residential"
+    name: str = ""
+    address: str = ""
+    input: dict = {}
+    variant: str = "classic"
+
+
+@app.post("/api/memo/pdf")
+def memo_pdf(req: _MemoReq):
+    """投资备忘录 PDF（不入库）：住宅走 pdf_report 模板，商业走 pdf_uw 增强版."""
+    from urllib.parse import quote
+    try:
+        if req.track == "commercial":
+            r = uw_commercial.compute_all(req.input)
+            pdf_bytes = pdf_uw.build_uw_pdf(r, "enhanced")
+        else:
+            validated = validate_input("residential", req.input)
+            p = {"track": "residential", "name": req.name, "address": req.address,
+                 "input": validated, "score": score_input("residential", validated)}
+            pdf_bytes = pdf_report.build_pdf(p)
+    except HTTPException:
+        raise
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(500, f"报告生成失败：{str(e)[:200]}")
+    slug = _deal_slug(req.address or req.name or "deal")
+    fname = f"dealdesk_{slug}_{date.today().strftime('%Y%m%d')}.pdf"
+    return Response(
+        content=pdf_bytes, media_type="application/pdf",
+        headers={"Content-Disposition":
+                 f"attachment; filename={fname}; filename*=UTF-8''{quote(fname)}"},
+    )
+
+
+class _ResXlsxReq(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    score: dict = {}
+    input: dict = {}
+    address: str = ""
+    verdict: dict | None = None
+    confidence: dict | None = None
+    comps: list = []
+
+
+@app.post("/api/res/report/xlsx")
+def res_report_xlsx(req: _ResXlsxReq):
+    """住宅核保明细 Excel：总览/现金流/comps/假设."""
+    from urllib.parse import quote
+    try:
+        xbytes = excel_uw.build_res_xlsx(req.score, req.input, req.address,
+                                         req.verdict, req.confidence, req.comps)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(500, f"报告生成失败：{str(e)[:200]}")
+    slug = _deal_slug(req.address or "deal")
+    fname = f"dealdesk_{slug}_{date.today().strftime('%Y%m%d')}.xlsx"
+    return Response(
+        content=xbytes,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition":
+                 f"attachment; filename={fname}; filename*=UTF-8''{quote(fname)}"},
+    )
 
 
 # ---------------- 统一 dashboard 路由 ----------------

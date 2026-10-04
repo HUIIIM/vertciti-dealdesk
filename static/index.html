@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DealDesk · 一页纸的买房决策</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&display=swap">
+<link rel="stylesheet" href="/d.css">
+<style>
+.hero{text-align:center;padding:56px 16px 8px}
+.hero h1{font-size:32px;font-weight:800;margin:0 0 8px}
+.hero h1 .t{color:var(--teal)}
+.hero p{color:var(--ink2);margin:0 0 28px}
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:16px;max-width:880px;margin:0 auto}
+@media(max-width:720px){.duo{grid-template-columns:1fr}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:8px;
+  padding:28px;cursor:pointer;text-align:left;color:var(--ink);width:100%;font:inherit}
+.card:hover,.card.sel{border-color:var(--teal)}
+.card h2{font-size:20px;margin:0 0 4px}
+.card .mode{display:inline-block;font-size:12px;color:var(--teal);border:1px solid var(--teal);
+  border-radius:12px;padding:2px 10px;margin-bottom:12px}
+.card ul{margin:12px 0 0;padding-left:18px;color:var(--ink2);font-size:13px}
+.card li{margin:4px 0}
+.step2{max-width:680px;margin:28px auto 0;display:none}
+.step2.show{display:block}
+.biginput{width:100%;background:var(--bg1);border:1px solid var(--line);color:var(--ink);
+  border-radius:8px;padding:0 18px;min-height:60px;font-size:16px}
+.frow2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+@media(max-width:720px){.frow2{grid-template-columns:1fr}}
+.frow2 .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}
+.frow2 select,.frow2 input{width:100%;background:var(--bg1);border:1px solid var(--line);
+  color:var(--ink);border-radius:6px;min-height:44px;padding:0 12px;font-size:14px}
+.go{margin-top:16px;width:100%;min-height:52px;font-size:16px}
+.back{background:none;border:0;color:var(--muted);cursor:pointer;margin-top:12px;font-size:13px;min-height:44px}
+.foot{text-align:center;color:var(--muted);font-size:12px;margin:48px 0 24px}
+.foot a{color:var(--muted)}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <div class="hero">
+    <h1>DealDesk <span class="t">·</span> 一页纸的买房决策</h1>
+    <p>打开这个页面，3 秒知道买还是不买，再往下翻知道为什么。</p>
+  </div>
+
+  <div class="duo" id="duo">
+    <button class="card" data-type="res">
+      <h2>住宅 / 个人</h2><span class="mode">小白模式</span>
+      <p style="color:var(--ink2);margin:8px 0 0">买来自住或收租</p>
+      <ul><li>大白话结论：值得买 / 再看看 / 别碰</li>
+      <li>零术语，每个数字配"这意味着什么"</li><li>全程有人带着走</li></ul>
+    </button>
+    <button class="card" data-type="com">
+      <h2>商业</h2><span class="mode">专业模式</span>
+      <p style="color:var(--ink2);margin:8px 0 0">买来做生意或收租</p>
+      <ul><li>cap rate / NOI / DSCR / 压力测试全开</li>
+      <li>缺口明确标出来，不假装有数据</li><li>术语不解释，默认你懂</li></ul>
+    </button>
+  </div>
+
+  <div class="step2" id="step2">
+    <p style="color:var(--ink2)"><b id="step2Title">住宅</b> · 第一步：告诉我地址</p>
+    <input class="biginput" id="addrInput" placeholder="输入物业地址，或粘贴 Zillow / Redfin 房源链接"
+      autocomplete="off" aria-label="物业地址">
+    <div class="frow2" id="ptypeRow" hidden>
+      <div class="field"><label>物业类型（选填，用于调 comps 过滤器）</label>
+        <select id="ptype"><option value="">未选择</option><option>写字楼</option><option>零售</option><option>多户</option><option>工业</option></select></div>
+      <div class="field"><label>收购价 / 要价 $（选填，不填可在结果页补）</label>
+        <input id="askInput" type="number" min="0" placeholder="如 850000"></div>
+    </div>
+    <div class="frow2" id="askRowRes">
+      <div class="field"><label>收购价 / 要价 $（选填，不填可在结果页补）</label>
+        <input id="askInputRes" type="number" min="0" placeholder="如 850000"></div>
+    </div>
+    <button class="btn primary go" id="goBtn">开始分析</button>
+    <div class="steps" id="goSteps" style="display:none"></div>
+    <button class="back" id="backBtn">← 重选住宅 / 商业</button>
+  </div>
+
+  <p class="foot">筛选辅助工具，不构成投资建议。<br>
+    <a href="/res-legacy.html">旧版住宅</a> · <a href="/uw-commercial.html">旧版商业核保</a> · <a href="/workbench.html">旧版工作台</a>（只读，2026-11-03 下线）</p>
+</main>
+<script>
+const $ = s => document.querySelector(s);
+let type = null;
+document.querySelectorAll('.card').forEach(c => c.addEventListener('click', () => {
+  type = c.dataset.type;
+  document.querySelectorAll('.card').forEach(x => x.classList.remove('sel'));
+  c.classList.add('sel');
+  $('#step2').classList.add('show');
+  $('#step2Title').textContent = type === 'res' ? '住宅' : '商业';
+  $('#ptypeRow').hidden = type !== 'com';
+  $('#askRowRes').style.display = type === 'com' ? 'none' : '';
+  $('#addrInput').focus();
+  $('#step2').scrollIntoView({behavior: 'smooth', block: 'center'});
+}));
+$('#backBtn').addEventListener('click', () => {
+  $('#step2').classList.remove('show');
+  document.querySelectorAll('.card').forEach(x => x.classList.remove('sel'));
+  type = null;
+});
+function stepLine(el, label, state) {
+  el.innerHTML += `<div class="step ${state}"><span class="st">${state === 'run' ? '<span class="spin"></span>' : '✓'}</span><span>${label}</span></div>`;
+}
+$('#goBtn').addEventListener('click', () => {
+  const addr = $('#addrInput').value.trim();
+  if (!addr) { $('#addrInput').focus(); return; }
+  const ask = type === 'com' ? $('#askInput').value : $('#askInputRes').value;
+  const ptype = type === 'com' ? $('#ptype').value : '';
+  const box = $('#goSteps'); box.style.display = 'block'; box.innerHTML = '';
+  $('#goBtn').disabled = true;
+  const steps = ['正在拉取 TopHap 数据…', '正在跑 comps…', '正在打开决策单页…'];
+  let i = 0;
+  const tick = () => {
+    if (i > 0) box.children[i - 1].className = 'step done',
+      box.children[i - 1].querySelector('.st').textContent = '✓';
+    if (i >= steps.length) {
+      location.href = '/d?addr=' + encodeURIComponent(addr) + '&type=' + type
+        + (ask ? '&price=' + encodeURIComponent(ask) : '')
+        + (ptype ? '&ptype=' + encodeURIComponent(ptype) : '');
+      return;
+    }
+    stepLine(box, steps[i], 'run'); i++;
+    setTimeout(tick, 600);
+  };
+  tick();
+});
+$('#addrInput').addEventListener('keydown', e => { if (e.key === 'Enter') $('#goBtn').click(); });
+</script>
+</body>
+</html>
