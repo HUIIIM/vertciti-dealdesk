@@ -63,6 +63,12 @@ async function api(method, path, body) {
 const srcTag = k => k === 'g' ? '<span class="src g"><i></i>实数已验证</span>'
   : k === 'y' ? '<span class="src y"><i></i>估算待核验</span>'
   : '<span class="src w"><i></i>待接数据源</span>';
+/* B1-09①：数字强制口径后缀。real=实测(green) / est=估算(yellow) / tbd=待验证(white) / calc=测算(yellow)。
+   无口径数字不得渲染——调用方必须传口径。 */
+const caliberBadge = k => k === 'real' ? '<span class="caliber c-real">实测</span>'
+  : k === 'est' ? '<span class="caliber c-est">估算</span>'
+  : k === 'tbd' ? '<span class="caliber">待验证</span>'
+  : k === 'calc' ? '<span class="caliber c-est">测算</span>' : '';
 const pf = '<span class="pf">PF</span>';
 /* Phase 5 第八轮 P1：pro forma 预测数字旁的角标（与图例"角标 PF = 基于卖方预测（pro forma），非实数"承诺一致） */
 const pfSup = '<sup class="pf">PF</sup>';
@@ -723,7 +729,7 @@ function renderAll() {
   const v = state.verdict;
   const vd = verdictDisplay();
   $('#svWord').textContent = vd.word;
-  $('#svWord').className = 'sv-word ' + verdictClass(vd.word);
+  $('#svWord').className = 'sv-word ' + verdictClass(vd.code);
   // P0-3＋item 1：有否决项时 verdict 永不裸奔——否决徽标与 verdict 词同行
   $('#svVetoBadge').innerHTML = vetoBadgeHtml(vd.vetoes);
   const rec = state.valuation?.reconciled;
@@ -732,28 +738,38 @@ function renderAll() {
   const askInp = $('#askBarInput');
   if (askInp && document.activeElement !== askInp) askInp.value = getA('ask') || '';
 }
-function verdictClass(v) {
-  if (!v) return 'v-na';
-  if (['值得买', 'BUY'].includes(v)) return 'v-buy';
-  if (['再看看', 'HOLD'].includes(v)) return 'v-hold';
-  if (['别碰', 'PASS'].includes(v)) return 'v-pass';
-  /* Phase 5 第四轮 A1：否决态是独立的第 4 状态（红），不是三档词的后缀 */
-  if (['否决', 'VETO'].includes(v)) return 'v-veto';
-  return 'v-na';
+/* B1-06：唯一 verdict 口径表（与 app/verdict.py VERDICT_TAXONOMY 同源，单点定义）。
+   全站统一双语渲染："值得买 · BUY"。旧 divergent 口径（住宅纯中文／商业纯英文）作废。 */
+const VERDICT_TAX = [
+  {code:'BUY', zh:'值得买', cls:'v-buy'},
+  {code:'HOLD', zh:'再看看', cls:'v-hold'},
+  {code:'PASS', zh:'别碰', cls:'v-pass'},
+  {code:'VETO', zh:'一票否决', cls:'v-veto'},
+];
+const VERDICT_WORD2CODE = {'值得买':'BUY','再看看':'HOLD','别碰':'PASS','否决':'VETO','一票否决':'VETO','BUY':'BUY','HOLD':'HOLD','PASS':'PASS','VETO':'VETO'};
+function verdictBilingual(word) {
+  const code = VERDICT_WORD2CODE[word];
+  if (!code) return word;
+  const t = VERDICT_TAX.find(t => t.code === code);
+  return t ? `${t.zh} · ${t.code}` : word;
+}
+function verdictClass(code) {
+  const t = VERDICT_TAX.find(t => t.code === code);
+  return t ? t.cls : 'v-na';
 }
 /* Phase 5 第四轮 A1：否决态独立成第 4 状态——有否决时 verdict 主词不许再是三档词：
-   住宅显示"否决"（红），商业显示"VETO"（红），配"一票否决 ×N"徽标＋否决理由。
-   三档文案（值得买/再看看/别碰、BUY/HOLD/PASS）只在无否决时使用，一字不改。
-   熔断态（数据不足/需人工复核）不进否决态。 */
+   全 track 统一显示"一票否决 · VETO"（红），配"一票否决 ×N"徽标＋否决理由。
+   三档文案只在无否决时使用。熔断态（数据不足/需人工复核）不进否决态。 */
 const TIER_WORDS = ['值得买', '再看看', '别碰', 'BUY', 'HOLD', 'PASS'];
 function vetoCount() { return (state.score?.vetoes || []).length; }
 function verdictDisplay() {
   const v = state.verdict;
   const n = vetoCount();
-  const word = v ? v.verdict : '待计算';
-  if (v && n > 0 && !v.circuit_broken && TIER_WORDS.includes(word))
-    return {word: state.type === 'res' ? '否决' : 'VETO', vetoes: n};
-  return {word, vetoes: n};
+  const raw = v ? v.verdict : '待计算';
+  const code = VERDICT_WORD2CODE[raw] || null;
+  if (v && n > 0 && !v.circuit_broken && code && code !== 'VETO')
+    return {word: verdictBilingual('VETO'), code: 'VETO', vetoes: n};
+  return {word: code ? verdictBilingual(raw) : raw, code, vetoes: n};
 }
 function vetoBadgeHtml(n) {
   return n > 0 ? `<span class="veto-badge">一票否决 ×${n}</span>` : '';
@@ -806,7 +822,7 @@ function renderZone1() {
   const vd = verdictDisplay();
   const w = $('#vWord');
   w.textContent = vd.word;
-  w.className = 'verdict-word ' + verdictClass(vd.word);
+  w.className = 'verdict-word ' + verdictClass(vd.code);
   // Phase 5 第八轮 P1：pro forma 路径（商业无 rent roll）下 verdict 行里的 DSCR 预测数
   // 强制标注 PF 角标——verdict 文案本身不动（红线），只在数字旁加 <sup> 标记；
   // 有 rent roll（trailing 实数）路径不许加（别误伤）
@@ -828,10 +844,10 @@ function renderZone1() {
   }
   const rec = state.valuation?.reconciled;
   // P0-5：单点不许包装成区间（R4：注释按 $/SF 离散度条件化）
-  $('#vRange').textContent = valuationDisplay();
+  $('#vRange').innerHTML = valuationDisplay() + (rec ? caliberBadge('est') : '');
   const m = state.score?.metrics || {};
   const cash = m.cash_to_close ?? m.total_cash_required;
-  $('#vCash').textContent = cash ? '全口径现金需求 ≈ ' + fmt$(cash) + '（首付＋交割＋储备金）' : '';
+  $('#vCash').innerHTML = cash ? '全口径现金需求 ≈ ' + fmt$(cash) + caliberBadge('calc') + '（首付＋交割＋储备金）' : '';
   // Phase 5 第三轮 D11：0 首付默认值透明化——小白必须一眼看到当前按 0 首付测算
   const zeroDown = state.type === 'res' ? !(getA('down') > 0) : !(getA('downPct') > 0);
   $('#vZeroDown').textContent = zeroDown ? '当前按 0 首付（100% 贷款）测算 → 去 Zone 7 调整首付' : '';
@@ -853,6 +869,64 @@ function renderZone1() {
   const gaps = state.type === 'com' && state.uw ? state.uw.plus.p0_gaps : [];
   $('#z1Gaps').innerHTML = gaps.length
     ? `<div class="amber"><b>缺口（已保守降级）：</b><br>${gaps.map(g => '· ' + esc(g)).join('<br>')}</div>` : '';
+  // B1-07：verdict hero 下 5×5 敏感性矩阵（异步，不阻塞）
+  renderSensMatrix();
+}
+
+/* B1-07：verdict hero 下 5×5 敏感性矩阵。
+   商业 = 退出 cap × 租金增长率 → IRR（复用 state.sens，/api/com/sensitivity 原生 5×5）；
+   住宅 = 利率 × 空置率 → 月现金流（调 /api/sensitivity，tiers 必须为合法数组，P0-2 标量 422）。
+   失败静默不出表，绝不编数字。 */
+async function renderSensMatrix() {
+  const wrap = $('#sensMatrixWrap'), tbl = $('#sensMatrix');
+  if (!wrap || !tbl) return;
+  wrap.hidden = true; tbl.innerHTML = '';
+  try {
+    if (state.type === 'com') {
+      const s = state.sens;
+      if (!s || !s.cells || s.cells.length !== 5) return;
+      const offLbl = bps => (bps > 0 ? '+' : '') + bps + 'bps';
+      let h = '<thead><tr><th>租金增长 ＼ 退出 cap</th>';
+      s.exit_caps.forEach(c => { h += `<th>${fmtPct(c, 2)}</th>`; });
+      h += '</tr></thead><tbody>';
+      s.cells.forEach((row, i) => {
+        h += `<tr><th>${offLbl(s.growth_offsets_bps[i])}</th>`;
+        row.forEach((cell, j) => {
+          const v = cell.irr;
+          const cls = v == null ? 'sm-na' : (v >= 0 ? 'sm-pos' : 'sm-neg');
+          const base = (i === 2 && j === 2) ? ' style="outline:2px solid var(--teal)"' : '';
+          h += `<td class="${cls}"${base}>${fmtPct(v, 1)}</td>`;
+        });
+        h += '</tr>';
+      });
+      tbl.innerHTML = h + '</tbody>';
+      $('#sensMatrixNote').textContent = '格子 = IRR；中心格为当前基准假设。改价/改假设后点"重新计算"刷新。';
+    } else {
+      const input = buildScoreInput();
+      const tiers = {rate_bps: [-200, -100, 0, 100, 200],
+                     vacancy_pp: [-4, -2, 0, 2, 4],
+                     grid2d: ['rate_bps', 'vacancy_pp']};
+      const r = await api('POST', '/api/sensitivity', {track: 'residential', input, tiers});
+      const m = r && r.matrix;
+      if (!m || !m.cells || m.cells.length !== 5) return;
+      let h = '<thead><tr><th>空置 ＼ 利率</th>';
+      m.x_labels.forEach(l => { h += `<th>${esc(l)}</th>`; });
+      h += '</tr></thead><tbody>';
+      m.cells.forEach((row, i) => {
+        h += `<tr><th>${esc(m.y_labels[i])}</th>`;
+        row.forEach((cell, j) => {
+          const v = cell.cash_flow_monthly;
+          const cls = v == null ? 'sm-na' : (v >= 0 ? 'sm-pos' : 'sm-neg');
+          const base = (i === 2 && j === 2) ? ' style="outline:2px solid var(--teal)"' : '';
+          h += `<td class="${cls}"${base}>${fmt$(v)}</td>`;
+        });
+        h += '</tr>';
+      });
+      tbl.innerHTML = h + '</tbody>';
+      $('#sensMatrixNote').textContent = '格子 = 月现金流；中心格为当前基准假设。改价/改假设后点"重新计算"刷新。';
+    }
+    wrap.hidden = false;
+  } catch (e) { /* 静默，不出表 */ }
 }
 
 /* P0-2（2026-10-05）：打分等级用户可见显示：A/B/C/D → "X 档"，"否决"保持原样 */
@@ -863,8 +937,8 @@ function renderZone2() {
   const z2 = $('#z2'); z2.hidden = false;
   const m = state.score?.metrics || {};
   const cards = [];
-  const kpi = (label, val, sub, note, cls) =>
-    `<div class="kpi"><div class="k-label">${label}</div><div class="k-val ${cls || ''}">${val}</div>
+  const kpi = (label, val, sub, note, cls, cal) =>
+    `<div class="kpi"><div class="k-label">${label}</div><div class="k-val ${cls || ''}">${val}${caliberBadge(cal)}</div>
      <div class="k-sub">${sub || ''}</div>${note ? `<div class="k-note">${note}</div>` : ''}</div>`;
   cards.push(`<p class="zlabel">Zone 2 · 关键指标</p>`);
   if (state.type === 'res') {
@@ -880,8 +954,8 @@ function renderZone2() {
     } else {
       cfSub = '租金覆盖月供还有剩'; cfNote = '比存银行高，但要自己管租客'; cfCls = 'k-ok';
     }
-    cards.push(kpi('月现金流', fmt$(cf), cfSub, cfNote, cfCls));
-    cards.push(kpi('现金回报率 CoC', fmtPct(m.cash_on_cash), '年净现金流 ÷ 全口径现金投入', ''));
+    cards.push(kpi('月现金流', fmt$(cf), cfSub, cfNote, cfCls, 'calc'));
+    cards.push(kpi('现金回报率 CoC', fmtPct(m.cash_on_cash), '年净现金流 ÷ 全口径现金投入', '', '', 'calc'));
     // P0-14：月供为 0/未计算时不许显示"$0 vs $0 / 租金能覆盖 — 的月供"破损占位符
     // Phase 5 第七轮 #5（xiaobai）：租金未填时不许写"租金能覆盖 0% 的月供"——
     // 未知≠0，误读成"房子租不出去"。isDefaultA 判定用户亲手填过没有。
@@ -891,32 +965,32 @@ function renderZone2() {
       piti ? fmt$(getA('rent')) + ' vs ' + fmt$(piti) : '待计算',
       piti ? (rentMissing ? '租金待补，覆盖率无法计算（未知≠0）'
                          : '租金能覆盖 ' + (getA('rent') / piti * 100).toFixed(0) + '% 的月供（本息+税+保险）')
-           : '填要价并计算后显示', ''));
-    cards.push(kpi('空置假设', fmtPct(getA('vac') / 100), '租金打 ' + (100 - getA('vac')).toFixed(0) + ' 折计', ''));
+           : '填要价并计算后显示', '', '', piti ? 'calc' : 'tbd'));
+    cards.push(kpi('空置假设', fmtPct(getA('vac') / 100), '租金打 ' + (100 - getA('vac')).toFixed(0) + ' 折计', '', '', 'tbd'));
     // Phase 5 第七轮 #2（xiaobai）：打分卡必须与 Zone 1 的 deal 评分同步——
     // 此前重算后 state.score 已更新但 Zone 2 没有任何打分卡（只有"待计算"分支），
     // 造成"Zone 1 有 43 分、Zone 2 还在待计算"的脱节。
-    if (!state.score) cards.push(kpi('打分', '待计算', '填要价后计算（上方要价条）', ''));
+    if (!state.score) cards.push(kpi('打分', '待计算', '填要价后计算（上方要价条）', '', '', 'tbd'));
     else cards.push(kpi('打分', (state.score.total != null ? state.score.total : '—') + ' 分',
       'deal 评分（' + gradeDisplay(state.score.grade) + '），与 Zone 1 同源',
       // Phase 5 第七轮 #4（xiaobai）：首付 25% 后 43→28 反直觉——核验结论：
       // 15 分全掉在"首付比例"维度（浮动制：首付越低基础分越高，0%→15 分、25%→0 分），
       // 其余四维没变（租金缺失→现金流维本来就是 0 分；CoC 0 首付"未计算"→25% 后 -22.8% 仍 0 分）。
       // 打的是买盒"策略匹配度"（低首付高杠杆），不是"首付越高越危险"。
-      '首付维按浮动制打"策略匹配度"：首付越低基础分越高（0%→15 分、25%→0 分）；其余维度没变。多付首付≠更危险。'));
+      '首付维按浮动制打"策略匹配度"：首付越低基础分越高（0%→15 分、25%→0 分）；其余维度没变。多付首付≠更危险。', '', 'calc'));
   } else {
     const uw = state.uw?.plus, a = state.uw?.analysis || {};
     const hasRR = !!(uw && uw.has_rent_roll);
     const bankNoi = uw?.noi_bank_bridge?.bank_noi;
     const askV = getA('ask');
-    cards.push(kpi('价格', askV ? fmt$(askV) : '待填要价', '收购价/要价', ''));
+    cards.push(kpi('价格', askV ? fmt$(askV) : '待填要价', '收购价/要价', '', '', 'tbd'));
     // item 3：无 rent roll 时 NOI 也不许出现 $0 硬数字——与 DSCR 卡同理显示"待 rent roll"
     // Phase 5 第八轮 P1：无 rent roll = pro forma 路径，标准 NOI 是预测数——强制标注 PF 角标；
     // 有 rent roll 时是实数，不许加（别误伤）
     cards.push(kpi('NOI（双口径）',
       hasRR ? (bankNoi != null ? fmt$(bankNoi) : '—') : '待 rent roll',
       '银行口径' + (m.noi ? '；标准 NOI ' + fmt$(m.noi) + (hasRR ? '' : pfSup) : ''),
-      hasRR ? '' : '导入租约明细后计算（Zone 4）'));
+      hasRR ? '' : '导入租约明细后计算（Zone 4）', '', hasRR ? 'real' : 'tbd'));
     const capIn = bankNoi && getA('ask') ? bankNoi / getA('ask') : null;
     // Phase 5 第六轮微修复 #1（remote N2）：无 rent roll 时 bank_noi 是瀑布
     // 调整的残差（0 起扣管理费/储备金/空置调整，常为小负数），truthy 导致
@@ -924,14 +998,14 @@ function renderZone2() {
     const capDisp = hasRR ? fmtPct(capIn, 2) : '—';
     cards.push(kpi('Trailing cap', capDisp,
       hasRR ? '市场区间待接 ' + srcTag('w') : '待 rent roll（无 NOI，不单独出数）',
-      '单个 cap 数字不许单独出现'));
+      '单个 cap 数字不许单独出现', '', hasRR ? 'est' : 'tbd'));
     // P0-4/P0-7：无 rent roll 时 DSCR 不许显示 0.00x——显示"待 rent roll"
     if (hasRR) {
       const dd = uw.dscr_dual;
       const td = dd.trailing.dscr, pd = dd.proforma.dscr;
       cards.push(kpi('DSCR 双轨',
-        (td != null && isFinite(td) ? td.toFixed(2) : '—') + 'x / ' +
-        (pd != null && isFinite(pd) ? pd.toFixed(2) : '—') + 'x' + pf,
+        (td != null && isFinite(td) ? td.toFixed(2) : '—') + 'x' + caliberBadge('real') + ' / ' +
+        (pd != null && isFinite(pd) ? pd.toFixed(2) : '—') + 'x' + caliberBadge('est') + pf,
         'trailing 主 / pro forma 辅', dd.trailing.label,
         td >= 1.2 ? 'k-ok' : 'k-bad'));
       cards.push(kpi('Debt Yield', fmtPct(uw.debt_yield, 2),
@@ -1138,7 +1212,7 @@ function renderZone3() {
     ${bars || '<div class="empty">无 comps</div>'}
     <p class="zsub" style="margin-top:14px">comp 勾选器（勾选/剔除实时重算汇总）${sel.length} / ${comps.length} 选中 ·
       中位 $/SF ${medPsf ? fmtPsf(medPsf) : '—'}</p>
-    <table class="data"><thead><tr><th></th><th>地址</th><th class="num">成交价</th><th class="num">面积</th><th class="num">$/SF</th><th class="num">调整%</th></tr></thead>
+    <table class="data"><thead><tr><th></th><th>地址</th><th class="num">成交价 ${caliberBadge('real')}</th><th class="num">面积</th><th class="num">$/SF</th><th class="num">调整%</th></tr></thead>
     <tbody>${rows}</tbody></table>
     <p class="note">comps 只是起点，出价前请核验相似度/日期/位置/成色/市场动向。gross adjustment &gt; 25% 的 comp 已标黄。只认 recorded sales；listing 挂牌价不是证据。</p>
     ${state.type === 'com' ? renderRentCompsTab() : ''}`;

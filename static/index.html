@@ -69,7 +69,7 @@
 
   <div class="step2" id="step2">
     <p style="color:var(--ink2)"><b id="step2Title">住宅</b> · 第一步：告诉我地址</p>
-    <input class="biginput" id="addrInput" placeholder="输入物业地址，或粘贴 Zillow / Redfin 房源链接"
+    <input class="biginput" id="addrInput" placeholder="输入物业地址，或粘贴 Zillow / Redfin 房源链接或房源文本"
       autocomplete="off" aria-label="物业地址">
     <p class="addr-note" id="addrNote" hidden></p>
     <div class="frow2" id="ptypeRow" hidden>
@@ -170,19 +170,44 @@ function addrNote(msg, ok) {
   n.textContent = msg || '';
   n.className = 'addr-note' + (msg ? (ok ? ' ok' : ' err') : '');
 }
+/* B1-08：Zillow/Redfin 房源文本粘贴解析（URL 走既有 P1-2；纯文本走本解析）。
+   识别：价格（首个 $ 金额）、地址（门牌号＋街道＋州＋zip 行）。beds/baths/sqft
+   暂无线上字段可填，只做识别提示，不编数、不硬填。 */
+function parseListingText(t) {
+  const out = {};
+  const pm = t.match(/\$\s*([\d,]+(?:\.\d+)?)/);
+  if (pm) out.price = pm[1].replace(/,/g, '');
+  for (const line of t.split('\n')) {
+    const m = line.trim().match(/^(\d{1,6}\s+[A-Za-z0-9 .'\-]+?),\s*([A-Za-z .'\-]+),\s*([A-Z]{2})\s*(\d{5})/);
+    if (m) { out.addr = `${m[1]}, ${m[2]}, ${m[3]} ${m[4]}`; break; }
+  }
+  return out;
+}
+const looksLikeListing = t => /\$\s*[\d,]+/.test(t) && !looksLikeUrl(t);
 /* 粘贴链接时即时解析：成功→填地址＋提示，失败→诚实报错（输入框不留 URL） */
+/* 粘贴房源文本时解析：识别出地址/价格→自动填字段＋提示 */
 $('#addrInput').addEventListener('paste', e => {
   const t = ((e.clipboardData || window.clipboardData) || {}).getData('text') || '';
-  if (!looksLikeUrl(t)) return;
-  e.preventDefault();
-  const hit = parseListingUrl(t);
-  if (hit) {
-    $('#addrInput').value = hit.addr;
-    addrNote('已从链接识别地址：' + hit.addr + '（' + hit.src + '）', true);
-  } else {
-    $('#addrInput').value = '';
-    addrNote('无法识别该链接，请粘贴纯地址', false);
+  if (looksLikeUrl(t)) {
+    e.preventDefault();
+    const hit = parseListingUrl(t);
+    if (hit) {
+      $('#addrInput').value = hit.addr;
+      addrNote('已从链接识别地址：' + hit.addr + '（' + hit.src + '）', true);
+    } else {
+      $('#addrInput').value = '';
+      addrNote('无法识别该链接，请粘贴纯地址', false);
+    }
+    return;
   }
+  if (!looksLikeListing(t)) return;
+  e.preventDefault();
+  const p = parseListingText(t);
+  const filled = [];
+  if (p.addr) { $('#addrInput').value = p.addr; filled.push('地址'); }
+  if (p.price) { $('#askInput').value = p.price; filled.push('价格 $' + Number(p.price).toLocaleString('en-US')); }
+  if (filled.length) addrNote('已从房源文本识别：' + filled.join('、'), true);
+  else { $('#addrInput').value = ''; addrNote('未识别出地址/价格，请粘贴纯地址', false); }
 });
 $('#goBtn').addEventListener('click', () => {
   let addr = $('#addrInput').value.trim();

@@ -20,6 +20,29 @@ from __future__ import annotations
 RES_TIERS = ("值得买", "再看看", "别碰")
 COM_TIERS = ("BUY", "HOLD", "PASS")
 
+# B1-06：唯一 verdict 口径表（前后端同源，单点定义）。
+# code 为机读 canonical；zh 为中文展示；cls 为前端样式类。
+# 全站统一双语渲染："值得买 · BUY"。旧 divergent 口径（住宅纯中文／商业纯英文）作废。
+VERDICT_TAXONOMY = (
+    {"code": "BUY", "zh": "值得买", "cls": "v-buy"},
+    {"code": "HOLD", "zh": "再看看", "cls": "v-hold"},
+    {"code": "PASS", "zh": "别碰", "cls": "v-pass"},
+    {"code": "VETO", "zh": "一票否决", "cls": "v-veto"},
+)
+# 后端各 track 的词（含历史词"否决"）→ canonical code
+VERDICT_WORD2CODE = {
+    "值得买": "BUY", "再看看": "HOLD", "别碰": "PASS",
+    "否决": "VETO", "一票否决": "VETO",
+    "BUY": "BUY", "HOLD": "HOLD", "PASS": "PASS", "VETO": "VETO",
+}
+
+
+def verdict_display(word: str) -> str:
+    """B1-06：统一双语渲染。verdict_display("值得买") → "值得买 · BUY" """
+    code = VERDICT_WORD2CODE.get(word, word)
+    zh = next((t["zh"] for t in VERDICT_TAXONOMY if t["code"] == code), word)
+    return f"{zh} · {code}" if code in ("BUY", "HOLD", "PASS", "VETO") else word
+
 RES_USAGE = "筛选辅助工具，不构成投资建议。"
 COM_USAGE = ("投资筛选用，非 USPAP 合规评估报告，不能用于贷款/诉讼；"
              "未实地勘察、未审阅租约原件。")

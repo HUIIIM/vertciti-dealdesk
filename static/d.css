@@ -266,3 +266,18 @@ table.sens-table .sens-base{background:var(--teal-dim)}
   background:var(--teal-dim);border:1px solid var(--line);font-size:14px}
 .typenudge[hidden]{display:none}
 .typenudge .btn{padding:6px 12px;font-size:13px}
+
+/* B1-07：verdict hero 下 5×5 敏感性矩阵 */
+.sens-matrix-scroll{overflow-x:auto;margin:6px 0}
+.sens-matrix{border-collapse:collapse;font-size:12px;min-width:520px}
+.sens-matrix th,.sens-matrix td{border:1px solid var(--line);padding:6px 8px;text-align:right;white-space:nowrap}
+.sens-matrix th{background:var(--teal-dim);color:var(--ink2);font-weight:600;text-align:center}
+.sens-matrix td.sm-pos{color:var(--teal)}
+.sens-matrix td.sm-neg{color:#e5484d}
+.sens-matrix td.sm-na{color:var(--ink3)}
+/* B1-08：粘贴解析 toast */
+.paste-toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--teal-dim);border:1px solid var(--teal);color:var(--ink);padding:10px 18px;border-radius:8px;font-size:14px;z-index:9999}
+/* B1-09：口径后缀 badge */
+.caliber{display:inline-block;font-size:10px;padding:1px 6px;border-radius:3px;border:1px solid var(--line);color:var(--ink3);margin-left:6px;vertical-align:middle}
+.caliber.c-real{border-color:var(--teal);color:var(--teal)}
+.caliber.c-est{border-color:var(--amber);color:var(--amber)}

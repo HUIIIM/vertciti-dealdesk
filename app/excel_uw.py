@@ -611,6 +611,31 @@ def build_res_xlsx(score: dict, inputs: dict, address: str,
     for i, w in enumerate([26, 22, 30], start=1):
         ax.column_dimensions[get_column_letter(i)].width = w
 
+    # B1-07：敏感性 sheet（5×5：利率 × 空置率 → 月现金流），与 /d 矩阵同源
+    from app import scoring_residential as _sres
+    sx = wb.create_sheet("敏感性")
+    _hdr(sx, 1, ["空置 ＼ 利率"] + [f"{b:+d}bps" for b in (-200, -100, 0, 100, 200)])
+    _base_rate = _f((inputs or {}).get("rate"))
+    _base_vac = _f((inputs or {}).get("vacancy_pct"))
+    _sr = 2
+    for _y in (-4, -2, 0, 2, 4):
+        c0 = sx.cell(row=_sr, column=1, value=f"{_y:+d}pp")
+        c0.font = BODY_FONT; c0.border = BORDER
+        for _j, _x in enumerate((-200, -100, 0, 100, 200)):
+            _dd = dict(inputs or {})
+            _dd["rate"] = max(_base_rate + _x / 100, 0)
+            _dd["vacancy_pct"] = max(_base_vac + _y, 0)
+            try:
+                _mv = _f(_sres.compute_metrics(_dd).get("cash_flow_monthly"))
+            except Exception:
+                _mv = None
+            _cc = sx.cell(row=_sr, column=2 + _j, value=_mv)
+            _cc.number_format = MONEY2; _cc.font = BODY_FONT; _cc.border = BORDER
+        _sr += 1
+    sx.column_dimensions["A"].width = 16
+    for _j in range(2, 7):
+        sx.column_dimensions[get_column_letter(_j)].width = 14
+
     wb.calculation.fullCalcOnLoad = True  # R7：含原生公式，打开即重算
     buf = io.BytesIO()
     wb.save(buf)

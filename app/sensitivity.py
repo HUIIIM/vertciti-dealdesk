@@ -83,7 +83,33 @@ def residential_sensitivity(d: dict, tiers: dict | None = None) -> dict:
 
     return {"rent_table": rent_steps, "rate_table": rate_steps,
             "vacancy_table": vacancy_steps, "combo": combo,
-            "base": {"cash_flow_monthly": res.compute_metrics(base)["cash_flow_monthly"]}}
+            "base": {"cash_flow_monthly": res.compute_metrics(base)["cash_flow_monthly"]},
+            # B1-07：可选 5×5 二维矩阵（rate_bps × vacancy_pp → 月现金流/现金回报率）。
+            # 加法：不传 grid2d 则行为零改动；传了则返回 matrix。
+            **(_res_grid2d(base, tiers) or {})}
+
+
+def _res_grid2d(base: dict, tiers: dict) -> dict | None:
+    """B1-07：住宅 5×5 敏感性矩阵（利率 × 空置率 → 月现金流/现金回报率）。"""
+    if tiers.get("grid2d") != ["rate_bps", "vacancy_pp"]:
+        return None
+    xs = list(tiers["rate_bps"])[:5]
+    ys = list(tiers["vacancy_pp"])[:5]
+    cells = []
+    for y in ys:
+        row = []
+        for x in xs:
+            dd = copy.deepcopy(base)
+            dd["rate"] = max(base.get("rate", 0) + x / 100, 0)
+            dd["vacancy_pct"] = max(base.get("vacancy_pct", 8) + y, 0)
+            m = res.compute_metrics(dd)
+            row.append({"cash_flow_monthly": m["cash_flow_monthly"],
+                        "cash_on_cash": m["cash_on_cash"]})
+        cells.append(row)
+    return {"matrix": {"x": "rate_bps", "y": "vacancy_pp",
+                       "x_labels": [f"{x:+d}bps" for x in xs],
+                       "y_labels": [f"{y:+d}pp" for y in ys],
+                       "cells": cells}}
 
 
 def commercial_sensitivity(d: dict, tiers: dict | None = None) -> dict:

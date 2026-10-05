@@ -462,7 +462,7 @@ function renderDashboard(app) {
         <div class="panel"><div class="panel-h"><h2>实时动态</h2><span class="micro">本地记录</span></div>
           <ul class="feed">${feedItems || '<li><span class="muted">暂无动态</span></li>'}</ul></div>
         <div class="panel"><div class="panel-h"><h2>数据源</h2></div><div id="srcPanel">
-          <div class="src-row"><span>TopHap 公共记录</span><span class="micro">检测中…</span></div>
+          <div class="src-row"><span>TopHap 公共记录</span><span class="micro">采集中…</span></div>
           <div class="src-row"><span>全网公开页面搜集</span><span class="st ok">可用</span></div>
           <div class="src-row"><span>PDF / 截图 intake</span><span class="st ok">可用</span></div>
         </div></div>
