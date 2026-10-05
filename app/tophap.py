@@ -379,6 +379,24 @@ def _map_detail(rec: dict) -> list[dict]:
     nb_name = nb.get("name") if isinstance(nb, dict) else nb
     if nb_name:
         out.append(_new_field("neighborhood", str(nb_name), note="TopHap 社区划分"))
+    # P0-3 (2026-10-05): 主体一致性校验用——TopHap 模糊命中可能返回异地物业，
+    # pull_comps 用 subject_state/subject_city 与输入地址比对，不一致则拒收
+    subj_state = g("state", "stateCode", "province", "state_code")
+    subj_city = g("city", "town", "municipality", "cityName")
+    if not subj_state or not subj_city:
+        # 兜底：从完整地址字符串里解析 "…, City, ST …"
+        import re as _re
+        full_addr = g("address", "fullAddress", "propertyAddress") or ""
+        m = _re.search(r",\s*([A-Za-z .'\-]+?),\s*([A-Z]{2})(?:\s+\d{5})?", str(full_addr))
+        if m:
+            subj_city = subj_city or m.group(1).strip()
+            subj_state = subj_state or m.group(2)
+    if subj_state:
+        out.append(_new_field("subject_state", str(subj_state).upper(),
+                              note="TopHap 定位到的物业所在州（主体校验用）"))
+    if subj_city:
+        out.append(_new_field("subject_city", str(subj_city),
+                              note="TopHap 定位到的物业所在城市（主体校验用）"))
     beds = _num(g("beds"))
     if beds is not None:
         out.append(_new_field("beds", int(beds), note="TopHap 物业档案（公共记录）"))

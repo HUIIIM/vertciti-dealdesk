@@ -162,3 +162,51 @@ def test_valuate_accepts_three_statuses():
     d = r.json()
     assert d["comps"]["count"] == 3
     assert d["comps"]["estimate"] > 0
+
+
+# ---------- P0-3 回归：主体一致性校验（2026-10-05） ----------
+
+def _fake_enrich_virginia(address, log=None):
+    """模拟 TopHap 对无效 NY 地址模糊命中到 Virginia 物业。"""
+    fields = ([{"key": "subject_state", "value": "VA"},
+               {"key": "subject_city", "value": "Colonial Heights"}]
+              + _FAKE_CMA_FIELDS)
+    return {"ok": True, "fields": fields, "note": "fake fuzzy match"}
+
+
+def _fake_enrich_ny(address, log=None):
+    fields = ([{"key": "subject_state", "value": "NY"},
+               {"key": "subject_city", "value": "New York"}]
+              + _FAKE_CMA_FIELDS)
+    return {"ok": True, "fields": fields, "note": "fake"}
+
+
+def test_pull_comps_rejects_cross_state_fuzzy_match(monkeypatch):
+    # 实测用例：1 Zzz Qqq Lane, Xyzzy, NY 00000 → TopHap 返回 Virginia 物业
+    # 必须 ok:false + 中文报错，不许沉默返回异地 comps
+    monkeypatch.setattr(tophap, "enrich_address", _fake_enrich_virginia)
+    r = pull_comps("1 Zzz Qqq Lane, Xyzzy, NY 00000")
+    assert r["ok"] is False
+    assert "无法定位" in r["error"] and "VA" in r["error"]
+
+
+def test_pull_comps_accepts_matching_state(monkeypatch):
+    monkeypatch.setattr(tophap, "enrich_address", _fake_enrich_ny)
+    r = pull_comps("450 W 44th St, New York, NY 10036")
+    assert r["ok"] is True
+    assert r["count"] == 4
+
+
+def test_pull_comps_passthrough_without_subject_state(monkeypatch):
+    # subject_state 缺失（detail 环节被跳过）→ 无法校验则放行，不误杀
+    monkeypatch.setattr(tophap, "enrich_address", _fake_enrich_ok)
+    r = pull_comps("450 W 44th St, New York, NY 10036")
+    assert r["ok"] is True
+
+
+def test_parse_input_state():
+    from app.workbench import _parse_input_state
+    assert _parse_input_state("1 Zzz Qqq Lane, Xyzzy, NY 00000") == "NY"
+    assert _parse_input_state("450 W 44th St, New York, NY 10036") == "NY"
+    assert _parse_input_state("1200 Commerce St, Dallas, TX 75207") == "TX"
+    assert _parse_input_state("no state here") == ""

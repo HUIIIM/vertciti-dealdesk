@@ -222,10 +222,14 @@ def score_only(payload: ProjectCreate):
 @app.post("/api/sensitivity")
 def run_sensitivity(payload: dict):
     """档位参数化：payload 可带 tiers{rate_bps, vacancy_pp, rent_pct, combo}；
-    不带 tiers 时保持 legacy 五档（旧链路零改动）。"""
+    不带 tiers 时保持 legacy 五档（旧链路零改动）。
+    P0-2 (2026-10-05): tiers 非法（标量/错类型）→ 422 中文，不再 500 透出。"""
     track = payload.get("track")
     data = payload.get("input", payload)
-    return sensitivity.run(track, data, payload.get("tiers"))
+    try:
+        return sensitivity.run(track, data, payload.get("tiers"))
+    except ValueError as e:
+        raise HTTPException(422, f"敏感性分析参数错误：{e}")
 
 
 # ---------------- Phase 3 新引擎：verdict / confidence / condition ----------------
@@ -714,12 +718,22 @@ def _deal_slug(text: str) -> str:
 
 @app.post("/api/uw/report/xlsx")
 def uw_report_xlsx(payload: dict):
-    """商业核保明细 Excel：总览/现金流/comps/假设；DSCR/IRR 用原生公式."""
+    """商业核保明细 Excel：总览/现金流/comps/假设；DSCR/IRR 用原生公式.
+
+    Phase 5 第二轮 item 6：DSCR 分子用银行口径 NOI（前端经 compute-plus 算好传入，
+    与网页 KPI 卡 / PDF 同数）；无 rent roll 时传 null，Excel 回退并诚实标注。
+    """
     data = payload.get("input", payload)
     comps = payload.get("comps") or []
     try:
         r = uw_commercial.compute_all(data)
-        xbytes = excel_uw.build_uw_xlsx(r, data, comps=comps)
+        xbytes = excel_uw.build_uw_xlsx(r, data, comps=comps,
+                                        meta={"bank_noi": payload.get("bank_noi"),
+                                              # Phase 5 第三轮 A3：has_rent_roll 门＋verdict 行
+                                              "has_rent_roll": payload.get("has_rent_roll"),
+                                              "verdict": payload.get("verdict"),
+                                              "verdict_word": payload.get("verdict_word"),
+                                              "veto_count": payload.get("veto_count")})
     except Exception as e:  # noqa: BLE001
         raise HTTPException(500, f"报告生成失败：{str(e)[:200]}")
     prop = r.get("property") or {}
@@ -758,6 +772,40 @@ def rentroll_template():
     )
 
 
+def _parse_rr_date(v) -> str:
+    """rent roll 日期鲁棒解析（P0-13＋Phase 5 第二轮 item 14）：datetime/date 对象、
+    YYYY-MM-DD 文本、YYYY/MM/DD、"Jan 1, 2025" / "January 1, 2025" 英文文本均接受；
+    解析失败返回 ""（调用方计数，不静默吞掉整行）。"""
+    if v is None or v == "":
+        return ""
+    try:
+        from datetime import date as _date, datetime as _dt
+        if isinstance(v, _dt):
+            return v.date().isoformat()
+        if isinstance(v, _date):
+            return v.isoformat()
+    except Exception:
+        pass
+    s = str(v).strip()[:10].replace("/", "-")
+    try:
+        from datetime import date as _date
+        return _date.fromisoformat(s).isoformat()
+    except Exception:
+        pass
+    # 英文文本日期："Jan 1, 2025" / "January 1, 2025"（模板手填常见）
+    try:
+        from datetime import datetime as _dt
+        txt = str(v).strip()
+        for _fmt in ("%b %d, %Y", "%B %d, %Y"):
+            try:
+                return _dt.strptime(txt, _fmt).date().isoformat()
+            except ValueError:
+                continue
+    except Exception:
+        pass
+    return ""
+
+
 @app.post("/api/uw/rentroll/parse")
 async def rentroll_parse(request: Request, file: UploadFile | None = File(None)):
     """rent roll 导入：上传 Excel 模板 或 body 粘贴 {"rows": [...]}.
@@ -765,8 +813,12 @@ async def rentroll_parse(request: Request, file: UploadFile | None = File(None))
     返回 uw 租户行格式（suite/tenant/sf/monthly_rent/lease_start/lease_end/
     escalation/expense_structure），可直接塞进 compute input.tenants。
     无 rent roll 时商业 verdict 最高 HOLD（由 verdict 引擎执行）。
+
+    P0-13：模板示例行（"示例租户"）自动跳过并计数；日期解析失败只清空该字段
+    （计入 bad_dates），不静默吞掉租户行。
     """
     rows: list[dict] = []
+    skipped_example = 0  # P0-13：跳过的模板示例行数
     if file is not None:
         _check_upload_size(request, 5 * 1024 * 1024, "rent roll")
         data = await file.read()
@@ -796,11 +848,16 @@ async def rentroll_parse(request: Request, file: UploadFile | None = File(None))
             if not any(line):
                 continue
             get = lambda c: line[c] if c is not None and c < len(line) else ""
+            tenant_name = str(get(c_tenant) or "").strip()
+            # P0-13：模板示例行不是真实租户，直接跳过
+            if tenant_name == "示例租户" or tenant_name.startswith("示例"):
+                skipped_example += 1
+                continue
             rows.append({
-                "suite": str(get(c_suite) or ""), "tenant": str(get(c_tenant) or ""),
+                "suite": str(get(c_suite) or ""), "tenant": tenant_name,
                 "sf": get(c_sf) or 0, "monthly_rent": get(c_rent) or 0,
-                "lease_start": str(get(c_start) or "")[:10],
-                "lease_end": str(get(c_end) or "")[:10],
+                "lease_start": _parse_rr_date(get(c_start)),
+                "lease_end": _parse_rr_date(get(c_end)),
                 "escalation": str(get(c_esc) or ""),
                 "expense_structure": str(get(c_exp) or ""),
             })
@@ -808,17 +865,26 @@ async def rentroll_parse(request: Request, file: UploadFile | None = File(None))
         body = await request.json()
         for r0 in (body.get("rows") or []):
             if isinstance(r0, dict):
+                tn = str(r0.get("tenant", "")).strip()
+                if tn == "示例租户" or tn.startswith("示例"):
+                    skipped_example += 1
+                    continue
                 rows.append(r0)
     tenants = []
+    bad_dates = 0  # P0-13：日期解析失败的租户行数（字段置空，不丢行）
     for r0 in rows:
         try:
+            ls = _parse_rr_date(r0.get("lease_start", ""))
+            le = _parse_rr_date(r0.get("lease_end", ""))
+            if (r0.get("lease_start") or r0.get("lease_end")) and not (ls or le):
+                bad_dates += 1
             tenants.append({
                 "suite": str(r0.get("suite", "")),
                 "tenant": str(r0.get("tenant", "")),
                 "sf": float(r0.get("sf") or 0),
                 "monthly_rent": float(r0.get("monthly_rent") or 0),
-                "lease_start": str(r0.get("lease_start", ""))[:10],
-                "lease_end": str(r0.get("lease_end", ""))[:10],
+                "lease_start": ls,
+                "lease_end": le,
                 "escalation": str(r0.get("escalation", "")),
                 "expense_structure": str(r0.get("expense_structure", "")),
             })
@@ -827,6 +893,8 @@ async def rentroll_parse(request: Request, file: UploadFile | None = File(None))
     return {
         "tenants": tenants,
         "count": len(tenants),
+        "skipped_example": skipped_example,
+        "bad_dates": bad_dates,
         "total_monthly": round(sum(t["monthly_rent"] for t in tenants), 2),
         "note": "租约明细待补充" if not tenants else "已导入，可进 compute_all().tenants",
     }
@@ -841,20 +909,86 @@ class _MemoReq(BaseModel):
     address: str = ""
     input: dict = {}
     variant: str = "classic"
+    # P0-8：当前 deal 真实数据（前端传入）
+    verdict: dict | None = None
+    score: dict | None = None
+    comps: list = []
+    assumptions: dict = {}
+    # Phase 5 第四轮 B2：前端实际生效的假设清单（含默认值，标 is_default）
+    effective_assumptions: list = []
+    uw_input: dict | None = None  # 商业：compute-plus 同款富输入（含租户/假设）
+    # Phase 5 第四轮 A1：verdict 显示词（否决态为独立第 4 状态：住宅"否决"/商业"VETO"，
+    # 与网页 Zone 1 同源）、否决数、银行口径 trailing DSCR（与网页 KPI 卡同数）
+    verdict_word: str = ""
+    veto_count: int = 0
+    dscr_trailing: float | None = None
+    # Phase 5 第三轮 A2：有无 rent roll（前端 compute-plus has_rent_roll 门）
+    has_rent_roll: bool = False
+    # Phase 5 第五轮 C9：网页 Zone 1 的估值结论（前端 valuationDisplay() 同源文案），
+    # 备忘录 PDF 必须带上（放贷人必看）
+    valuation_display: str = ""
 
 
 @app.post("/api/memo/pdf")
 def memo_pdf(req: _MemoReq):
-    """投资备忘录 PDF（不入库）：住宅走 pdf_report 模板，商业走 pdf_uw 增强版."""
+    """投资备忘录 PDF（不入库）：住宅走 pdf_report 模板，商业走 pdf_uw 增强版.
+
+    P0-8：接到当前 deal 真实数据（verdict/KPI/comps/假设）；商业用 uw_input
+    富输入重算，不再导出全零模板。
+    """
     from urllib.parse import quote
     try:
+        deal = {"name": req.name, "address": req.address, "verdict": req.verdict,
+                "score": req.score, "comps": req.comps,
+                "assumptions": req.assumptions,
+                # Phase 5 第四轮 B2：PDF"关键假设"栏用此清单（含默认值标注）
+                "effective_assumptions": req.effective_assumptions,
+                "verdict_word": req.verdict_word, "veto_count": req.veto_count,
+                "dscr_trailing": req.dscr_trailing,
+                # Phase 5 第五轮 C9：估值结论进备忘录 PDF
+                "valuation_display": req.valuation_display,
+                # Phase 5 第三轮 A2：服务端兜底——前端没传时按 uw_input 有无租户判定
+                "has_rent_roll": req.has_rent_roll}
         if req.track == "commercial":
-            r = uw_commercial.compute_all(req.input)
-            pdf_bytes = pdf_uw.build_uw_pdf(r, "enhanced")
+            uw_in = req.uw_input or req.input
+            if not deal["has_rent_roll"]:
+                deal["has_rent_roll"] = bool((uw_in or {}).get("tenants"))
+            r = uw_commercial.compute_all(uw_in)
+            # Phase 5 第四轮 B2/B4：补上只有后端知道的生效假设——持有年数＋退出 cap
+            # （来源：用户输入/联动市场cap/默认），PDF"关键假设"栏必须列出
+            _eff = list(req.effective_assumptions or [])
+            _ex = (r.get("analysis") or {}).get("exit") or {}
+            if _ex:
+                _eff.append({"key": "hold_years", "label": "持有年数",
+                             "value": _ex.get("hold_years"),
+                             "display": f"{_ex.get('hold_years')} 年",
+                             "is_default": bool(_ex.get("hold_years_is_default"))})
+                _src = _ex.get("exit_cap_source") or "默认"
+                _eff.append({"key": "exit_cap_rate", "label": "退出 cap",
+                             "value": _ex.get("exit_cap_rate"),
+                             "display": f"{(_ex.get('exit_cap_rate') or 0) * 100:.2f}%"
+                                        + ("" if _src == "用户输入" else f"（{_src}）"),
+                             "is_default": _src == "默认"})
+            deal["effective_assumptions"] = _eff
+            # 富输入带上物业名/地址，避免"未命名物业"
+            prop = r.get("property") or {}
+            if not prop.get("name") and req.name:
+                prop["name"] = req.name
+            if not prop.get("address") and req.address:
+                prop["address"] = req.address
+            pdf_bytes = pdf_uw.build_uw_pdf(r, "enhanced", deal=deal)
         else:
             validated = validate_input("residential", req.input)
             p = {"track": "residential", "name": req.name, "address": req.address,
-                 "input": validated, "score": score_input("residential", validated)}
+                 "input": validated,
+                 "score": req.score or score_input("residential", validated),
+                 "verdict": req.verdict, "comps": req.comps,
+                 "assumptions": req.assumptions,
+                 # Phase 5 第四轮 B2：PDF"关键假设"栏用此清单（含默认值标注）
+                 "effective_assumptions": req.effective_assumptions,
+                 "verdict_word": req.verdict_word, "veto_count": req.veto_count,
+                 # Phase 5 第五轮 C9：估值结论进备忘录 PDF
+                 "valuation_display": req.valuation_display}
             pdf_bytes = pdf_report.build_pdf(p)
     except HTTPException:
         raise

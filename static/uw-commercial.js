@@ -69,7 +69,8 @@ function scenario(inp, baseRents, netSf, purchase, autoCam, autoPkg) {
   const pkgSrc = pkgMan ? "manual" : (f(autoPkg) ? "rent_roll" : "none");
   const totalPotential = baseRents + camRec + parking + other;
   const vacPct = f(inp.vacancy_pct);
-  const vacLoss = totalPotential * vacPct;
+  // P0-1 (2026-10-05): vacancy_pct 为百分制（0-100），统一 /100 转小数（与后端一致）
+  const vacLoss = totalPotential * vacPct / 100;
   const egi = totalPotential - vacLoss;
   const expenses = {};
   EXPENSES.forEach(([k]) => (expenses[k] = f(inp[k])));
@@ -519,8 +520,9 @@ function bindInputs() {
     if (e.target.closest("#btnFillVac")) {
       const rr = result.rent_roll;
       const impl = rr.total_sf_property ? rr.vacant_sf / rr.total_sf_property : 0;
-      state.historical.vacancy_pct = Math.round(impl * 10000) / 10000;
-      state.proforma.vacancy_pct = Math.round(impl * 10000) / 10000;
+      // P0-1 (2026-10-05): impl 为小数比率，转百分制存入 vacancy_pct（与后端口径一致）
+      state.historical.vacancy_pct = Math.round(impl * 10000) / 100;
+      state.proforma.vacancy_pct = Math.round(impl * 10000) / 100;
       syncInputs(); renderAll(false); markDirty();
     }
   });

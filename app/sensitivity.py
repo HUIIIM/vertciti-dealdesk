@@ -155,7 +155,36 @@ def commercial_sensitivity(d: dict, tiers: dict | None = None) -> dict:
             "vacancy_table": vacancy_steps, "combo": combo}
 
 
+def _validate_tiers(tiers: dict | None) -> dict | None:
+    """P0-2 (2026-10-05): tiers 参数校验，fail-closed。
+
+    tiers 为 None → 走 legacy 五档（合法）。
+    非 None 时必须为 dict；rate_bps/vacancy_pp/rent_pct 必须为数字数组
+    （标量如 200 会直接 422，不再 500 透出）；combo 必须为布尔值。
+    非法时抛 ValueError（中文），由 API 层转 422。
+    """
+    if tiers is None:
+        return None
+    if not isinstance(tiers, dict):
+        raise ValueError(f"tiers 应为对象，如 {{\"rate_bps\": [100,200,300]}}；收到 {type(tiers).__name__}")
+    for key in ("rate_bps", "vacancy_pp", "rent_pct"):
+        if key not in tiers:
+            continue
+        v = tiers[key]
+        if isinstance(v, (int, float)) and not isinstance(v, bool):
+            raise ValueError(
+                f"tiers.{key} 应为数组（如 [{int(v)}])，收到标量 {v}；"
+                f"文档口径：rate_bps/vacancy_pp/rent_pct 均为数组")
+        if not isinstance(v, (list, tuple)) or not all(
+                isinstance(x, (int, float)) and not isinstance(x, bool) for x in v):
+            raise ValueError(f"tiers.{key} 应为数字数组，收到 {v!r}")
+    if "combo" in tiers and not isinstance(tiers["combo"], bool):
+        raise ValueError(f"tiers.combo 应为 true/false，收到 {tiers['combo']!r}")
+    return tiers
+
+
 def run(track: str, d: dict, tiers: dict | None = None) -> dict:
+    _validate_tiers(tiers)
     if track == "residential":
         return residential_sensitivity(d, tiers)
     if track == "commercial":

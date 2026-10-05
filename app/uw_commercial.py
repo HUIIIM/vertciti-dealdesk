@@ -68,6 +68,11 @@ def compute_rent_roll(tenants: list[dict], vacant_sf: float = 0.0) -> dict:
             "monthly_parking": m_pkg,
             "annual_cam": m_cam * 12.0,
             "annual_parking": m_pkg * 12.0,
+            # P0-13：租期字段必须透传，否则 WALT/到期分析全空
+            "lease_start": str(t.get("lease_start") or "")[:10],
+            "lease_end": str(t.get("lease_end") or "")[:10],
+            "escalation": str(t.get("escalation") or ""),
+            "expense_structure": str(t.get("expense_structure") or ""),
         })
     total_sf = sum(r["sf"] for r in rows)
     total_monthly = sum(r["monthly_rent"] for r in rows)
@@ -115,7 +120,8 @@ def compute_scenario(inp: dict, base_rents: float, net_sf: float,
     other = _f(inp.get("other_income"))
     total_potential = base_rents + cam_rec + parking + other
     vacancy_pct = _f(inp.get("vacancy_pct"))          # NEW (template hardcoded 0)
-    vacancy_loss = total_potential * vacancy_pct
+    # P0-1 (2026-10-05): vacancy_pct 口径为百分制（0-100），此处统一 /100 转小数
+    vacancy_loss = total_potential * vacancy_pct / 100
     egi = total_potential - vacancy_loss
     expenses = {k: _f(inp.get(k)) for k in EXPENSE_KEYS}
     total_expenses = sum(expenses.values())
@@ -166,25 +172,31 @@ def compute_scenario(inp: dict, base_rents: float, net_sf: float,
 
 # ---------------------------------------------------------------- Analysis
 def amort_payment(loan: float, annual_rate: float, amort_years: float) -> float:
-    """Annual debt service for a fully amortizing loan."""
+    """Annual debt service for a fully amortizing loan（银行标准口径）.
+
+    按月摊还：月复利等额本息月供 × 12。此前为按年摊还（年复利），
+    DSCR 分母系统性偏大约 1.2%（2026-10-04 panel2 broker 实证：
+    $2.24M/6.5%/25年 按年 $183,638.52 vs 按月 $181,495.68）。
+    annual_rate 为小数（如 0.065）。
+    """
+    from app.finance import monthly_payment as _mp
     loan, annual_rate = _f(loan), _f(annual_rate)
     n = int(round(_f(amort_years)))
     if loan <= 0 or n <= 0:
         return 0.0
     if annual_rate <= 0:
         return loan / n
-    r = annual_rate
-    return loan * r / (1.0 - (1.0 + r) ** -n)
+    return _mp(loan, annual_rate * 100.0, n) * 12.0
 
 
 def remaining_balance(loan: float, annual_rate: float, amort_years: float,
                       payment: float, after_years: int) -> float:
-    """Outstanding principal after k annual payments (annual compounding)."""
-    bal = _f(loan)
-    r = _f(annual_rate)
-    for _ in range(max(0, after_years)):
-        bal = bal * (1.0 + r) - payment
-    return max(0.0, bal)
+    """Outstanding principal after k years（按月摊还，月复利；与 amort_payment 同口径）.
+
+    payment 参数保留做兼容（现按月供内部重算，不再使用传入的年供额）。
+    """
+    from app.finance import remaining_balance as _rbm
+    return _rbm(_f(loan), _f(annual_rate) * 100.0, _f(amort_years), after_years)
 
 
 def compute_analysis(a: dict, hist: dict, pro: dict) -> dict:
@@ -198,7 +210,9 @@ def compute_analysis(a: dict, hist: dict, pro: dict) -> dict:
 
     down_pct = _f(a.get("down_pct"))
     rate = _f(a.get("rate"))
-    amort_type = (a.get("amort_type") or "IO").upper()   # IO | AMORTIZING (NEW)
+    # P0-4（Phase 5）：默认全额本息摊还（AMORTIZING）。此前默认 IO（纯利息）但前端标注
+    # "全额本息"，口径不诚实（1.42x vs 真实 1.16x）。显式选 IO 时标注必须同步改为纯利息。
+    amort_type = (a.get("amort_type") or "AMORTIZING").upper()   # AMORTIZING | IO
     amort_years = _f(a.get("amort_years"), 30)
     loan_bal = purchase * (1.0 - down_pct)
     if amort_type == "AMORTIZING":
@@ -290,13 +304,27 @@ def compute_exit(a: dict, pro: dict, loan_bal: float, rate: float,
     """Hold-period exit: sale proceeds, IRR, equity multiple. NEW."""
     hold_years = int(round(_f(a.get("hold_years"), 5)))
     hold_years = max(1, min(hold_years, 50))  # 钳制 1-50 年：防极大值 DoS
+    hold_years_is_default = not _f(a.get("hold_years"))
     noi_growth = _f(a.get("noi_growth"), 0.02)
-    exit_cap = _f(a.get("exit_cap_rate"), 0.05)
+    # Phase 5 第四轮 B4：退出 cap 联动用户输入——显式填了退出 cap 用显式值；
+    # 没填但填了市场 cap 则联动市场 cap；都没填才用 5% 硬默认（PDF 标"默认"）。
+    # 此前永远 5% 且无标记（pro-investor：填了市场 cap 5.5% 仍印 5.00%）。
+    _exit_cap_raw = _f(a.get("exit_cap_rate"))
+    _mkt_cap_raw = _f(a.get("market_cap_rate"))
+    if _exit_cap_raw > 0:
+        exit_cap, exit_cap_source = _exit_cap_raw, "用户输入"
+    elif _mkt_cap_raw > 0 and not a.get("market_cap_rate_is_default"):
+        exit_cap, exit_cap_source = _mkt_cap_raw, "联动市场cap"
+    else:
+        exit_cap, exit_cap_source = 0.05, "默认"
     exit_fee_pct = 0.04  # 模板固定 4%（2026-10-01 Miao 决定锁定，不开放调节）
     abatements = _f(a.get("abatements"))
     if hold_years <= 0 or net_liquidity <= 0:
-        return {"hold_years": hold_years, "irr": 0.0, "equity_multiple": 0.0,
-                "sale_price": 0.0, "sale_proceeds": 0.0, "cash_flows": []}
+        return {"hold_years": hold_years,
+                "hold_years_is_default": hold_years_is_default,
+                "irr": 0.0, "equity_multiple": 0.0,
+                "sale_price": 0.0, "sale_proceeds": 0.0, "cash_flows": [],
+                "exit_cap_rate": exit_cap, "exit_cap_source": exit_cap_source}
     base_noi = pro["noi"]
     flows = [-net_liquidity]
     for y in range(1, hold_years + 1):
@@ -316,8 +344,10 @@ def compute_exit(a: dict, pro: dict, loan_bal: float, rate: float,
     em = _div(total_in, net_liquidity)
     return {
         "hold_years": hold_years,
+        "hold_years_is_default": hold_years_is_default,
         "noi_growth": noi_growth,
         "exit_cap_rate": exit_cap,
+        "exit_cap_source": exit_cap_source,   # 用户输入 | 联动市场cap | 默认
         "sale_price": sale_price,
         "remaining_loan": rem,
         "sale_proceeds": sale_proceeds,

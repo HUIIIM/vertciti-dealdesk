@@ -97,8 +97,9 @@ def test_expense_change_reduces_noi():
 
 # ---------- 新增字段 ----------
 def test_vacancy_pct_new():
+    # P0-1 (2026-10-05): vacancy_pct 统一百分制（0-100），后端统一 /100
     d = example_39_main()
-    d["proforma"]["vacancy_pct"] = 0.05
+    d["proforma"]["vacancy_pct"] = 5
     r = compute_all(d)
     p = r["proforma"]
     assert approx(p["vacancy_loss"], 2299048.0 * 0.05)
@@ -106,17 +107,35 @@ def test_vacancy_pct_new():
     assert approx(p["noi"], 2299048.0 * 0.95 - 299048.0)
 
 
+def test_vacancy_pct_p0_regression():
+    """P0-1 回归：百分制空置率 {0, 8, 15} → vacancy_loss 正确、NOI 为正合理值。
+
+    实测用例：vacancy 15% 曾因漏 /100 算出 NOI −5.86M（100 倍错数）。
+    """
+    from app.uw_commercial import compute_scenario
+    base = 397548.0
+    for pct, expected_loss in ((0, 0.0), (8, base * 0.08), (15, base * 0.15)):
+        r = compute_scenario({"vacancy_pct": pct}, base, 10000, 5000000)
+        assert approx(r["vacancy_loss"], expected_loss), f"vacancy {pct}%"
+        assert approx(r["egi"], base - expected_loss)
+    # 15% 空置率：NOI 必须为正数合理值（费用为 0 时 NOI = EGI > 0）
+    r15 = compute_scenario({"vacancy_pct": 15}, base, 10000, 5000000)
+    assert r15["noi"] > 0
+    assert approx(r15["vacancy_loss"], 59632.2, 1.0)
+
+
 def test_amortizing_loan_new():
+    from app.finance import monthly_payment
     pmt = amort_payment(29400000, 0.06, 30)
-    # 等额本息年还应大于只还利息
+    # 等额本息年还应大于只还利息；口径=按月摊还（银行标准，月供×12）
     assert pmt > 29400000 * 0.06
-    assert approx(pmt, 29400000 * 0.06 / (1 - 1.06 ** -30))
+    assert approx(pmt, monthly_payment(29400000, 6.0, 30) * 12)
     d = example_39_main()
     d["analysis"]["amort_type"] = "AMORTIZING"
     d["analysis"]["amort_years"] = 30
     r = compute_all(d)
     assert approx(r["analysis"]["annual_debt_service"], pmt)
-    # 5 年后剩余本金小于原贷款
+    # 5 年后剩余本金小于原贷款（月复利口径）
     rem = remaining_balance(29400000, 0.06, 30, pmt, 5)
     assert 0 < rem < 29400000
     assert approx(r["analysis"]["exit"]["remaining_loan"], rem)

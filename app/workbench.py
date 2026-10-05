@@ -160,7 +160,10 @@ def valuate_comps(comps: list[WbComp]) -> dict:
     wsum = sum(weights)
     est = sum(r["adjusted_price"] * w / wsum for r, w in zip(rows, weights))
     adj_prices = sorted(r["adjusted_price"] for r in rows)
-    mid = adj_prices[len(adj_prices) // 2]
+    n = len(adj_prices)
+    # 真中位数：偶数个时取中间两数的平均（此前取排序后第 n//2+1 个，上中位数，偏高）
+    mid = (adj_prices[n // 2] if n % 2
+           else (adj_prices[n // 2 - 1] + adj_prices[n // 2]) / 2)
     psfs = [r["price_per_sf"] for r in rows if r["price_per_sf"]]
     return {
         "tag": ESTIMATE_TAG,
@@ -320,6 +323,38 @@ def parse_comps_csv(text: str) -> dict:
 COMPS_PULL_SOURCE = "TopHap CMA · recorded sales"
 
 
+def _parse_input_state(address: str) -> str:
+    """P0-3 (2026-10-05): 从输入地址提取州缩写（尽力而为），供主体一致性校验用。"""
+    import re
+    t = (address or "").strip()
+    m = re.search(r",\s*([A-Z]{2})(?:\s+\d{5})?\s*$", t)
+    if m:
+        return m.group(1).upper()
+    m2 = re.search(r"\b([A-Z]{2})\s+\d{5}\b", t)
+    return m2.group(1).upper() if m2 else ""
+
+
+def _check_subject_identity(address: str, fields: list) -> str | None:
+    """P0-3 (2026-10-05): 主体一致性校验。
+
+    TopHap find_property_by_address 是模糊匹配，无效地址可能命中异地物业。
+    比对输入地址的州 vs TopHap 定位到的物业所在州，不一致 → 返回中文错误文案；
+    一致或任一侧取不到州 → 返回 None（通过）。
+    """
+    want = _parse_input_state(address)
+    if not want:
+        return None
+    got = ""
+    for f in fields or []:
+        if isinstance(f, dict) and f.get("key") == "subject_state":
+            got = str(f.get("value") or "").upper()
+            break
+    if got and got != want:
+        return (f"地址无法定位：TopHap 匹配到的物业在 {got}，与输入地址的州（{want}）不符，"
+                f"请检查输入地址是否正确（可能是 TopHap 模糊命中了异地物业）")
+    return None
+
+
 def pull_comps(address: str) -> dict:
     """按地址从 TopHap CMA 拉取可比成交（recorded sales 口径）。
 
@@ -332,6 +367,10 @@ def pull_comps(address: str) -> dict:
     r = tophap.enrich_address(address)
     if not r.get("ok"):
         return {"ok": False, "error": r.get("note") or "TopHap 拉取失败"}
+    # P0-3 (2026-10-05): 主体一致性校验——模糊命中异地物业时拒收，不沉默返回别处数据
+    identity_err = _check_subject_identity(address, r.get("fields"))
+    if identity_err:
+        return {"ok": False, "error": identity_err}
     fetched_at = datetime.now().strftime("%Y-%m-%d %H:%M")
     rows = []
     for f in r.get("fields", []):
@@ -366,7 +405,9 @@ def pull_comps(address: str) -> dict:
                 "price_per_sf": round(ppsf, 2) if ppsf else None,
                 "distance_miles": float(c.get("distance_mi") or 0),
                 "adjustment_pct": 0.0,
-                "noi_annual": 0.0,
+                # P0-3升级 (2026-10-05): TopHap CMA 不提供 NOI → 缺失值用 null（未知），
+                # 不用 0.0（前端会渲染成 $0 误导；null 渲染为 —/N/A）。0 只保留给真零。
+                "noi_annual": None,
                 "source": COMPS_PULL_SOURCE,
                 "note": "；".join(extra),
                 "fetched_at": fetched_at,

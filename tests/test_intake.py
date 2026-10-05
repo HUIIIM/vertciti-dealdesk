@@ -137,19 +137,34 @@ def test_merge_prefers_higher_confidence():
 
 
 def test_address_pipeline_degradation(monkeypatch):
-    # 搜索有结果，但全部被反爬拦 → 字段全部 manual_needed，日志记录 blocked
-    monkeypatch.setattr(rp, "ddg_search", lambda q, log, max_results=8: [
-        {"title": "123 Main St", "url": "https://www.zillow.com/homedetails/1"},
-        {"title": "assessor", "url": "https://assessor.example.gov/p/1"}])
-    def fake_fetch(url, log):
-        rp._log(log, f"抓取 {url[:40]}", "blocked", "HTTP 403：站点反爬拦截，已停手")
-        return {"ok": False, "note": "blocked", "blocked": True}
-    monkeypatch.setattr(rp, "fetch_page", fake_fetch)
+    # 2026-10-05 重写：旧版 mock 的是 rp.ddg_search 旧代码路径，现已走 providers.run_chain
+    # 多源链（TopHap → RentCast → 公开网页 → Census）。本测试 mock 整条链：
+    # 所有 provider 要么被反爬拦（blocked），要么无数据 → 字段全空、manual_needed 补齐、日志记 blocked
+    from app import providers
+
+    def fake_run_chain(address, log=None, providers=None, use_cache=True):
+        log = log if log is not None else []
+        rp._log(log, "TopHap", "blocked", "HTTP 403：站点反爬拦截，已停手")
+        rp._log(log, "RentCast", "blocked", "HTTP 403：站点反爬拦截，已停手")
+        rp._log(log, "公开网页", "blocked", "HTTP 403：站点反爬拦截，已停手")
+        rp._log(log, "Census", "failed", "Census 保底未返回有效数据")
+        return {"ok": False, "fields": [], "primary_provider": None,
+                "provider_results": [
+                    {"provider": "TopHap", "status": "blocked"},
+                    {"provider": "RentCast", "status": "blocked"},
+                    {"provider": "公开网页", "status": "blocked"},
+                    {"provider": "Census", "status": "failed"}],
+                "diagnostics": "TopHap 反爬拦截；RentCast 反爬拦截；公开网页反爬拦截；Census 无数据",
+                "log": log, "cached": False}
+
+    monkeypatch.setattr(providers, "run_chain", fake_run_chain)
     d = rp.run_address_pipeline("123 Main St, Tampa, FL 33602")
     assert d["fields"] == []
     assert len(d["manual_needed"]) > 0
     assert all(m["status"] == "manual_needed" and "手动" in m["note"] for m in d["manual_needed"])
     assert any(e["status"] == "blocked" for e in d["log"])
+    # 全挂时必须有中文诊断，不静默
+    assert "diagnostics" in d and d["diagnostics"]
 
 
 def test_url_pipeline_seller_labeling(monkeypatch):

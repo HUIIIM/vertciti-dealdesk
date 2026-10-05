@@ -46,7 +46,8 @@ def noi_bank_bridge(result: dict, market_vacancy_pct: float | None = None) -> di
     seller_noi = _f(hist.get("noi"))
     egi = _f(hist.get("egi"))
     total_potential = _f(hist.get("total_potential"))
-    cur_vac = _f(hist.get("vacancy_pct"))
+    # P0-1 (2026-10-05): compute_scenario 回显的 vacancy_pct 为百分制，转小数再参与计算
+    cur_vac = _f(hist.get("vacancy_pct")) / 100
     expenses = hist.get("expenses") or {}
     existing_mgmt = _f(expenses.get("management_fee"))
 
@@ -98,25 +99,46 @@ def noi_bank_bridge(result: dict, market_vacancy_pct: float | None = None) -> di
 
 
 # ---------------------------------------------------------------- DSCR 双轨
-def dscr_dual(result: dict) -> dict:
+def dscr_dual(result: dict, bank_noi: float | None = None) -> dict:
+    """DSCR 双轨：trailing 主 / pro forma 辅，每个数字强制口径标注（P0-4）.
+
+    口径铁律：分子=银行口径 NOI（有则用，无则回退现金流口径并如实标注）；
+    分母=年还本付息（按月摊还口径，银行标准），标注必须与实际 amort_type 一致
+    （AMORTIZING→"全额本息按月摊还"，IO→"纯利息（IO），不含本金"），不许挂羊头卖狗肉。
+    """
     ana = result.get("analysis") or {}
     inpl = ana.get("inplace") or {}
     proj = ana.get("projected") or {}
     ds = _f(ana.get("annual_debt_service"))
     rate = _f(ana.get("rate"))
     amort = ana.get("amort_years")
+    amort_type = str(ana.get("amort_type") or "AMORTIZING").upper()
+    if amort_type == "AMORTIZING":
+        ds_note = "全额本息按月摊还，{} 年".format(amort)
+    else:
+        ds_note = "纯利息（IO），不含本金"
+    # trailing 分子：优先银行口径 NOI
+    if bank_noi:
+        trailing_dscr = _div(bank_noi, ds)
+        trailing_num_note = "银行口径 NOI"
+    else:
+        trailing_dscr = _f(inpl.get("dscr"))
+        trailing_num_note = "现金流口径 NOI（银行口径缺失，回退）"
     return {
         "trailing": {
-            "dscr": _f(inpl.get("dscr")),
-            "label": ("{:.2f}x（银行口径 NOI / 全额本息，{} 年摊还，{:.2f}% 定息假设）"
-                      .format(_f(inpl.get("dscr")), amort, rate * 100)),
+            "dscr": trailing_dscr,
+            "label": ("{:.2f}x（{} / {}，{:.2f}% 定息假设）"
+                      .format(trailing_dscr, trailing_num_note, ds_note, rate * 100)),
             "primary": True,
+            "numerator": trailing_num_note,
+            "amort_type": amort_type,
         },
         "proforma": {
             "dscr": _f(proj.get("dscr")),
-            "label": ("{:.2f}x（PF：预测口径 NOI / 全额本息，{} 年摊还，{:.2f}% 定息假设）"
-                      .format(_f(proj.get("dscr")), amort, rate * 100)),
+            "label": ("{:.2f}x（PF：预测口径 NOI / {}，{:.2f}% 定息假设）"
+                      .format(_f(proj.get("dscr")), ds_note, rate * 100)),
             "primary": False,
+            "amort_type": amort_type,
         },
         "annual_debt_service": ds,
         "redline": {"strong": 1.35, "agency": 1.25, "bank_floor": 1.20, "dead": 1.00},
@@ -216,12 +238,13 @@ def stress_table(data: dict, loan_amount: float | None = None,
     for bps in STRESS_TIERS["rate_bps"]:
         scenarios.append((f"利率 +{bps}bps", {"rate_delta": bps / 10000}))
     for pp in STRESS_TIERS["vacancy_pp"]:
-        scenarios.append((f"空置 +{pp}pp", {"vac_delta": pp / 100}))
+        # P0-1 (2026-10-05): _tweak 操作的是百分制输入，vac_delta 用百分点（pp），不再 /100
+        scenarios.append((f"空置 +{pp}pp", {"vac_delta": pp}))
     for pct in STRESS_TIERS["rent_pct"]:
         scenarios.append((f"租金 {pct}%", {"rent_mult": 1 + pct / 100}))
     if STRESS_TIERS["combo"]:
         scenarios.append(("组合：利率+200bps & 空置+5pp",
-                          {"rate_delta": 0.02, "vac_delta": 0.05}))
+                          {"rate_delta": 0.02, "vac_delta": 5}))
     rows = []
     for label, kw in scenarios:
         r = uw_commercial.compute_all(_tweak(data, **kw))
@@ -294,7 +317,7 @@ def compute_plus(data: dict, loan_amount: float | None = None,
     out["plus"] = {
         "debt_yield": round(debt_yield, 4),
         "debt_yield_note": "NOI（银行口径）÷ 拟贷款额；≥8-10% 舒适，≥7% agency 多户底线，<6% 机构资金出局",
-        "dscr_dual": dscr_dual(base),
+        "dscr_dual": dscr_dual(base, bank_noi),
         "noi_bank_bridge": bridge,
         "ltv": ltv,
         "rent_roll_detail": rr,
