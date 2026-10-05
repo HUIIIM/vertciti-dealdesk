@@ -312,6 +312,76 @@ def uw_compute(payload: dict):
         raise HTTPException(500, f"计算失败：{str(e)[:200]}")
 
 
+@app.post("/api/com/sensitivity")
+def com_sensitivity(payload: dict):
+    """商业二维敏感性矩阵（P0-5，对标 ARGUS）。
+
+    横轴=退出 cap rate（±100bps，步长 50bps），纵轴=租金增长率
+    （±100bps，步长 50bps），格子=IRR / Equity Multiple。
+    25 格全部复用 uw_commercial.compute_all()（与页面/Excel 同源），
+    基准格（中心）= 当前输入的实际退出 cap 与增长率。
+    """
+    import copy
+
+    def _f(x, default=0.0) -> float:
+        try:
+            v = float(x)
+        except (TypeError, ValueError):
+            return default
+        if v != v or v in (float("inf"), float("-inf")):
+            return default
+        return v
+
+    data = payload.get("input", payload)
+    if not isinstance(data, dict):
+        raise HTTPException(400, "input 必须是对象")
+    try:
+        base = uw_commercial.compute_all(data)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(500, f"计算失败：{str(e)[:200]}")
+    base_exit = (base.get("analysis") or {}).get("exit") or {}
+    # 标准 v1.0 §1.1：输入层 [PCT]，输出回显 [DEC] —— 扫描在百分制输入上加减，
+    # 轴标签/响应回显保持小数（前端 fmtPct 按小数消费）
+    exit_cap_base = _f(base_exit.get("exit_cap_rate")) or 0.05
+    _g_in = (data.get("analysis") or {}).get("noi_growth")
+    growth_base = _f(_g_in if _g_in not in (None, "") else 2.0)  # [PCT]
+    offsets_dec = [-0.01, -0.005, 0.0, 0.005, 0.01]   # 轴步长（小数）
+    offsets_pct = [-1.0, -0.5, 0.0, 0.5, 1.0]          # 输入步长（百分点）
+    cells = []
+    for gi, go in enumerate(offsets_pct):
+        row = []
+        for ci, co in enumerate(offsets_dec):
+            d2 = copy.deepcopy(data)
+            an = d2.get("analysis")
+            if not isinstance(an, dict):
+                an = d2["analysis"] = {}
+            # 显式写入百分制输入：compute_exit 按"用户输入"口径采用，保证 25 格口径一致
+            an["exit_cap_rate"] = max((exit_cap_base + co) * 100, 0.1)
+            an["noi_growth"] = max(growth_base + go, -99.0)
+            try:
+                r2 = uw_commercial.compute_all(d2)
+            except Exception as e:  # noqa: BLE001
+                raise HTTPException(500, f"扫描计算失败：{str(e)[:200]}")
+            ex2 = (r2.get("analysis") or {}).get("exit") or {}
+            # LINT-04：IRR 不收敛 → None（前端渲染"—"），不许 round(0.0) 冒充
+            _irr_v = ex2.get("irr")
+            row.append({
+                "irr": None if _irr_v is None else round(_f(_irr_v), 4),
+                "equity_multiple": round(_f(ex2.get("equity_multiple")), 4),
+            })
+        cells.append(row)
+    return {
+        "exit_cap_base": round(exit_cap_base, 4),
+        "growth_base": round(growth_base, 4),
+        "exit_cap_source": base_exit.get("exit_cap_source"),
+        "exit_cap_offsets_bps": [-100, -50, 0, 50, 100],
+        "growth_offsets_bps": [-100, -50, 0, 50, 100],
+        "exit_caps": [round(exit_cap_base + o, 4) for o in offsets_dec],
+        "growths": [round(growth_base / 100 + o, 4) for o in offsets_dec],
+        "cells": cells,
+    }
+
+
 @app.post("/api/uw/report")
 def uw_report(payload: dict):
     """商业核保报告导出：当前（未保存也行）输入 -> 经典版/增强版 PDF。

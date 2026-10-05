@@ -24,6 +24,16 @@ from __future__ import annotations
 import math
 
 
+# ---------------------------------------------------------------- 单位口径铁律
+# 商业核保数据标准 v1.0 §1.1（CEO 2026-10-05 终裁①）：
+#   [PCT] 百分制（0-100）= 人类输入口径；[DEC] 小数制（0-1）= 计算口径。
+#   /api/uw/* 的输入层一律 [PCT]（vacancy_pct / down_pct / rate / market_cap_rate /
+#   exit_cap_rate / noi_growth），计算层一律 [DEC]，边界经 normalize_pct() 归一化。
+#   compute_* 的输出回显为 [DEC]（Excel PCT 格式格 / PDF _pct() / dscr 双轨标注
+#   均按小数消费——输出口径不变，下游零改动）。
+#   唯一例外：compute_scenario 回显的 vacancy_pct 保持输入 [PCT] 原样
+#  （commercial_plus.noi_bank_bridge 按百分制消费）。
+
 def _f(x, default=0.0) -> float:
     try:
         v = float(x)
@@ -32,6 +42,29 @@ def _f(x, default=0.0) -> float:
     if math.isnan(v) or math.isinf(v):
         return default
     return v
+
+
+def normalize_pct(x) -> float:
+    """[PCT] → [DEC] 边界归一化：百分制输入 ÷100 转小数。
+
+    输入层唯一允许的归一化点；业务公式里禁止散落 /100（LINT-01）。
+    缺失/非法 → 0.0（调用方负责 N/A 链，见 TIER_S / TIER_A）。
+    """
+    return _f(x) / 100.0
+
+
+# LINT-06：魔法数字集中声明（来源注记）
+EXIT_FEE_PCT = 4.0            # [PCT] 退出费用率（2026-10-01 Miao 决定锁定，不开放调节）
+DEFAULT_NOI_GROWTH_PCT = 2.0  # [PCT] NOI 年增长率默认（bank/agency 口；bridge 口强制 0，标准 §4）
+DEFAULT_EXIT_CAP_PCT = 5.0    # [PCT] 退出 cap 硬默认（exit_cap_source="默认" 时标注）
+DEFAULT_HOLD_YEARS = 5         # 持有年数默认（钳制 1-50）
+
+
+# 标准 §1.2 N/A 分级：字段注册表（LINT-08 扫描用）
+TIER_S = ("purchase_price", "net_rentable_sf", "property_type")  # 缺一 → 全报告"数据不足"
+TIER_A = ("vacancy_pct", "down_pct", "rate", "amort_years", "market_cap_rate",
+          "exit_cap_rate", "noi_growth",
+          "lease_start", "lease_end", "expense_structure")        # 缺失 → 模块 N/A＋verdict 降级
 
 
 def _div(a, b) -> float:
@@ -119,9 +152,9 @@ def compute_scenario(inp: dict, base_rents: float, net_sf: float,
     parking = pkg_manual or _f(auto_parking)
     other = _f(inp.get("other_income"))
     total_potential = base_rents + cam_rec + parking + other
-    vacancy_pct = _f(inp.get("vacancy_pct"))          # NEW (template hardcoded 0)
-    # P0-1 (2026-10-05): vacancy_pct 口径为百分制（0-100），此处统一 /100 转小数
-    vacancy_loss = total_potential * vacancy_pct / 100
+    # 标准 v1.0 §1.1：vacancy_pct 输入 [PCT]，边界 normalize → [DEC] 再进乘法（P0-1 锁死点）
+    vacancy_pct = normalize_pct(inp.get("vacancy_pct"))       # NEW (template hardcoded 0)
+    vacancy_loss = total_potential * vacancy_pct
     egi = total_potential - vacancy_loss
     expenses = {k: _f(inp.get(k)) for k in EXPENSE_KEYS}
     total_expenses = sum(expenses.values())
@@ -129,6 +162,8 @@ def compute_scenario(inp: dict, base_rents: float, net_sf: float,
     ti = _f(inp.get("tenant_improvements"))
     capex = _f(inp.get("capex"))
     lc = _f(inp.get("leasing_commissions"))
+    # 终裁②：盈亏平衡出租率分子含储备金（与 Excel 标注一致）
+    replacement_reserve = _f(inp.get("replacement_reserve"))
     cash_flow_avail = noi - ti - capex - lc           # =B36/E36 in template
     # Template's "Cash Flow" row convention: NOI + Other Income (was hardcoded
     # 2,299,048 / 1,299,048 in the template; now a live formula).
@@ -143,7 +178,8 @@ def compute_scenario(inp: dict, base_rents: float, net_sf: float,
             "parking_income": "manual" if pkg_manual else ("rent_roll" if _f(auto_parking) else "none"),
         },
         "total_potential": total_potential,
-        "vacancy_pct": vacancy_pct,
+        # 回显输入 [PCT] 原样（commercial_plus.noi_bank_bridge 按百分制消费）；计算已用小数
+        "vacancy_pct": _f(inp.get("vacancy_pct")),
         "vacancy_loss": vacancy_loss,
         "egi": egi,
         "expenses": expenses,
@@ -152,6 +188,7 @@ def compute_scenario(inp: dict, base_rents: float, net_sf: float,
         "tenant_improvements": ti,
         "capex": capex,
         "leasing_commissions": lc,
+        "replacement_reserve": replacement_reserve,
         "cash_flow_avail": cash_flow_avail,
         "cash_flow_gross": cash_flow_gross,
         "cap_rate": _div(noi, purchase_price),
@@ -208,8 +245,11 @@ def compute_analysis(a: dict, hist: dict, pro: dict) -> dict:
     closing = _f(a.get("closing_costs"))
     total_uses = purchase + repairs + reserve + lender_fees + closing
 
-    down_pct = _f(a.get("down_pct"))
-    rate = _f(a.get("rate"))
+    # 标准 v1.0 §1.1（终裁①）：输入层 [PCT] → 边界 normalize → 计算层 [DEC]。
+    # 命名违规迁移（附录 B）：down_pct=0.30/rate=0.06/market_cap_rate=0.04 的小数输入
+    # 口径已废止；现输入 30 / 6.5 / 6 表示 30% / 6.5% / 6%。
+    down_pct = normalize_pct(a.get("down_pct"))
+    rate = normalize_pct(a.get("rate"))
     # P0-4（Phase 5）：默认全额本息摊还（AMORTIZING）。此前默认 IO（纯利息）但前端标注
     # "全额本息"，口径不诚实（1.42x vs 真实 1.16x）。显式选 IO 时标注必须同步改为纯利息。
     amort_type = (a.get("amort_type") or "AMORTIZING").upper()   # AMORTIZING | IO
@@ -226,10 +266,10 @@ def compute_analysis(a: dict, hist: dict, pro: dict) -> dict:
     projected_noi = _f(a.get("projected_noi")) or pro["noi"]     # F15 手工，空=取现金流
     inplace_noi_cf = _f(a.get("inplace_noi_cf")) or hist["noi"]  # I24 手工，空=取现金流
     inplace_cap = _div(inplace_noi, purchase)             # template: =F13/C13
-    market_cap = _f(a.get("market_cap_rate"))
+    market_cap = normalize_pct(a.get("market_cap_rate"))
     projected_resale = _div(projected_noi, market_cap)   # template: =F15/F16
     acquisition_fees = repairs + reserve + lender_fees + closing  # =SUM(C14:C17)
-    exit_fee_pct = 0.04  # 模板固定 4%（2026-10-01 Miao 决定锁定，不开放调节）
+    exit_fee_pct = EXIT_FEE_PCT / 100.0  # [DEC] 模板固定 4%（2026-10-01 Miao 决定锁定，不开放调节）
     exit_fees = projected_resale * exit_fee_pct          # template: =F17*0.04
     net_gains = projected_resale - (purchase + acquisition_fees + exit_fees)
     roi = _div(net_gains, net_liquidity)                 # template: =F20/C21
@@ -252,7 +292,10 @@ def compute_analysis(a: dict, hist: dict, pro: dict) -> dict:
     inp = coc(inplace_noi_cf, hist["other_income"])  # I24 口径（F2 证明可与 F13 不同）
 
     # NEW: break-even occupancy (pro forma basis)
-    breakeven_occ = _div(pro["total_expenses"] + annual_debt,
+    # 终裁②：分子含储备金 —— (OpEx + debt_service + annual_reserve) ÷ TPI，
+    # 与 Excel 总览标注"(费用＋还本付息＋储备金) ÷ 满租有效总收入"一致
+    annual_reserve = _f(pro.get("replacement_reserve"))
+    breakeven_occ = _div(pro["total_expenses"] + annual_debt + annual_reserve,
                          pro["total_potential"])
 
     # NEW: hold / exit analysis
@@ -266,6 +309,8 @@ def compute_analysis(a: dict, hist: dict, pro: dict) -> dict:
         "lender_fees": lender_fees,
         "closing_costs": closing,
         "total_uses": total_uses,
+        # 输出回显一律 [DEC]（小数）：Excel PCT 格式格 / PDF _pct() / dscr 双轨标注
+        # 均按小数消费。输入是 [PCT]，此处是归一化后的计算口径。
         "down_pct": down_pct,
         "rate": rate,
         "amort_type": amort_type,
@@ -301,30 +346,40 @@ def compute_analysis(a: dict, hist: dict, pro: dict) -> dict:
 def compute_exit(a: dict, pro: dict, loan_bal: float, rate: float,
                  amort_type: str, amort_years: float, annual_debt: float,
                  net_liquidity: float, purchase: float) -> dict:
-    """Hold-period exit: sale proceeds, IRR, equity multiple. NEW."""
-    hold_years = int(round(_f(a.get("hold_years"), 5)))
+    """Hold-period exit: sale proceeds, IRR, equity multiple. NEW.
+
+    输入层 [PCT]：a["noi_growth"] / a["exit_cap_rate"] / a["market_cap_rate"] 均为
+    百分制（2 表示 2%），此处 normalize → [DEC]。位置参数 loan_bal / rate /
+    annual_debt / net_liquidity 为内部 [DEC]，不归一化。
+    """
+    hold_years = int(round(_f(a.get("hold_years"), DEFAULT_HOLD_YEARS)))
     hold_years = max(1, min(hold_years, 50))  # 钳制 1-50 年：防极大值 DoS
     hold_years_is_default = not _f(a.get("hold_years"))
-    noi_growth = _f(a.get("noi_growth"), 0.02)
+    # 标准 §4 分歧③裁决：bank/agency 口默认 2%（规则估算）；bridge/hard money 口
+    # 强制 0% 由调用方在输入层置 noi_growth=0 实现（本函数不猜 funding-type）
+    noi_growth = normalize_pct(a.get("noi_growth", DEFAULT_NOI_GROWTH_PCT))
     # Phase 5 第四轮 B4：退出 cap 联动用户输入——显式填了退出 cap 用显式值；
     # 没填但填了市场 cap 则联动市场 cap；都没填才用 5% 硬默认（PDF 标"默认"）。
     # 此前永远 5% 且无标记（pro-investor：填了市场 cap 5.5% 仍印 5.00%）。
     _exit_cap_raw = _f(a.get("exit_cap_rate"))
     _mkt_cap_raw = _f(a.get("market_cap_rate"))
     if _exit_cap_raw > 0:
-        exit_cap, exit_cap_source = _exit_cap_raw, "用户输入"
+        exit_cap, exit_cap_source = normalize_pct(a.get("exit_cap_rate")), "用户输入"
     elif _mkt_cap_raw > 0 and not a.get("market_cap_rate_is_default"):
-        exit_cap, exit_cap_source = _mkt_cap_raw, "联动市场cap"
+        exit_cap, exit_cap_source = normalize_pct(a.get("market_cap_rate")), "联动市场cap"
     else:
-        exit_cap, exit_cap_source = 0.05, "默认"
-    exit_fee_pct = 0.04  # 模板固定 4%（2026-10-01 Miao 决定锁定，不开放调节）
+        exit_cap, exit_cap_source = DEFAULT_EXIT_CAP_PCT / 100.0, "默认"
+    exit_fee_pct = EXIT_FEE_PCT / 100.0  # [DEC] 模板固定 4%（2026-10-01 Miao 决定锁定，不开放调节）
     abatements = _f(a.get("abatements"))
     if hold_years <= 0 or net_liquidity <= 0:
+        # LINT-04：退化输入不许用 0.0 冒充结果 —— IRR/EM/出售价一律 None（N/A 链）
         return {"hold_years": hold_years,
                 "hold_years_is_default": hold_years_is_default,
-                "irr": 0.0, "equity_multiple": 0.0,
-                "sale_price": 0.0, "sale_proceeds": 0.0, "cash_flows": [],
-                "exit_cap_rate": exit_cap, "exit_cap_source": exit_cap_source}
+                "irr": None, "equity_multiple": None,
+                "sale_price": None, "sale_proceeds": None,
+                "remaining_loan": None, "cash_flows": [],
+                "exit_cap_rate": exit_cap, "exit_cap_source": exit_cap_source,
+                "noi_growth": noi_growth}
     base_noi = pro["noi"]
     flows = [-net_liquidity]
     for y in range(1, hold_years + 1):
@@ -352,18 +407,20 @@ def compute_exit(a: dict, pro: dict, loan_bal: float, rate: float,
         "remaining_loan": rem,
         "sale_proceeds": sale_proceeds,
         "cash_flows": flows,
-        "irr": irr,
+        "irr": irr,                            # 不收敛 → None（终裁⑤，禁 0.0 冒充）
         "equity_multiple": em,
     }
 
 
 def _irr(flows: list[float], lo: float = -0.99, hi: float = 10.0,
-         iters: int = 100) -> float:
+         iters: int = 100) -> float | None:
+    """IRR 二分求解。终裁⑤：不收敛 → None（N/A 链），禁止返回 0.0
+    （0% IRR 会被误读为"保本"）。"""
     def npv(r: float) -> float:
         return sum(cf / (1.0 + r) ** i for i, cf in enumerate(flows))
     f_lo, f_hi = npv(lo), npv(hi)
     if f_lo * f_hi > 0:
-        return 0.0
+        return None
     for _ in range(iters):
         mid = (lo + hi) / 2.0
         if f_lo * npv(mid) <= 0:
@@ -403,15 +460,16 @@ def default_inputs() -> dict:
         "analysis": {
             "purchase_price": 0, "building_repairs": 0, "capital_reserve": 0,
             "lender_fees": 0, "closing_costs": 0,
-            "down_pct": 0.30, "rate": 0.06, "amort_type": "IO",
-            "amort_years": 30, "market_cap_rate": 0.04,
+            # 标准 v1.0 §1.1：以下输入一律 [PCT]（百分制），计算层经 normalize_pct() 转小数
+            "down_pct": 30, "rate": 6.5, "amort_type": "IO",
+            "amort_years": 30, "market_cap_rate": 6,
             "abatements": 0,
             # 模板血缘：F13/F15/F24/I24 是手工承保假设（非公式）。
             # 空=None 时自动取 Cash Flow 实时值；一旦手填就锁定为手工口径。
             "underwritten_noi": None,   # F13 在手 NOI（驱动在手 Cap）
             "projected_noi": None,      # F15 预测 NOI（驱动转售价值）
             "inplace_noi_cf": None,     # I24 现金流块的在手 NOI
-            "hold_years": 5, "noi_growth": 0.02, "exit_cap_rate": 0.05,
+            "hold_years": 5, "noi_growth": 2, "exit_cap_rate": 5,
         },
     }
 
@@ -441,8 +499,8 @@ def example_39_main() -> dict:
     # base rents 1,000,000.08 + 299,048 - 299,048 = 1,000,000.08 ✓
     d["analysis"].update({
         "purchase_price": 42000000, "lender_fees": 420000,
-        "closing_costs": 864000, "down_pct": 0.30, "rate": 0.06,
-        "amort_type": "IO", "market_cap_rate": 0.04,
+        "closing_costs": 864000, "down_pct": 30, "rate": 6,
+        "amort_type": "IO", "market_cap_rate": 4,
     })
     return d
 
@@ -460,6 +518,22 @@ def compute_all(data: dict) -> dict:
                            net_sf, purchase,
                            rent["total_annual_cam"], rent["total_annual_parking"])
     analysis = compute_analysis(data.get("analysis"), hist, pro)
+    # 标准 §1.2 / LINT-08：Tier S/A 缺失不许静默默认 —— 显式缺口清单。
+    # 缺失字段的计算链仍按 0 参与（不抛错），但调用方必须检查 data_gaps / tier_s_ok。
+    _an_in = data.get("analysis") or {}
+    _gaps_s = [k for k in TIER_S
+               if k == "purchase_price" and not _f(_an_in.get("purchase_price"))]
+    _gaps_s += [k for k in TIER_S if k != "purchase_price"
+                and not str(prop.get(k) or "").strip()
+                and not _f(prop.get(k))]
+    _gaps_a = []
+    for _sec, _d in (("historical", data.get("historical") or {}),
+                     ("proforma", data.get("proforma") or {})):
+        if _d.get("vacancy_pct") in (None, ""):
+            _gaps_a.append(f"{_sec}.vacancy_pct")
+    for k in ("down_pct", "rate", "amort_years", "market_cap_rate"):
+        if _an_in.get(k) in (None, ""):
+            _gaps_a.append(f"analysis.{k}")
     # per-SF headline metrics (NEW)
     per_sf = {
         "price_per_sf": _div(purchase, net_sf),
@@ -478,4 +552,7 @@ def compute_all(data: dict) -> dict:
         "proforma": pro,
         "analysis": analysis,
         "per_sf": per_sf,
+        # 标准 §1.2：Tier S 缺一 → "数据不足"，Tier A 缺失 → 模块 N/A＋verdict 降级
+        "data_gaps": {"tier_s": _gaps_s, "tier_a": _gaps_a},
+        "tier_s_ok": not _gaps_s,
     }

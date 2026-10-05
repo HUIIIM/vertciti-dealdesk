@@ -57,12 +57,12 @@ class TestUwPdf(unittest.TestCase):
             pdf = pdf_uw.build_uw_pdf(r, variant)
             self.assertTrue(pdf.startswith(b"%PDF"), f"{variant} 空白输入崩了")
         text = _extract_text(pdf_uw.build_uw_pdf(r, "enhanced"))
-        self.assertIn("--", text, "NaN/None 应渲染为 --")
+        self.assertIn("—", text, "NaN/None 应渲染为 —（D 铁律：全端统一）")
 
     def test_nan_renders_honest(self):
-        self.assertEqual(pdf_uw._money(float("nan")), "--")
-        self.assertEqual(pdf_uw._pct(None), "--")
-        self.assertEqual(pdf_uw._num(float("inf")), "--")
+        self.assertEqual(pdf_uw._money(float("nan")), "—")
+        self.assertEqual(pdf_uw._pct(None), "—")
+        self.assertEqual(pdf_uw._num(float("inf")), "—")
         self.assertEqual(pdf_uw._esc("<a>&\""), "&lt;a&gt;&amp;\"")
 
     def test_html_escaping_in_output(self):

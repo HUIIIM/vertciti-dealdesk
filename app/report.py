@@ -7,8 +7,9 @@ from datetime import datetime
 
 from . import charts, report_narrative, sensitivity
 
-GRADE_LABELS = {"A": "A 级（日报头条）", "B": "B 级（日报收录）", "C": "C 级（观察名单）",
-                "不收录": "不收录（<50 分）", "否决": "一票否决"}
+# P0-2（2026-10-05）：打分等级显示统一为 A/B/C/D 档（旧 verdict 词退役）
+GRADE_LABELS = {"A": "A 档（日报头条）", "B": "B 档（日报收录）", "C": "C 档（观察名单）",
+                "D": "D 档（<50 分）", "否决": "一票否决"}
 
 
 def _pct(x, digits=1):
@@ -16,7 +17,8 @@ def _pct(x, digits=1):
 
 
 def _money(x):
-    return "—" if x is None else f"${x:,.0f}"
+    # Phase 5 第六轮微修复 #8（newbie）：负号放 $ 前面（-$7,585），不许 $-7,585
+    return "—" if x is None else ("-$" + f"{abs(x):,.0f}" if x < 0 else f"${x:,.0f}")
 
 
 def render(project: dict) -> str:
@@ -38,7 +40,7 @@ def render(project: dict) -> str:
             row("营业费用/月", _money(m["opex"])),
             row("月 NOI", _money(m["noi_monthly"])),
             row("月净现金流", _money(m["cash_flow_monthly"])),
-            row("单门月现金流", _money(m["cash_flow_per_door"])),
+            row("整套月现金流", _money(m["cash_flow_per_door"])),
             row("Cash-on-cash", _pct(m["cash_on_cash"])),
             row("DSCR", m["dscr"] if m["dscr"] is not None else "—"),
             row("Cap rate", _pct(m["cap_rate"])),

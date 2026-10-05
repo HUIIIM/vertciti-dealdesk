@@ -16,22 +16,37 @@
   <span class="typetag" id="z0Type">—</span>
   <span class="stamp" id="z0Stamp"></span>
   <div class="actions">
+    <button class="btn ghost" id="btnChangeAddr" title="换个地址重新分析">换地址</button>
     <button class="btn ghost" id="btnToggle" title="切换住宅/商业视角">切换视角</button>
     <div class="dd" id="ddPdf">
       <button class="btn" id="btnPdf" aria-haspopup="true">导出 PDF ▾</button>
       <div class="dd-menu" role="menu">
-        <button id="btnPdfMemo">投资备忘录 PDF（模板版）</button>
+        <button id="btnPdfMemo">投资备忘录 PDF</button>
         <button id="btnPrint">页面原样打印</button>
+        <button id="btnPdfComClassic">商业核保 PDF·经典版</button>
+        <button id="btnPdfComPlus">商业核保 PDF·增强版</button>
       </div>
     </div>
     <button class="btn" id="btnXlsx">导出 Excel</button>
   </div>
 </div></header>
-<div id="stickyV"><span class="sv-word" id="svWord">—</span><span id="svMeta">—</span>
-  <button class="btn" id="svExport">导出</button></div>
+<!-- B：地址类型自动识别横幅——intake 识别出商业物业但当前为住宅视角时弹出，一键切换 -->
+<div id="typeNudge" class="typenudge" hidden>
+  <span id="typeNudgeText"></span>
+  <button class="btn primary" id="typeNudgeGo">切换商业视角</button>
+  <button class="btn ghost" id="typeNudgeNo">继续住宅</button>
+</div>
+<div id="stickyV"><span class="sv-word" id="svWord">—</span><span id="svVetoBadge"></span><span id="svMeta">—</span>
+  <button class="btn" id="svExport" title="导出当前 deal 的投资备忘录 PDF">导出备忘录</button></div>
 
 <main class="wrap">
   <p class="howto" id="howto">怎么看这页：<b>先看结论</b>（值得买/再看看/别碰）· <b>再看价格证据</b>（Zone 3）· <b>最后看假设</b>（Zone 7，可改数重算）</p>
+
+  <!-- 要价显眼条（P1：要价入口从 Zone 7 小字移到显眼处） -->
+  <div id="askBar"><label for="askBarInput">收购价 / 要价 $</label>
+    <input id="askBarInput" type="number" min="0" placeholder="如 850000" aria-label="收购价或要价">
+    <button class="btn primary" id="askBarGo">重新计算</button>
+    <span class="note" id="askBarNote"></span></div>
 
   <!-- loading -->
   <section class="zone" id="zLoad"><h2>正在分析</h2>
@@ -40,16 +55,18 @@
 
   <!-- Zone 1 -->
   <section class="z1" id="z1" hidden>
+    <p class="zlabel">Zone 1 · 结论</p>
     <div>
-      <p class="verdict-word" id="vWord">—</p>
+      <p class="verdict-line"><span class="verdict-word" id="vWord">—</span><span id="vVetoBadge"></span></p>
       <p class="one-liner" id="vOne"></p>
       <div class="conf-row">
         <div class="conf-bar"><div class="conf-fill" id="vConfFill" style="width:0%"></div></div>
         <span id="vConfNum">—</span>
       </div>
-      <p class="conf-note">置信度 = 证据质量分（0-100），不是推荐强度：它回答"证据有多硬"，不回答"该不该买"。<span id="vConfLabel"></span></p>
+      <p class="conf-note">置信度 = 证据质量分（0-100），不是推荐强度：它回答"证据有多硬"，不回答"该不该买"。deal 评分是买卖打分（&lt;50 别碰），置信度是证据质量分——两码事。<span id="vConfLabel"></span></p>
       <p class="vrange" id="vRange"></p>
       <p class="cashneed" id="vCash"></p>
+      <p class="zerodown" id="vZeroDown"></p>
       <div id="vVetoes"></div>
       <div id="vReasons"></div>
       <p class="usage" id="vUsage"></p>
@@ -71,35 +88,35 @@
 
   <!-- Zone 3 -->
   <section class="zone" id="z3" hidden>
-    <button class="acc-head" data-acc="z3"><h2>价格公不公允</h2><span class="chev">▾</span></button>
+    <button class="acc-head" data-acc="z3"><h2><span class="znum">Zone 3</span>价格公不公允</h2><span class="chev">▾</span></button>
     <div class="acc-body" id="z3Body"></div>
   </section>
 
   <!-- Zone 4 + 5 -->
   <div class="z45">
     <section class="zone" id="z4" hidden>
-      <button class="acc-head" data-acc="z4"><h2>现金流构成</h2><span class="chev">▾</span></button>
+      <button class="acc-head" data-acc="z4"><h2><span class="znum">Zone 4</span>现金流构成</h2><span class="chev">▾</span></button>
       <div class="acc-body" id="z4Body"></div>
     </section>
     <section class="zone" id="z5" hidden>
-      <button class="acc-head" data-acc="z5"><h2>市场水温</h2><span class="chev">▾</span></button>
+      <button class="acc-head" data-acc="z5"><h2><span class="znum">Zone 5</span>市场水温</h2><span class="chev">▾</span></button>
       <div class="acc-body" id="z5Body"></div>
     </section>
   </div>
 
   <!-- Zone 6 -->
   <section class="zone" id="z6" hidden>
-    <button class="acc-head" data-acc="z6"><h2>未来估价会是多少 <span class="tag exp">趋势外推（实验）</span></h2><span class="chev">▾</span></button>
+    <button class="acc-head" data-acc="z6"><h2><span class="znum">Zone 6</span>未来估价会是多少 <span class="tag exp">趋势外推（实验）</span></h2><span class="chev">▾</span></button>
     <div class="acc-body" id="z6Body"></div>
   </section>
 
   <!-- Zone 7 -->
   <section class="zone" id="z7" hidden>
-    <button class="acc-head" data-acc="z7"><h2>假设与明细</h2><span class="chev">▾</span></button>
+    <button class="acc-head" data-acc="z7"><h2><span class="znum">Zone 7</span>假设与明细</h2><span class="chev">▾</span></button>
     <div class="acc-body" id="z7Body"></div>
   </section>
 
-  <p class="note" style="margin-top:24px">筛选辅助工具，不构成投资建议。估值永远是区间，不给单点数字。comps 只是起点，出价前请核验相似度/日期/位置/成色/市场动向。</p>
+  <p class="note" style="margin-top:24px">筛选辅助工具，不构成投资建议。估值给区间；comps 高度一致时诚实标注单点，不拿"区间"包装单点。comps 只是起点，出价前请核验相似度/日期/位置/成色/市场动向。</p>
 </main>
 <div id="toast"></div>
 <script src="/d.js"></script>

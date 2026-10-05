@@ -1,9 +1,10 @@
 """商业线评分引擎 —— 严格实现 buyer-box-commercial.md v1.3.
 
 100 分构成：NOI/DSCR 30 / 租约质量 20 / 贷款条款 15 / 首付 10 / 市场 10 / 风险逆向扣分 15.
-分级：>=80 A / 65-79 B / 50-64 C / <50 不收录；任一硬否决 => 等级"否决".
+分级：>=80 A / 65-79 B / 50-64 C / <50 D；任一硬否决 => 等级"否决".
+（打分等级为 A/B/C/D 档；verdict 另看 verdict 口径：值得买/再看看/别碰 · BUY/HOLD/PASS。）
 DSCR <1.25 直接否决不参与打分（酒店 ≥1.35）。
-v1.1 新增：office / hotel 纳入 in scope（专项保守核保）；value-add 预租 ≥70% 进 A 门禁；
+v1.1 新增：office / hotel 纳入 in scope（专项保守核保）；value-add 预租 ≥70% 进 A 档门禁；
 cash-to-close 为一级字段。
 v1.2（Miao 亲定 2026-09-28 晚）：subject-to 首付浮动制——≤10% 为正常区间，
 首付评分按 deal 质量浮动（基础分随首付比例递减＋现金流强度上浮最高 15 分）。
@@ -12,7 +13,7 @@ v1.3（Miao 亲定 2026-09-28 晚＋CEO 终裁）：
 refi 后能拿出钱）；只有退出完全依赖短期高价抛售且 refi/持有皆不成立时才否决
 （无可行退出 no_viable_exit）；凡退出含抛售成分挂"退出依赖高价抛售"风险旗；
 ② 负净值不再单独否决，改"负净值入场"风险旗＋补偿条件制。
-降级机制：downgrades 列表记录"封顶降级"（如 office 压力测试失败最高 C 级），
+降级机制：downgrades 列表记录"封顶降级"（如 office 压力测试失败最高 C 档），
 与 vetoes（一票否决）区分展示。
 """
 
@@ -31,6 +32,8 @@ ASSET_LABELS = {
 }
 
 STRUCTURE_LABELS = {
+    "standard": "普通购买",
+    "new_loan": "贷款购买（新办贷款）",
     "seller_financing": "Seller financing（卖方融资）",
     "master_lease": "Master lease / lease-option（主租约）",
     "subject_to": "Subject-to（承接现有商业贷款）",
@@ -95,7 +98,7 @@ def compute_metrics(d: dict, with_stress: bool = True) -> dict:
     office：空置/坏账强制下限 12%；租金下调 10% 压力测试（with_stress=False 时跳过，
     供压力测试内部递归调用）。
     cash_to_close（一级字段）= 现金首付＋交割费＋储备金＋首年 capex/TI-LC（＋酒店 PIP capex）。
-    金额硬上限不硬编码（待 Miao 给数额）。
+    金额硬上限不硬编码（待确认）。
     """
     asset = d.get("asset_class", "retail_strip")
     is_hotel = asset == "hotel"
@@ -241,7 +244,7 @@ def check_vetoes(d: dict, m: dict) -> list[dict]:
     if is_hotel:
         if not d.get("has_operating_history", True):
             vetoes.append({"code": "hotel_no_history",
-                           "message": "无经营记录的新建/烂尾酒店 = 不收录（v1.1 专项口径）"})
+                           "message": "无经营记录的新建/烂尾酒店（一票否决，v1.1 专项口径）"})
         if d.get("revpar_source") == "proforma":
             vetoes.append({"code": "hotel_proforma_revpar",
                            "message": "卖方 pro-forma RevPAR 不许用（v1.1 专项口径）"})
@@ -256,10 +259,14 @@ def check_vetoes(d: dict, m: dict) -> list[dict]:
             vetoes.append({"code": "short_balloon",
                            "message": f"短期 balloon 否决：{b} 年内到期 balloon（Miao 亲定）"})
             break
-    if not d.get("exit_primary") or not d.get("exit_backup") or not d.get("buyer_pool_evidence"):
-        vetoes.append({"code": "no_exit", "message": "无退出预案否决：缺主路径/备选路径/买家池证据"})
-    if d.get("structure") == "subject_to" and not d.get("exit_backup"):
-        vetoes.append({"code": "no_dos_plan", "message": "subject-to 无 due-on-sale 备用预案"})
+    # P0-2（Phase 5）：退出 / due-on-sale 否决仅在 structure=subject_to 时参与 verdict；
+    # 普通购买/贷款购买/其他结构下永不出现。单一"退出策略"输入即可解除对应否决。
+    if d.get("structure") == "subject_to" and not d.get("exit_primary"):
+        vetoes.append({"code": "no_exit",
+                       "message": "无退出预案否决：subject-to 须先选定退出策略（出售/refi/转租购/持有收租）"})
+    if d.get("structure") == "subject_to" and not (d.get("exit_backup") or d.get("due_on_sale_plan")):
+        vetoes.append({"code": "no_dos_plan",
+                       "message": "subject-to 无 due-on-sale 备用预案（须能 refi/出售/转租购三选一落地）"})
     if not d.get("phase1_clear", True):
         vetoes.append({"code": "environmental", "message": "环境红旗否决：Phase I 有未解决红旗"})
     if d.get("ti_lc_unfunded_over_12mo"):
@@ -270,8 +277,9 @@ def check_vetoes(d: dict, m: dict) -> list[dict]:
                        "message": "Rollover 悬崖否决：WALT<2 年且 12 个月内到期租金 >40%"})
     if d.get("noi_evidence") == "proforma":
         vetoes.append({"code": "proforma_noi", "message": "卖方 pro-forma NOI 无 rent roll/租约支撑"})
-    if not d.get("seller_signed_auth_release", False):
-        vetoes.append({"code": "no_auth_release", "message": "卖方拒绝签 authorization to release"})
+    # P0-1（Phase 5）：删除"卖方拒绝签 authorization to release"无条件一票否决——
+    # 后端无输入源能证明"拒绝"，属幻觉式否决。改为 Zone 7 交割 checklist 的一项
+    # （"交割前向卖方索取 authorization to release"，状态未验证），永不自动否决。
     if not d.get("zoning_ok", True):
         vetoes.append({"code": "zoning", "message": "Zoning 不合规且无 variance 路径"})
     if d.get("fraud_flag"):
@@ -288,9 +296,15 @@ def check_vetoes(d: dict, m: dict) -> list[dict]:
     dscr = m["dscr"]
     req = m["required_dscr"]
     if dscr is not None and dscr < req:
-        vetoes.append({"code": "low_dscr",
-                       "message": f"DSCR {dscr:.2f} < {req:.2f}，直接否决不参与打分"
-                                  + ("（酒店专项 ≥1.35）" if is_hotel else "")})
+        # Phase 5 第二轮 item 3：无 rent roll 时 DSCR 算不出是"待接数据"不是 0.00——
+        # 否决理由必须如实写"无 rent roll，DSCR 无法核保（待接数据）"，不许出现 0.00x 当硬数字
+        if not d.get("has_rent_roll"):
+            vetoes.append({"code": "low_dscr",
+                           "message": "无 rent roll，DSCR 无法核保（待接数据）"})
+        else:
+            vetoes.append({"code": "low_dscr",
+                           "message": f"DSCR {dscr:.2f} < {req:.2f}，直接否决不参与打分"
+                                      + ("（酒店专项 ≥1.35）" if is_hotel else "")})
     return vetoes
 
 
@@ -303,17 +317,17 @@ def score(d: dict) -> dict:
     is_hotel = asset == "hotel"
 
     # --- v1.1 封顶降级（downgrades）：不是一票否决，但封顶等级 ---
-    # 等级序：不收录 < C < B < A
+    # 等级序：D < C < B < A
     downgrades = []
     if is_office and m["stressed_dscr"] is not None and m["stressed_dscr"] < 1.25:
         downgrades.append({"code": "office_rent_stress", "cap": "C",
                            "message": f"Office 租金下调 10% 压力测试 DSCR {m['stressed_dscr']:.2f} <1.25：最高降级为 C"})
     if d.get("is_value_add_vacant") and d.get("pre_lease_pct", 0) < 70:
         downgrades.append({"code": "value_add_prelease", "cap": "B",
-                           "message": f"Value-add 预租率 {d.get('pre_lease_pct', 0):.0f}% <70%：不能进 A 级"})
+                           "message": f"Value-add 预租率 {d.get('pre_lease_pct', 0):.0f}% <70%：最高 B 档"})
     if is_hotel and not d.get("low_season_covers_ds", False):
         downgrades.append({"code": "hotel_low_season", "cap": "B",
-                           "message": "酒店淡季覆盖测试未通过（淡季月份现金流未覆盖当月 debt service）：不能进 A 级"})
+                           "message": "酒店淡季覆盖测试未通过（淡季月份现金流未覆盖当月 debt service）：最高 B 档"})
 
     # --- 维度1: NOI 与 DSCR 30 分 ---
     cap = (m["entry_cap"] or 0) * 100
@@ -433,25 +447,25 @@ def score(d: dict) -> dict:
     elif total >= 50:
         grade = "C"
     else:
-        grade = "不收录"
-    # v1.1 封顶降级：downgrades 只降级不否决（等级序：不收录 < C < B < A）
+        grade = "D"
+    # v1.1 封顶降级：downgrades 只降级不否决（等级序：D < C < B < A）
     if not vetoes and downgrades:
-        order = {"不收录": 0, "C": 1, "B": 2, "A": 3}
+        order = {"D": 0, "C": 1, "B": 2, "A": 3}
         for dg in downgrades:
             if order.get(grade, 0) > order.get(dg["cap"], 0):
                 grade = dg["cap"]
 
     req_dscr = m["required_dscr"]
-    dscr_label = f"DSCR ≥{req_dscr:.2f}" + ("（酒店专项）" if is_hotel else "（A 级 ≥1.35）")
+    dscr_label = f"DSCR ≥{req_dscr:.2f}" + ("（酒店专项）" if is_hotel else "（A 档 ≥1.35）")
     checks = [
-        {"label": "入场 cap ≥7.5%（A 级 ≥8.5%）", "ok": cap >= 7.5, "note": f"当前 {cap:.2f}%"},
+        {"label": "入场 cap ≥7.5%（A 档 ≥8.5%）", "ok": cap >= 7.5, "note": f"当前 {cap:.2f}%"},
         {"label": "spread ≥ 市场+100bps", "ok": spread >= 100, "note": f"当前 {spread:.0f}bps"},
         {"label": dscr_label, "ok": dscr >= req_dscr, "note": f"当前 {dscr:.2f}"},
-        {"label": "月净现金流 ≥$1,000（A 级 ≥$2,000）", "ok": m["net_cf_monthly"] >= 1000,
+        {"label": "月净现金流 ≥$1,000（A 档 ≥$2,000）", "ok": m["net_cf_monthly"] >= 1000,
          "note": f"当前 ${m['net_cf_monthly']:,.0f}/月"},
-        {"label": "CoC ≥12%（A 级 ≥15%）", "ok": (m["cash_on_cash"] or 0) >= 0.12,
+        {"label": "CoC ≥12%（A 档 ≥15%）", "ok": (m["cash_on_cash"] or 0) >= 0.12,
          "note": f"当前 {(m['cash_on_cash'] or 0)*100:.1f}%"},
-        {"label": "WALT ≥3 年（A 级 ≥5 年；office ≥4 年）", "ok": walt >= (4 if is_office else 3),
+        {"label": "WALT ≥3 年（A 档 ≥5 年；office ≥4 年）", "ok": walt >= (4 if is_office else 3),
          "note": f"当前 {walt:.1f} 年"},
         {"label": "储备金 ≥6 个月 debt service", "ok": d.get("reserves_months_ds", 0) >= need,
          "note": f"当前 {d.get('reserves_months_ds', 0):.1f} 个月（要求 ≥{need}）"},
@@ -462,7 +476,7 @@ def score(d: dict) -> dict:
         {"label": "全口径现金需求 cash-to-close（一级字段）", "ok": True,
          "note": f"${m['cash_to_close']:,.0f} = 首付＋交割费＋储备金＋首年 capex/TI-LC"
                  + ("＋PIP capex" if is_hotel and d.get("pip_capex", 0) else "")
-                 + "；金额硬上限待 Miao 给数额"},
+                 + "；金额硬上限待确认"},
     ]
     if is_office:
         checks.append({"label": "Office 在租率 ≥80%", "ok": d.get("occupancy_pct", 0) >= 80,
@@ -475,7 +489,7 @@ def score(d: dict) -> dict:
         checks.append({"label": "酒店 FF&E ≥4% revenue", "ok": d.get("hotel_ff_e_pct", 4) >= 4,
                        "note": f"当前 {d.get('hotel_ff_e_pct', 4):.1f}%，年 ${m['ff_e_annual']:,.0f}"})
     if d.get("is_value_add_vacant"):
-        checks.append({"label": "Value-add 预租率 ≥70%（进 A 级门禁）",
+        checks.append({"label": "Value-add 预租率 ≥70%（进 A 档门禁）",
                        "ok": d.get("pre_lease_pct", 0) >= 70,
                        "note": f"当前 {d.get('pre_lease_pct', 0):.0f}%"})
     return {"total": total, "grade": grade, "dimensions": dims,

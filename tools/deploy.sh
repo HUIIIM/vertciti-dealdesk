@@ -50,8 +50,11 @@ rsync -a --delete --delete-excluded \
 log "  static/ 同步完成"
 
 # ---- 步骤 3：复制根静态文件 ----
+# 注意：/d 由 vercel.json rewrite 到根 /d.html，其引用的 /d.js、/d.css、
+# /index.html 也都走根级文件——根拷贝列表必须与 static/ 保持同步，
+# 否则生产站会 serve 旧前端（Phase 5 教训）。
 log "步骤 3/6：复制根静态文件到 ${DEPLOY_DIR}/ 根 ..."
-for f in index.html workbench.html workbench.js uw-commercial.html uw-commercial.js app.js style.css; do
+for f in index.html d.html d.js d.css workbench.html workbench.js uw-commercial.html uw-commercial.js app.js style.css; do
     if [ -f "static/${f}" ]; then
         cp "static/${f}" "${DEPLOY_DIR}/${f}" \
             || fail "复制 static/${f} 失败"

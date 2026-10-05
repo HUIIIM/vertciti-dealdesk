@@ -15,9 +15,9 @@ body{margin:0;background:var(--bg0);color:var(--ink);
 a{color:var(--teal)}
 .wrap{max-width:1180px;margin:0 auto;padding:0 16px 80px}
 
-/* Zone 0 顶栏 */
-.z0{position:sticky;top:0;z-index:50;background:rgba(6,10,19,.96);
-  border-bottom:1px solid var(--line);backdrop-filter:blur(6px)}
+/* Zone 0 顶栏：背景必须完全不透明（item 10：杜绝 sticky 文字穿透） */
+.z0{position:sticky;top:0;z-index:50;background:#060a13;
+  border-bottom:1px solid var(--line)}
 .z0-in{max-width:1180px;margin:0 auto;padding:10px 16px;display:flex;
   align-items:center;gap:12px;flex-wrap:wrap}
 .z0 .addr{font-weight:700;font-size:15px;flex:1;min-width:200px}
@@ -47,12 +47,32 @@ a{color:var(--teal)}
 /* PF 角标 */
 .pf{display:inline-block;font-size:10px;font-weight:700;color:#3a2b00;background:var(--amber);
   border-radius:3px;padding:1px 5px;margin-left:6px;vertical-align:2px}
+/* Phase 5 第八轮 P1：pro forma 数字旁的 <sup> 角标（与图例"角标 PF"承诺一致；视觉语言与 .pf 徽标统一） */
+sup.pf{font-size:10px;font-weight:700;color:#3a2b00;background:var(--amber);
+  border-radius:3px;padding:0 4px;margin-left:4px;line-height:1;vertical-align:super}
+
+/* Phase 5 第五轮 D10：Zone 3 comps 拉取失败徽标（标题行红色"拉取失败"） */
+.fail-badge{display:inline-block;background:#b91c1c;color:#fff;font-size:11px;font-weight:700;
+  border-radius:3px;padding:2px 8px;margin-left:8px;vertical-align:2px;letter-spacing:0}
+/* Phase 5 第七轮 R10（remote）：comps 重复记录标注 */
+.dup-tag{display:inline-block;background:rgba(248,113,113,.14);color:#f87171;font-size:11px;
+  font-weight:700;border:1px solid rgba(248,113,113,.4);border-radius:4px;padding:0 6px;margin-left:6px}
+
+/* Phase 5 第五轮 D12（pro-investor P1）：Zone 1 的"Zone 1 · 结论"标题跨两列——
+   否则 2 列 grid 把标题放左列、结论内容挤进右列 300px，左半幅大面积空白 */
+.z1 > .zlabel{grid-column:1 / -1}
 
 /* Zone 1 verdict hero */
 .z1{margin-top:18px;background:var(--surface);border:1px solid var(--line);
   border-radius:var(--radius);padding:22px;display:grid;grid-template-columns:1fr 300px;gap:20px}
-.verdict-word{font-size:32px;font-weight:800;letter-spacing:1px;margin:0 0 6px}
+/* item 1：verdict 词与否决徽标同行显示（flex 保证配对，窄屏自动换行紧贴） */
+.verdict-line{margin:0 0 6px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.verdict-word{font-size:32px;font-weight:800;letter-spacing:1px;margin:0}
 .v-buy{color:var(--green)} .v-hold{color:var(--amber)} .v-pass{color:var(--red)} .v-na{color:var(--muted)}
+/* Phase 5 第四轮 A1：否决态独立第 4 状态——红 */
+.v-veto{color:var(--red)}
+/* broker P1-16：移动端 verdict 词不许断行（"否/决态"式断裂） */
+.verdict-word,.sv-word{white-space:nowrap}
 .one-liner{color:var(--ink2);font-size:14px;margin:0 0 12px;max-width:640px}
 .conf-row{display:flex;align-items:center;gap:10px;margin:10px 0}
 .conf-bar{width:220px;height:8px;background:var(--bg1);border:1px solid var(--line);border-radius:4px;overflow:hidden}
@@ -60,6 +80,7 @@ a{color:var(--teal)}
 .conf-note{font-size:12px;color:var(--muted)}
 .vrange{font-size:18px;font-weight:700;margin:8px 0}
 .cashneed{color:var(--ink2);margin:4px 0}
+.zerodown{color:#b45309;font-weight:600;font-size:13px;margin:4px 0}
 .veto{color:var(--red);font-size:13px;margin:6px 0}
 .reason{color:var(--ink2);font-size:13px;margin:4px 0}
 .usage{color:var(--muted);font-size:12px;margin-top:12px}
@@ -81,7 +102,9 @@ a{color:var(--teal)}
 .zone h2{font-size:15px;margin:0 0 4px;font-weight:700}
 .zone .zsub{color:var(--muted);font-size:12px;margin:0 0 14px}
 .acc-head{width:100%;background:none;border:0;color:var(--ink);display:flex;
-  align-items:center;justify-content:space-between;padding:14px 0;cursor:pointer;min-height:44px}
+  align-items:center;justify-content:space-between;padding:14px 0;cursor:pointer;min-height:44px;
+  /* Phase 5 第七轮 #1（xiaobai）：标题整行可点——禁文字选中拖拽，避免"点文字没反应"的体感 */
+  user-select:none;-webkit-user-select:none}
 .acc-head h2{margin:0}
 .acc-body{display:block}
 .zone.closed .acc-body{display:none}
@@ -160,14 +183,26 @@ input[type=range]{width:100%;height:44px;accent-color:var(--teal)}
 @media (max-width:720px){
   .z1{grid-template-columns:1fr}
   .z45{grid-template-columns:1fr !important}
-  #stickyV{display:flex;position:sticky;top:57px;z-index:40;background:rgba(13,21,38,.97);
-    border-bottom:1px solid var(--line);padding:8px 16px;align-items:center;gap:10px;font-size:13px}
+  /* item 10：移动端 z0 头部换行后高达 156px，#stickyV 按 top:57px 会被埋在头部下面——
+     移动端 z0 改为不 sticky，#stickyV 置顶（top:0）做 verdict 常驻栏，根治重叠 */
+  .z0{position:static}
+  /* item 10：sticky 背景必须完全不透明——此前 rgba(.96/.97)+blur 在移动端透出正文文字 */
+  #stickyV{display:flex;position:sticky;top:0;z-index:40;background:#0d1526;
+    border-bottom:1px solid var(--line);padding:8px 16px;align-items:center;gap:10px;font-size:13px;
+    /* Phase 5 第四轮 E10：390px 下内容超宽时换行，不许按钮压字 */
+    flex-wrap:wrap;row-gap:6px}
   #stickyV .sv-word{font-weight:800}
+  #stickyV #svMeta{min-width:0;flex:1 1 100%}
   #stickyV .btn{min-height:40px;padding:0 10px;margin-left:auto}
   .hbar-row{grid-template-columns:110px 1fr 80px}
 }
+/* item 10：文件上传控件的原生文字不许溢出其容器 */
+.field input[type=file]{font-size:12px;max-width:100%}
 .z45{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
 .z45 .zone{margin-top:0}
+/* item 8：grid item 默认 min-width:auto 会把 560px 表格宽度向上传播撑开整页
+   （390px 下实测 scrollWidth 614）——强制 min-width:0，表格在 zone 内横滑 */
+.z45 > .zone{min-width:0}
 
 /* 打印 */
 @media print{
@@ -177,7 +212,57 @@ input[type=range]{width:100%;height:44px;accent-color:var(--teal)}
   .zone,.z1,.kpi{break-inside:avoid;background:#fff;border:1px solid #ccc;color:#111}
   .zone h2,.verdict-word,.kpi .k-val,.frow .fv{color:#111}
   .one-liner,.kpi .k-sub,.conf-note,.note,.usage,.howto,.zsub{color:#444}
-  .v-buy{color:#047857}.v-hold{color:#b45309}.v-pass{color:#b91c1c}
+  .v-buy{color:#047857}.v-hold{color:#b45309}.v-pass{color:#b91c1c}.v-veto{color:#b91c1c}
   a{color:#111;text-decoration:none}
   .zone.closed .acc-body{display:block !important}
 }
+
+/* Phase 5：术语 tooltip（P0-9） */
+.gloss{border-bottom:1px dotted var(--teal);cursor:help;color:inherit}
+.gloss:hover,.gloss:focus{color:var(--teal)}
+/* 否决态徽标（P0-3） */
+.veto-badge{display:inline-block;background:#7f1d1d;color:#fecaca;border:1px solid #b91c1c;
+  border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;margin:6px 0}
+/* Zone 编号（P1） */
+.znum{display:inline-block;font-size:11px;font-weight:700;color:var(--teal);
+  border:1px solid var(--teal);border-radius:10px;padding:1px 8px;margin-right:8px;vertical-align:2px}
+.zlabel{font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.06em;margin:0 0 6px}
+/* 要价显眼条（P1） */
+#askBar{display:flex;align-items:center;gap:12px;background:var(--surface);
+  border:1px solid var(--teal);border-radius:10px;padding:12px 16px;margin:12px 0}
+#askBar label{font-weight:700;font-size:15px;white-space:nowrap}
+#askBarInput{flex:1;min-width:0;background:var(--bg1);border:1px solid var(--line);
+  color:var(--ink);border-radius:8px;min-height:48px;padding:0 14px;font-size:17px;font-weight:700}
+#askBar .btn{min-height:48px;padding:0 22px;font-size:15px}
+#askBar .note{margin:0}
+@media (max-width:720px){
+  #askBar{flex-wrap:wrap}
+  #askBarInput{flex:1 1 100%}
+  #askBar .btn{flex:1}
+}
+/* P1 移动端：表格横向滚动（comps"调整%"列不再被右缘裁掉） */
+.acc-body{overflow-x:auto}
+table.data{min-width:560px}
+/* P1：sticky 栏导出按钮不被半压 */
+#stickyV .btn{flex-shrink:0}
+/* Phase 5 第四轮 C6：价格锚 sanity check 红色警告 */
+.anchor-warn{color:#f87171;font-weight:800;margin:6px 0}
+/* P0-5（2026-10-05）：商业敏感性矩阵表 */
+.sens-wrap{margin-top:18px}
+.tbl-scroll{overflow-x:auto}
+table.sens-table{border-collapse:collapse;min-width:640px;width:100%;font-size:12.5px}
+table.sens-table th,table.sens-table td{border:1px solid var(--line-soft);padding:7px 9px;text-align:center}
+table.sens-table thead th{background:var(--surface2);color:var(--ink2);font-weight:700;font-size:11.5px;white-space:nowrap}
+table.sens-table .sens-axis{background:var(--surface2);color:var(--ink2);font-weight:700;white-space:nowrap}
+table.sens-table .sens-cell{background:var(--surface)}
+.sens-cell .sens-irr{display:block;font-weight:700;font-variant-numeric:tabular-nums}
+.sens-cell .sens-em{display:block;color:var(--muted);font-size:11.5px;font-variant-numeric:tabular-nums}
+table.sens-table .sens-base{background:var(--teal-dim)}
+.sens-note{color:var(--muted);font-size:12px;margin:8px 0 0}
+
+/* B：地址类型自动识别横幅 */
+.typenudge{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  margin:10px auto;max-width:1120px;padding:10px 14px;border-radius:10px;
+  background:var(--teal-dim);border:1px solid var(--line);font-size:14px}
+.typenudge[hidden]{display:none}
+.typenudge .btn{padding:6px 12px;font-size:13px}

@@ -12,7 +12,8 @@ from __future__ import annotations
 
 
 def _money(x):
-    return "—" if x is None else f"${x:,.0f}"
+    # Phase 5 第六轮微修复 #8（newbie）：负号放 $ 前面（-$4,064），不许 $-4,064
+    return "—" if x is None else ("-$" + f"{abs(x):,.0f}" if x < 0 else f"${x:,.0f}")
 
 
 def _pct(x, digits=1):
@@ -27,13 +28,13 @@ GRADE_SENTENCE = {
     "A": "各项硬指标都在安全区内，这是一笔可以直接推进尽调的交易。",
     "B": "基本面成立，但有明确的失分项——先补短板，再谈推进。",
     "C": "先放进观察名单；等条件变化（降价、条款松动）再拿出来重算。",
-    "不收录": "按当前条件数字算不过来，不建议推进；除非重谈价格或结构。",
+    "D": "按当前条件数字算不过来，不建议推进；除非重谈价格或结构。",
     "否决": "触发了一票否决项，按当前结构这笔交易不能做。",
 }
 
 RENT_SOURCE_LABEL = {
     "comps_verified": "实测 comps",
-    "estimated": "估算（未核实，不进 A 级）",
+    "estimated": "估算（未核实，最高 B 档）",
     "proforma": "pro-forma（卖方自嗨）",
 }
 
@@ -69,7 +70,9 @@ def lead_paragraphs(p: dict, B, T) -> list:
     )
     grade = s["grade"]
     p2 = (
-        f"{T('DealDesk 综合评分')}{B(str(s['total']) + ' 分')}{T('（' + grade + '）。')}"
+        # Phase 5 第五轮 C7（newbie）：叫法统一为"deal 评分"——"DealDesk 综合评分"
+        # 是自创的第三个名字，PDF 独立阅读者会对"综合评分 vs deal 评分 vs 置信度"困惑
+        f"{T('deal 评分')}{B(str(s['total']) + ' 分')}{T('（' + grade + '）。')}"
         f"{T(GRADE_SENTENCE.get(grade, ''))}"
         f"{T('下面先看否决项与测算，再看这一分一分是怎么拿到的。')}"
     )
@@ -116,7 +119,7 @@ def conclusion_paragraphs(p: dict, B, T) -> list:
             f"{B('结论：先观察，不主动推进。')}"
             f"{T('当前条件够不上收录线。设个价格/条款闹钟：卖方松动（降价、降首付、延长账期）时再拿出来重算。')}"
         )
-    else:  # 不收录
+    else:  # D
         out.append(
             f"{B('结论：按当前条件放弃。')}"
             f"{T('数字算不过来，硬推进只会亏时间。除非价格或结构重谈，否则不回头。')}"

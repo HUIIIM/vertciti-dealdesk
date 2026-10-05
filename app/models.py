@@ -1,6 +1,14 @@
 """输入数据模型（Pydantic v2, frozen 风格校验）.
 
 百分制约定：所有 `*_pct` 字段输入百分制数字（8 表示 8%），内部统一 /100。
+
+商业核保数据标准 v1.0 §1.1（CEO 2026-10-05 终裁①）：
+  /api/uw/*（compute/compute-plus/report/report.xlsx/memo 商業）的 input
+  输入层一律 [PCT]：vacancy_pct / down_pct / rate / market_cap_rate /
+  exit_cap_rate / noi_growth（如 8 / 30 / 6.5 / 6 / 5 / 2）；
+  计算层一律 [DEC]，边界经 app/uw_commercial.py::normalize_pct() 归一化；
+  compute_* 输出回显为 [DEC]（Excel PCT 格式格 / PDF _pct() 按小数消费）。
+  rate 在 /api/score 与 /api/uw/* 同为百分制输入 —— 同名一义。
 """
 
 from __future__ import annotations
@@ -13,8 +21,9 @@ from pydantic import BaseModel, ConfigDict, Field
 class ResidentialInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    structure: Literal["subject_to", "seller_financing", "loan_assumption",
-                       "lease_option", "novation", "wholesale"] = "subject_to"
+    structure: Literal["standard", "new_loan", "subject_to", "seller_financing",
+                       "loan_assumption", "lease_option", "novation",
+                       "wholesale"] = "standard"
     price: float = Field(gt=0, description="收购价/成交价")
     down_payment: float = Field(default=0, ge=0, description="首付金额 $")
     loan_balance: float = Field(default=0, ge=0, description="承接贷款余额 $")
@@ -72,8 +81,9 @@ class CommercialInput(BaseModel):
     asset_class: Literal["small_bay_industrial", "retail_strip", "mixed_use",
                          "small_multifamily_5plus", "office", "hotel",
                          "other"] = "retail_strip"
-    structure: Literal["seller_financing", "master_lease", "subject_to",
-                       "loan_assumption", "seller_carryback_2nd"] = "seller_financing"
+    structure: Literal["standard", "new_loan", "seller_financing", "master_lease",
+                       "subject_to", "loan_assumption",
+                       "seller_carryback_2nd"] = "seller_financing"
     price: float = Field(gt=0)
     closing_costs: float = Field(default=0, ge=0)
     capex_y1: float = Field(default=0, ge=0, description="首年必须投的 capex")
@@ -108,6 +118,10 @@ class CommercialInput(BaseModel):
     fraud_flag: bool = False
     exit_primary: str = ""
     exit_backup: str = ""
+    due_on_sale_plan: str = ""  # P0-2：与住宅线同名字段，subject-to due-on-sale 备用预案
+    # Phase 5 第二轮（item 3）：前端是否已导入结构化 rent roll；无 rent roll 时
+    # DSCR 否决理由必须写"无 rent roll，DSCR 无法核保（待接数据）"，不许拿 0.00 当硬数字
+    has_rent_roll: bool = False
     buyer_pool_evidence: str = ""
     reserves_months_ds: float = Field(default=0, ge=0)
     is_value_add_vacant: bool = False
@@ -125,7 +139,7 @@ class CommercialInput(BaseModel):
     franchise_term_ok: bool = Field(default=True, description="特许经营协议 ≥10 年或有续期权")
     low_season_covers_ds: bool = Field(default=False, description="淡季月份现金流覆盖当月 debt service")
     # --- v1.1: 通用新增 ---
-    pre_lease_pct: float = Field(default=0, ge=0, le=100, description="预租率 %（value-add 进 A 级要求 ≥70）")
+    pre_lease_pct: float = Field(default=0, ge=0, le=100, description="预租率 %（value-add 进 A 档要求 ≥70）")
     exit_flip_dependent_only: bool = Field(default=False, description="退出含高价抛售成分（v1.3 起不再单独否决，挂风险旗；仅当 refi/持有皆不成立时否决）")
     refi_cashout_viable: bool = Field(default=False, description="refi 路径能独立算通、refi 后能拿出钱（v1.3 高价抛售软化条件）")
     risk_flags: list[str] = Field(default_factory=list)

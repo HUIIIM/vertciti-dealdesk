@@ -216,6 +216,7 @@ STRESS_TIERS = {
 
 def _tweak(data: dict, rate_delta: float = 0.0, vac_delta: float = 0.0,
            rent_mult: float = 1.0) -> dict:
+    # 标准 v1.0 §1.1：analysis 输入层 [PCT] —— rate_delta / vac_delta 均为百分点
     d = copy.deepcopy(data)
     a = d.setdefault("analysis", {})
     a["rate"] = max(0.0, _f(a.get("rate")) + rate_delta)
@@ -236,7 +237,8 @@ def stress_table(data: dict, loan_amount: float | None = None,
     """压力测试表：行=档位，列=DSCR / Debt Yield / Breakeven；破红线标红."""
     scenarios = [("基准", {})]
     for bps in STRESS_TIERS["rate_bps"]:
-        scenarios.append((f"利率 +{bps}bps", {"rate_delta": bps / 10000}))
+        # 标准 v1.0：rate 输入 [PCT] —— 100bps = 1.0 个百分点
+        scenarios.append((f"利率 +{bps}bps", {"rate_delta": bps / 100}))
     for pp in STRESS_TIERS["vacancy_pp"]:
         # P0-1 (2026-10-05): _tweak 操作的是百分制输入，vac_delta 用百分点（pp），不再 /100
         scenarios.append((f"空置 +{pp}pp", {"vac_delta": pp}))

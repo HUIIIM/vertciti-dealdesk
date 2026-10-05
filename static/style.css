@@ -182,7 +182,7 @@ body {
 .badge.A { color: var(--green); background: var(--green-dim); border-color: var(--green-line); }
 .badge.B { color: var(--blue); background: var(--blue-dim); border-color: var(--blue-line); }
 .badge.C { color: var(--amber); background: var(--amber-dim); border-color: var(--amber-line); }
-.badge.否决, .badge.不收录 { color: var(--red); background: var(--red-dim); border-color: var(--red-line); }
+.badge.否决, .badge.D { color: var(--red); background: var(--red-dim); border-color: var(--red-line); }
 .badge.big { font-size: 26px; padding: 8px 20px; border-radius: 10px; letter-spacing: 0; }
 
 /* 可信度芯片 */

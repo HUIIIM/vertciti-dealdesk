@@ -77,12 +77,13 @@ function scenario(inp, baseRents, netSf, purchase, autoCam, autoPkg) {
   const totalExp = Object.values(expenses).reduce((a, b) => a + b, 0);
   const noi = egi - totalExp;
   const ti = f(inp.tenant_improvements), capex = f(inp.capex), lc = f(inp.leasing_commissions);
+  const replRes = f(inp.replacement_reserve);   // 终裁②：盈亏平衡分子含储备金
   return {
     base_rents: baseRents, cam_recovery: camRec, parking_income: parking, other_income: other,
     income_sources: { cam_recovery: camSrc, parking_income: pkgSrc },
     total_potential: totalPotential, vacancy_pct: vacPct, vacancy_loss: vacLoss, egi,
     expenses, total_expenses: totalExp, noi,
-    tenant_improvements: ti, capex, leasing_commissions: lc,
+    tenant_improvements: ti, capex, leasing_commissions: lc, replacement_reserve: replRes,
     cash_flow_avail: noi - ti - capex - lc,
     cash_flow_gross: noi + other,           // 模板口径：NOI + 其他收入
     cap_rate: div(noi, purchase),
@@ -107,7 +108,8 @@ function remainingBal(loan, rate, years, pmt, afterYears) {
 function irrOf(flows) {
   const npv = (r) => flows.reduce((s, cf, i) => s + cf / Math.pow(1 + r, i), 0);
   let lo = -0.99, hi = 10, flo = npv(lo), fhi = npv(hi);
-  if (flo * fhi > 0) return 0;
+  // 终裁⑤：不收敛 → NaN（渲染"—"），禁止返回 0.0 冒充（0% 会被误读为保本）
+  if (flo * fhi > 0) return NaN;
   for (let i = 0; i < 100; i++) {
     const mid = (lo + hi) / 2;
     if (flo * npv(mid) <= 0) { hi = mid; fhi = npv(hi); }
@@ -118,10 +120,11 @@ function irrOf(flows) {
 
 function computeExit(a, pro, loanBal, rate, amortType, amortYears, annualDebt, netLiq) {
   const holdYears = Math.round(f(a.hold_years, 5));
-  const growth = f(a.noi_growth, 0.02), exitCap = f(a.exit_cap_rate, 0.05);
+  // 标准 v1.0 §1.1：输入层 [PCT] → 此处 normalize → [DEC]
+  const growth = f(a.noi_growth, 2) / 100, exitCap = f(a.exit_cap_rate, 5) / 100;
   const exitFeePct = 0.04, abate = f(a.abatements);  // 模板固定 4%，2026-10-01 Miao 决定锁定
   if (holdYears <= 0 || netLiq <= 0)
-    return { hold_years: holdYears, irr: 0, equity_multiple: 0, sale_price: 0, sale_proceeds: 0, remaining_loan: 0 };
+    return { hold_years: holdYears, irr: NaN, equity_multiple: NaN, sale_price: NaN, sale_proceeds: NaN, remaining_loan: NaN };
   const baseNoi = pro.noi, flows = [-netLiq];
   for (let y = 1; y <= holdYears; y++)
     flows.push(baseNoi * Math.pow(1 + growth, y - 1) - abate - annualDebt);
@@ -145,7 +148,9 @@ function computeAnalysis(a, hist, pro) {
   const repairs = f(a.building_repairs), reserve = f(a.capital_reserve);
   const lenderFees = f(a.lender_fees), closing = f(a.closing_costs);
   const totalUses = purchase + repairs + reserve + lenderFees + closing;
-  const downPct = f(a.down_pct), rate = f(a.rate);
+  // 标准 v1.0 §1.1（终裁①）：输入层 [PCT] → 边界 normalize → [DEC]；
+  // down_pct=0.30 / rate=0.06 的小数输入口径已废止，现输入 30 / 6.5
+  const downPct = f(a.down_pct) / 100, rate = f(a.rate) / 100;
   const amortType = (a.amort_type || "IO").toUpperCase();
   const amortYears = f(a.amort_years, 30);
   const loanBal = purchase * (1 - downPct);
@@ -154,7 +159,7 @@ function computeAnalysis(a, hist, pro) {
   const inNoi = f(a.underwritten_noi) || hist.noi;      // F13 手工，空=取现金流
   const prNoi = f(a.projected_noi) || pro.noi;            // F15 手工，空=取现金流
   const inNoiCf = f(a.inplace_noi_cf) || hist.noi;        // I24 手工，空=取现金流
-  const marketCap = f(a.market_cap_rate);
+  const marketCap = f(a.market_cap_rate) / 100;   // [PCT] 输入 → [DEC]
   const resale = div(prNoi, marketCap);
   const acqFees = repairs + reserve + lenderFees + closing;
   const exitFeePct = 0.04;  // 模板固定 4%，2026-10-01 Miao 决定锁定
@@ -185,7 +190,8 @@ function computeAnalysis(a, hist, pro) {
     net_gains: netGains, roi: div(netGains, netLiq),
     projected: coc(prNoi, pro.other_income),
     inplace: coc(inNoiCf, hist.other_income),
-    breakeven_occupancy: div(pro.total_expenses + annualDebt, pro.total_potential),
+    // 终裁②：分子含储备金（与后端 / Excel 标注一致）
+    breakeven_occupancy: div(pro.total_expenses + annualDebt + f(pro.replacement_reserve), pro.total_potential),
     exit: computeExit(a, pro, loanBal, rate, amortType, amortYears, annualDebt, netLiq),
   };
 }
@@ -252,7 +258,8 @@ function fmtVal(v, kind) {
 }
 function setInputVal(el, path) {
   const v = getPath(state, path);
-  if (el.dataset.pct) el.value = v === 0 || v == null ? "" : (f(v) * 100).toFixed(3).replace(/\.?0+$/, "");
+  // 标准 v1.0 §1.1：data-pct 字段显示 [PCT] 原样（不再 ×100；A1/A3 修复）
+  if (el.dataset.pct) el.value = v === 0 || v == null ? "" : String(f(v));
   else el.value = v === 0 || v == null ? (el.type === "number" ? "" : v) : v;
 }
 
@@ -347,7 +354,8 @@ function cfTableHTML(sc, title, linkedNote) {
   };
   const inp = (lbl, key, isPct) => {
     const v = state[title][key];
-    const disp = isPct ? (v ? (f(v) * 100).toFixed(2) : "") : (v || "");
+    // 标准 v1.0 §1.1：state 存 [PCT] 原样（8 表示 8%），显示不再 ×100（A1 修复）
+    const disp = (v || "");
     let srcTag = "", ph = "";
     if (sc.income_sources && sc.income_sources[key]) {
       const s = sc.income_sources[key];
@@ -477,7 +485,7 @@ function bindInputs() {
     const el = e.target;
     if (el.dataset.in) {
       let v = el.type === "number" ? (el.value === "" ? 0 : parseFloat(el.value)) : el.value;
-      if (el.dataset.pct) v = f(v) / 100;
+      // 标准 v1.0 §1.1：data-pct 字段 state 存 [PCT] 原样（不再 /100；A1/A3 修复）
       setPath(state, el.dataset.in, v);
       renderAll(true);
       pulseAuto();
@@ -492,8 +500,8 @@ function bindInputs() {
       markDirty();
     } else if (el.dataset.cf) {
       const key = el.dataset.k;
+      // 标准 v1.0 §1.1：现金流输入存 [PCT] 原样（空置率手填 8 = 8%；A1 修复）
       let v = el.value === "" ? 0 : parseFloat(el.value);
-      if (el.dataset.ispct === "1") v = f(v) / 100;
       state[el.dataset.cf][key] = v;
       // 只重算数字，不重建输入框（避免光标跳）
       renderAll(true);
@@ -572,11 +580,11 @@ function blankState() {
     tenants: [{ suite: "1", tenant: "", sf: 0, monthly_rent: 0, underwritten_annual: "" }],
     vacant_sf: 0,
     historical: baseScenario(), proforma: baseScenario(),
-    analysis: { purchase_price: 0, building_repairs: 0, capital_reserve: 0, lender_fees: 0, closing_costs: 0, down_pct: 0.3, rate: 0.06, amort_type: "IO", amort_years: 30, market_cap_rate: 0.04, abatements: 0, underwritten_noi: null, projected_noi: null, inplace_noi_cf: null, hold_years: 5, noi_growth: 0.02, exit_cap_rate: 0.05 },
+    analysis: { purchase_price: 0, building_repairs: 0, capital_reserve: 0, lender_fees: 0, closing_costs: 0, down_pct: 30, rate: 6.5, amort_type: "IO", amort_years: 30, market_cap_rate: 6, abatements: 0, underwritten_noi: null, projected_noi: null, inplace_noi_cf: null, hold_years: 5, noi_growth: 2, exit_cap_rate: 5 },
   };
 }
 function baseScenario() {
-  const o = { cam_recovery: 0, parking_income: 0, other_income: 0, vacancy_pct: 0, tenant_improvements: 0, capex: 0, leasing_commissions: 0 };
+  const o = { cam_recovery: 0, parking_income: 0, other_income: 0, vacancy_pct: 0, tenant_improvements: 0, capex: 0, leasing_commissions: 0, replacement_reserve: 0 };
   EXPENSES.forEach(([k]) => (o[k] = 0));
   return o;
 }

@@ -65,7 +65,7 @@ const RES_SECTIONS = [
     {key: 'monthly_rent', label: '月租金 $', type: 'number', def: ''},
     {key: 'other_income_monthly', label: '其他月收入 $', type: 'number', def: 0},
     {key: 'rent_source', label: '租金依据', type: 'select', def: 'estimated', options: [
-      ['comps_verified', '实测 comps'], ['estimated', '估算（未核实不进 A 级）'], ['proforma', 'pro-forma（否决）']]},
+      ['comps_verified', '实测 comps'], ['estimated', '估算（未核实最高 B 档）'], ['proforma', 'pro-forma（否决）']]},
     {key: 'taxes_annual', label: '年房产税 $', type: 'number', def: 0},
     {key: 'insurance_annual', label: '年保险 $', type: 'number', def: 0},
     {key: 'hoa_monthly', label: '月 HOA $', type: 'number', def: 0},
@@ -159,7 +159,7 @@ const COM_SECTIONS = [
     {key: 'as_is_appraisal', label: 'As-is 评估值 $', type: 'number', def: 0, hint: '成交价高于此值 = 负净值否决'},
   ]},
   {title: '租约结构', fields: [
-    {key: 'walt_years', label: 'WALT（年）', type: 'number', def: 0, hint: '要求 ≥3 年，A 级 ≥5 年'},
+    {key: 'walt_years', label: 'WALT（年）', type: 'number', def: 0, hint: '要求 ≥3 年，A 档 ≥5 年'},
     {key: 'all_nnn', label: '全 NNN 租约', type: 'check', def: false},
     {key: 'concentration_12mo_pct', label: '12 个月内到期租金占比 %', type: 'number', def: 0, hint: '要求 ≤30%'},
     {key: 'tenant_quality_ok', label: '租户信用/分散度达标', type: 'check', def: false},
@@ -179,11 +179,11 @@ const COM_SECTIONS = [
     {key: 'hotel_mgmt_pct', label: '管理费 %（≥5% 营收）', type: 'number', def: 5},
     {key: 'hotel_ff_e_pct', label: 'FF&E reserve %（≥4% 营收）', type: 'number', def: 4},
     {key: 'has_operating_history', label: '有稳定经营记录', type: 'check', def: true,
-      hint: '无记录的新建/烂尾酒店 = 不收录'},
+      hint: '无记录的新建/烂尾酒店（一票否决）'},
     {key: 'pip_capex', label: '品牌 PIP capex $', type: 'number', def: 0, hint: '全额计入收购成本与现金需求'},
     {key: 'franchise_term_ok', label: '特许经营协议 ≥10 年或有续期权', type: 'check', def: true},
     {key: 'low_season_covers_ds', label: '淡季月份现金流覆盖当月 debt service', type: 'check', def: false,
-      hint: '未通过 = 不能进 A 级'},
+      hint: '未通过 = 最高 B 档'},
   ]},
   {title: '合规与退出预案', fields: [
     {key: 'phase1_clear', label: 'Phase I 环境无未解决红旗', type: 'check', def: true},
@@ -201,7 +201,7 @@ const COM_SECTIONS = [
     {key: 'buyer_pool_evidence', label: '买家池证据', type: 'text', def: ''},
     {key: 'reserves_months_ds', label: '储备金（几个月 debt service）', type: 'number', def: 0, hint: '要求 ≥6 个月；value-add ≥12 个月'},
     {key: 'is_value_add_vacant', label: 'Value-add / 带空置资产', type: 'check', def: false},
-    {key: 'pre_lease_pct', label: '预租率 %（value-add 进 A 级要求 ≥70%）', type: 'number', def: 0},
+    {key: 'pre_lease_pct', label: '预租率 %（value-add 进 A 档要求 ≥70%）', type: 'number', def: 0},
   ]},
   {title: '风险旗（每 1 个实质风险旗扣 3 分）', fields: [
     {key: 'insurance_unavailable', label: '保险买不到/暴涨的市场', type: 'check', flag: true},
@@ -358,16 +358,16 @@ function insightHtml() {
     const names = state.projects.filter(p => p.score.grade === '否决' || (p.score.vetoes || []).length)
       .slice(0, 3).map(p => esc(p.name || p.address || ('#' + p.id))).join('、');
     return `<div class="insight bad"><div class="ic">✕</div><div>
-    <div class="t">${k.veto} 个项目触发一票否决${k.a ? `，但有 ${k.a} 个 A 级项目可推进` : '，还没有 A 级项目'}</div>
+    <div class="t">${k.veto} 个项目触发一票否决${k.a ? `，但有 ${k.a} 个 A 档项目可推进` : '，还没有 A 档项目'}</div>
     <div class="d">否决：${names}${k.veto > 3 ? ` 等 ${k.veto} 个` : ''}。否决项在详情页逐条列出，先处理否决再谈分级。</div></div></div>`;
   }
   if (k.a) return `<div class="insight good"><div class="ic">◈</div><div>
-    <div class="t">${k.a} 个 A 级项目在管线中，总全口径现金需求 ${money(k.cash)}</div>
+    <div class="t">${k.a} 个 A 档项目在管线中，总全口径现金需求 ${money(k.cash)}</div>
     <div class="d">按 cash-to-close 升序排列，先看最便宜的——资金有限，贵的不先谈。</div></div></div>`;
   const b = state.projects.filter(p => p.score.grade === 'B').length;
   return `<div class="insight warn"><div class="ic">◈</div><div>
-    <div class="t">还没有 A 级项目，${b} 个 B 级在观察</div>
-    <div class="d">B 级进日报收录，C 级只进观察名单。点进详情看看，差的那几分能不能谈回来。</div></div></div>`;
+    <div class="t">还没有 A 档项目，${b} 个 B 档在观察</div>
+    <div class="d">B 档进日报收录，C 档只进观察名单。点进详情看看，差的那几分能不能谈回来。</div></div></div>`;
 }
 
 function sortVal(p, key) {
@@ -433,7 +433,7 @@ function renderDashboard(app) {
     <div class="zone">${insightHtml()}</div>
     <div class="zone"><div class="kpis">
       <div class="kpi" style="--kc:var(--brand)"><div class="k">在管项目</div><div class="v num">${k.n}</div><div class="s">住宅 / 商业双轨</div></div>
-      <div class="kpi" style="--kc:var(--green)"><div class="k">A 级项目</div><div class="v num" style="color:var(--green)">${k.a}</div><div class="s">≥80 分 · 日报头条</div></div>
+      <div class="kpi" style="--kc:var(--green)"><div class="k">A 档项目</div><div class="v num" style="color:var(--green)">${k.a}</div><div class="s">≥80 分 · 日报头条</div></div>
       <div class="kpi" style="--kc:var(--blue)"><div class="k">平均分</div><div class="v num">${k.avg == null ? '—' : k.avg.toFixed(1)}<small>/100</small></div><div class="s">全管线加权口径一致</div></div>
       <div class="kpi" style="--kc:#f79009"><div class="k">总 cash-to-close</div><div class="v num">${money(k.cash)}</div><div class="s">全口径现金需求合计</div></div>
       <div class="kpi" style="--kc:var(--red)"><div class="k">一票否决</div><div class="v num" style="color:${k.veto ? 'var(--red)' : 'inherit'}">${k.veto}</div><div class="s">任一硬否决 = 否决</div></div>

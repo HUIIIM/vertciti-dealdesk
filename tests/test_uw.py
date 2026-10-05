@@ -176,7 +176,8 @@ def test_empty_project_no_crash():
     assert r["rent_roll"]["total_annual_lease"] == 0
     assert r["historical"]["noi"] == 0
     assert r["analysis"]["net_liquidity"] == 0
-    assert r["analysis"]["exit"]["irr"] == 0
+    # 终裁⑤：空项目 IRR 不收敛 → None（禁 0.0 冒充）
+    assert r["analysis"]["exit"]["irr"] is None
 
 
 def test_zero_sf_no_div0():
@@ -231,7 +232,7 @@ def test_uw_template_endpoint():
     r = client.get("/api/uw/template")
     assert r.status_code == 200
     body = r.json()
-    assert body["blank"]["analysis"]["down_pct"] == 0.3
+    assert body["blank"]["analysis"]["down_pct"] == 30
     assert body["example_39_main"]["property"]["zip"] == "11354"
 
 
@@ -251,7 +252,7 @@ def test_new_property_fields_and_parking_per_1000sf():
     assert approx(r2["property"]["parking_per_1000sf"], 50 / (17042 / 1000), 1e-4)
     # market_cap_rate 可输入并驱动转售价：NOI / cap
     d3 = example_39_main()
-    d3["analysis"]["market_cap_rate"] = 0.05
+    d3["analysis"]["market_cap_rate"] = 5
     r3 = compute_all(d3)
     assert approx(r3["analysis"]["projected_resale"], 2000000.0 / 0.05)
 

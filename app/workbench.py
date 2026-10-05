@@ -118,8 +118,8 @@ class WbComp(BaseModel):
     sf: float = Field(default=0, ge=0)
     distance_miles: float = Field(default=0, ge=0)
     adjustment_pct: float = Field(default=0, description="调整 %（百分制，可正可负）")
-    noi_annual: float = Field(default=0, ge=0,
-                              description="可比年 NOI（可选，>0 则算出 cap rate）")
+    noi_annual: float | None = Field(default=None, ge=0,
+                              description="可比年 NOI（可选，>0 则算出 cap rate；缺失=未知，走 N/A 渲染）")
     source: str = ""      # 来源（必填，前端强制）
     note: str = ""
 
@@ -307,7 +307,9 @@ def parse_comps_csv(text: str) -> dict:
                 "sf": float(str(r.get("sf") or 0).replace(",", "") or 0),
                 "distance_miles": float(str(r.get("distance_miles") or 0) or 0),
                 "adjustment_pct": float(str(r.get("adjustment_pct") or 0) or 0),
-                "noi_annual": float(str(r.get("noi_annual") or 0) or 0),
+                # D 铁律：CSV 空 noi = 未知 → None（走 N/A 渲染）；显式 "0" 保留 0.0
+                "noi_annual": (lambda _v: None if _v in (None, "")
+                               else float(str(_v).replace(",", "")))(r.get("noi_annual")),
                 "source": (r.get("source") or "").strip(),
                 "note": (r.get("note") or "").strip(),
             })

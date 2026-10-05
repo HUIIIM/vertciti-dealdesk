@@ -15,6 +15,9 @@
 .hero p{color:var(--ink2);margin:0 0 28px}
 .duo{display:grid;grid-template-columns:1fr 1fr;gap:16px;max-width:880px;margin:0 auto}
 @media(max-width:720px){.duo{grid-template-columns:1fr}}
+/* B2/B3：.frow2 的 display:grid 会覆盖 hidden 属性（UA 样式 display:none 优先级低于
+   作者样式），导致住宅流也看到商业的物业类型＋第二个价格框——hidden 必须强制隐藏 */
+.frow2[hidden]{display:none !important}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:8px;
   padding:28px;cursor:pointer;text-align:left;color:var(--ink);width:100%;font:inherit}
 .card:hover,.card.sel{border-color:var(--teal)}
@@ -34,6 +37,9 @@
   color:var(--ink);border-radius:6px;min-height:44px;padding:0 12px;font-size:14px}
 .go{margin-top:16px;width:100%;min-height:52px;font-size:16px}
 .back{background:none;border:0;color:var(--muted);cursor:pointer;margin-top:12px;font-size:13px;min-height:44px}
+.addr-note{font-size:13px;margin:8px 0 0;min-height:20px}
+.addr-note.ok{color:var(--teal)}
+.addr-note.err{color:#f87171;font-weight:700}
 .foot{text-align:center;color:var(--muted);font-size:12px;margin:48px 0 24px}
 .foot a{color:var(--muted)}
 </style>
@@ -42,7 +48,8 @@
 <main class="wrap">
   <div class="hero">
     <h1>DealDesk <span class="t">·</span> 一页纸的买房决策</h1>
-    <p>打开这个页面，3 秒知道买还是不买，再往下翻知道为什么。</p>
+    <p>打开这个页面，3 秒知道买还是不买，再往下翻知道为什么。<br>
+    <span style="font-size:13px">选好类型、输入地址——所有分析都在<b>统一决策单页</b>上完成，没有第二入口。</span></p>
   </div>
 
   <div class="duo" id="duo">
@@ -64,15 +71,24 @@
     <p style="color:var(--ink2)"><b id="step2Title">住宅</b> · 第一步：告诉我地址</p>
     <input class="biginput" id="addrInput" placeholder="输入物业地址，或粘贴 Zillow / Redfin 房源链接"
       autocomplete="off" aria-label="物业地址">
+    <p class="addr-note" id="addrNote" hidden></p>
     <div class="frow2" id="ptypeRow" hidden>
       <div class="field"><label>物业类型（选填，用于调 comps 过滤器）</label>
         <select id="ptype"><option value="">未选择</option><option>写字楼</option><option>零售</option><option>多户</option><option>工业</option></select></div>
+    </div>
+    <div class="frow2">
       <div class="field"><label>收购价 / 要价 $（选填，不填可在结果页补）</label>
         <input id="askInput" type="number" min="0" placeholder="如 850000"></div>
     </div>
-    <div class="frow2" id="askRowRes">
-      <div class="field"><label>收购价 / 要价 $（选填，不填可在结果页补）</label>
-        <input id="askInputRes" type="number" min="0" placeholder="如 850000"></div>
+    <div class="frow2">
+      <div class="field"><label>交易结构（决定 verdict 用哪套否决规则，默认普通购买）</label>
+        <select id="structSel">
+          <option value="standard" selected>普通购买</option>
+          <option value="new_loan">贷款购买（新办贷款）</option>
+          <option value="subject_to">subject-to（承接现有贷款）</option>
+        </select></div>
+      <div class="field"><label>&nbsp;</label>
+        <p class="note" style="margin:0">subject-to 才有"退出预案 / due-on-sale 备用预案"否决项；普通购买/贷款购买永不触发。</p></div>
     </div>
     <button class="btn primary go" id="goBtn">开始分析</button>
     <div class="steps" id="goSteps" style="display:none"></div>
@@ -92,7 +108,6 @@ document.querySelectorAll('.card').forEach(c => c.addEventListener('click', () =
   $('#step2').classList.add('show');
   $('#step2Title').textContent = type === 'res' ? '住宅' : '商业';
   $('#ptypeRow').hidden = type !== 'com';
-  $('#askRowRes').style.display = type === 'com' ? 'none' : '';
   $('#addrInput').focus();
   $('#step2').scrollIntoView({behavior: 'smooth', block: 'center'});
 }));
@@ -104,11 +119,90 @@ $('#backBtn').addEventListener('click', () => {
 function stepLine(el, label, state) {
   el.innerHTML += `<div class="step ${state}"><span class="st">${state === 'run' ? '<span class="spin"></span>' : '✓'}</span><span>${label}</span></div>`;
 }
+/* P1-2（2026-10-05）：Zillow / Redfin 房源链接 → 地址解析。
+   保守启发式：只认 zillow.com / redfin.com 域名，逐 path 段试地址形 slug；
+   slug 必须同时满足：门牌号开头＋含街道后缀词＋2 字母州＋5 位 zip 结尾，
+   任一不满足即判失败。失败 = 失败，绝不把 URL 当地址吞进流程，更不编地址。 */
+const STREET_SUFFIX = /^(st|street|ave|avenue|rd|road|blvd|boulevard|dr|drive|ln|lane|ct|court|pl|place|way|ter|terrace|pkwy|parkway|cir|circle)$/i;
+/* Broadway 是常见连写后缀（Broadway），单独处理 */
+const hasStreetSuffix = p => STREET_SUFFIX.test(p) || /broadway$/i.test(p);
+function parseSlug(slug) {
+  const parts = slug.split('-').filter(Boolean);
+  if (parts.length < 4) return null;
+  if (!/^\d{1,6}$/.test(parts[0])) return null;               // 门牌号开头
+  if (!/^\d{5}$/.test(parts[parts.length - 1])) return null; // 5 位 zip 结尾
+  let state = null, streetParts;
+  if (parts.length >= 5 && /^[A-Za-z]{2}$/.test(parts[parts.length - 2])) {
+    state = parts[parts.length - 2].toUpperCase();            // slug 自带州（Zillow 格式）
+    streetParts = parts.slice(0, -2);
+  } else {
+    streetParts = parts.slice(0, -1);
+  }
+  if (!streetParts.slice(1).some(hasStreetSuffix)) return null; // 街道后缀词
+  return {streetParts, state, zip: parts[parts.length - 1]};
+}
+function parseListingUrl(text) {
+  let u;
+  try { u = new URL(text.trim()); } catch (e) { return null; }
+  const host = u.hostname.toLowerCase();
+  if (!host.includes('zillow.com') && !host.includes('redfin.com')) return null;
+  const src = host.includes('zillow.com') ? 'Zillow' : 'Redfin';
+  const segs = u.pathname.split('/').filter(Boolean);
+  // 第一遍：slug 自带州（Zillow homedetails 格式）
+  for (const s of segs) {
+    const p = parseSlug(s);
+    if (p && p.state) return {addr: [...p.streetParts, p.state, p.zip].join(' '), src};
+  }
+  // 第二遍：Redfin 格式 /ST/City/<slug>，州从 path 取（仍来自 URL 本身，不编）
+  for (let i = 0; i < segs.length; i++) {
+    const p = parseSlug(segs[i]);
+    if (p && !p.state) {
+      const st = segs.slice(0, i).find(x => /^[A-Z]{2}$/.test(x));
+      if (st) return {addr: [...p.streetParts, st, p.zip].join(' '), src};
+    }
+  }
+  return null;
+}
+const looksLikeUrl = t => /^(https?:\/\/|www\.)/i.test(t.trim()) || /(zillow|redfin)\.com/i.test(t);
+function addrNote(msg, ok) {
+  const n = $('#addrNote');
+  n.hidden = !msg;
+  n.textContent = msg || '';
+  n.className = 'addr-note' + (msg ? (ok ? ' ok' : ' err') : '');
+}
+/* 粘贴链接时即时解析：成功→填地址＋提示，失败→诚实报错（输入框不留 URL） */
+$('#addrInput').addEventListener('paste', e => {
+  const t = ((e.clipboardData || window.clipboardData) || {}).getData('text') || '';
+  if (!looksLikeUrl(t)) return;
+  e.preventDefault();
+  const hit = parseListingUrl(t);
+  if (hit) {
+    $('#addrInput').value = hit.addr;
+    addrNote('已从链接识别地址：' + hit.addr + '（' + hit.src + '）', true);
+  } else {
+    $('#addrInput').value = '';
+    addrNote('无法识别该链接，请粘贴纯地址', false);
+  }
+});
 $('#goBtn').addEventListener('click', () => {
-  const addr = $('#addrInput').value.trim();
+  let addr = $('#addrInput').value.trim();
   if (!addr) { $('#addrInput').focus(); return; }
-  const ask = type === 'com' ? $('#askInput').value : $('#askInputRes').value;
+  // P1-2：URL 绝不直接进流程——能解析则换纯地址，不能解析则报错并中止
+  if (looksLikeUrl(addr)) {
+    const hit = parseListingUrl(addr);
+    if (hit) {
+      addr = hit.addr;
+      $('#addrInput').value = addr;
+      addrNote('已从链接识别地址：' + addr + '（' + hit.src + '）', true);
+    } else {
+      addrNote('无法识别该链接，请粘贴纯地址', false);
+      $('#addrInput').focus();
+      return;
+    }
+  }
+  const ask = $('#askInput').value;
   const ptype = type === 'com' ? $('#ptype').value : '';
+  const struct = $('#structSel').value || 'standard';
   const box = $('#goSteps'); box.style.display = 'block'; box.innerHTML = '';
   $('#goBtn').disabled = true;
   const steps = ['正在拉取 TopHap 数据…', '正在跑 comps…', '正在打开决策单页…'];
@@ -119,7 +213,8 @@ $('#goBtn').addEventListener('click', () => {
     if (i >= steps.length) {
       location.href = '/d?addr=' + encodeURIComponent(addr) + '&type=' + type
         + (ask ? '&price=' + encodeURIComponent(ask) : '')
-        + (ptype ? '&ptype=' + encodeURIComponent(ptype) : '');
+        + (ptype ? '&ptype=' + encodeURIComponent(ptype) : '')
+        + '&struct=' + encodeURIComponent(struct);
       return;
     }
     stepLine(box, steps[i], 'run'); i++;

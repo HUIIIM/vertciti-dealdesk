@@ -32,6 +32,16 @@ WEIGHTS = {
     "recon": 10,      # 三法收敛度
 }
 
+# P0-9：因子英文代码配中文名（前端直接展示中文，不再裸奔英文代码）
+FACTOR_LABELS = {
+    "comps_nq": "comps 数量与质量",
+    "timeliness": "comps 时效（成交日期新旧）",
+    "geo_match": "地理与物业类型匹配度",
+    "noi_q": "NOI 数据质量（实数 vs 估算）",
+    "cap_e": "cap rate 证据强度",
+    "recon": "三法估值收敛度",
+}
+
 LABEL_LINE = "证据质量分（0-100），不是推荐强度：它回答'证据有多硬'，不回答'该不该买'。"
 
 
@@ -112,6 +122,10 @@ def _score_noi_q(evidence: dict) -> tuple[float, str]:
     table = {
         "audited_ttm": (100.0, "经审计 TTM（银行口径）"),
         "seller_unverified": (60.0, "卖方提供未验证"),
+        # Phase 5 第五轮 B5（remote R5）：住宅租金是用户 Zone 7 自填的估算，
+        # 从不是"卖方提供"——与 verdict 依据"租金为估算（待与租约/市场核验）"
+        # 统一口径。分值与 seller_unverified 同档（60），只改口径表述。
+        "user_estimate": (60.0, "租金为估算（待与租约/市场核验）"),
         "proforma": (40.0, "pro forma 预测（强制标注 PF）"),
         "none": (0.0, "无 NOI 数据"),
     }
@@ -175,7 +189,8 @@ def compute(track: str, comps: list | None = None, evidence: dict | None = None)
         weighted = s * w / 100
         total += weighted
         factors[name] = {"score": round(s, 1), "weight": w,
-                         "weighted": round(weighted, 1), "note": note}
+                         "weighted": round(weighted, 1), "note": note,
+                         "label": FACTOR_LABELS.get(name, name)}
     notes: list[str] = []
     # P1 缺口 5：无 cap 提取证据时 Confidence 天花板 60
     if ev.get("cap_evidence", "none") not in ("market_pull",) and track == "commercial":

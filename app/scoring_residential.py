@@ -1,7 +1,8 @@
 """住宅线评分引擎 —— 严格实现 buyer-box.md v2.3.
 
 100 分构成：现金流 30 / 贷款条款 25 / 首付 15 / 市场 15 / 风险逆向扣分 15.
-分级：>=80 A / 65-79 B / 50-64 C / <50 不收录；任一硬否决 => 等级"否决".
+分级：>=80 A / 65-79 B / 50-64 C / <50 D；任一硬否决 => 等级"否决".
+（打分等级为 A/B/C/D 档；verdict 另看 verdict 口径。）
 v2.2（Miao 亲定 2026-09-28 晚）：subject-to 首付浮动制——≤10% 为正常区间，
 首付评分按 deal 质量浮动（基础分随首付比例递减＋现金流强度上浮最高 15 分），
 删除 subject-to 首付在 8%/10% 的任何硬否决。
@@ -14,6 +15,8 @@ from __future__ import annotations
 from .finance import clamp, floating_down_payment_score, lin_map, monthly_payment, safe_div
 
 STRUCTURE_LABELS = {
+    "standard": "普通购买",
+    "new_loan": "贷款购买（新办贷款）",
     "subject_to": "Subject-to（承接现有贷款）",
     "seller_financing": "Seller financing（卖方融资）",
     "loan_assumption": "Loan assumption（银行正式承接）",
@@ -101,16 +104,21 @@ def check_vetoes(d: dict, m: dict) -> list[dict]:
     balloon = d.get("balloon_years")
     if balloon is not None and balloon < 5:
         vetoes.append({"code": "short_balloon", "message": f"短期 balloon 否决：{balloon} 年内到期 balloon（Miao 亲定）"})
-    if not d.get("exit_primary") or not d.get("exit_backup"):
-        vetoes.append({"code": "no_exit", "message": "无退出预案否决：缺少主退出路径或备选路径"})
+    # P0-2（Phase 5）：退出 / due-on-sale 否决仅在 structure=subject_to 时参与 verdict；
+    # 普通购买/贷款购买结构下永不出现。单一"退出策略"输入即可解除对应否决
+    # （备选路径硬性要求取消——前端只有一个退出策略入口，选了即解除）。
+    if d.get("structure") == "subject_to" and not d.get("exit_primary"):
+        vetoes.append({"code": "no_exit",
+                       "message": "无退出预案否决：subject-to 须先选定退出策略（出售/refi/转租购/持有收租）"})
     if d.get("structure") == "subject_to" and not d.get("due_on_sale_plan"):
         vetoes.append({"code": "no_dos_plan", "message": "无 due-on-sale 备用预案否决：subject-to 必须能 refi/出售/转租购三选一落地"})
     if d.get("seller_delinquent_days", 0) > 90 and not d.get("has_discount_hedge"):
         vetoes.append({"code": "delinquent", "message": "卖方贷款逾期 >90 天且无深度折价对冲"})
     if not d.get("insurance_available", True):
         vetoes.append({"code": "no_insurance", "message": "房子买不到保险/无保险路径"})
-    if not d.get("seller_signed_auth_release", False):
-        vetoes.append({"code": "no_auth_release", "message": "卖方拒绝签 authorization to release——核实不了贷款真相就没有交易"})
+    # P0-1（Phase 5）：删除"卖方拒绝签 authorization to release"无条件一票否决——
+    # 后端无输入源能证明"拒绝"，属幻觉式否决。改为 Zone 7 交割 checklist 的一项
+    # （"交割前向卖方索取 authorization to release"，状态未验证），永不自动否决。
     if d.get("rent_source") == "proforma":
         vetoes.append({"code": "proforma_rent", "message": "租金是 pro-forma 自嗨、无 comps 支撑"})
     if d.get("hoa_arrears_severe") or d.get("title_defect"):
@@ -126,8 +134,11 @@ def score(d: dict) -> dict:
     vetoes = check_vetoes(d, m)
     dims = []
 
-    # --- 维度1: 现金流 30 分（单门现金流/DSCR/CoC 综合）---
+    # --- 维度1: 现金流 30 分（整套现金流/DSCR/CoC 综合）---
+    # Phase 5 第六轮微修复 #7（newbie）：住宅小白不懂"单门"黑话→"整套"；
+    # #8：负号放 $ 前面（-$7,585/月），不许 $-7585/月
     per_door = m["cash_flow_per_door"]
+    _pd_txt = ("-$" if per_door < 0 else "$") + f"{abs(per_door):,.0f}/月"
     if per_door >= 500:
         cf_s = 1.0
     elif per_door >= 300:
@@ -160,9 +171,9 @@ def score(d: dict) -> dict:
         dscr_s = 0.0
     cashflow_pts = 30 * (0.6 * cf_s + 0.2 * coc_s + 0.2 * dscr_s)
     if coc is not None:
-        cf_detail = f"单门现金流 ${per_door:.0f}/月，CoC {coc*100:.1f}%"
+        cf_detail = f"整套现金流 {_pd_txt}，CoC {coc*100:.1f}%"
     else:
-        cf_detail = f"单门现金流 ${per_door:.0f}/月，CoC 未计算"
+        cf_detail = f"整套现金流 {_pd_txt}，CoC 未计算"
     cf_detail += f"，DSCR {dscr:.2f}" if dscr is not None else "，DSCR 未计算"
     dims.append({"key": "cashflow", "label": "现金流指标", "weight": 30,
                  "points": round(cashflow_pts, 1), "detail": cf_detail})
@@ -239,19 +250,19 @@ def score(d: dict) -> dict:
     elif total >= 50:
         grade = "C"
     else:
-        grade = "不收录"
+        grade = "D"
 
     checks = [
         {"label": "储备金 ≥6 个月 PITI", "ok": d.get("reserves_months_piti", 0) >= 6,
          "note": f"当前 {d.get('reserves_months_piti', 0):.1f} 个月"},
-        {"label": "单门现金流 ≥$300/月", "ok": per_door >= 300,
-         "note": f"当前 ${per_door:.0f}/门/月"},
-        {"label": "CoC ≥12%（A 级 ≥15%）", "ok": (coc or 0) >= 0.12,
+        {"label": "整套现金流 ≥$300/月", "ok": per_door >= 300,
+         "note": f"当前 {_pd_txt}"},
+        {"label": "CoC ≥12%（A 档 ≥15%）", "ok": (coc or 0) >= 0.12,
          "note": f"当前 {coc*100:.1f}%" if coc is not None else "未计算"},
         {"label": "DSCR ≥1.25", "ok": (dscr or 0) >= 1.25,
          "note": f"当前 {dscr:.2f}" if dscr is not None else "未计算"},
         {"label": "租金有 comps 支撑", "ok": d.get("rent_source") != "proforma",
-         "note": {"comps_verified": "实测 comps", "estimated": "估算（未核实不进 A 级）",
+         "note": {"comps_verified": "实测 comps", "estimated": "估算（未核实不进 A 档）",
                   "proforma": "pro-forma（否决）"}.get(d.get("rent_source"), "")},
         {"label": "净值（负净值挂风险旗，不再单独否决）", "ok": True,
          "note": f"交割净值 ${m['equity']:,.0f}"
@@ -260,7 +271,7 @@ def score(d: dict) -> dict:
          "ok": d.get("structure") != "subject_to" or (m["down_pct"] or 0) * 100 <= 10,
          "note": f"当前 {((m['down_pct'] or 0) * 100):.1f}%（deal 越好、可承受首付越高）"},
         {"label": "全口径现金需求 cash-to-close（一级字段）", "ok": True,
-         "note": f"${m['cash_to_close']:,.0f} = 首付＋交割费＋初期维修＋储备金；金额硬上限待 Miao 给数额"},
+         "note": f"${m['cash_to_close']:,.0f} = 首付＋交割费＋初期维修＋储备金；金额硬上限待确认"},
     ]
     return {"total": total, "grade": grade, "dimensions": dims,
             "vetoes": vetoes, "downgrades": [], "metrics": m, "checks": checks,

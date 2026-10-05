@@ -42,6 +42,8 @@ FIELD_LABELS = {
     "year_built": "建造年份", "taxes_annual": "年房产税", "hoa_monthly": "月 HOA",
     "monthly_rent": "月租金（估算）", "zestimate": "平台估值参考",
     "price_history": "价格历史", "market_news": "市场新闻/供需信号",
+    # Phase 5 第三轮 D12：TopHap 物业档案英文 key 中文化（小白模式零术语）
+    "neighborhood": "社区", "stories": "楼层数", "market_value": "市场价值",
 }
 # 填表单映射：pipeline key -> 前端 input id
 FORM_MAP = {"address": "p-address", "asking_price": "p-asking",

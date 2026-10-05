@@ -104,12 +104,34 @@ class TestResidential(unittest.TestCase):
         self.assertIn("负净值入场", risk_detail)
 
     def test_negative_equity_missing_exit_still_vetoed(self):
-        # 补偿条件缺一：无备选退出路径 → no_exit 否决拦下（不是负净值否决）
-        s = res.score(base_residential(price=140000, exit_backup=""))
+        # Phase 5 新规则：subject-to 下只有"完全没有退出策略"才否决；
+        # 单一退出策略（exit_primary）即可解除 no_exit（备选路径硬性要求取消）。
+        s = res.score(base_residential(price=140000, exit_primary=""))
         codes = [v["code"] for v in s["vetoes"]]
         self.assertIn("no_exit", codes)
         self.assertNotIn("negative_equity", codes)
         self.assertEqual(s["grade"], "否决")
+
+    def test_subject_to_exit_primary_clears_no_exit(self):
+        # Phase 5：选了退出策略 → no_exit 解除（exit_backup 缺失也不再否决）
+        s = res.score(base_residential(price=140000, exit_backup=""))
+        codes = [v["code"] for v in s["vetoes"]]
+        self.assertNotIn("no_exit", codes)
+
+    def test_non_subject_to_no_exit_veto(self):
+        # Phase 5：普通购买/贷款购买结构下，退出预案否决永不出现
+        s = res.score(base_residential(price=140000, structure="standard",
+                                       exit_primary="", exit_backup=""))
+        codes = [v["code"] for v in s["vetoes"]]
+        self.assertNotIn("no_exit", codes)
+        self.assertNotIn("no_dos_plan", codes)
+
+    def test_no_auth_release_never_vetoes(self):
+        # Phase 5（P0-1）："卖方拒绝签 authorization to release"永不自动否决
+        s = res.score(base_residential(price=140000,
+                                       seller_signed_auth_release=False))
+        codes = [v["code"] for v in s["vetoes"]]
+        self.assertNotIn("no_auth_release", codes)
 
     def test_floating_rate_veto(self):
         s = res.score(base_residential(rate_type="floating"))

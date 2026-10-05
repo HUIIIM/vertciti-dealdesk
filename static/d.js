@@ -9,6 +9,7 @@ const Q = new URLSearchParams(location.search);
 const state = {
   addr: (Q.get('addr') || '').trim(),
   type: Q.get('type') === 'com' ? 'com' : 'res',
+  typeExplicit: Q.has('type'),   // B：type 由 URL 显式传入？否则允许自动识别横幅
   ask: parseFloat(Q.get('price')) || null,
   ptype: Q.get('ptype') || '',
   struct: Q.get('struct') || 'standard', // P0-10：交易结构，默认普通购买
@@ -171,7 +172,9 @@ async function boot() {
     const comps = state.comps.filter(c => state.selected.has(c._id)).map(c => ({
       address: c.address, status: c.status || 'sold', price: c.price || 0,
       sale_date: c.sale_date || '', sf: c.sf || 0, distance_miles: c.distance_miles || 0,
-      adjustment_pct: c.adjustment_pct || 0, noi_annual: c.noi_annual || 0,
+      adjustment_pct: c.adjustment_pct || 0,
+      // LINT-04 / D 铁律：缺失 noi 必须保持 null（渲染 N/A），禁止 || 0 回退
+      noi_annual: c.noi_annual ?? null,
       source: c.source || '', note: c.note || ''}));
     const v = await api('POST', '/api/wb/valuate', {
       property: {address: state.addr, prop_type: state.type === 'res' ? 'residential' : 'commercial'},
@@ -188,8 +191,32 @@ async function boot() {
   // 4) 物业档案（慢，不阻塞）
   setStep(status, 'intake', 'run');
   api('POST', '/api/wb/intake/run', {mode: 'address', text: state.addr})
-    .then(r => { state.intake = r; setStep(status, 'intake', 'done'); renderZone7(); })
+    .then(r => { state.intake = r; setStep(status, 'intake', 'done'); renderZone7(); typeNudge(r); })
     .catch(() => setStep(status, 'intake', 'fail'));
+
+/* B：地址类型自动识别——intake 的 property_type_detail / property_type /
+   description 含商业关键词，且 URL 未显式指定 type、当前为住宅视角时，
+   顶部弹一键切换横幅（不再让用户进错入口）。商业→住宅不打扰（商业视角是强意图）。 */
+function typeNudge(intake) {
+  try {
+    if (state.typeExplicit || state.type !== 'res') return;
+    const fields = (intake && intake.fields) || [];
+    const txt = fields.filter(f => /type|usage|description|class/i.test(f.key || ''))
+      .map(f => String(f.value || '')).join(' ').toLowerCase();
+    const KW = /retail|office|industrial|commercial|strip|mall|plaza|warehouse|mixed[\s-]*use|hospitality|hotel|restaurant|auto[\s-]*repair|gas[\s-]*station|self[\s-]*storage|church|school|daycare|laundromat|car[\s-]*wash/;
+    if (!KW.test(txt)) return;
+    const bar = $('#typeNudge');
+    $('#typeNudgeText').textContent = '检测到该地址疑似商业物业（' +
+      fields.map(f => String(f.value || '')).join(' ').slice(0, 60) + '），是否切换到商业视角？';
+    bar.hidden = false;
+    $('#typeNudgeGo').onclick = () => {
+      location.href = '/d?addr=' + encodeURIComponent(state.addr) + '&type=com'
+        + (state.ask ? '&price=' + state.ask : '')
+        + '&struct=' + encodeURIComponent(state.assumptions.structure || 'standard');
+    };
+    $('#typeNudgeNo').onclick = () => { bar.hidden = true; };
+  } catch (e) { /* 识别失败不打断主流程 */ }
+}
 
   // 5) 预测
   setStep(status, 'forecast', 'run');
@@ -240,9 +267,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // 整行（标题文字＋箭头）都是同一个 <button>，点哪里都展开。
   initAccordions();
   // Phase 5 第七轮 R7（remote）：商业线"怎么看这页"不许用住宅 verdict 词表
-  // （值得买/再看看/别碰）——商业线换商业词表（VETO/通过/再看）。
+  // （值得买/再看看/别碰）——商业线换商业词表（BUY/HOLD/PASS，一票否决为 VETO）。
   if (state.type === 'com') {
-    $('#howto').innerHTML = '怎么看这页：<b>先看结论</b>（VETO/通过/再看）'
+    $('#howto').innerHTML = '怎么看这页：<b>先看结论</b>（BUY / HOLD / PASS，一票否决为 VETO）'
       + '· <b>再看价格证据</b>（Zone 3）· <b>最后看假设</b>（Zone 7，可改数重算）';
   }
   if (!state.addr) {
@@ -262,9 +289,11 @@ document.addEventListener('DOMContentLoaded', () => {
   $('#btnChangeAddr').addEventListener('click', () => { location.href = '/'; });
   // P1：要价显眼条
   const askGo = () => {
-    const v = parseFloat($('#askBarInput').value);
+    // P0 bug#1（2026-10-05）：与 Zone 7 的"重新计算"同语义——resolveAsk 按"新编辑"裁决，
+    // 无论价格改在哪边，点哪边重算都生效（"改价/改假设后点重新计算刷新"）
+    const v = parseFloat(resolveAsk()) || 0;
     if (!v) { $('#askBarInput').focus(); return; }
-    setAssumption('ask', v);
+    writeAsk(v); // 假设＋双 DOM 一起写，防 syncZone7Inputs 把陈旧 DOM 误判成新编辑
     state.ask = v;
     runScoreChain();
   };
@@ -273,6 +302,8 @@ document.addEventListener('DOMContentLoaded', () => {
   $('#btnPdf').addEventListener('click', () => $('#ddPdf').classList.toggle('open'));
   document.addEventListener('click', e => { if (!e.target.closest('#ddPdf')) $('#ddPdf').classList.remove('open'); });
   $('#btnPdfMemo').addEventListener('click', exportPdfMemo);
+  $('#btnPdfComClassic').addEventListener('click', () => exportUwPdf('classic'));
+  $('#btnPdfComPlus').addEventListener('click', () => exportUwPdf('enhanced'));
   $('#btnPrint').addEventListener('click', () => window.print());
   $('#btnXlsx').addEventListener('click', exportXlsx);
   // P0-12：sticky 栏"导出备忘录"名实相符——真导出 PDF，不再是 scroll-to-top
@@ -359,14 +390,45 @@ function buildScoreInput() {
     has_rent_roll: hasRR};
 }
 
+/* P0 bug#1（2026-10-05）：价格双入口写回——假设＋两个 DOM 输入永远一致，
+   之后 resolveAsk 的"差异检测"才不会把陈旧 DOM 误判成新编辑。 */
+function writeAsk(v) {
+  const num = parseFloat(v) || 0;
+  setAssumption('ask', num);
+  const ab = $('#askBarInput'); if (ab) ab.value = num;
+  const z7 = document.querySelector('#z7Body [data-a="ask"]'); if (z7) z7.value = num;
+  return num;
+}
+
+/* P0 bug#1（2026-10-05）：价格有两个入口（页顶要价条 #askBarInput / Zone 7 假设 data-a="ask"）。
+   以"与已同步假设的差异"判定哪边是新编辑（程序化填值不触发事件也能识别）；
+   只有一边变 → 用那一边；两边都变/都没变 → 页顶条优先。 */
+function resolveAsk() {
+  const ab = $('#askBarInput');
+  const z7 = document.querySelector('#z7Body [data-a="ask"]');
+  const barVal = ab && ab.value ? String(ab.value).trim() : '';
+  const z7Val = z7 && z7.value ? String(z7.value).trim() : '';
+  const cur = String(getA('ask') || '');
+  const norm = s => { const n = parseFloat(s); return n ? String(n) : ''; };
+  const barNew = norm(barVal) !== '' && norm(barVal) !== norm(cur);
+  const z7New = norm(z7Val) !== '' && norm(z7Val) !== norm(cur);
+  if (barNew && !z7New) return barVal;
+  if (z7New && !barNew) return z7Val;
+  return barVal || z7Val || cur;
+}
+
 /* item 14：Zone 7 输入只在 change 事件才同步 state——用户键入后直接点"重新计算"
-   （或程序化填值）时 change 可能没触发。重算前强制同步一次，根治"补填收购价失效"。 */
+   （或程序化填值）时 change 可能没触发。重算前强制同步一次，根治"补填收购价失效"。
+   P0 bug#1（2026-10-05）：价格走 resolveAsk 裁决（防页顶条陈旧值覆盖 Zone 7 新编辑，
+   反之亦然），裁决后双向回写，两处输入永远一致。 */
 function syncZone7Inputs() {
   document.querySelectorAll('#z7Body [data-a]').forEach(inp => {
-    setAssumption(inp.dataset.a, inp.value);
+    if (inp.dataset.a !== 'ask') setAssumption(inp.dataset.a, inp.value);
   });
-  const askBar = $('#askBarInput');
-  if (askBar && askBar.value) setAssumption('ask', parseFloat(askBar.value) || 0);
+  // P0 bug#1（2026-10-05）：价格走 resolveAsk 裁决（防页顶条陈旧值覆盖 Zone 7 新编辑，
+  // 反之亦然），裁决后 writeAsk 双向回写，两处输入永远一致。
+  const v = resolveAsk();
+  if (v !== '') writeAsk(v);
 }
 
 async function runScoreChain() {
@@ -382,6 +444,9 @@ async function runScoreChain() {
     state.score = score;
     // 商业：跑 compute-plus（rent roll 若已导入则带入）
     if (state.type === 'com') await runUwPlus();
+    // P0-5（2026-10-05）：商业敏感性矩阵（退出 cap × 租金增长率，25 格）——
+    // 失败静默（state.sens 保持 null，不出表），绝不编数字
+    if (state.type === 'com') await runSensitivity();
     // confidence
     // Phase 5 第五轮 B5（remote R5）：住宅租金是用户 Zone 7 自填的估算，
     // 从不是"卖方提供"——用 user_estimate（与 verdict 依据"租金为估算"统一口径；
@@ -461,7 +526,9 @@ function buildVerdictEvidence() {
 
 /* 商业 compute-plus 输入（P0-8：PDF 备忘录复用同一份富输入，不再用贫输入算出全零） */
 function buildUwInput() {
-  const ask = getA('ask'), downPct = getA('downPct') / 100, rate = getA('rate') / 100;
+  // 标准 v1.0 §1.1：uw 输入层 [PCT] 原样（getA('downPct')/('rate')/('capMkt')/('vac')
+  // 已是百分制），不再预除 /100；后端 normalize_pct() 归一化
+  const ask = getA('ask'), downPct = getA('downPct'), rate = getA('rate');
   const tenants = (state.rentRoll || []).map(t => ({
     suite: t.suite, tenant: t.tenant, sf: t.sf, monthly_rent: t.monthly_rent,
     lease_start: t.lease_start, lease_end: t.lease_end,
@@ -481,7 +548,7 @@ function buildUwInput() {
     analysis: {purchase_price: ask, down_pct: downPct, rate, amort_years: getA('amort'),
       // item 7⑤：市场 cap 必须进 PDF 富输入——否则"预测转售价值"算不出（—）而退出节
       // 又有退出售价，两处打架；同时"税前净收益/ROI"会算出 -333% 这类无意义数
-      market_cap_rate: getA('capMkt') / 100,
+      market_cap_rate: getA('capMkt'),
       // Phase 5 第四轮 B4：退出 cap 联动标记——后端判定退出 cap 用的是用户输入/
       // 联动市场 cap/硬默认，供 PDF 标注"默认"
       market_cap_rate_is_default: isDefaultA('capMkt')},
@@ -495,6 +562,37 @@ async function runUwPlus() {
     state.uw = await api('POST', '/api/uw/compute-plus',
       {input, with_stress: true, valuation_range: null});
   } catch (e) { state.uw = null; }
+}
+
+/* P0-5（2026-10-05）：商业二维敏感性矩阵（退出 cap × 租金增长率 → IRR / EM）。
+   输入与 runUwPlus 同源（buildUwInput），25 格复用后端 compute_all。 */
+async function runSensitivity() {
+  try {
+    state.sens = await api('POST', '/api/com/sensitivity', {input: buildUwInput()});
+  } catch (e) { state.sens = null; }
+}
+
+/* P0-5：敏感性矩阵表（商业 Zone 2 KPI 卡之后）。state.sens 为空时不出表。 */
+function sensTableHtml() {
+  const s = state.sens;
+  if (!s || !s.cells || s.cells.length !== 5) return '';
+  const offLbl = bps => (bps > 0 ? '+' : '') + bps + 'bps';
+  let h = `<div class="sens-wrap"><p class="zlabel">敏感性矩阵：退出 cap × 租金增长率</p>
+    <div class="tbl-scroll"><table class="sens-table"><thead><tr><th>租金增长 ＼ 退出 cap</th>`;
+  s.exit_caps.forEach(c => { h += `<th>${fmtPct(c, 2)}</th>`; });
+  h += '</tr></thead><tbody>';
+  s.cells.forEach((row, i) => {
+    h += `<tr><td class="sens-axis">${offLbl(s.growth_offsets_bps[i])}</td>`;
+    row.forEach((cell, j) => {
+      const base = (i === 2 && j === 2) ? ' sens-base' : '';
+      h += `<td class="sens-cell${base}"><span class="sens-irr">${fmtPct(cell.irr, 1)}</span>`
+        + `<span class="sens-em">${Number(cell.equity_multiple).toFixed(2)}x</span></td>`;
+    });
+    h += '</tr>';
+  });
+  h += `</tbody></table></div>
+    <p class="sens-note">格子 = IRR / Equity Multiple；中心格（±0bps）为当前基准假设；退出 cap 假设必须披露。改价 / 改假设后点"重新计算"刷新。</p></div>`;
+  return h;
 }
 
 /* ---------------- 导出 ---------------- */
@@ -543,6 +641,33 @@ async function exportPdfMemo() {
   } catch (e) { toast('PDF 生成失败：' + e.message, 4000); }
 }
 
+/* C：一键导出——商业核保 PDF（经典版 / 增强版），复用 /api/uw/report.
+   经典版 = Manny Khoshbin 模板口径；增强版 = DSCR 双轨＋压力测试 */
+async function exportUwPdf(variant) {
+  $('#ddPdf').classList.remove('open');
+  if (!state.uw) { toast('商业 PDF 需要先导入 rent roll 并计算（Zone 4）', 3500); return; }
+  toast('正在生成商业核保 PDF（' + (variant === 'classic' ? '经典版' : '增强版') + '）…');
+  try {
+    const plus = state.uw.plus || {};
+    const body = {variant, input: buildUwInput(),
+      comps: state.comps.filter(c => state.selected.has(c._id)),
+      assumptions: state.assumptions,
+      verdict: state.verdict, verdict_word: verdictDisplay().word,
+      has_rent_roll: !!plus.has_rent_roll,
+      bank_noi: plus.has_rent_roll ? (plus.noi_bank_bridge?.bank_noi ?? null) : null};
+    const r = await fetch('/api/uw/report', {method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body)});
+    if (!r.ok) throw new Error(await r.text().then(t => t.slice(0, 120)));
+    const blob = await r.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = r.headers.get('content-disposition')?.match(/filename\*?=(?:UTF-8''")?([^";]+)/)?.[1] || ('dealdesk_uw_' + variant + '.pdf');
+    a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    toast('已导出 PDF');
+  } catch (e) { toast('PDF 生成失败：' + e.message, 4000); }
+}
+
 async function exportXlsx() {
   toast('正在生成 Excel…');
   try {
@@ -550,7 +675,7 @@ async function exportXlsx() {
     if (state.type === 'com') {
       if (!state.uw) { toast('商业 Excel 需要先导入 rent roll 并计算（Zone 4）', 3500); return; }
       // 用 compute-plus 的底层输入重建：直接调 xlsx 端点需 uw input，这里用 rentRoll＋假设重建
-      const ask = getA('ask'), downPct = getA('downPct') / 100, rate = getA('rate') / 100;
+      const ask = getA('ask'), downPct = getA('downPct'), rate = getA('rate');
       const tenants = (state.rentRoll || []).map(t => ({...t}));
       // item 6：银行口径 NOI 随包发给 Excel（与网页 KPI 卡 / PDF 同数）；无 rent roll 时为 null
       const plus = state.uw.plus || {};
@@ -565,7 +690,8 @@ async function exportXlsx() {
         // P0-1 (2026-10-05): vacancy_pct 统一百分制（后端 /100），此处不再预除
         historical: {vacancy_pct: getA('vac')},
         proforma: {vacancy_pct: getA('vac')},
-        analysis: {purchase_price: ask, down_pct: downPct, rate, amort_years: getA('amort')}},
+        analysis: {purchase_price: ask, down_pct: downPct, rate, amort_years: getA('amort'),
+          market_cap_rate: getA('capMkt'), market_cap_rate_is_default: isDefaultA('capMkt')}},
         comps: state.comps.filter(c => state.selected.has(c._id)),
         // Phase 5 第三轮 A3：has_rent_roll 门＋verdict 行随包发给 Excel
         has_rent_roll: !!plus.has_rent_roll,
@@ -729,6 +855,9 @@ function renderZone1() {
     ? `<div class="amber"><b>缺口（已保守降级）：</b><br>${gaps.map(g => '· ' + esc(g)).join('<br>')}</div>` : '';
 }
 
+/* P0-2（2026-10-05）：打分等级用户可见显示：A/B/C/D → "X 档"，"否决"保持原样 */
+function gradeDisplay(g) { return g === '否决' ? '否决' : (g ? g + ' 档' : ''); }
+
 /* Zone 2 */
 function renderZone2() {
   const z2 = $('#z2'); z2.hidden = false;
@@ -769,7 +898,7 @@ function renderZone2() {
     // 造成"Zone 1 有 43 分、Zone 2 还在待计算"的脱节。
     if (!state.score) cards.push(kpi('打分', '待计算', '填要价后计算（上方要价条）', ''));
     else cards.push(kpi('打分', (state.score.total != null ? state.score.total : '—') + ' 分',
-      'deal 评分（' + (state.score.grade || '') + '），与 Zone 1 同源',
+      'deal 评分（' + gradeDisplay(state.score.grade) + '），与 Zone 1 同源',
       // Phase 5 第七轮 #4（xiaobai）：首付 25% 后 43→28 反直觉——核验结论：
       // 15 分全掉在"首付比例"维度（浮动制：首付越低基础分越高，0%→15 分、25%→0 分），
       // 其余四维没变（租金缺失→现金流维本来就是 0 分；CoC 0 首付"未计算"→25% 后 -22.8% 仍 0 分）。
@@ -819,6 +948,8 @@ function renderZone2() {
       cards.push(kpi('盈亏平衡', '待 rent roll', '', ''));
     }
   }
+  // P0-5（2026-10-05）：商业敏感性矩阵表放 Zone 2 KPI 卡之后
+  if (state.type === 'com') cards.push(sensTableHtml());
   z2.innerHTML = cards.join('');
 }
 
@@ -837,7 +968,8 @@ async function retryCompsPull() {
       const comps = state.comps.map(c => ({address: c.address, status: c.status || 'sold',
         price: c.price || 0, sale_date: c.sale_date || '', sf: c.sf || 0,
         distance_miles: c.distance_miles || 0, adjustment_pct: c.adjustment_pct || 0,
-        noi_annual: c.noi_annual || 0, source: c.source || '', note: c.note || ''}));
+        // LINT-04 / D 铁律：缺失 noi 必须保持 null（渲染 N/A），禁止 || 0 回退
+        noi_annual: c.noi_annual ?? null, source: c.source || '', note: c.note || ''}));
       state.valuation = await api('POST', '/api/wb/valuate', {
         property: {address: state.addr,
                    prop_type: state.type === 'res' ? 'residential' : 'commercial'},
@@ -1417,6 +1549,8 @@ function renderZone7() {
   body.querySelectorAll('[data-a]').forEach(inp =>
     inp.addEventListener('change', () => {
       setAssumption(inp.dataset.a, inp.value);
+      // P0 bug#1（2026-10-05）：Zone 7 改价即时同步页顶条，双入口不分叉
+      if (inp.dataset.a === 'ask') { const ab = $('#askBarInput'); if (ab && inp.value) ab.value = inp.value; }
       // 结构切换影响输入项（subject-to 显示承接贷款余额），重渲染本区
       if (inp.dataset.a === 'structure' || inp.dataset.a === 'exitStrategy') renderZone7();
     }));
