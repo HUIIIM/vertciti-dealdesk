@@ -411,6 +411,33 @@ def uw_report(payload: dict):
     )
 
 
+@app.post("/api/uw/tearsheet")
+def uw_tearsheet(payload: dict):
+    """一键 Tear Sheet（台账 2026-10-05）：当前（未保存也行）输入 → 投资一页纸 PDF。
+
+    关键字段（价格/NOI/cap rate/全口径现金需求/月供/DSCR）＋ 3 条 highlights ＋
+    1 条下一步建议；缺数项渲染 "—"，不估算。
+    """
+    data = payload.get("input", payload)
+    try:
+        from app import tearsheet
+        r = uw_commercial.compute_all(data)
+        deal = {"name": payload.get("name") or (r.get("property", {}) or {}).get("name", ""),
+                "address": payload.get("address") or (r.get("property", {}) or {}).get("address", ""),
+                "has_rent_roll": bool((data.get("tenants") or []))}
+        pdf_bytes = tearsheet.build_tearsheet_pdf(r, deal)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(500, f"Tear Sheet 生成失败：{str(e)[:200]}")
+    name = deal["name"] or "deal"
+    slug = "".join(c if c.isalnum() else "-" for c in name)[:30] or "deal"
+    safe_ascii = f"DealDesk-tearsheet-{slug}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={safe_ascii}"},
+    )
+
+
 @app.get("/api/uw/projects")
 def uw_list_projects():
     return db.list_uw_projects()
@@ -1051,7 +1078,8 @@ def memo_pdf(req: _MemoReq):
                 prop["name"] = req.name
             if not prop.get("address") and req.address:
                 prop["address"] = req.address
-            pdf_bytes = pdf_uw.build_uw_pdf(r, "enhanced", deal=deal)
+            pdf_bytes = pdf_uw.build_uw_pdf(r, "enhanced", deal=deal,
+                                            cover_tearsheet=True)
         else:
             validated = validate_input("residential", req.input)
             p = {"track": "residential", "name": req.name, "address": req.address,

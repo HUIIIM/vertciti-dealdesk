@@ -676,6 +676,32 @@ async function init() {
   }
   $("#btnReportClassic").addEventListener("click", (e) => exportReport("classic", e.currentTarget));
   $("#btnReportEnhanced").addEventListener("click", (e) => exportReport("enhanced", e.currentTarget));
+  // ---- 一键 Tear Sheet（台账 2026-10-05）：当前 state → 投资一页纸 PDF 下载 ----
+  $("#btnTearsheet").addEventListener("click", async (e) => {
+    const btn = e.currentTarget, label = btn.textContent;
+    btn.disabled = true; btn.textContent = "生成中…";
+    try {
+      const r = await fetch("/api/uw/tearsheet", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ input: state,
+          name: (state.property && state.property.name) || "",
+          address: (state.property && state.property.address) || "" }),
+      });
+      if (!r.ok) throw new Error("API " + r.status);
+      const blob = await r.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      const nm = (state.property && state.property.name) || "deal";
+      a.download = `DealDesk-TearSheet-${nm}.pdf`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    } catch (err) {
+      alert("Tear Sheet 生成失败（网络/服务异常），请稍后重试");
+    } finally {
+      btn.disabled = false; btn.textContent = label;
+    }
+  });
   $("#projSel").addEventListener("change", (e) => {
     if (e.target.value) loadProject(e.target.value);
   });

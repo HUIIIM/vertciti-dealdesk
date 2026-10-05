@@ -416,11 +416,15 @@ def build_classic_pdf(r: dict) -> bytes:
 
 
 # ============================================================ 增强版
-def build_enhanced_pdf(r: dict, deal: dict | None = None) -> bytes:
+def build_enhanced_pdf(r: dict, deal: dict | None = None,
+                       cover_tearsheet: bool = False) -> bytes:
     """商业核保增强版备忘录.
 
     P0-8：deal 传入时渲染当前 deal 真实数据（verdict/KPI/comps/假设），
     不再导出全零模板；deal 缺失时标题如实标注"数据未接入"。
+
+    cover_tearsheet=True 时在正文前插入 Tear Sheet（一页纸）封面页
+    （台账 2026-10-05：一键 Tear Sheet 进备忘录封面页）。
     """
     _register_fonts()
     deal = deal or {}
@@ -448,6 +452,13 @@ def build_enhanced_pdf(r: dict, deal: dict | None = None) -> bytes:
     cw = W - 28 * mm
     story = []
     now = _now_et()
+
+    # 一键 Tear Sheet 封面页（台账 2026-10-05）：备忘录 PDF 第一页即一页纸
+    if cover_tearsheet:
+        from app import tearsheet as _ts
+        _ts_data = _ts.build_tearsheet_data(r, deal)
+        story.extend(_ts.tearsheet_story(_ts_data, cw))
+        story.append(PageBreak())
 
     def dp(text, size=9, color=WHITE, bold=False, align="left"):
         align_i = {"left": 0, "center": 1, "right": 2}[align]
@@ -802,7 +813,11 @@ def build_enhanced_pdf(r: dict, deal: dict | None = None) -> bytes:
     # 深色底
     def _bg(canvas, doc):
         canvas.saveState()
-        canvas.setFillColor(DK_BG)
+        # Tear Sheet 封面页（第 1 页）用白底：浅色一页纸版式在深底上不可读
+        if cover_tearsheet and getattr(doc, "page", 0) == 1:
+            canvas.setFillColor(WHITE)
+        else:
+            canvas.setFillColor(DK_BG)
         canvas.rect(0, 0, A4[0], A4[1], fill=1, stroke=0)
         canvas.restoreState()
 
@@ -811,13 +826,15 @@ def build_enhanced_pdf(r: dict, deal: dict | None = None) -> bytes:
 
 
 # ---------------------------------------------------------------- 统一入口
-def build_uw_pdf(r: dict, variant: str = "classic", deal: dict | None = None) -> bytes:
+def build_uw_pdf(r: dict, variant: str = "classic", deal: dict | None = None,
+                 cover_tearsheet: bool = False) -> bytes:
     """r = compute_all() 结果；variant ∈ {classic, enhanced}。
 
     deal（可选）：当前 deal 真实数据 {name/address/verdict/score/comps/assumptions}，
     enhanced 版用它渲染结论＋comps＋假设（P0-8），不再导出全零模板。
+    cover_tearsheet：enhanced 版前插 Tear Sheet 封面页（备忘录 PDF 专用）。
     """
     _register_fonts()
     if variant == "enhanced":
-        return build_enhanced_pdf(r, deal=deal)
+        return build_enhanced_pdf(r, deal=deal, cover_tearsheet=cover_tearsheet)
     return build_classic_pdf(r)
