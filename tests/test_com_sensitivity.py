@@ -36,7 +36,8 @@ def test_grid_shape_and_offsets():
             assert set(c.keys()) == {"irr", "equity_multiple"}
             # 终裁⑤：IRR 不收敛 → null（禁 0.0 冒充）
             assert c["irr"] is None or isinstance(c["irr"], (int, float))
-            assert isinstance(c["equity_multiple"], (int, float))
+            # R2：EM 病态 → null（与 IRR 同口径，禁 0.0 冒充）
+            assert c["equity_multiple"] is None or isinstance(c["equity_multiple"], (int, float))
     # 轴标签与基准一致
     assert len(body["exit_caps"]) == 5 and len(body["growths"]) == 5
     assert abs(body["exit_caps"][2] - body["exit_cap_base"]) < 1e-9

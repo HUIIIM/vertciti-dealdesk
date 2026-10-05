@@ -230,6 +230,9 @@ def run_sensitivity(payload: dict):
         return sensitivity.run(track, data, payload.get("tiers"))
     except ValueError as e:
         raise HTTPException(422, f"敏感性分析参数错误：{e}")
+    except KeyError as e:
+        # R1 (2026-10-05)：缺必填字段（如 price）→ 422 中文，不再 500 透出
+        raise HTTPException(422, f"敏感性分析缺少必填字段：{e}")
 
 
 # ---------------- Phase 3 新引擎：verdict / confidence / condition ----------------
@@ -367,7 +370,9 @@ def com_sensitivity(payload: dict):
             _irr_v = ex2.get("irr")
             row.append({
                 "irr": None if _irr_v is None else round(_f(_irr_v), 4),
-                "equity_multiple": round(_f(ex2.get("equity_multiple")), 4),
+                # R2：EM 与 IRR 同口径，None 透传不许 round(0.0) 冒充
+                "equity_multiple": None if ex2.get("equity_multiple") is None
+                else round(_f(ex2.get("equity_multiple")), 4),
             })
         cells.append(row)
     return {

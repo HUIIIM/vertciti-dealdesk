@@ -396,7 +396,8 @@ def compute_exit(a: dict, pro: dict, loan_bal: float, rate: float,
     flows[-1] += sale_proceeds
     irr = _irr(flows)
     total_in = sum(f for f in flows[1:] if f > 0)
-    em = _div(total_in, net_liquidity)
+    # R2 (2026-10-05)：终裁⑤同口径——分母为零 → None（N/A 链），禁止 0.0 冒充
+    em = None if _f(net_liquidity) == 0 else _div(total_in, net_liquidity)
     return {
         "hold_years": hold_years,
         "hold_years_is_default": hold_years_is_default,

@@ -529,6 +529,7 @@ def build_res_xlsx(score: dict, inputs: dict, address: str,
         _row(ws, r, "置信度", confidence.get("score", ""),
              "证据质量分，非推荐强度", None); r += 1
     r = _section(ws, r, "关键指标")
+    _krow = {}
     for label, key, fmt, note in (
             ("月现金流 $", "cash_flow_monthly", MONEY2, ""),
             ("现金回报率", "cash_on_cash", PCT, "年净现金流 ÷ 全口径现金投入"),
@@ -537,7 +538,16 @@ def build_res_xlsx(score: dict, inputs: dict, address: str,
             ("全口径现金需求 $", "cash_to_close", MONEY2, "首付＋交割＋储备金"),
             ("空置假设", None, None, f"{_f((inputs or {}).get('vacancy_pct'))}%")):
         v = _f(m.get(key)) if key else None
-        _row(ws, r, label, v, note, fmt); r += 1
+        _row(ws, r, label, v, note, fmt)
+        if key:
+            _krow[key] = r
+        r += 1
+    # R7 (2026-10-05)：现金回报率改原生公式，可复算。
+    # 现金流 sheet 行固定：净现金流在第 6 行（表头 1 ＋ 5 行），C6 = 年净现金流。
+    if "cash_on_cash" in _krow and "cash_to_close" in _krow:
+        _rr, _cr = _krow["cash_on_cash"], _krow["cash_to_close"]
+        ws.cell(row=_rr, column=2,
+                value=f"=IF(B{_cr}=0,\"—\",'现金流'!C6/B{_cr})")
     ws.column_dimensions["A"].width = 26
     ws.column_dimensions["B"].width = 22
     ws.column_dimensions["C"].width = 44
@@ -551,7 +561,8 @@ def build_res_xlsx(score: dict, inputs: dict, address: str,
             ("净现金流", _f(m.get("cash_flow_monthly")))]
     rr = 2
     for label, mv in rows:
-        _row(cf, rr, label, mv, mv * 12, fmt_b=MONEY2)
+        # R7 (2026-10-05)：年 $ 列改原生公式 =B{rr}*12，可复算
+        _row(cf, rr, label, mv, f"=B{rr}*12", fmt_b=MONEY2)
         # Phase 5 第五轮 A2：裸 0 加"待接/未填"备注（与商业 sheet 同标准）
         if mv == 0:
             cell = cf.cell(row=rr, column=4, value="待接/未填")
@@ -600,6 +611,7 @@ def build_res_xlsx(score: dict, inputs: dict, address: str,
     for i, w in enumerate([26, 22, 30], start=1):
         ax.column_dimensions[get_column_letter(i)].width = w
 
+    wb.calculation.fullCalcOnLoad = True  # R7：含原生公式，打开即重算
     buf = io.BytesIO()
     wb.save(buf)
     return buf.getvalue()
