@@ -13,7 +13,7 @@ from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, ValidationError
 
-from . import db, image_intake, pdf_intake, pdf_report, pdf_uw, report, research_pipeline, scoring_commercial, scoring_residential, sensitivity, uw_commercial, workbench
+from . import db, image_intake, pdf_intake, pdf_report, pdf_uw, report, research_pipeline, scoring_commercial, scoring_residential, sensitivity, uw_commercial, validators, workbench
 from . import commercial_plus, condition_adjust, confidence as conf_mod, excel_uw, verdict as verdict_mod
 from .data import hpi
 from .models import CommercialInput, ProjectCreate, ResidentialInput
@@ -387,15 +387,48 @@ def com_sensitivity(payload: dict):
     }
 
 
+@app.post("/api/wb/intake/gate")
+def wb_intake_gate(payload: dict):
+    """Intake 数据质量门（台账 2026-10-06）：对任意字段集合跑门。
+
+    payload: {deal_type: commercial|residential, fields: {flat_key: value} 或
+              [{key,value,...}], tenants: [...], text: 原始文本(可选，用于文档内矛盾检测)}
+    fail → blocked（拦截进 underwriting）；warn → 标黄复核。
+    """
+    deal_type = str(payload.get("deal_type") or "commercial").lower()
+    if deal_type not in ("commercial", "residential"):
+        raise HTTPException(400, f"unknown deal_type: {deal_type!r}")
+    fields = payload.get("fields") or {}
+    tenants = payload.get("tenants") or []
+    text = str(payload.get("text") or "")
+    try:
+        return validators.run_quality_gate(deal_type, fields, tenants=tenants, raw_text=text)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(500, f"质量门运行失败：{str(e)[:200]}")
+
+
+def _enforce_quality_gate(data: dict, action: str):
+    """fail 清零才能进 underwriting：blocked → 422 硬拦。"""
+    g = validators.gate_verdict_for_state(data)
+    if g["blocked"]:
+        raise HTTPException(422, {
+            "error": f"数据质量门拦截（{action}）：{g['fails_n']} 项自相矛盾，修正后重试",
+            "quality_gate": g,
+        })
+    return g
+
+
 @app.post("/api/uw/report")
 def uw_report(payload: dict):
     """商业核保报告导出：当前（未保存也行）输入 -> 经典版/增强版 PDF。
     variant: classic（Manny Khoshbin 模板版式）| enhanced（DealDesk 增强版：
-    DSCR/IRR/盈亏平衡/持有退出）。"""
+    DSCR/IRR/盈亏平衡/持有退出）。
+    2026-10-06：先过 intake 数据质量门，fail → 422 拦截。"""
     variant = str(payload.get("variant", "classic") or "classic").lower()
     if variant not in ("classic", "enhanced"):
         raise HTTPException(400, f"unknown variant: {variant!r}")
     data = payload.get("input", payload)
+    _enforce_quality_gate(data, "报告导出")
     try:
         r = uw_commercial.compute_all(data)
         pdf_bytes = pdf_uw.build_uw_pdf(r, variant)
@@ -417,8 +450,10 @@ def uw_tearsheet(payload: dict):
 
     关键字段（价格/NOI/cap rate/全口径现金需求/月供/DSCR）＋ 3 条 highlights ＋
     1 条下一步建议；缺数项渲染 "—"，不估算。
+    2026-10-06：先过 intake 数据质量门，fail → 422 拦截。
     """
     data = payload.get("input", payload)
+    _enforce_quality_gate(data, "Tear Sheet")
     try:
         from app import tearsheet
         r = uw_commercial.compute_all(data)

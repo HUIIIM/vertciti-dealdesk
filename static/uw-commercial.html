@@ -289,6 +289,27 @@ table.t input.cell-in::placeholder { color: var(--tx3); font-size: 11px; font-fa
 .intake-status.ok { color: var(--green); }
 .intake-status.err { color: var(--red); }
 .intake-status.busy { color: var(--amber); }
+/* ---- 数据质量门（台账 2026-10-06） ---- */
+.gate-panel { border: 1px solid var(--amber-line, #b98a1d); border-radius: 8px;
+  background: rgba(185,138,29,.08); padding: 10px 14px; margin: 0 0 14px; font-size: 12.5px; }
+.gate-panel.pass { border-color: var(--green-line, #2dd4bf); background: rgba(45,212,191,.06); }
+.gate-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+.gate-chip { font-weight: 800; font-size: 12px; padding: 2px 10px; border-radius: 999px; }
+.gate-chip.blocked { background: #7f1d1d; color: #fff; }
+.gate-chip.warn { background: #b98a1d; color: #111; }
+.gate-chip.pass { background: #065f46; color: #fff; }
+.gate-summary { color: var(--muted); }
+.gate-list { margin: 6px 0; padding-left: 18px; }
+.gate-list li { margin: 4px 0; }
+.gate-list .sev-fail { color: #fca5a5; font-weight: 700; }
+.gate-list .sev-warn { color: var(--amber); font-weight: 700; }
+.gate-detail { color: var(--muted); font-size: 12px; }
+.gate-fields { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.gate-f { font-size: 11.5px; border: 1px solid var(--line, #334155); border-radius: 6px;
+  padding: 2px 8px; color: var(--muted); }
+.gate-f.low { border-color: var(--amber); color: var(--amber); font-weight: 700; }
+.gate-f.flagged { border-color: #ef4444; color: #fca5a5; font-weight: 700; }
+input.gate-yellow, select.gate-yellow { box-shadow: 0 0 0 2px var(--amber) !important; }
 .c-grid > * { min-width: 0; }
 </style>
 </head>
@@ -338,6 +359,8 @@ table.t input.cell-in::placeholder { color: var(--tx3); font-size: 11px; font-fa
     <span class="intake-hint">自动提取价格/面积/NOI/租户，填入下表；全部标"卖方口径、待验证"</span>
     <span class="intake-status" id="intakeStatus"></span>
   </div>
+  <!-- 数据质量门面板（台账 2026-10-06）：fail 拦截 / warn 标黄 -->
+  <div class="gate-panel" id="gatePanel" hidden></div>
   <p class="note">任一输入格改动 → 整条链自动重算并闪烁。<b>琥珀色</b> = 机器算出；<span class="bdg">描边徽章</span> = 你的手工覆盖。留空即自动。</p>
 
   <!-- 一眼结论 -->

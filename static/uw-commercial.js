@@ -655,11 +655,17 @@ async function init() {
     const label = btn.textContent;
     btn.disabled = true; btn.textContent = "生成中…";
     try {
+      if (!(await gateCheckForExport("报告导出"))) return; // fail → 拦截
       const r = await fetch("/api/uw/report", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ input: state, variant }),
       });
+      if (r.status === 422) {
+        let msg = "数据质量门拦截：请修正矛盾数据后重试";
+        try { const j = await r.json(); msg = (j.detail && j.detail.error) || msg; } catch (_) {}
+        throw new Error(msg);
+      }
       if (!r.ok) throw new Error("API " + r.status);
       const blob = await r.blob();
       const a = document.createElement("a");
@@ -681,6 +687,7 @@ async function init() {
     const btn = e.currentTarget, label = btn.textContent;
     btn.disabled = true; btn.textContent = "生成中…";
     try {
+      if (!(await gateCheckForExport("Tear Sheet"))) return; // fail → 拦截
       const r = await fetch("/api/uw/tearsheet", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -688,6 +695,11 @@ async function init() {
           name: (state.property && state.property.name) || "",
           address: (state.property && state.property.address) || "" }),
       });
+      if (r.status === 422) {
+        let msg = "数据质量门拦截：请修正矛盾数据后重试";
+        try { const j = await r.json(); msg = (j.detail && j.detail.error) || msg; } catch (_) {}
+        throw new Error(msg);
+      }
       if (!r.ok) throw new Error("API " + r.status);
       const blob = await r.blob();
       const a = document.createElement("a");
@@ -723,6 +735,7 @@ async function init() {
         const d = await r.json();
         if (!r.ok || d.error) throw new Error(d.error || ("HTTP " + r.status));
         let filled = 0, skipped = [];
+        clearGateMarks();
         // 填字段：key 直接对应 data-in 路径
         for (const fld of (d.fields || [])) {
           const el = document.querySelector('[data-in="' + fld.key + '"]');
@@ -755,6 +768,18 @@ async function init() {
         if (skipped.length) parts.push("未映射 " + skipped.length + " 项");
         parts.push("（全部为卖方口径、待独立验证）");
         setStatus("ok", parts.join("；"));
+        // 数据质量门：渲染面板 + 标黄矛盾/偏离字段
+        if (d.quality_gate) {
+          applyGateMarks(d.quality_gate);
+          renderGate(d.quality_gate);
+          if (d.quality_gate.blocked) {
+            parts.push("⛔ 门拦截 " + d.quality_gate.fails_n + " 项：修正后才能导出报告/Tear Sheet");
+            setStatus("err", parts.join("；"));
+          } else if (d.quality_gate.status === "warn") {
+            parts.push("⚠️ 门告警 " + d.quality_gate.warns_n + " 项已标黄");
+            setStatus("busy", parts.join("；"));
+          }
+        }
       } catch (err) {
         setStatus("err", "解析失败：" + err.message);
       } finally {
@@ -766,6 +791,80 @@ async function init() {
     if (!intakeStatus) return;
     intakeStatus.className = "intake-status " + cls;
     intakeStatus.textContent = msg;
+  }
+  // ---- 数据质量门（台账 2026-10-06）：fail 拦截 / warn 标黄 ----
+  function clearGateMarks() {
+    document.querySelectorAll(".gate-yellow").forEach((el) => el.classList.remove("gate-yellow"));
+  }
+  function applyGateMarks(gate) {
+    // 标黄：fail/warn 命中的字段（表单描边琥珀色，常驻到下次 intake/手改）
+    for (const key of (gate && gate.yellow_fields) || []) {
+      const el = document.querySelector('[data-in="' + key + '"]');
+      if (el) el.classList.add("gate-yellow");
+    }
+  }
+  function renderGate(gate) {
+    const panel = document.getElementById("gatePanel");
+    if (!panel || !gate) return;
+    const chip = gate.status === "blocked" ? '<span class="gate-chip blocked">⛔ 数据质量门拦截</span>'
+      : gate.status === "warn" ? '<span class="gate-chip warn">⚠️ 数据质量门告警</span>'
+      : '<span class="gate-chip pass">✅ 数据质量门通过</span>';
+    let html = '<div class="gate-head">' + chip + '<span class="gate-summary">' +
+      (gate.summary || "") + '（' + (gate.schema_version || "") + '）</span></div>';
+    const items = [];
+    for (const c of (gate.fails || [])) items.push({ c, cls: "sev-fail", tag: "⛔ 拦截" });
+    for (const c of (gate.warns || [])) items.push({ c, cls: "sev-warn", tag: "⚠️ 复核" });
+    if (items.length) {
+      html += '<ul class="gate-list">' + items.map((it) =>
+        '<li><span class="' + it.cls + '">' + it.tag + '</span> ' +
+        it.c.title.replace(/</g, "&lt;") +
+        (it.c.detail ? '<div class="gate-detail">' + it.c.detail.replace(/</g, "&lt;").slice(0, 300) + "</div>" : "") +
+        "</li>").join("") + "</ul>";
+    }
+    const fr = gate.field_report || [];
+    if (fr.length) {
+      html += '<div class="gate-fields">' + fr.map((f) => {
+        const cls = f.flagged ? "gate-f flagged" : (f.low_confidence ? "gate-f low" : "gate-f");
+        const page = f.page ? (" · P" + f.page) : "";
+        return '<span class="' + cls + '" title="' + (f.source || "") + '">' +
+          String(f.label || f.key).replace(/</g, "&lt;") + page + " · " +
+          String(f.confidence || "").replace(/</g, "&lt;") + "</span>";
+      }).join("") + "</div>";
+    }
+    panel.innerHTML = html;
+    panel.classList.toggle("pass", gate.status === "pass");
+    panel.hidden = false;
+  }
+  // 导出前过门：blocked → 弹窗列 fail 并终止；warn → 确认后继续
+  async function gateCheckForExport(action) {
+    const flat = {};
+    document.querySelectorAll("[data-in]").forEach((el) => {
+      const v = (el.value || "").toString().trim();
+      if (v !== "") flat[el.getAttribute("data-in")] = v;
+    });
+    const tenants = (state.tenants || []).map((t) => ({
+      suite: t.suite || "", tenant: t.tenant || "", sf: t.sf, monthly_rent: t.monthly_rent }));
+    try {
+      const r = await fetch("/api/wb/intake/gate", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deal_type: "commercial", fields: flat, tenants }),
+      });
+      const g = await r.json();
+      if (!r.ok) return true; // 门服务异常不挡路（服务端仍会硬拦）
+      if (g.blocked) {
+        alert("数据质量门拦截（" + action + "）：" + (g.fails || []).map((c) => c.title).join("\n") +
+          "\n\n请修正矛盾数据后重试。");
+        renderGate(g);
+        return false;
+      }
+      if (g.status === "warn") {
+        renderGate(g);
+        return confirm("数据质量门告警（" + action + "）：\n" +
+          (g.warns || []).map((c) => c.title).join("\n") +
+          "\n\n标黄字段请先核实。仍要继续生成吗？");
+      }
+      return true;
+    } catch (_) { return true; }
   }
   // ---- 地址 → 州平均税率 → 自动填房产税（realyzer 思路，静态表+零key实现） ----
   async function autoFillTax() {

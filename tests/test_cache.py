@@ -4,7 +4,11 @@
 的测试路径（test_providers.py 的旧用例）不受影响。这里用 monkeypatch 把
 四个 provider 类的方法替换为可计数/可控的 fake，走 providers=None 测缓存。
 """
+import os
+import sys
 import time
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import pytest
 
