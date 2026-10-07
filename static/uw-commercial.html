@@ -356,8 +356,22 @@ input.gate-yellow, select.gate-yellow { box-shadow: 0 0 0 2px var(--amber) !impo
       <input type="file" id="intakeImg" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp" hidden>
       <span class="btn sm">上传截图（房源页/照片）</span>
     </label>
+    <button class="btn sm" id="intakePaste" type="button">粘贴文本（OM / Flyer 文本）</button>
     <span class="intake-hint">自动提取价格/面积/NOI/租户，填入下表；全部标"卖方口径、待验证"</span>
     <span class="intake-status" id="intakeStatus"></span>
+  </div>
+  <!-- 粘贴文本 intake 弹窗（台账 2026-10-07） -->
+  <div id="pasteOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:999;align-items:center;justify-content:center;">
+    <div style="width:min(720px,92vw);max-height:86vh;display:flex;flex-direction:column;background:var(--panel,#111);border:1px solid var(--line,#333);border-radius:12px;padding:16px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <b>粘贴 OM / Flyer 文本</b>
+        <button class="btn sm" id="pasteClose" type="button">关闭</button>
+      </div>
+      <textarea id="pasteText" style="flex:1;min-height:260px;resize:vertical;" placeholder="把 OM、flyer、卖方材料里的文本粘贴到这里（英文/中文均可），点「提取并填表」自动识别价格、面积、NOI、租户…&#10;&#10;全部结果标「卖方材料口径、待独立验证」。"></textarea>
+      <div style="margin-top:10px;display:flex;gap:8px;justify-content:flex-end;">
+        <button class="btn sm primary" id="pasteGo" type="button">提取并填表</button>
+      </div>
+    </div>
   </div>
   <!-- 数据质量门面板（台账 2026-10-06）：fail 拦截 / warn 标黄 -->
   <div class="gate-panel" id="gatePanel" hidden></div>

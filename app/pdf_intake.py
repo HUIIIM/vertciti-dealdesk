@@ -156,13 +156,15 @@ def parse_pdf_text(text: str, filename: str, pages: list[str] | None = None) -> 
 
 
 
-def parse_commercial_pdf_text(text: str, filename: str, pages: list[str] | None = None) -> dict:
+def parse_commercial_pdf_text(text: str, filename: str, pages: list[str] | None = None,
+                              source_label: str | None = None) -> dict:
     """商业 OM / flyer → 商业核保字段（全部卖方口径、待验证）。
 
     pages 可选：用于标注字段来源页码（数据质量门 field_report 用）。
+    source_label 可选：覆盖默认来源标注（如"粘贴文本"）。
     """
     at = datetime.now().strftime("%Y-%m-%d %H:%M")
-    source = f"PDF:{filename}"
+    source = source_label or f"PDF:{filename}"
     pm = _PageMap(pages)
 
     def F(key, value, display=None, note="", page=None):
@@ -279,6 +281,28 @@ def run_commercial_pdf_upload(saved_path: str, filename: str) -> dict:
     d["quality_gate"] = validators.run_quality_gate(
         "commercial", d["fields"], tenants=d.get("tenants"),
         raw_text=text, pages=pages)
+    return d
+
+
+def run_commercial_text_upload(text: str) -> dict:
+    """商业粘贴文本 intake（台账 2026-10-07）：粘贴 OM/flyer 文本 → 结构化字段。
+
+    与 PDF intake 共用同一抽取引擎（parse_commercial_pdf_text），抽取逻辑
+    完全一致；全部字段标"卖方材料口径、待独立验证"，同样跑数据质量门。
+    """
+    from . import validators
+    text = text or ""
+    at = datetime.now().strftime("%Y-%m-%d %H:%M")
+    d = parse_commercial_pdf_text(text, "pasted-text.txt", pages=None,
+                                  source_label="粘贴文本")
+    d["mode"] = "paste"
+    d["text_chars"] = len(text)
+    d["excerpt"] = text[:500]
+    d["claim_notice"] = f"以下全部数字为{CLAIM_LABEL}，须独立验证后方可用于估值/打分"
+    # 2026-10-06 数据质量门同样适用：fail 拦截、warn 标黄
+    d["quality_gate"] = validators.run_quality_gate(
+        "commercial", d["fields"], tenants=d.get("tenants"), raw_text=text,
+        pages=None)
     return d
 
 

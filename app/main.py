@@ -779,6 +779,28 @@ async def uw_commercial_intake_pdf(request: Request, file: UploadFile = File(...
             pass
 
 
+# ---------------- 商业核保粘贴文本 intake：粘贴 OM/flyer 文本 → 商业字段 ----------------
+
+@app.post("/api/uw-commercial/intake/text")
+def uw_commercial_intake_text(payload: dict):
+    """商业粘贴文本 intake（台账 2026-10-07）：粘贴 OM/flyer/卖方材料文本
+    → 提取商业核保字段（价格/面积/NOI/租户）。
+
+    与 PDF intake 共用同一抽取引擎，返回形状一致（fields[] 直接对应
+    uw-commercial.html 的 data-in 路径 + tenants[] + quality_gate），
+    全部标"卖方材料口径、待独立验证"。
+    """
+    text = str((payload or {}).get("text") or "")
+    if not text.strip():
+        raise HTTPException(400, "文本为空，请粘贴 OM / flyer 文本后再提取")
+    if len(text) > 500_000:
+        raise HTTPException(400, "文本过长（上限约 500KB），请分段粘贴")
+    try:
+        return pdf_intake.run_commercial_text_upload(text)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(500, f"提取失败：{str(e)[:200]}")
+
+
 # ---------------- 截图 intake：房源页截图 → pending 队列 → cron 视觉提取 ----------------
 
 @app.post("/api/wb/intake/image")

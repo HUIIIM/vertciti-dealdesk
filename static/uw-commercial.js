@@ -720,9 +720,58 @@ async function init() {
   window.addEventListener("beforeunload", (e) => {
     if (dirty) { e.preventDefault(); e.returnValue = ""; }
   });
-  // ---- 智能录取：PDF → 自动填表 ----
+  // ---- 智能录取：PDF / 粘贴文本 → 自动填表 ----
   const intakeInput = $("#intakePdf");
   const intakeStatus = $("#intakeStatus");
+  // 统一的 intake 结果填表逻辑（台账 2026-10-07：PDF 与粘贴文本共用）
+  function applyIntakeResult(d) {
+    let filled = 0, skipped = [];
+    clearGateMarks();
+    // 填字段：key 直接对应 data-in 路径
+    for (const fld of (d.fields || [])) {
+      const el = document.querySelector('[data-in="' + fld.key + '"]');
+      if (el && fld.value != null) {
+        el.value = fld.value;
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+        el.style.boxShadow = "0 0 0 2px var(--teal-line)";
+        setTimeout(() => { el.style.boxShadow = ""; }, 1800);
+        filled++;
+      } else {
+        skipped.push(fld.key + "（无对应输入项）");
+      }
+    }
+    // 填租户：tenants[] → rent roll 行（直接进 state.tenants，再 render）
+    const ts = d.tenants || [];
+    if (ts.length) {
+      for (const t of ts) {
+        state.tenants.push({
+          suite: t.suite || "", tenant: t.tenant || "",
+          sf: t.sf || 0, monthly_rent: t.monthly_rent || 0,
+          underwritten_annual: t.monthly_rent ? (t.monthly_rent * 12) : 0
+        });
+      }
+      markDirty();
+    }
+    renderAll();
+    const parts = [];
+    parts.push("已填 " + filled + " 个字段");
+    if (ts.length) parts.push(ts.length + " 个租户");
+    if (skipped.length) parts.push("未映射 " + skipped.length + " 项");
+    parts.push("（全部为卖方口径、待独立验证）");
+    setStatus("ok", parts.join("；"));
+    // 数据质量门：渲染面板 + 标黄矛盾/偏离字段
+    if (d.quality_gate) {
+      applyGateMarks(d.quality_gate);
+      renderGate(d.quality_gate);
+      if (d.quality_gate.blocked) {
+        parts.push("⛔ 门拦截 " + d.quality_gate.fails_n + " 项：修正后才能导出报告/Tear Sheet");
+        setStatus("err", parts.join("；"));
+      } else if (d.quality_gate.status === "warn") {
+        parts.push("⚠️ 门告警 " + d.quality_gate.warns_n + " 项已标黄");
+        setStatus("busy", parts.join("；"));
+      }
+    }
+  }
   if (intakeInput) {
     intakeInput.addEventListener("change", async (e) => {
       const f = e.target.files[0];
@@ -734,56 +783,50 @@ async function init() {
         const r = await fetch("/api/uw-commercial/intake/pdf", { method: "POST", body: fd });
         const d = await r.json();
         if (!r.ok || d.error) throw new Error(d.error || ("HTTP " + r.status));
-        let filled = 0, skipped = [];
-        clearGateMarks();
-        // 填字段：key 直接对应 data-in 路径
-        for (const fld of (d.fields || [])) {
-          const el = document.querySelector('[data-in="' + fld.key + '"]');
-          if (el && fld.value != null) {
-            el.value = fld.value;
-            el.dispatchEvent(new Event("input", { bubbles: true }));
-            el.style.boxShadow = "0 0 0 2px var(--teal-line)";
-            setTimeout(() => { el.style.boxShadow = ""; }, 1800);
-            filled++;
-          } else {
-            skipped.push(fld.key + "（无对应输入项）");
-          }
-        }
-        // 填租户：tenants[] → rent roll 行（直接进 state.tenants，再 render）
-        const ts = d.tenants || [];
-        if (ts.length) {
-          for (const t of ts) {
-            state.tenants.push({
-              suite: t.suite || "", tenant: t.tenant || "",
-              sf: t.sf || 0, monthly_rent: t.monthly_rent || 0,
-              underwritten_annual: t.monthly_rent ? (t.monthly_rent * 12) : 0
-            });
-          }
-          markDirty();
-        }
-        renderAll();
-        const parts = [];
-        parts.push("已填 " + filled + " 个字段");
-        if (ts.length) parts.push(ts.length + " 个租户");
-        if (skipped.length) parts.push("未映射 " + skipped.length + " 项");
-        parts.push("（全部为卖方口径、待独立验证）");
-        setStatus("ok", parts.join("；"));
-        // 数据质量门：渲染面板 + 标黄矛盾/偏离字段
-        if (d.quality_gate) {
-          applyGateMarks(d.quality_gate);
-          renderGate(d.quality_gate);
-          if (d.quality_gate.blocked) {
-            parts.push("⛔ 门拦截 " + d.quality_gate.fails_n + " 项：修正后才能导出报告/Tear Sheet");
-            setStatus("err", parts.join("；"));
-          } else if (d.quality_gate.status === "warn") {
-            parts.push("⚠️ 门告警 " + d.quality_gate.warns_n + " 项已标黄");
-            setStatus("busy", parts.join("；"));
-          }
-        }
+        applyIntakeResult(d);
       } catch (err) {
         setStatus("err", "解析失败：" + err.message);
       } finally {
         e.target.value = "";
+      }
+    });
+  }
+  // ---- 粘贴文本 intake（台账 2026-10-07）：粘贴 OM/flyer 文本 → 提取填表 ----
+  const pasteBtn = $("#intakePaste");
+  const pasteOverlay = $("#pasteOverlay");
+  const pasteText = $("#pasteText");
+  function openPasteModal() {
+    if (pasteOverlay) {
+      pasteOverlay.style.display = "flex";
+      if (pasteText) pasteText.focus();
+    }
+  }
+  function closePasteModal() {
+    if (pasteOverlay) pasteOverlay.style.display = "none";
+  }
+  if (pasteBtn) pasteBtn.addEventListener("click", openPasteModal);
+  const pasteClose = $("#pasteClose");
+  if (pasteClose) pasteClose.addEventListener("click", closePasteModal);
+  if (pasteOverlay) pasteOverlay.addEventListener("click", (e) => {
+    if (e.target === pasteOverlay) closePasteModal();
+  });
+  const pasteGo = $("#pasteGo");
+  if (pasteGo) {
+    pasteGo.addEventListener("click", async () => {
+      const t = (pasteText && pasteText.value || "").trim();
+      if (!t) { setStatus("err", "请先粘贴文本"); return; }
+      setStatus("busy", "提取中…");
+      closePasteModal();
+      try {
+        const r = await fetch("/api/uw-commercial/intake/text", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: t }),
+        });
+        const d = await r.json();
+        if (!r.ok || d.error) throw new Error(d.error || ("HTTP " + r.status));
+        applyIntakeResult(d);
+      } catch (err) {
+        setStatus("err", "提取失败：" + err.message);
       }
     });
   }
