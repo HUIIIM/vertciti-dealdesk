@@ -81,6 +81,13 @@ header.top .sub { color: var(--muted); font-size: 12.5px; margin-top: 6px; }
 .wb .passbox input { padding: 6px 9px; font-size: 12.5px; background: var(--bg1); border: 1px solid var(--line); border-radius: 6px; color: var(--ink); width: 180px; font-family: inherit; }
 .wb .btn.xs { padding: 5px 10px; font-size: 12px; margin: 2px 4px 2px 0; }
 .wb .src-badge { display: inline-block; font-size: 11px; color: var(--muted); background: rgba(148,163,184,.12); border-radius: 4px; padding: 1px 7px; white-space: nowrap; }
+/* 产权穿透树（2026-10-08）：L0/L1/L2 纵向树 */
+.wb .tree-node { border-left: 3px solid var(--line); padding: 8px 12px; margin: 8px 0 8px 0; background: var(--bg1); border-radius: 0 8px 8px 0; }
+.wb .tree-node.lv0 { border-color: var(--teal); margin-left: 0; }
+.wb .tree-node.lv1 { border-color: var(--blue, #60a5fa); margin-left: 18px; }
+.wb .tree-node.lv2 { border-color: var(--amber); margin-left: 36px; }
+.wb .tree-lv { font-size: 12px; font-weight: 700; margin-right: 6px; }
+.wb .card.slim { margin-top: 12px; }
 </style>
 </head>
 <body>
@@ -115,6 +122,7 @@ header.top .sub { color: var(--muted); font-size: 12.5px; margin-top: 6px; }
   <button class="btn ghost" onclick="WB.refreshScreenshots()">刷新截图提取结果</button>
   <span class="src" id="intake-status"></span>
   <div id="intake-results"></div>
+  <div id="ownership-tree"></div>
   <div id="screenshot-tasks"></div>
   <div id="intake-log"></div>
 </section>

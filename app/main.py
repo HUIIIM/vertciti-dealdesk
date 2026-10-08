@@ -13,7 +13,7 @@ from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, ValidationError
 
-from . import db, image_intake, pdf_intake, pdf_report, pdf_uw, report, research_pipeline, scoring_commercial, scoring_residential, sensitivity, uw_commercial, validators, workbench
+from . import db, image_intake, ownership, pdf_intake, pdf_report, pdf_uw, report, research_pipeline, scoring_commercial, scoring_residential, sensitivity, uw_commercial, validators, workbench
 from . import commercial_plus, condition_adjust, confidence as conf_mod, excel_uw, verdict as verdict_mod
 from .data import hpi
 from .models import CommercialInput, ProjectCreate, ResidentialInput
@@ -835,6 +835,25 @@ def wb_intake_extracted(task_id: str):
         raise HTTPException(404, "提取结果尚未生成，请稍后刷新")
     except ValueError as e:
         raise HTTPException(400, str(e))
+
+
+@app.post("/api/wb/ownership/tree")
+def wb_ownership_tree(payload: dict):
+    """产权穿透树（台账 2026-10-08 第 1 项，学自 Reonomy Top4）。
+
+    body: {"address": "...", "owner_name": "可选/手动指定",
+           "owner_source": "可选/持有人来源说明"}。
+    owner_name 未给时走 TopHap 解析持有人（token 过期则降级为部分树）；
+    NY 物业自动查 NY DOS 公开备案穿透到注册代理人/负责人。
+    任一推断节点带[待验证]；联系方式只收 verified 公开记录地址。
+    """
+    try:
+        return ownership.tree_for_address(
+            (payload or {}).get("address", ""),
+            owner_name=(payload or {}).get("owner_name") or None,
+            owner_source=(payload or {}).get("owner_source") or "")
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(500, f"穿透树生成失败：{str(e)[:200]}")
 
 
 # ---------------- 商业核保增补（接 compute_all，零逻辑改动） ----------------

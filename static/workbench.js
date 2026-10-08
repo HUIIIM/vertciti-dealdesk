@@ -438,7 +438,59 @@ WB.renderIntake = function (d) {
     `<div class="logline"><span class="st-${l.status}">[${l.status}]</span> ${esc(l.step)} <span class="src">${esc(l.note || '')} · ${esc(l.at)}</span></div>`).join('');
   $('#intake-log').innerHTML = logs ? `<h4>搜集日志（${d.log.length} 步）</h4>${logs}` : '';
   $('#intake-status').textContent = '';
+  WB.loadOwnershipTree();
+}
+
+/* ---------- 产权穿透树（台账 2026-10-08 第 1 项，学自 Reonomy Top4） ----------
+   intake 渲染后自动生成：L0 物业 → L1 契约持有人 → L2 NY DOS 备案穿透
+   （注册代理人/负责人）。推断节点强制 [待验证]；联系方式只显示 verified
+   公开记录地址。非阻塞：失败只显示提示，不影响 intake 结果。 */
+WB.loadOwnershipTree = async function () {
+  const box = document.getElementById('ownership-tree');
+  if (!box) return;
+  const d = WB.intakeData || {};
+  const addr = d.address || (d.parsed || {}).address
+    || ((document.getElementById('in-address') || {}).value || '').trim();
+  if (!addr) { box.innerHTML = ''; return; }
+  box.innerHTML = '<p class="src">⏳ 产权穿透生成中（TopHap 持有人＋NY DOS 备案）…</p>';
+  try {
+    const r = await fetch('/api/wb/ownership/tree', {method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({address: addr})});
+    if (!r.ok) throw new Error((await r.text()).slice(0, 120));
+    box.innerHTML = WB.renderOwnershipTree(await r.json());
+  } catch (e) {
+    box.innerHTML = `<p class="src">产权穿透暂不可用：${esc(e.message)}</p>`;
+  }
 };
+
+WB.renderOwnershipTree = function (t) {
+  if (!t || !t.ok) return '<p class="src">产权穿透：无数据</p>';
+  const badge = c => c === 'verified'
+    ? '<span class="badge high">✅ 公开记录</span>'
+    : '<span class="badge seller">⚠️ 待验证</span>';
+  const lvLabel = l => ['🏠 物业', '📜 持有人', '👤 穿透'][l] || ('L' + l);
+  const nodes = (t.nodes || []).map(n =>
+    `<div class="tree-node lv${n.level}"><span class="tree-lv">${lvLabel(n.level)}</span> `
+    + `<b>${esc(n.display || n.name)}</b> <span class="src">${esc(n.relation || '')}</span> ${badge(n.confidence)}`
+    + (n.note ? `<div class="src">${esc(n.note)}</div>` : '')
+    + (n.sources || []).map(s => `<div class="src">来源：${esc(s.source)}${s.note ? ' · ' + esc(s.note) : ''}</div>`).join('')
+    + `</div>`).join('');
+  const contacts = (t.contacts || []).length
+    ? '<h4>📇 联系方式（仅 verified 公开记录）</h4><ul style="margin:4px 0;padding-left:18px">'
+      + t.contacts.map(c => `<li>${esc(c.value)} <span class="src">（${esc(c.note || c.kind)}）</span></li>`).join('')
+      + '</ul>'
+    : '';
+  const caveats = (t.caveats || []).length
+    ? '<h4>⚠️ 待验证事项</h4><ul style="margin:4px 0;padding-left:18px">'
+      + t.caveats.map(c => `<li>${esc(c)}</li>`).join('') + '</ul>'
+    : '';
+  const head = t.owner_resolved
+    ? '🌳 产权穿透树'
+    : '🌳 产权穿透树（持有人未解析）';
+  return `<div class="card slim"><h4>${head}</h4>${nodes}${contacts}${caveats}`
+    + `<p class="src">推断节点一律标注[待验证]；联系方式只采用公开记录，不编造电话/邮箱。</p></div>`;
+};;
 
 WB.fillForm = function () {
   const d = WB.intakeData;
