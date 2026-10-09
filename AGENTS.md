@@ -19,6 +19,10 @@
 ```bash
 rm -f dealdesk.db && .venv/bin/pytest tests/ -q
 ```
+- 本机 shell 直接跑 pytest 会 `ModuleNotFoundError: No module named 'app'`
+  （连已存在的 test_ownership.py 也一样，非代码问题）：必须加
+  `PYTHONPATH=.`，即 `PYTHONPATH=. .venv/bin/pytest tests/ -q`。
+  （2026-10-09 实证）
 
 - **跑测试前必删 `dealdesk.db`**（仓库根的开发副产品库）：`DEALDESK_DB` 环境变量
   在 `app.db` import 之后才生效，测试隔离有预先存在的 bug；根目录有脏库时
@@ -35,6 +39,17 @@ rm -f dealdesk.db && .venv/bin/pytest tests/ -q
 - 改了 `static/` 内联 JS 必须同步重算 CSP hash 并写入 `vercel.json`
  （曾因 hash 未更新导致全站 #app 空白，curl 200 看不出）。
 - 部署后必验生产 URL 真实渲染（curl 200 不算验证）。
+- **坏部署处置（2026-10-09 实证 dpl_69pJZCYCShhyrofoqHsuMugNjG8j）**：
+  生产部署后若全站 500（含未改动的端点），先判"坏部署"而非"坏代码"——
+  用同 bundle 打 preview 部署验证：preview 正常即证代码无辜。
+  处置顺序：① 立即用 Vercel API redeploy 上一健康部署回滚（2 分钟恢复）；
+  ② 再用同一 bundle 做一次干净生产部署。部署后第一动作永远是
+  `GET /api/tophap/status` 冒烟，500 则回滚、不反复重部署同一 bundle。
+- vercel-deploy/ 有**两处**静态副本：根目录一份 ＋ `static/` 子目录一份
+  （与仓库 `static/` 三方对齐，缺任一=生产页面版本错乱）；rsync 同步三条：
+  `app/ → vercel-deploy/app/`、`static/ → vercel-deploy/static/`、
+  `static/ → vercel-deploy/`（根，排除 api/、app/、vercel.json、
+  requirements.txt、dealdesk-seed.db）。
 
 ## Git 规范
 
