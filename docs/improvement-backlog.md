@@ -6,17 +6,17 @@
 
 ## 待做（按优先级）
 
-1. [ ] **Sell-readiness 卖方动机分**（学自 Reonomy，Top5）：0-100 规则分（持有>10年+25、maturity<24mo+30、refinance+15、lien/violation+20、同 zip 销售率↑+10），intake 输出字段，附每项信号来源。验收：3 个已知 deal 打分排序与人工判断一致
-2. [ ] 生产 PDF 解析换纯 Python 库（D2）：Vercel 无 poppler → 切 pypdf/pdfplumber 零系统依赖进 requirements.txt，消除"生产永远传不了 PDF"
-3. [ ] 误导性数字口径（D3/D4，D460 CEO 已定）：`_div` 零分母 / `_irr` 无解返回 None，前端统一渲染"N/A"（禁显示 0.00/0%）
-4. [ ] `monthly_payment` 与 `amort_payment` 百分制/小数制口径统一（埋雷）：审计发现两者利率口径不一致，静默错数风险
-5. [ ] 商业页 390px 移动端 QA：新增"一键 Tear Sheet"按钮后 cmd-ctl 在 390px 是否溢出/可操作；商业页三栏在小屏不溢出。验收：真机/真浏览器 390px 逐项目检通过
-6. [ ] 商业页截图/图片录取（暂缓项回补）：上传房源截图 → OCR/视觉提取 → 填表（标卖方口径待验证）。验收：上传一张真实房源截图，价格/面积/租金字段正确提取并标待验证
-7. [ ] 扫描版 PDF OCR（暂缓项回补）：图片型 PDF 先 OCR 再走现有提取链路，明确提示"OCR 口径"
-8. [ ] 门覆盖补齐（2026-10-06 数据质量门二期）：截图 intake 的视觉提取结果同样跑质量门（`image_intake` 输出附 quality_gate）；住宅页（d.html）接入商
+1. [ ] 生产 PDF 解析换纯 Python 库（D2）：Vercel 无 poppler → 切 pypdf/pdfplumber 零系统依赖进 requirements.txt，消除"生产永远传不了 PDF"
+2. [ ] 误导性数字口径（D3/D4，D460 CEO 已定）：`_div` 零分母 / `_irr` 无解返回 None，前端统一渲染"N/A"（禁显示 0.00/0%）
+3. [ ] `monthly_payment` 与 `amort_payment` 百分制/小数制口径统一（埋雷）：审计发现两者利率口径不一致，静默错数风险
+4. [ ] 商业页 390px 移动端 QA：新增"一键 Tear Sheet"按钮后 cmd-ctl 在 390px 是否溢出/可操作；商业页三栏在小屏不溢出。验收：真机/真浏览器 390px 逐项目检通过
+5. [ ] 商业页截图/图片录取（暂缓项回补）：上传房源截图 → OCR/视觉提取 → 填表（标卖方口径待验证）。验收：上传一张真实房源截图，价格/面积/租金字段正确提取并标待验证
+6. [ ] 扫描版 PDF OCR（暂缓项回补）：图片型 PDF 先 OCR 再走现有提取链路，明确提示"OCR 口径"
+7. [ ] 门覆盖补齐（2026-10-06 数据质量门二期）：截图 intake 的视觉提取结果同样跑质量门（`image_intake` 输出附 quality_gate）；住宅页（d.html）接入商
     业页同款门面板 + 导出前过门。验收：截图/住宅两路各喂一份矛盾材料，fail 正确拦截并标黄
-9. [ ] RentCast 激活：等董事长绑卡后接入 fallback 链实测（外部阻塞，不占每日名额）
-10. [ ] vercel-deploy 静态双副本同步自动化（2026-10-07 本轮新发现）：vercel-deploy/ 根与 static/ 各有一份静态文件（uw-commercial.html/js 等），失步=生产页面老版本；加部署前自动 diff 门禁（不一致直接 fail）。验收：模拟失步一次，门禁拦截
+8. [ ] RentCast 激活：等董事长绑卡后接入 fallback 链实测（外部阻塞，不占每日名额）
+9. [ ] vercel-deploy 静态双副本同步自动化（2026-10-07 本轮新发现）：vercel-deploy/ 根与 static/ 各有一份静态文件（uw-commercial.html/js 等），失步=生产页面老版本；加部署前自动 diff 门禁（不一致直接 fail）。验收：模拟失步一次，门禁拦截
+10. [ ] ECB 未关闭罚金接入卖方动机分（2026-10-09 本轮遗留）：Socrata 6bgk-3dad 按地址查 balance_due>0 → 并入 lien_violation 信号（与 DOB 违规同权）；验收：有欠款物业正确加分且附来源
 
 ## 暂缓（被 Top5 挤掉，未丢弃，消化完按序取回）
 
@@ -43,6 +43,7 @@
 
 ## 已完成
 
+- 2026-10-09：Sell-readiness 卖方动机分上线（原台账第 1 项，学自 Reonomy Top5）。新模块 `app/sell_readiness.py`：0-100 规则分（持有>10年+25 / 贷款到期<24mo+30 / 再融资+15 / 留置权·违规+20 / 区域热度+10），每项附来源；贷款到期/再融资暂无数据源→诚实 unavailable 不计分不虚构；留置权信号=TopHap distress/法拍预警＋NYC DOB 公开违规（Socrata 3h2n-5cm9，门牌号+街道归一化匹配）；区域热度=TopHap CMA 年度成交数同比（代理指标明示）；ECB 未关闭罚金暂未纳入（caveat 明示，已补进待做）。新端点 POST /api/wb/sell-readiness/score（TopHap/DOB 均 best-effort 降级）；工作台 intake 渲染后自动加载打分卡。证据：commit 007b0d1（tests/test_sell_readiness.py 29 新，全量 449 passed）＋ 生产 E2E（dpl_DjrbSrgWmkfRK2TpPZvHF16yKzGJ）：3 个已知 deal 打分排序与人工判断一致（1500 Atlantic Ave 19.1年持有 25分 ＞ 30-30 Northern Blvd 15.7年持有 25分 ＞ 450 W 44th 4.7年持有 0分；无一命中 distress/违规）；生产 workbench.html/js 含打分卡。证据文件：goals/vertcity-build-out/hidden_files/dealdesk-improvement-2026-10-09/。附带：首轮生产部署 dpl_69pJZCYCShhyrofoqHsuMugNjG8j 全站 500（同 bundle preview 启动正常，判定坏部署非代码问题）→ 立即回滚上一健康部署恢复 → 干净重部署一次成功。教训：部署后先 GET /api/tophap/status 冒烟，500 立即回滚再排查。
 - 2026-10-08：Ownership 产权穿透树上线（原台账第 1 项，学自 Reonomy Top4）。新模块 `app/ownership.py`：L0 物业 → L1 契约持有人（TopHap ownerName 公共记录 verified）→ L2 NY DOS 公开备案穿透（Socrata n9v6-gdp6：注册代理人/CEO·负责人/送达地址，verified）；任一推断节点强制 [待验证]＋caveats 逐条列明；联系方式只收 verified 公开记录地址，不编电话/邮箱；新端点 POST /api/wb/ownership/tree（TopHap 不可用时降级为部分树）；工作台 intake 渲染后自动加载（workbench.js/html）。证据：commit d35f595（tests/test_ownership.py 28 用例）＋ 生产 E2E（2026-10-09 补验）：/api/wb/ownership/tree 对 450 W 44th St 返回 ok:true（TopHap 未解析到持有人时诚实降级为 L0 部分树＋caveat）。备注：2026-10-08 当轮台账未及时登记，本轮补记。
 - 2026-10-07：商业页粘贴文本智能录取上线（原台账第 1 项）。新端点 POST /api/uw-commercial/intake/text：粘贴 OM/flyer 文本 → 价格/面积/在手+预测 NOI/cap/地址/租户（Suite 行）提取，与 PDF intake 共用同一抽取引擎（`parse_commercial_pdf_text`）；全部标"卖方材料口径、待独立验证"，响应附数据质量门；商业页 intake bar 新增「粘贴文本」弹窗按钮，填表逻辑重构为共用 `applyIntakeResult(d)`（PDF/粘贴两路共用，含门面板+标黄）。证据：pytest 392 passed（8 新，1 deselect pre-existing test_address_pipeline_degradation）＋ 生产 E2E（dpl_8jZBswtdX5jBc26Bt1g88UhtRqSX）：粘贴 1500 Atlantic Ave 样例文本 → 全部字段正确提取（source=粘贴文本）；质量门在新路径生效（两租户年化 <$285k NOI 正确触发 noi_vs_gross_rent 拦截）；生产 uw-commercial.html/js 含新按钮与端点调用。证据文件：goals/vertcity-build-out/hidden_files/dealdesk-improvement-2026-10-07/
 
