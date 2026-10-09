@@ -439,7 +439,53 @@ WB.renderIntake = function (d) {
   $('#intake-log').innerHTML = logs ? `<h4>搜集日志（${d.log.length} 步）</h4>${logs}` : '';
   $('#intake-status').textContent = '';
   WB.loadOwnershipTree();
+  WB.loadSellReadiness();
 }
+
+/* ---------- 卖方动机分（台账 2026-10-09 第 3 项，学自 Reonomy Top5） ----------
+   intake 渲染后自动计算：0-100 规则分（持有>10年+25 / 贷款到期+30 /
+   再融资+15 / 留置权·违规+20 / 区域热度+10），每项附来源；
+   无数据信号记"无数据"不计分、不虚构。非阻塞：失败只显示提示。 */
+WB.loadSellReadiness = async function () {
+  const box = document.getElementById('sell-readiness');
+  if (!box) return;
+  const d = WB.intakeData || {};
+  const addr = d.address || (d.parsed || {}).address
+    || ((document.getElementById('in-address') || {}).value || '').trim();
+  if (!addr) { box.innerHTML = ''; return; }
+  box.innerHTML = '<p class="src">⏳ 卖方动机分计算中（TopHap 持有人记录＋DOB 公开违规）…</p>';
+  try {
+    const r = await fetch('/api/wb/sell-readiness/score', {method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({address: addr})});
+    if (!r.ok) throw new Error((await r.text()).slice(0, 120));
+    box.innerHTML = WB.renderSellReadiness(await r.json());
+  } catch (e) {
+    box.innerHTML = `<p class="src">卖方动机分暂不可用：${esc(e.message)}</p>`;
+  }
+};
+
+WB.renderSellReadiness = function (t) {
+  if (!t || !t.ok) return '<p class="src">卖方动机分：无数据</p>';
+  const stBadge = s => s === 'hit' ? '<span class="badge high">✅ 命中</span>'
+    : s === 'miss' ? '<span class="badge">— 未命中</span>'
+    : '<span class="badge seller">⚠️ 无数据</span>';
+  const rows = (t.signals || []).map(s =>
+    `<div class="tree-node"><b>${esc(s.label)}</b> <span class="src">（${esc(s.rule)}）</span> `
+    + `${stBadge(s.status)} <b>${s.earned}/${s.points}</b>`
+    + (s.value ? `<div class="src">${esc(s.value)}</div>` : '')
+    + `<div class="src">来源：${esc(s.source)}${s.note ? ' · ' + esc(s.note) : ''}</div>`
+    + `</div>`).join('');
+  const caveats = (t.caveats || []).length
+    ? '<h4>⚠️ 口径说明</h4><ul style="margin:4px 0;padding-left:18px">'
+      + t.caveats.map(c => `<li>${esc(c)}</li>`).join('') + '</ul>'
+    : '';
+  return `<div class="card slim"><h4>🎯 卖方动机分：${t.score}/100`
+    + `（动机${esc(t.tier)}）</h4>`
+    + `<p class="src">${esc(t.tier_note || '')}</p>${rows}${caveats}`
+    + `<p class="src">规则分仅供线索参考：无数据源的信号不计分、不虚构；`
+    + `ECB 未关闭罚金暂未纳入。</p></div>`;
+};
 
 /* ---------- 产权穿透树（台账 2026-10-08 第 1 项，学自 Reonomy Top4） ----------
    intake 渲染后自动生成：L0 物业 → L1 契约持有人 → L2 NY DOS 备案穿透

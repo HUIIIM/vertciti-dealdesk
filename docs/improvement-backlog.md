@@ -6,18 +6,17 @@
 
 ## 待做（按优先级）
 
-1. [ ] 商业页粘贴文本智能录取：粘贴 OM/flyer 文本 → 自动提取价格/面积/NOI/租户 → 填表（标卖方口径待验证）
-2. [ ] **Ownership 穿透树**（学自 Reonomy，Top4）：intake 自动生成 LLC→真人→可信度树（SoS 公开查询 + TopHap ownership + 标注 verified/待验证）；联系方式只走 verified 来源。验收：450 W 44th 显示完整穿透链，任一推断字段带[待验证]
-3. [ ] **Sell-readiness 卖方动机分**（学自 Reonomy，Top5）：0-100 规则分（持有>10年+25、maturity<24mo+30、refinance+15、lien/violation+20、同 zip 销售率↑+10），intake 输出字段，附每项信号来源。验收：3 个已知 deal 打分排序与人工判断一致
-4. [ ] 生产 PDF 解析换纯 Python 库（D2）：Vercel 无 poppler → 切 pypdf/pdfplumber 零系统依赖进 requirements.txt，消除"生产永远传不了 PDF"
-5. [ ] 误导性数字口径（D3/D4，D460 CEO 已定）：`_div` 零分母 / `_irr` 无解返回 None，前端统一渲染"N/A"（禁显示 0.00/0%）
-6. [ ] `monthly_payment` 与 `amort_payment` 百分制/小数制口径统一（埋雷）：审计发现两者利率口径不一致，静默错数风险
-7. [ ] 商业页 390px 移动端 QA：新增"一键 Tear Sheet"按钮后 cmd-ctl 在 390px 是否溢出/可操作；商业页三栏在小屏不溢出。验收：真机/真浏览器 390px 逐项目检通过
-8. [ ] 商业页截图/图片录取（暂缓项回补）：上传房源截图 → OCR/视觉提取 → 填表（标卖方口径待验证）。验收：上传一张真实房源截图，价格/面积/租金字段正确提取并标待验证
-9. [ ] 扫描版 PDF OCR（暂缓项回补）：图片型 PDF 先 OCR 再走现有提取链路，明确提示"OCR 口径"
-10. [ ] 门覆盖补齐（2026-10-06 数据质量门二期）：截图 intake 的视觉提取结果同样跑质量门（`image_intake` 输出附 quality_gate）；住宅页（d.html）接入商
+1. [ ] **Sell-readiness 卖方动机分**（学自 Reonomy，Top5）：0-100 规则分（持有>10年+25、maturity<24mo+30、refinance+15、lien/violation+20、同 zip 销售率↑+10），intake 输出字段，附每项信号来源。验收：3 个已知 deal 打分排序与人工判断一致
+2. [ ] 生产 PDF 解析换纯 Python 库（D2）：Vercel 无 poppler → 切 pypdf/pdfplumber 零系统依赖进 requirements.txt，消除"生产永远传不了 PDF"
+3. [ ] 误导性数字口径（D3/D4，D460 CEO 已定）：`_div` 零分母 / `_irr` 无解返回 None，前端统一渲染"N/A"（禁显示 0.00/0%）
+4. [ ] `monthly_payment` 与 `amort_payment` 百分制/小数制口径统一（埋雷）：审计发现两者利率口径不一致，静默错数风险
+5. [ ] 商业页 390px 移动端 QA：新增"一键 Tear Sheet"按钮后 cmd-ctl 在 390px 是否溢出/可操作；商业页三栏在小屏不溢出。验收：真机/真浏览器 390px 逐项目检通过
+6. [ ] 商业页截图/图片录取（暂缓项回补）：上传房源截图 → OCR/视觉提取 → 填表（标卖方口径待验证）。验收：上传一张真实房源截图，价格/面积/租金字段正确提取并标待验证
+7. [ ] 扫描版 PDF OCR（暂缓项回补）：图片型 PDF 先 OCR 再走现有提取链路，明确提示"OCR 口径"
+8. [ ] 门覆盖补齐（2026-10-06 数据质量门二期）：截图 intake 的视觉提取结果同样跑质量门（`image_intake` 输出附 quality_gate）；住宅页（d.html）接入商
     业页同款门面板 + 导出前过门。验收：截图/住宅两路各喂一份矛盾材料，fail 正确拦截并标黄
-11. [ ] RentCast 激活：等董事长绑卡后接入 fallback 链实测（外部阻塞，不占每日名额）
+9. [ ] RentCast 激活：等董事长绑卡后接入 fallback 链实测（外部阻塞，不占每日名额）
+10. [ ] vercel-deploy 静态双副本同步自动化（2026-10-07 本轮新发现）：vercel-deploy/ 根与 static/ 各有一份静态文件（uw-commercial.html/js 等），失步=生产页面老版本；加部署前自动 diff 门禁（不一致直接 fail）。验收：模拟失步一次，门禁拦截
 
 ## 暂缓（被 Top5 挤掉，未丢弃，消化完按序取回）
 
@@ -28,6 +27,12 @@
 
 ## 后续迭代候选（竞品研究未进 Top5，排大版本/长期）
 
+### 全球 AI 对标植入（2026-10-07 第二轮）
+- [ ] **[P0·已验证] "一句话投决"入口**（学自 Homesage.ai Sage，B-016 独立验证完成）：自然语言问 → 编排现有 pipeline（comps/underwriting/tearsheet）→ 返回决策建议＋每步引用；参考 Sage 的 dozens-of-tools 静默编排 + Lite/Pro/Deep Search 三档。双负责人：AI=DealDesk-对标专员，人类=Miao。ETA 2026-10-14。clean-room：学形态自己写，不抄代码。
+- [ ] **[P1] agentic layer + human review + daily digest 形态**（学自 Realtor.com RealAssist，B-028）：现有工作流内嵌 agentic 自动化、发送前人工 review、合规标注法（数据准确性/披露规则）。双负责人：AI=DealDesk-对标专员，人类=Miao。
+- [ ] **[P1] 引用层跨行业佐证**（学自 Sea "Cora"，S-046）：垂直 AI"每答案必附原文条款"已是共识打法——DealDesk 引用层（每个数字可溯源）继续加固，验收口径：任一 AI 生成数字无来源即 fail。
+- [ ] **[P2] 房地产客户关系自动化跟踪**（Joe AI €2M，法国，B-037）：赛道跟踪。
+
 - Canonical deal schema + connector 注册表（学自 Cherre，架构重构）
 - 轻量 entity resolution：多源字段冲突 flag 而非静默取第一个（学自 Cherre）
 - Buy-box 自动打分：Miao"资金很少"硬约束写成可配置 YAML（学自 Dealpath）
@@ -37,6 +42,9 @@
 - 债务时间线：C 页债务到期小节（学自 Crexi，可并入 tear sheet 二期）
 
 ## 已完成
+
+- 2026-10-08：Ownership 产权穿透树上线（原台账第 1 项，学自 Reonomy Top4）。新模块 `app/ownership.py`：L0 物业 → L1 契约持有人（TopHap ownerName 公共记录 verified）→ L2 NY DOS 公开备案穿透（Socrata n9v6-gdp6：注册代理人/CEO·负责人/送达地址，verified）；任一推断节点强制 [待验证]＋caveats 逐条列明；联系方式只收 verified 公开记录地址，不编电话/邮箱；新端点 POST /api/wb/ownership/tree（TopHap 不可用时降级为部分树）；工作台 intake 渲染后自动加载（workbench.js/html）。证据：commit d35f595（tests/test_ownership.py 28 用例）＋ 生产 E2E（2026-10-09 补验）：/api/wb/ownership/tree 对 450 W 44th St 返回 ok:true（TopHap 未解析到持有人时诚实降级为 L0 部分树＋caveat）。备注：2026-10-08 当轮台账未及时登记，本轮补记。
+- 2026-10-07：商业页粘贴文本智能录取上线（原台账第 1 项）。新端点 POST /api/uw-commercial/intake/text：粘贴 OM/flyer 文本 → 价格/面积/在手+预测 NOI/cap/地址/租户（Suite 行）提取，与 PDF intake 共用同一抽取引擎（`parse_commercial_pdf_text`）；全部标"卖方材料口径、待独立验证"，响应附数据质量门；商业页 intake bar 新增「粘贴文本」弹窗按钮，填表逻辑重构为共用 `applyIntakeResult(d)`（PDF/粘贴两路共用，含门面板+标黄）。证据：pytest 392 passed（8 新，1 deselect pre-existing test_address_pipeline_degradation）＋ 生产 E2E（dpl_8jZBswtdX5jBc26Bt1g88UhtRqSX）：粘贴 1500 Atlantic Ave 样例文本 → 全部字段正确提取（source=粘贴文本）；质量门在新路径生效（两租户年化 <$285k NOI 正确触发 noi_vs_gross_rent 拦截）；生产 uw-commercial.html/js 含新按钮与端点调用。证据文件：goals/vertcity-build-out/hidden_files/dealdesk-improvement-2026-10-07/
 
 - 2026-10-06：Intake 数据质量门上线（原台账第 1 项，学自 Dealpath/Cherre Top3）。新模块 `app/validators.py`：固定字段 schema（commercial-v1/residential-v1：类型/口径/核保必填/合理区间）＋ 规则层（cap rate 一致性 >300bps fail / NOI 超毛租金 fail / 租约面积超可租面积 fail / 租户租金单价物理不可能 fail / 文档内同一口径多数值矛盾 fail / 偏离 warn），fail 清零前 blocked；`pdf_intake` 按页提取（pdftotext `\x0c` 分页）字段标注来源页码；两 intake 端点响应附 `quality_gate`（field_report：来源/页码/置信度，低置信标黄）；新端点 POST /api/wb/intake/gate；`/api/uw/report` 与 `/api/uw/tearsheet` 服务端硬拦（blocked→422）；商业页门面板（拦截/告警/通过）＋ fail/warn 命中的输入框琥珀描边常驻标黄＋导出前过门（拦截则终止、告警则确认）。附带修复：`tests/test_cache.py` 缺 sys.path 导致全量 pytest 采集失败。证据：pytest 384 passed（20 新，1 deselect pre-existing test_address_pipeline_degradation）＋ 生产 E2E（dpl_2qamFzhczTPoeqPYq9uftfqeUB2B）：/api/wb/intake/gate 矛盾字段 → blocked（2 fail：NOI>毛租金/双要价矛盾，yellow_fields 3 个）；/api/uw/tearsheet 矛盾 state → 422、干净 state → 200 PDF；/api/uw/report 同样 422/200；uw-commercial.html/js 含门面板与标黄代码。限制：生产无 poppler，PDF intake 端点返回"缺少 pdftotext"（台账第 4 项 D2 待解决），故生产 E2E 用 gate 端点＋JSON 字段直调完成。证据文件：goals/vertcity-build-out/hidden_files/dealdesk-improvement-2026-10-06/
 - 2026-10-05：一键 Tear Sheet 上线（原台账第 1 项，学自 Dealpath Top2）。新模块 `app/tearsheet.py`：compute_all() 结果 → 一页纸数据（12 个关键指标：价格/NOI/cap/全口径现金需求/月供/DSCR/盈亏平衡/现金回报/IRR/股本倍数）＋ 规则引擎生成恰好 3 条 highlights（危>警>好排序：DSCR<1.0 致命、DSCR<1.25 银行口径警告、盈亏平衡>90% 安全垫薄、cap±100bps 定价信号、现金回报<5%/IRR<8% 偏低）＋ 1 条下一步建议；缺数一律 None → "—"（不印 0.00×/0%）。新端点 POST /api/uw/tearsheet（当前未保存 state 一键生成独立 1 页 PDF）；商业页 cmd-ctl 新增"一键 Tear Sheet"按钮（flex-wrap 已有，390px 无新增溢出风险）；备忘录 PDF（POST /api/memo/pdf 商业线）首插 Tear Sheet 封面页（浅色页配白底，深色正文页不受影响）。证据：pytest 364 passed（10 新，1 deselect pre-existing test_address_pipeline_degradation）＋ 生产 E2E：450 W 44th St（$4.35M）/api/uw/tearsheet 200 → 严格 1 页、文本层含 TEAR SHEET/$4,350,000/DSCR/全口径现金需求/下一步建议；/api/memo/pdf 商业 200 → 3 页且第 1 页为 Tear Sheet 封面；生产 uw-commercial.html/js 含按钮与端点调用。证据文件：goals/vertcity-build-out/hidden_files/dealdesk-improvement-2026-10-05/

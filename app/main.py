@@ -13,7 +13,7 @@ from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, ValidationError
 
-from . import db, image_intake, ownership, pdf_intake, pdf_report, pdf_uw, report, research_pipeline, scoring_commercial, scoring_residential, sensitivity, uw_commercial, validators, workbench
+from . import db, image_intake, ownership, pdf_intake, pdf_report, pdf_uw, report, research_pipeline, scoring_commercial, scoring_residential, sell_readiness, sensitivity, uw_commercial, validators, workbench
 from . import commercial_plus, condition_adjust, confidence as conf_mod, excel_uw, verdict as verdict_mod
 from .data import hpi
 from .models import CommercialInput, ProjectCreate, ResidentialInput
@@ -854,6 +854,22 @@ def wb_ownership_tree(payload: dict):
             owner_source=(payload or {}).get("owner_source") or "")
     except Exception as e:  # noqa: BLE001
         raise HTTPException(500, f"穿透树生成失败：{str(e)[:200]}")
+
+
+@app.post("/api/wb/sell-readiness/score")
+def wb_sell_readiness_score(payload: dict):
+    """卖方动机分（台账 2026-10-09 第 3 项，学自 Reonomy Top5）。
+
+    body: {"address": "..."}。0-100 规则分（持有>10年+25 / 贷款到期<24mo+30 /
+    再融资+15 / 留置权·违规+20 / 区域热度+10），每项附来源；
+    无数据源的信号记 unavailable 不计分、不虚构。
+    TopHap 不可用时对应信号 unavailable；DOB 查询仅 NYC、best-effort。
+    """
+    try:
+        return sell_readiness.score_for_address(
+            (payload or {}).get("address", ""))
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(500, f"卖方动机分计算失败：{str(e)[:200]}")
 
 
 # ---------------- 商业核保增补（接 compute_all，零逻辑改动） ----------------
