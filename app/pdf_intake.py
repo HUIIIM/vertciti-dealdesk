@@ -2,17 +2,18 @@
 
 铁律：PDF 里所有数字一律标"卖方材料口径、待独立验证"，
 绝不直接采信（deal intake 铁律：独立验证先于结构设计）。
-文本提取用系统 pdftotext（poppler）；缺失则明确报错，不静默失败。
+文本提取用纯 Python 库 pypdf（零系统依赖，Vercel serverless 可用）；
+D2（2026-10-09）：替换原系统 pdftotext（poppler）方案，消除"生产永远传不了 PDF"。
 """
 
 from __future__ import annotations
 
 import os
 import re
-import shutil
-import subprocess
 import tempfile
 from datetime import datetime
+
+from pypdf import PdfReader
 
 from . import demand_validation as dv
 from . import research_pipeline as rp
@@ -25,28 +26,26 @@ TALKING_KEYWORDS = ["cap", "noi", "turnkey", "renovat", "cash flow", "appreciati
 
 
 def pdftotext_available() -> bool:
-    return shutil.which("pdftotext") is not None
+    """兼容旧名：pypdf 为硬依赖，恒为 True。新代码请用 pypdf_available()。"""
+    return pypdf_available()
+
+
+def pypdf_available() -> bool:
+    return True  # pypdf 在 requirements.txt，为硬依赖
+
+
+def _normalize_page(raw: str | None) -> str:
+    lines = [re.sub(r"[ \t\u00a0]+", " ", ln).strip() for ln in (raw or "").splitlines()]
+    return "\n".join(ln for ln in lines if ln)
 
 
 def extract_text_pages(pdf_path: str) -> tuple[list[str], str]:
-    """按页提取：返回 ([page1, page2, ...], note)。pdftotext 用 \x0c 分页。"""
-    if not pdftotext_available():
-        return [], "系统缺少 pdftotext（poppler），无法解析 PDF；请手动录入"
+    """按页提取：返回 ([page1, page2, ...], note)。pypdf 原生按页，无需 \\x0c 分割。"""
     try:
-        out = pdf_path + ".txt"
-        r = subprocess.run(["pdftotext", "-layout", pdf_path, out],
-                           capture_output=True, timeout=60,
-                           stdin=subprocess.DEVNULL)  # 加密 PDF 不等待密码输入
-        if r.returncode != 0 or not os.path.exists(out):
-            return [], f"pdftotext 失败（exit {r.returncode}）：{r.stderr.decode(errors='ignore')[:150]}"
-        with open(out, encoding="utf-8", errors="ignore") as f:
-            raw = f.read()
-        os.remove(out)
-        pages = []
-        for pg in raw.split("\x0c"):
-            lines = [re.sub(r"[ \t\u00a0]+", " ", ln).strip() for ln in pg.splitlines()]
-            pg_text = "\n".join(ln for ln in lines if ln)
-            pages.append(pg_text)
+        reader = PdfReader(pdf_path)
+        if reader.is_encrypted:
+            return [], "PDF 已加密，无法解析；请解密后上传或手动录入"
+        pages = [_normalize_page(pg.extract_text()) for pg in reader.pages]
         if sum(len(p) for p in pages) < 50:
             return [], "PDF 提取出的文本过少（可能是扫描件无文本层），请手动录入"
         return pages, ""

@@ -210,7 +210,7 @@ def test_parse_pdf_text_all_seller_claimed():
 
 
 def _minimal_pdf_bytes() -> bytes:
-    """手工拼一个最小合法单页 PDF（含一行文本），供 pdftotext 实测。"""
+    """手工拼一个最小合法单页 PDF（含一行文本），供 pypdf 实测。"""
     content = (b"BT /F1 18 Tf 72 720 Td (Price $485000 3bd 2ba 1500 sqft "
                b"Rent $2900/mo Beautiful renovated Tampa duplex for sale now) Tj ET")
     objs = [
@@ -235,7 +235,7 @@ def _minimal_pdf_bytes() -> bytes:
     return pdf
 
 
-@pytest.mark.skipif(not pdf_intake.pdftotext_available(), reason="无 pdftotext")
+@pytest.mark.skipif(not pdf_intake.pypdf_available(), reason="无 pypdf")
 def test_pdf_end_to_end_text_extraction(tmp_path):
     p = tmp_path / "t.pdf"
     p.write_bytes(_minimal_pdf_bytes())
@@ -266,14 +266,14 @@ def test_intake_pdf_rejects_non_pdf():
 
 
 def test_intake_pdf_garbage_graceful():
-    # 假 PDF：pdftotext 失败 → 返回 error 字段而非崩溃
+    # 假 PDF：pypdf 解析失败 → 返回 error 字段而非崩溃
     r = client.post("/api/wb/intake/pdf",
                     files={"file": ("a.pdf", io.BytesIO(b"%PDF-1.4 garbage" * 20), "application/pdf")})
     assert r.status_code == 200
     assert "error" in r.json()
 
 
-@pytest.mark.skipif(not pdf_intake.pdftotext_available(), reason="无 pdftotext")
+@pytest.mark.skipif(not pdf_intake.pypdf_available(), reason="无 pypdf")
 def test_intake_pdf_endpoint_ok():
     r = client.post("/api/wb/intake/pdf",
                     files={"file": ("t.pdf", io.BytesIO(_minimal_pdf_bytes()), "application/pdf")})

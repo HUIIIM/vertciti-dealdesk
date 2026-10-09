@@ -6,3 +6,4 @@ reportlab>=4.0
 openpyxl>=3.1
 pypinyin>=0.50
 Pillow>=10.0  # 报告图表：服务端手绘 PNG（pdf_report 嵌入），Vercel serverless 可用
+pypdf>=6.0  # PDF 文本提取：纯 Python，零系统依赖（D2：替换 poppler/pdftotext，生产可用）
