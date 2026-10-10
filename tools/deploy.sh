@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 #
 # DealDesk 一键部署脚本：部署前自动把 repo 根同步到 vercel-deploy/，
-# 再调用 vc-deploy 发布到 Vercel 生产环境并等待 READY。
+# 再跑 tools/pre_deploy_diff_gate.sh 门禁（台账第 9 项），通过才调用
+# vc-deploy 发布到 Vercel 生产环境并等待 READY。
 #
 # 用法：bash tools/deploy.sh   （在仓库根或任意目录执行均可）
 # 失败时以非零退出码退出。
@@ -71,13 +72,12 @@ cp "requirements.txt" "${DEPLOY_DIR}/requirements.txt" \
     || fail "requirements.txt 复制失败"
 log "  requirements.txt 同步完成"
 
-# ---- 步骤 5：一致性校验（不动 api/ 目录） ----
-log "步骤 5/6：一致性校验 ..."
-diff -rq app "${DEPLOY_DIR}/app" --exclude=__pycache__ \
-    || fail "校验失败：app 与 ${DEPLOY_DIR}/app 存在差异"
-diff -rq static "${DEPLOY_DIR}/static" \
-    || fail "校验失败：static 与 ${DEPLOY_DIR}/static 存在差异"
-log "  校验通过：app/、static/ 与部署目录完全一致（api/ 未动）"
+# ---- 步骤 5：部署前 diff 门禁（台账第 9 项，vc-deploy 调用前必跑） ----
+# 覆盖 AGENTS.md 三条 rsync 规则（含根静态副本——旧 diff -rq 校验漏了这一条）。
+log "步骤 5/6：部署前 diff 门禁 ..."
+bash "${SCRIPT_DIR}/pre_deploy_diff_gate.sh" \
+    || fail "diff 门禁拦截：vercel-deploy/ 与仓库源失步，停止部署"
+log "  门禁通过：三方全部对齐"
 
 # ---- 步骤 6：部署到 Vercel 并等待 READY ----
 log "步骤 6/6：部署到 Vercel（项目 ${PROJECT}，团队 ${TEAM}），等待 READY ..."
