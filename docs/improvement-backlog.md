@@ -14,7 +14,7 @@
 7. [ ] 门覆盖补齐（2026-10-06 数据质量门二期）：截图 intake 的视觉提取结果同样跑质量门（`image_intake` 输出附 quality_gate）；住宅页（d.html）接入商
     业页同款门面板 + 导出前过门。验收：截图/住宅两路各喂一份矛盾材料，fail 正确拦截并标黄
 8. [ ] RentCast 激活：等董事长绑卡后接入 fallback 链实测（外部阻塞，不占每日名额）
-9. [x] vercel-deploy 静态双副本同步自动化（2026-10-07 本轮新发现；2026-10-09 落地）：vercel-deploy/ 根与 static/ 各有一份静态文件（uw-commercial.html/js 等），失步=生产页面老版本；加部署前自动 diff 门禁（不一致直接 fail）。新脚本 `tools/pre_deploy_diff_gate.sh`：按 AGENTS.md 三条 rsync 规则做 dry-run diff（rsync -rL -n --checksum --delete；-rL 只比文件内容，排除 setgid/mtime 环境噪音），任一处失步→退出 1＋打印失步文件清单；已接进 `tools/deploy.sh` 步骤 5（vc-deploy 调用前必跑，原 diff -rq 校验漏了根副本规则，已替换）。验收证据：① 故意在 vercel-deploy/uw-commercial.html（根副本）加一行→门禁退出 1，清单列出 `uw-commercial.html`（规则 3）；② 恢复文件后门禁退出 0，三方对齐；③ 全量 pytest：449 passed（1 deselect pre-existing test_address_pipeline_degradation）。commit 待填。
+9. [x] vercel-deploy 静态双副本同步自动化（2026-10-07 本轮新发现；2026-10-09 落地）：vercel-deploy/ 根与 static/ 各有一份静态文件（uw-commercial.html/js 等），失步=生产页面老版本；加部署前自动 diff 门禁（不一致直接 fail）。新脚本 `tools/pre_deploy_diff_gate.sh`：按 AGENTS.md 三条 rsync 规则做 dry-run diff（rsync -rL -n --checksum --delete；-rL 只比文件内容，排除 setgid/mtime 环境噪音），任一处失步→退出 1＋打印失步文件清单；已接进 `tools/deploy.sh` 步骤 5（vc-deploy 调用前必跑，原 diff -rq 校验漏了根副本规则，已替换）。验收证据：① 故意在 vercel-deploy/uw-commercial.html（根副本）加一行→门禁退出 1，清单列出 `uw-commercial.html`（规则 3）；② 恢复文件后门禁退出 0，三方对齐；③ 全量 pytest：449 passed（1 deselect pre-existing test_address_pipeline_degradation）。证据 commit 4b954cc（noreply 作者，未 push）。
 10. [ ] ECB 未关闭罚金接入卖方动机分（2026-10-09 本轮遗留）：Socrata 6bgk-3dad 按地址查 balance_due>0 → 并入 lien_violation 信号（与 DOB 违规同权）；验收：有欠款物业正确加分且附来源
 11. [ ] PDF 多栏版式阅读顺序校验（2026-10-09 D2 新发现）：pypdf 无 pdftotext -layout 模式，多栏 flyer 文本可能按错误顺序拼接导致数字错位；验收：找一份真实双栏 OM，关键字段提取顺序正确，或明确标注"版式复杂、人工复核"
 
