@@ -30,9 +30,11 @@ def _f(x, default=0.0) -> float:
     return v
 
 
-def _div(a, b) -> float:
+def _div(a, b) -> float | None:
+    # D3（2026-10-10，D460 CEO 已定）：零分母 → None（N/A 链），禁止 0.0 冒充。
+    # 调用方一律做 None 守卫；前端/报表 None → "—"，绝不渲染 0.00/0%。
     b = _f(b)
-    return _f(a) / b if b else 0.0
+    return _f(a) / b if b else None
 
 
 # ---------------------------------------------------------------- NOI 银行调整桥
@@ -122,21 +124,30 @@ def dscr_dual(result: dict, bank_noi: float | None = None) -> dict:
         trailing_dscr = _div(bank_noi, ds)
         trailing_num_note = "银行口径 NOI"
     else:
-        trailing_dscr = _f(inpl.get("dscr"))
+        # D3：全款（ds=0）或 dscr 缺失 → None（N/A 链）；禁 _f() 压成 0.0
+        # （"0.00×" 会被误读为"资不抵债"）
+        trailing_dscr = inpl.get("dscr")
+        trailing_dscr = None if trailing_dscr is None else _f(trailing_dscr)
         trailing_num_note = "现金流口径 NOI（银行口径缺失，回退）"
+    proforma_dscr = proj.get("dscr")
+    proforma_dscr = None if proforma_dscr is None else _f(proforma_dscr)
+
+    def _dscr_label(v):
+        return "—" if v is None else "{:.2f}x".format(v)
+
     return {
         "trailing": {
             "dscr": trailing_dscr,
-            "label": ("{:.2f}x（{} / {}，{:.2f}% 定息假设）"
-                      .format(trailing_dscr, trailing_num_note, ds_note, rate * 100)),
+            "label": ("{}（{} / {}，{:.2f}% 定息假设）"
+                      .format(_dscr_label(trailing_dscr), trailing_num_note, ds_note, rate * 100)),
             "primary": True,
             "numerator": trailing_num_note,
             "amort_type": amort_type,
         },
         "proforma": {
-            "dscr": _f(proj.get("dscr")),
-            "label": ("{:.2f}x（PF：预测口径 NOI / {}，{:.2f}% 定息假设）"
-                      .format(_f(proj.get("dscr")), ds_note, rate * 100)),
+            "dscr": proforma_dscr,
+            "label": ("{}（PF：预测口径 NOI / {}，{:.2f}% 定息假设）"
+                      .format(_dscr_label(proforma_dscr), ds_note, rate * 100)),
             "primary": False,
             "amort_type": amort_type,
         },
@@ -254,15 +265,20 @@ def stress_table(data: dict, loan_amount: float | None = None,
         bank_noi = bridge["bank_noi"]
         loan = _f(loan_amount) or _f(r["analysis"].get("loan_bal"))
         ana = r["analysis"]
+        # D3：dscr/debt_yield 缺失 → None（N/A 链）；breaks 未知不判破线
+        dscr_t = ana["inplace"].get("dscr")
+        dscr_p = ana["projected"].get("dscr")
+        dy = _div(bank_noi, loan)
         rows.append({
             "scenario": label,
-            "dscr_trailing": round(_f(ana["inplace"].get("dscr")), 3),
-            "dscr_proforma": round(_f(ana["projected"].get("dscr")), 3),
-            "debt_yield": round(_div(bank_noi, loan), 4),
-            "breakeven": round(_f(ana.get("breakeven_occupancy")), 4),
+            "dscr_trailing": None if dscr_t is None else round(dscr_t, 3),
+            "dscr_proforma": None if dscr_p is None else round(dscr_p, 3),
+            "debt_yield": None if dy is None else round(dy, 4),
+            "breakeven": (None if ana.get("breakeven_occupancy") is None
+                         else round(ana.get("breakeven_occupancy"), 4)),
             "breaks": {
-                "dscr": _f(ana["inplace"].get("dscr")) < 1.20,
-                "debt_yield": _div(bank_noi, loan) < 0.06,
+                "dscr": dscr_t is not None and dscr_t < 1.20,
+                "debt_yield": dy is not None and dy < 0.06,
                 "breakeven": _f(ana.get("breakeven_occupancy")) > 1.0,
             },
         })
@@ -285,7 +301,7 @@ def compute_plus(data: dict, loan_amount: float | None = None,
     loan = _f(loan_amount) or _f(ana.get("loan_bal"))
     bridge = noi_bank_bridge(base, market_vacancy_pct)
     bank_noi = bridge["bank_noi"]
-    debt_yield = _div(bank_noi, loan)
+    debt_yield = _div(bank_noi, loan)   # D3：loan=0 → None（N/A 链），禁 0.0 冒充
 
     # LTV 双算：按估值区间下限/上限；无区间时按收购价并注记
     ltv = {"loan": round(loan, 2)}
@@ -300,8 +316,9 @@ def compute_plus(data: dict, loan_amount: float | None = None,
         })
     else:
         price = _f(ana.get("purchase_price"))
+        ltv_at = _div(loan, price)   # D3：price=0 → None（N/A 链）
         ltv.update({
-            "at_purchase": round(_div(loan, price), 4),
+            "at_purchase": None if ltv_at is None else round(ltv_at, 4),
             "note": "无估值区间，按收购价计（待估值接入后双算）",
         })
 
@@ -317,7 +334,7 @@ def compute_plus(data: dict, loan_amount: float | None = None,
 
     out = dict(base)
     out["plus"] = {
-        "debt_yield": round(debt_yield, 4),
+        "debt_yield": None if debt_yield is None else round(debt_yield, 4),
         "debt_yield_note": "NOI（银行口径）÷ 拟贷款额；≥8-10% 舒适，≥7% agency 多户底线，<6% 机构资金出局",
         "dscr_dual": dscr_dual(base, bank_noi),
         "noi_bank_bridge": bridge,

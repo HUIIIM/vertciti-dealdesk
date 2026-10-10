@@ -181,12 +181,13 @@ def test_empty_project_no_crash():
 
 
 def test_zero_sf_no_div0():
+    # D3（2026-10-10）：零分母 → None（N/A 链），前端渲染"—"；禁 0.0 冒充
     d = default_inputs()
     d["tenants"] = [{"suite": "1", "tenant": "T", "sf": 0, "monthly_rent": 5000,
                      "underwritten_annual": 60000}]
     r = compute_all(d)
-    assert r["rent_roll"]["tenants"][0]["monthly_per_sf"] == 0
-    assert r["rent_roll"]["occupancy"] == 0
+    assert r["rent_roll"]["tenants"][0]["monthly_per_sf"] is None
+    assert r["rent_roll"]["occupancy"] is None
 
 
 # ---------- API ----------

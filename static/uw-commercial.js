@@ -23,7 +23,7 @@ const f = (x, d = 0) => {
   const v = parseFloat(x);
   return Number.isFinite(v) ? v : d;
 };
-const div = (a, b) => (f(b) === 0 ? 0 : f(a) / f(b));
+const div = (a, b) => (f(b) === 0 ? NaN : f(a) / f(b));   // D3：零分母 → NaN（N/A 链），fmtVal 渲染"—"，禁 0 冒充
 
 /* ---------------- 计算引擎（port of uw_commercial.py） ---------------- */
 function rentRoll(tenants, vacantSf) {

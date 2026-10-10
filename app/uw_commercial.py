@@ -67,10 +67,14 @@ TIER_A = ("vacancy_pct", "down_pct", "rate", "amort_years", "market_cap_rate",
           "lease_start", "lease_end", "expense_structure")        # 缺失 → 模块 N/A＋verdict 降级
 
 
-def _div(a, b) -> float:
+def _div(a, b) -> float | None:
+    # D3（2026-10-10，D460 CEO 已定）：零分母 → None（N/A 链），禁止 0.0 冒充
+    # —— 0.00/0% 会被误读为"真实算出的零"（如 IRR 0% 误读为保本）。
+    # 调用方一律做 None 守卫（算术链断开处见 projected_resale / sale_price），
+    # 前端 None → "—"（fmtVal），绝不渲染 0.00/0%。
     b = _f(b)
     if b == 0:
-        return 0.0
+        return None
     return _f(a) / b
 
 
@@ -268,11 +272,14 @@ def compute_analysis(a: dict, hist: dict, pro: dict) -> dict:
     inplace_cap = _div(inplace_noi, purchase)             # template: =F13/C13
     market_cap = normalize_pct(a.get("market_cap_rate"))
     projected_resale = _div(projected_noi, market_cap)   # template: =F15/F16
+    # D3：market_cap 为 0 → projected_resale 为 None，整条算术链断开走 N/A
+    # （退出费用/净收益/ROI 一律 None，禁拿 0.0 冒充"不赚钱"）
     acquisition_fees = repairs + reserve + lender_fees + closing  # =SUM(C14:C17)
     exit_fee_pct = EXIT_FEE_PCT / 100.0  # [DEC] 模板固定 4%（2026-10-01 Miao 决定锁定，不开放调节）
-    exit_fees = projected_resale * exit_fee_pct          # template: =F17*0.04
-    net_gains = projected_resale - (purchase + acquisition_fees + exit_fees)
-    roi = _div(net_gains, net_liquidity)                 # template: =F20/C21
+    exit_fees = None if projected_resale is None else projected_resale * exit_fee_pct  # =F17*0.04
+    net_gains = (None if projected_resale is None
+                 else projected_resale - (purchase + acquisition_fees + exit_fees))
+    roi = None if net_gains is None else _div(net_gains, net_liquidity)  # =F20/C21
 
     abatements = _f(a.get("abatements"))                  # NEW (template blank)
 
@@ -388,6 +395,16 @@ def compute_exit(a: dict, pro: dict, loan_bal: float, rate: float,
     # sale at end of hold
     noi_exit = base_noi * (1.0 + noi_growth) ** hold_years
     sale_price = _div(noi_exit, exit_cap)
+    if sale_price is None:
+        # D3：退出 cap 为零 → 出售价不可定义，IRR/EM/出售收益一律 None（N/A 链，
+        # 同 LINT-04 退化口径），不许用 0.0 冒充"卖不掉"
+        return {"hold_years": hold_years,
+                "hold_years_is_default": hold_years_is_default,
+                "irr": None, "equity_multiple": None,
+                "sale_price": None, "sale_proceeds": None,
+                "remaining_loan": None, "cash_flows": flows,
+                "exit_cap_rate": exit_cap, "exit_cap_source": exit_cap_source,
+                "noi_growth": noi_growth}
     if amort_type == "AMORTIZING":
         rem = remaining_balance(loan_bal, rate, amort_years, annual_debt, hold_years)
     else:

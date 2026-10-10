@@ -175,7 +175,7 @@ def build_uw_xlsx(result: dict, inputs: dict, comps: list | None = None,
          "按月摊还（银行标准）", MONEY2); r += 1
     dscr_row = r
     _row(ws, r, "偿债覆盖率（DSCR，历史主）",
-         f"=IF(B{ds_cell_row}=0,0,B{noi_cell_row}/B{ds_cell_row})" if has_rr else rr_wait,
+         f"=IF(B{ds_cell_row}=0,NA(),B{noi_cell_row}/B{ds_cell_row})" if has_rr else rr_wait,
          "银行口径 NOI ÷ 年还本付息（按月摊还）" if has_rr else "无 rent roll，DSCR 无法核保",
          PCT if has_rr else None, bold_a=True); r += 1
     _row(ws, r, "偿债覆盖率（DSCR，预测辅）",
@@ -183,7 +183,7 @@ def build_uw_xlsx(result: dict, inputs: dict, comps: list | None = None,
          "预测口径 NOI ÷ 年还本付息" if has_rr else "无 rent roll，DSCR 无法核保",
          PCT if has_rr else None); r += 1
     _row(ws, r, "Debt Yield（NOI ÷ 拟贷款额）",
-         f"=IF(B{loan_row}=0,0,B{noi_cell_row}/B{loan_row})" if has_rr else rr_wait,
+         f"=IF(B{loan_row}=0,NA(),B{noi_cell_row}/B{loan_row})" if has_rr else rr_wait,
          "银行 sizing 硬约束；≥8-10% 舒适" if has_rr else "无 rent roll，待接数据",
          PCT if has_rr else None); r += 1
     _row(ws, r, "全口径现金投入 $", _f(ana.get("net_liquidity")),

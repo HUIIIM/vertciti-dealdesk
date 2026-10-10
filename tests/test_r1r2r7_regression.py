@@ -25,8 +25,9 @@ def test_r2_em_none_when_no_equity():
 
 
 def test_r2_em_none_unit():
-    # _div 语义保持；compute 层分母零 → None
-    assert uw_commercial._div(10, 0) == 0.0  # _div 本体不动
+    # D3（2026-10-10）：_div 零分母 → None（N/A 链）；旧口径 0.0 已废止
+    assert uw_commercial._div(10, 0) is None
+    assert uw_commercial._div(10, 2) == 5.0
 
 
 def test_r7_res_xlsx_has_native_formulas():
