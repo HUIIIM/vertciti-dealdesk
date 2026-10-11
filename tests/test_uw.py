@@ -126,7 +126,7 @@ def test_vacancy_pct_p0_regression():
 
 def test_amortizing_loan_new():
     from app.finance import monthly_payment
-    pmt = amort_payment(29400000, 0.06, 30)
+    pmt = amort_payment(29400000, 6.0, 30)
     # 等额本息年还应大于只还利息；口径=按月摊还（银行标准，月供×12）
     assert pmt > 29400000 * 0.06
     assert approx(pmt, monthly_payment(29400000, 6.0, 30) * 12)
@@ -136,7 +136,7 @@ def test_amortizing_loan_new():
     r = compute_all(d)
     assert approx(r["analysis"]["annual_debt_service"], pmt)
     # 5 年后剩余本金小于原贷款（月复利口径）
-    rem = remaining_balance(29400000, 0.06, 30, pmt, 5)
+    rem = remaining_balance(29400000, 6.0, 30, pmt, 5)
     assert 0 < rem < 29400000
     assert approx(r["analysis"]["exit"]["remaining_loan"], rem)
 

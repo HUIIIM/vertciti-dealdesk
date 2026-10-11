@@ -108,7 +108,7 @@ class TestB4ExitCapLinkage(unittest.TestCase):
     def _exit(self, analysis):
         pro = {"noi": 200000, "total_potential": 300000, "total_expenses": 50000,
                "total_annual_lease": 0, "total_annual_uw": 0, "other_income": 0}
-        return uw_commercial.compute_exit(analysis, pro, 595000, 0.065,
+        return uw_commercial.compute_exit(analysis, pro, 595000, 6.5,
                                           "AMORTIZING", 25, 48210, 255000, 850000)
 
     def test_default_exit_cap(self):

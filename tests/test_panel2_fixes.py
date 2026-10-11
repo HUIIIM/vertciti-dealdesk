@@ -29,7 +29,7 @@ def approx(a, b, tol=0.01):
 class TestMonthlyAmortization(unittest.TestCase):
     def test_amort_payment_is_monthly_based(self):
         # broker 实证：$2.24M/6.5%/25年 按年 $183,638.52 vs 按月 $181,495.68
-        pmt = uw_commercial.amort_payment(2240000, 0.065, 25)
+        pmt = uw_commercial.amort_payment(2240000, 6.5, 25)
         self.assertTrue(approx(pmt, 181495.68, 1.0), f"got {pmt}")
         self.assertTrue(approx(pmt, monthly_payment(2240000, 6.5, 25) * 12, 0.01))
         # 不再是旧的按年复利值
@@ -37,8 +37,8 @@ class TestMonthlyAmortization(unittest.TestCase):
 
     def test_remaining_balance_monthly_consistent(self):
         from app.finance import remaining_balance as _rbm
-        pmt = uw_commercial.amort_payment(29400000, 0.06, 30)
-        rem = uw_commercial.remaining_balance(29400000, 0.06, 30, pmt, 5)
+        pmt = uw_commercial.amort_payment(29400000, 6.0, 30)
+        rem = uw_commercial.remaining_balance(29400000, 6.0, 30, pmt, 5)
         self.assertTrue(0 < rem < 29400000)
         # 与 finance.monthly 口径一致（payment 参数兼容保留，不再使用）
         self.assertTrue(approx(rem, _rbm(29400000, 6.0, 30, 5), 0.01))

@@ -190,7 +190,7 @@ class TestLint04HonestFormatters:
         e = uw_commercial.compute_exit(
             {"purchase_price": 0},
             {"noi": 0, "total_potential": 1, "total_expenses": 0},
-            0, 0.06, "IO", 30, 0, 0, 0)
+            0, 6.0, "IO", 30, 0, 0, 0)
         assert e["irr"] is None and e["sale_price"] is None, \
             "LINT-04 FAIL：退化输入的 IRR/出售价不许用 0.0 冒充"
 
@@ -246,7 +246,7 @@ class TestLint07PmtConvention:
 
     def test_monthly_amortizing(self):
         from app.uw_commercial import amort_payment
-        pmt = amort_payment(1_000_000, 0.06, 30)
+        pmt = amort_payment(1_000_000, 6.0, 30)
         # 年债务偿还额 = 月复利等额本息月供 × 12：100万/6%/30年 ≈ 71,946/年
         assert pmt == pytest.approx(71946, rel=0.002), pmt
         # 旧口径（按年复利一次付）≈ 72,649 —— 不许回归

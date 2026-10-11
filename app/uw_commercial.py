@@ -33,6 +33,9 @@ import math
 #   均按小数消费——输出口径不变，下游零改动）。
 #   唯一例外：compute_scenario 回显的 vacancy_pct 保持输入 [PCT] 原样
 #  （commercial_plus.noi_bank_bridge 按百分制消费）。
+#   2026-10-11 口径统一：本模块 amort_payment/remaining_balance 与
+#   app.finance.monthly_payment/finance.remaining_balance 统一为百分制 [PCT]
+#   （此前本模块两函数用小数制，埋雷已除）；调用处做 [DEC]→[PCT] 边界换算。
 
 def _f(x, default=0.0) -> float:
     try:
@@ -212,32 +215,35 @@ def compute_scenario(inp: dict, base_rents: float, net_sf: float,
 
 
 # ---------------------------------------------------------------- Analysis
-def amort_payment(loan: float, annual_rate: float, amort_years: float) -> float:
+def amort_payment(loan: float, annual_rate_pct: float, amort_years: float) -> float:
     """Annual debt service for a fully amortizing loan（银行标准口径）.
 
     按月摊还：月复利等额本息月供 × 12。此前为按年摊还（年复利），
     DSCR 分母系统性偏大约 1.2%（2026-10-04 panel2 broker 实证：
     $2.24M/6.5%/25年 按年 $183,638.52 vs 按月 $181,495.68）。
-    annual_rate 为小数（如 0.065）。
+    annual_rate_pct 为百分制（如 6.5）——与 app.finance.monthly_payment 同口径
+    （2026-10-11 口径统一：此前本函数用小数制 0.065，埋雷已除）。
     """
     from app.finance import monthly_payment as _mp
-    loan, annual_rate = _f(loan), _f(annual_rate)
+    loan, annual_rate_pct = _f(loan), _f(annual_rate_pct)
     n = int(round(_f(amort_years)))
     if loan <= 0 or n <= 0:
         return 0.0
-    if annual_rate <= 0:
+    if annual_rate_pct <= 0:
         return loan / n
-    return _mp(loan, annual_rate * 100.0, n) * 12.0
+    return _mp(loan, annual_rate_pct, n) * 12.0
 
 
-def remaining_balance(loan: float, annual_rate: float, amort_years: float,
+def remaining_balance(loan: float, annual_rate_pct: float, amort_years: float,
                       payment: float, after_years: int) -> float:
     """Outstanding principal after k years（按月摊还，月复利；与 amort_payment 同口径）.
 
+    annual_rate_pct 为百分制（如 6.5）——与 app.finance.remaining_balance 同口径
+    （2026-10-11 口径统一：此前本函数用小数制 0.065，埋雷已除）。
     payment 参数保留做兼容（现按月供内部重算，不再使用传入的年供额）。
     """
     from app.finance import remaining_balance as _rbm
-    return _rbm(_f(loan), _f(annual_rate) * 100.0, _f(amort_years), after_years)
+    return _rbm(_f(loan), _f(annual_rate_pct), _f(amort_years), after_years)
 
 
 def compute_analysis(a: dict, hist: dict, pro: dict) -> dict:
@@ -254,13 +260,16 @@ def compute_analysis(a: dict, hist: dict, pro: dict) -> dict:
     # 口径已废止；现输入 30 / 6.5 / 6 表示 30% / 6.5% / 6%。
     down_pct = normalize_pct(a.get("down_pct"))
     rate = normalize_pct(a.get("rate"))
+    # 2026-10-11 口径统一：finance 数学层（amort_payment/remaining_balance）利率为
+    # 百分制；本处 [DEC]→[PCT] 一次换算后向下传递（LINT-01 允许：rate 已归一化）。
+    rate_pct = rate * 100.0
     # P0-4（Phase 5）：默认全额本息摊还（AMORTIZING）。此前默认 IO（纯利息）但前端标注
     # "全额本息"，口径不诚实（1.42x vs 真实 1.16x）。显式选 IO 时标注必须同步改为纯利息。
     amort_type = (a.get("amort_type") or "AMORTIZING").upper()   # AMORTIZING | IO
     amort_years = _f(a.get("amort_years"), 30)
     loan_bal = purchase * (1.0 - down_pct)
     if amort_type == "AMORTIZING":
-        annual_debt = amort_payment(loan_bal, rate, amort_years)
+        annual_debt = amort_payment(loan_bal, rate_pct, amort_years)
     else:
         annual_debt = loan_bal * rate                     # template: =C23*C25
     financed = -loan_bal                                  # template: =-C23
@@ -306,7 +315,7 @@ def compute_analysis(a: dict, hist: dict, pro: dict) -> dict:
                          pro["total_potential"])
 
     # NEW: hold / exit analysis
-    hold = compute_exit(a, pro, loan_bal, rate, amort_type, amort_years,
+    hold = compute_exit(a, pro, loan_bal, rate_pct, amort_type, amort_years,
                         annual_debt, net_liquidity, purchase)
 
     return {
@@ -350,14 +359,16 @@ def compute_analysis(a: dict, hist: dict, pro: dict) -> dict:
     }
 
 
-def compute_exit(a: dict, pro: dict, loan_bal: float, rate: float,
+def compute_exit(a: dict, pro: dict, loan_bal: float, rate_pct: float,
                  amort_type: str, amort_years: float, annual_debt: float,
                  net_liquidity: float, purchase: float) -> dict:
     """Hold-period exit: sale proceeds, IRR, equity multiple. NEW.
 
     输入层 [PCT]：a["noi_growth"] / a["exit_cap_rate"] / a["market_cap_rate"] 均为
-    百分制（2 表示 2%），此处 normalize → [DEC]。位置参数 loan_bal / rate /
-    annual_debt / net_liquidity 为内部 [DEC]，不归一化。
+    百分制（2 表示 2%），此处 normalize → [DEC]。位置参数 loan_bal /
+    annual_debt / net_liquidity 为内部 [DEC]，不归一化；
+    rate_pct 为百分制（6.5 表示 6.5%）——与 finance 层同口径
+    （2026-10-11 口径统一：此前为小数制，埋雷已除）。
     """
     hold_years = int(round(_f(a.get("hold_years"), DEFAULT_HOLD_YEARS)))
     hold_years = max(1, min(hold_years, 50))  # 钳制 1-50 年：防极大值 DoS
@@ -406,7 +417,7 @@ def compute_exit(a: dict, pro: dict, loan_bal: float, rate: float,
                 "exit_cap_rate": exit_cap, "exit_cap_source": exit_cap_source,
                 "noi_growth": noi_growth}
     if amort_type == "AMORTIZING":
-        rem = remaining_balance(loan_bal, rate, amort_years, annual_debt, hold_years)
+        rem = remaining_balance(loan_bal, rate_pct, amort_years, annual_debt, hold_years)
     else:
         rem = loan_bal
     sale_proceeds = sale_price - rem - sale_price * exit_fee_pct
