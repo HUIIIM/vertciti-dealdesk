@@ -6,17 +6,17 @@
 
 ## 待做（按优先级）
 
-1. [ ] 误导性数字口径（D3/D4，D460 CEO 已定）：`_div` 零分母 / `_irr` 无解返回 None，前端统一渲染"N/A"（禁显示 0.00/0%）
-3. [ ] `monthly_payment` 与 `amort_payment` 百分制/小数制口径统一（埋雷）：审计发现两者利率口径不一致，静默错数风险
-4. [ ] 商业页 390px 移动端 QA：新增"一键 Tear Sheet"按钮后 cmd-ctl 在 390px 是否溢出/可操作；商业页三栏在小屏不溢出。验收：真机/真浏览器 390px 逐项目检通过
-5. [ ] 商业页截图/图片录取（暂缓项回补）：上传房源截图 → OCR/视觉提取 → 填表（标卖方口径待验证）。验收：上传一张真实房源截图，价格/面积/租金字段正确提取并标待验证
-6. [ ] 扫描版 PDF OCR（暂缓项回补）：图片型 PDF 先 OCR 再走现有提取链路，明确提示"OCR 口径"
-7. [ ] 门覆盖补齐（2026-10-06 数据质量门二期）：截图 intake 的视觉提取结果同样跑质量门（`image_intake` 输出附 quality_gate）；住宅页（d.html）接入商
+1. [ ] 商业页 390px 移动端 QA：新增"一键 Tear Sheet"按钮后 cmd-ctl 在 390px 是否溢出/可操作；商业页三栏在小屏不溢出。验收：真机/真浏览器 390px 逐项目检通过
+2. [ ] 商业页截图/图片录取（暂缓项回补）：上传房源截图 → OCR/视觉提取 → 填表（标卖方口径待验证）。验收：上传一张真实房源截图，价格/面积/租金字段正确提取并标待验证
+3. [ ] 扫描版 PDF OCR（暂缓项回补）：图片型 PDF 先 OCR 再走现有提取链路，明确提示"OCR 口径"
+4. [ ] 门覆盖补齐（2026-10-06 数据质量门二期）：截图 intake 的视觉提取结果同样跑质量门（`image_intake` 输出附 quality_gate）；住宅页（d.html）接入商
     业页同款门面板 + 导出前过门。验收：截图/住宅两路各喂一份矛盾材料，fail 正确拦截并标黄
-8. [ ] RentCast 激活：等董事长绑卡后接入 fallback 链实测（外部阻塞，不占每日名额）
-9. [x] vercel-deploy 静态双副本同步自动化（2026-10-07 本轮新发现；2026-10-09 落地）：vercel-deploy/ 根与 static/ 各有一份静态文件（uw-commercial.html/js 等），失步=生产页面老版本；加部署前自动 diff 门禁（不一致直接 fail）。新脚本 `tools/pre_deploy_diff_gate.sh`：按 AGENTS.md 三条 rsync 规则做 dry-run diff（rsync -rL -n --checksum --delete；-rL 只比文件内容，排除 setgid/mtime 环境噪音），任一处失步→退出 1＋打印失步文件清单；已接进 `tools/deploy.sh` 步骤 5（vc-deploy 调用前必跑，原 diff -rq 校验漏了根副本规则，已替换）。验收证据：① 故意在 vercel-deploy/uw-commercial.html（根副本）加一行→门禁退出 1，清单列出 `uw-commercial.html`（规则 3）；② 恢复文件后门禁退出 0，三方对齐；③ 全量 pytest：449 passed（1 deselect pre-existing test_address_pipeline_degradation）。证据 commit 4b954cc（noreply 作者，未 push）。
-10. [ ] ECB 未关闭罚金接入卖方动机分（2026-10-09 本轮遗留）：Socrata 6bgk-3dad 按地址查 balance_due>0 → 并入 lien_violation 信号（与 DOB 违规同权）；验收：有欠款物业正确加分且附来源
-11. [ ] PDF 多栏版式阅读顺序校验（2026-10-09 D2 新发现）：pypdf 无 pdftotext -layout 模式，多栏 flyer 文本可能按错误顺序拼接导致数字错位；验收：找一份真实双栏 OM，关键字段提取顺序正确，或明确标注"版式复杂、人工复核"
+5. [ ] RentCast 激活：等董事长绑卡后接入 fallback 链实测（外部阻塞，不占每日名额）
+6. [x] vercel-deploy 静态双副本同步自动化（2026-10-07 本轮新发现；2026-10-09 落地）：vercel-deploy/ 根与 static/ 各有一份静态文件（uw-commercial.html/js 等），失步=生产页面老版本；加部署前自动 diff 门禁（不一致直接 fail）。新脚本 `tools/pre_deploy_diff_gate.sh`：按 AGENTS.md 三条 rsync 规则做 dry-run diff（rsync -rL -n --checksum --delete；-rL 只比文件内容，排除 setgid/mtime 环境噪音），任一处失步→退出 1＋打印失步文件清单；已接进 `tools/deploy.sh` 步骤 5（vc-deploy 调用前必跑，原 diff -rq 校验漏了根副本规则，已替换）。验收证据：① 故意在 vercel-deploy/uw-commercial.html（根副本）加一行→门禁退出 1，清单列出 `uw-commercial.html`（规则 3）；② 恢复文件后门禁退出 0，三方对齐；③ 全量 pytest：449 passed（1 deselect pre-existing test_address_pipeline_degradation）。证据 commit 4b954cc（noreply 作者，未 push）。
+7. [ ] ECB 未关闭罚金接入卖方动机分（2026-10-09 本轮遗留）：Socrata 6bgk-3dad 按地址查 balance_due>0 → 并入 lien_violation 信号（与 DOB 违规同权）；验收：有欠款物业正确加分且附来源
+8. [ ] PDF 多栏版式阅读顺序校验（2026-10-09 D2 新发现）：pypdf 无 pdftotext -layout 模式，多栏 flyer 文本可能按错误顺序拼接导致数字错位；验收：找一份真实双栏 OM，关键字段提取顺序正确，或明确标注"版式复杂、人工复核"
+9. [ ] 前端 JS 预览与后端 compute_all 口径对齐审计（2026-10-10 D3/D4 本轮新发现）：uw-commercial.js 的 computeAnalysis/computeExit/div/irrOf 是后端 compute_all 的 JS 复刻，本轮 div/irrOf 的 N/A 链修复靠人工同步——两套逻辑独立演进、无自动化一致性校验，下次后端改口径前端必分叉。验收：加一条对照测试（同输入→后端 JSON 与前端 JS 计算的关键比率一致，None/NaN 同判）或落盘血缘清单注明"改后端必改前端"
+10. [ ] 前端 JS amortPayment/remainingBal 仍是按年摊还旧口径、与后端月复利分叉（2026-10-11 本轮新发现）：static/uw-commercial.js 的 `amortPayment` 仍用按年复利公式（n=年数、年利率一次计息）、`remainingBal` 按年迭代；后端 2026-10-04 已切月复利等额本息（panel2 broker 实证差约 1.2%）。前端预览的年供/DSCR/退出测算与后端 compute_all 同输入不一致。验收：同输入下前端预览关键比率与后端一致（可与第 9 项的对照测试合并验收）
 
 ## 暂缓（被 Top5 挤掉，未丢弃，消化完按序取回）
 
@@ -42,6 +42,10 @@
 - 债务时间线：C 页债务到期小节（学自 Crexi，可并入 tear sheet 二期）
 
 ## 已完成
+
+- 2026-10-11：利率口径统一、埋雷拆除（原台账第 1 项）。`app.finance.monthly_payment/remaining_balance` 用百分制（6.5），而 `app.uw_commercial.amort_payment/remaining_balance` 用小数制（0.065）且内部藏 `*100`——同名函数不同口径，传错即静默 100 倍错数。现四函数统一为百分制：`amort_payment(loan, annual_rate_pct, amort_years)` / `remaining_balance(loan, annual_rate_pct, ...)` 直传 finance 层；`compute_analysis` 做一次 `[DEC]→[PCT]` 边界换算（`rate_pct`，LINT-01 合规——rate 已归一化）；`compute_exit` 参数改名 `rate_pct` 明示口径。审计结论：全部 `monthly_payment` 现存调用方（workbench/scoring_residential/scoring_commercial/wrap_analysis）均为百分制，无一错传，无线上错数。附带：审计发现前端 `static/uw-commercial.js` 的 `amortPayment/remainingBal` 仍是按年摊还旧口径、与后端月复利分叉约 1.2%——已补进待做第 10 项。证据：commit cb881a9（noreply 作者，未 push）＋ 全量 pytest 463 passed ＋ ship-gate released（dpl https://vertciti-dealdesk-pj6ao1a1i-vertciti.vercel.app，SG5 /api/tophap/status 200）＋ 生产 E2E：真 deal（450 W 44th St $4.35M，30% 首付，6.5%/25年）/api/uw/compute → annual_debt_service 246720.7 == monthly_payment(3045000, 6.5, 25)×12、exit.remaining_loan 2757617.88，本地/生产完全一致。证据文件：goals/vertcity-build-out/hidden_files/dealdesk-improvement-2026-10-11/（prod_verify_payload.json / prod_verify_resp.json）。
+
+- 2026-10-10：误导性数字口径修复（D3/D4，D460 CEO 已定；原台账第 1 项）。`app/uw_commercial.py::_div` 与 `app/commercial_plus.py::_div` 零分母 → None（N/A 链），禁 0.0 冒充（0.00/0% 会被误读为真实算出的零）；`_irr` 无解已返回 None（D4，补显式回归测试）。None 守卫加到全部算术链：projected_resale→exit_fees/net_gains/roi、compute_exit sale_price（退化走 LINT-04 同款 N/A 链）、debt_yield、dscr_dual 双口径 label（"—"替代"0.00×"）、stress 表 dscr/debt_yield/breaks（未知不判破线）、LTV at_purchase；前端 `static/uw-commercial.js` 的 `div()` 改零分母 → NaN（fmtVal 渲染"—"）；Excel 原生公式 `IF(分母=0,0,…)` → `NA()`。前端/报表/PDF 渲染器原已把 None/非有限映射为"—"，本次逐路核验无 0.00/0% 残留。口径说明：台账原文"前端统一渲染'N/A'"，实际落地沿用仓库铁律（AGENTS.md）"缺数渲染'—'"字形，Excel 内用 #N/A——实质要求（禁误导性 0.00/0%）已满足。证据：commit 128deb8（noreply 作者，未 push）＋ 全量 pytest 458 passed（1 deselect pre-existing test_address_pipeline_degradation，10 新用例 tests/test_d3_d4_na_chain.py）＋ 生产 E2E（dpl_J2Cd7g7uQY7Efkhuk51ezvRGvnqq）：退化输入 /api/uw/compute → 9 个关键比率全 null；真 deal（450 W 44th St $4.35M，30% 首付）→ cap 5.52%/DSCR 0.807/debt yield 7.11%/LTV 0.70 正常数无回归；生产 uw-commercial.js（根＋static/ 双副本）含新 div()。附带：本轮新发现前端 JS 复刻与后端无对齐校验，已补进待做第 10 项。
 
 - 2026-10-09：生产 PDF 解析换纯 Python 库（D2，原台账第 1 项）。`app/pdf_intake.py`：pdftotext（poppler）→ pypdf 原生按页提取，零系统依赖；`requirements.txt` 新增 pypdf>=6.0；加密 PDF 明确报错不等待密码输入；`pdftotext_available()` 保留为兼容 shim。证据：commit 2550f2a（tests 449 passed，1 deselect pre-existing）＋ 生产 E2E（dpl_4jKcyhem5CXNoXyTvoScUJxvP6po）：真实 PDF 上传 /api/wb/intake/pdf → $4,350,000 正确提取、无"缺少 pdftotext"错误、claim_notice 标"卖方材料口径、待独立验证"。备注：本轮 cron worker 未执行，由 parent 直接修复闭环。
 - 2026-10-09：Sell-readiness 卖方动机分上线（原台账第 1 项，学自 Reonomy Top5）。新模块 `app/sell_readiness.py`：0-100 规则分（持有>10年+25 / 贷款到期<24mo+30 / 再融资+15 / 留置权·违规+20 / 区域热度+10），每项附来源；贷款到期/再融资暂无数据源→诚实 unavailable 不计分不虚构；留置权信号=TopHap distress/法拍预警＋NYC DOB 公开违规（Socrata 3h2n-5cm9，门牌号+街道归一化匹配）；区域热度=TopHap CMA 年度成交数同比（代理指标明示）；ECB 未关闭罚金暂未纳入（caveat 明示，已补进待做）。新端点 POST /api/wb/sell-readiness/score（TopHap/DOB 均 best-effort 降级）；工作台 intake 渲染后自动加载打分卡。证据：commit 007b0d1（tests/test_sell_readiness.py 29 新，全量 449 passed）＋ 生产 E2E（dpl_DjrbSrgWmkfRK2TpPZvHF16yKzGJ）：3 个已知 deal 打分排序与人工判断一致（1500 Atlantic Ave 19.1年持有 25分 ＞ 30-30 Northern Blvd 15.7年持有 25分 ＞ 450 W 44th 4.7年持有 0分；无一命中 distress/违规）；生产 workbench.html/js 含打分卡。证据文件：goals/vertcity-build-out/hidden_files/dealdesk-improvement-2026-10-09/。附带：首轮生产部署 dpl_69pJZCYCShhyrofoqHsuMugNjG8j 全站 500（同 bundle preview 启动正常，判定坏部署非代码问题）→ 立即回滚上一健康部署恢复 → 干净重部署一次成功。教训：部署后先 GET /api/tophap/status 冒烟，500 立即回滚再排查。
