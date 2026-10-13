@@ -324,6 +324,97 @@ def run_pdf_upload(saved_path: str, filename: str) -> dict:
     return d
 
 
+IMAGE_CLAIM_NOTICE = ("以下全部数字为截图 OCR 提取、卖方材料口径、待独立验证，"
+                      "须独立验证后方可用于估值/打分")
+
+
+def run_commercial_image_ocr_text(text: str, filename: str = "screenshot.png",
+                                  engine: str = "browser-tesseract") -> dict:
+    """商业截图 OCR 文本 intake（台账第 2 项，2026-10-13）。
+
+    截图先经 OCR（浏览器端 Tesseract.js，或服务端 tesseract 若可用）转文本，
+    再与 PDF/粘贴 intake 共用同一抽取引擎（parse_commercial_pdf_text）。
+    全部字段标"卖方材料口径、待独立验证"，来源标"截图OCR:<文件名>"，
+    同样跑数据质量门（quality_gate）。
+    """
+    from . import validators
+    text = text or ""
+    at = datetime.now().strftime("%Y-%m-%d %H:%M")
+    fname = (filename or "screenshot.png").strip() or "screenshot.png"
+    if len(text.strip()) < 20:
+        return {"mode": "image", "filename": fname, "fields": [], "tenants": [],
+                "error": "OCR 未识别出足够文本（少于 20 字符），请换更清晰的截图或改用粘贴文本",
+                "error_code": "ocr_text_too_short",
+                "ocr_engine": engine, "fetched_at": at,
+                "claim_notice": IMAGE_CLAIM_NOTICE}
+    d = parse_commercial_pdf_text(text, fname, pages=None,
+                                  source_label=f"截图OCR:{fname}")
+    d["mode"] = "image"
+    d["ocr_engine"] = engine
+    d["text_chars"] = len(text)
+    d["excerpt"] = text[:500]
+    d["claim_notice"] = IMAGE_CLAIM_NOTICE
+    d["quality_gate"] = validators.run_quality_gate(
+        "commercial", d["fields"], tenants=d.get("tenants"), raw_text=text,
+        pages=None)
+    return d
+
+
+def server_ocr_available() -> bool:
+    """服务端 OCR 是否可用：tesseract 二进制在 PATH，或 pytesseract 可导入。"""
+    import shutil
+    if shutil.which("tesseract"):
+        return True
+    try:
+        import pytesseract  # noqa: F401
+        return shutil.which("tesseract") is not None
+    except Exception:
+        return False
+
+
+def extract_text_from_image_bytes(data: bytes) -> tuple[str, str]:
+    """服务端 OCR：图片字节 -> (text, note)。无引擎时 text 为空、note 说明。
+
+    生产（Vercel serverless）无 tesseract 二进制，主路径是浏览器端 OCR；
+    本函数只在本地/自托管装有 tesseract 时生效，绝不编造识别结果。
+    """
+    import io
+    import shutil
+    import subprocess
+    try:
+        from PIL import Image
+        with Image.open(io.BytesIO(data)) as im:
+            im.verify()
+    except Exception as e:  # noqa: BLE001
+        return "", f"文件不是有效的图片：{str(e)[:120]}"
+    exe = shutil.which("tesseract")
+    if not exe:
+        return "", ("服务端无 OCR 引擎（tesseract 未安装）；"
+                    "请使用商业页浏览器端 OCR（上传截图自动识别），或改用粘贴文本")
+    # tesseract 读 stdin、写 stdout，不落盘
+    try:
+        proc = subprocess.run([exe, "stdin", "stdout", "-l", "eng"],
+                              input=data, capture_output=True, timeout=60)
+        text = (proc.stdout or b"").decode("utf-8", errors="replace")
+        return _normalize_page(text), "" if text.strip() else "OCR 未识别出文本"
+    except Exception as e:  # noqa: BLE001
+        return "", f"服务端 OCR 异常：{str(e)[:150]}"
+
+
+def run_commercial_image_upload(data: bytes, filename: str) -> dict:
+    """服务端直传图片 intake：OCR 成功走 OCR 文本链路；无引擎返回明确 error_code。"""
+    at = datetime.now().strftime("%Y-%m-%d %H:%M")
+    fname = (filename or "screenshot.png").strip() or "screenshot.png"
+    text, note = extract_text_from_image_bytes(data)
+    if not text:
+        return {"mode": "image", "filename": fname, "fields": [], "tenants": [],
+                "error": note, "error_code": "ocr_unavailable_server",
+                "ocr_engine": "none", "fetched_at": at,
+                "claim_notice": IMAGE_CLAIM_NOTICE}
+    d = run_commercial_image_ocr_text(text, fname, engine="tesseract-server")
+    return d
+
+
 def save_upload(file_bytes: bytes, filename: str) -> str:
     """保存上传文件到 /tmp（临时），返回路径。"""
     safe = re.sub(r"[^A-Za-z0-9._\-]", "_", filename)[-80:]

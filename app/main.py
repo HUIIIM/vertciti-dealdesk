@@ -801,6 +801,60 @@ def uw_commercial_intake_text(payload: dict):
         raise HTTPException(500, f"提取失败：{str(e)[:200]}")
 
 
+# ---------------- 商业核保截图 intake：房源截图 → OCR → 商业字段 → 自动填表 ----------------
+
+@app.post("/api/uw-commercial/intake/image-text")
+def uw_commercial_intake_image_text(payload: dict):
+    """商业截图 OCR 文本 intake（台账第 2 项，2026-10-13）。
+
+    浏览器端 Tesseract.js 对截图做 OCR 后把文本发到这里，与 PDF intake
+    共用同一抽取引擎；返回 fields[]/tenants[]/quality_gate，全部标
+    "截图 OCR 提取、卖方材料口径、待独立验证"。
+    """
+    text = str((payload or {}).get("text") or "")
+    filename = str((payload or {}).get("filename") or "screenshot.png")
+    if not text.strip():
+        raise HTTPException(400, "OCR 文本为空，请换更清晰的截图重试")
+    if len(text) > 500_000:
+        raise HTTPException(400, "OCR 文本过长（上限约 500KB）")
+    try:
+        d = pdf_intake.run_commercial_image_ocr_text(text, filename)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(500, f"提取失败：{str(e)[:200]}")
+    if d.get("error"):
+        raise HTTPException(422, d["error"])
+    return d
+
+
+@app.post("/api/uw-commercial/intake/image")
+async def uw_commercial_intake_image(request: Request, file: UploadFile = File(...)):
+    """商业截图直传 intake：服务端 OCR（tesseract 可用时）→ 商业字段。
+
+    生产 serverless 无 tesseract 时返回 422 + error_code=ocr_unavailable_server，
+    前端据此走浏览器端 OCR 路径，绝不假装排队提取（旧 pending 轮询端点
+    /api/wb/intake/image/result/ 从未存在，商业页旧截图流程在生产不可用）。
+    """
+    name = file.filename or "screenshot.png"
+    if not name.lower().endswith((".png", ".jpg", ".jpeg", ".webp")):
+        raise HTTPException(400, "只接受截图图片（png/jpg/webp）")
+    _check_upload_size(request, 15 * 1024 * 1024, "截图")
+    data = await file.read()
+    if len(data) > 15 * 1024 * 1024:
+        raise HTTPException(400, "截图超过 15MB 上限")
+    # 魔数校验与住宅截图 intake（image_intake.ALLOWED_EXT）共用同一规则
+    magic_ok = (
+        data[:8] == b"\x89PNG\r\n\x1a\n"
+        or data[:2] == b"\xff\xd8"
+        or (data[:4] == b"RIFF" and data[8:12] == b"WEBP")
+    )
+    if not magic_ok:
+        raise HTTPException(400, "文件不是有效的图片")
+    d = pdf_intake.run_commercial_image_upload(data, name)
+    if d.get("error"):
+        raise HTTPException(422, d["error"])
+    return d
+
+
 # ---------------- 截图 intake：房源页截图 → pending 队列 → cron 视觉提取 ----------------
 
 @app.post("/api/wb/intake/image")

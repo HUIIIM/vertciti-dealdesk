@@ -757,7 +757,9 @@ async function init() {
     parts.push("已填 " + filled + " 个字段");
     if (ts.length) parts.push(ts.length + " 个租户");
     if (skipped.length) parts.push("未映射 " + skipped.length + " 项");
-    parts.push("（全部为卖方口径、待独立验证）");
+    parts.push(d.mode === "image"
+      ? "（全部为截图 OCR 提取、卖方口径、待独立验证）"
+      : "（全部为卖方口径、待独立验证）");
     setStatus("ok", parts.join("；"));
     // 数据质量门：渲染面板 + 标黄矛盾/偏离字段
     if (d.quality_gate) {
@@ -977,71 +979,70 @@ async function init() {
     } catch (e) { box.style.display = "none"; }
   }
   if (_addrEl) _addrEl.addEventListener("blur", fetchPhotos);
-  // ---- 智能录取：截图 → 视觉提取 → 自动填表 ----
-  // 截图 key → data-in 路径映射（与 pdf_intake 字段命名对齐）
-  const IMG_KEYMAP = {
-    address: "property.address",
-    asking_price: "analysis.purchase_price",
-    building_sf: "property.net_rentable_sf",
-    year_built: "property.year_built",
-    property_type: "property.property_type",
-  };
+  // ---- 智能录取：截图 → OCR → 自动填表（台账第 2 项，2026-10-13） ----
+  // 主路径：浏览器端 Tesseract.js OCR（生产 serverless 无 tesseract 二进制，
+  // 旧 pending 队列轮询的 /api/wb/intake/image/result/ 端点从未存在、不可用）；
+  // OCR 文本 → POST /api/uw-commercial/intake/image-text → 与 PDF 共用抽取引擎
+  // + 数据质量门 → applyIntakeResult 填表。浏览器 OCR 失败时回退服务端直传端点。
+  const TESSERACT_CDN = "https://cdn.jsdelivr.net/npm/tesseract.js@5.0.5/dist/tesseract.min.js";
+  let _tesseractLoading = null;
+  function loadTesseract() {
+    if (window.Tesseract) return Promise.resolve(window.Tesseract);
+    if (_tesseractLoading) return _tesseractLoading;
+    _tesseractLoading = new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = TESSERACT_CDN;
+      s.onload = () => resolve(window.Tesseract);
+      s.onerror = () => reject(new Error("OCR 引擎加载失败（网络）"));
+      document.head.appendChild(s);
+    });
+    return _tesseractLoading;
+  }
+  async function ocrImageInBrowser(file) {
+    const Tesseract = await loadTesseract();
+    const res = await Tesseract.recognize(file, "eng", {
+      logger: (m) => {
+        if (m && m.status === "recognizing text") {
+          setStatus("busy", "截图 OCR 识别中 " + Math.round((m.progress || 0) * 100) + "%…");
+        }
+      },
+    });
+    return (res && res.data && res.data.text) || "";
+  }
   const intakeImg = $("#intakeImg");
   if (intakeImg) {
     intakeImg.addEventListener("change", async (e) => {
       const f = e.target.files[0];
       e.target.value = "";
       if (!f) return;
-      setStatus("busy", "截图上传中…");
+      setStatus("busy", "截图 OCR 识别中…");
       try {
-        const fd = new FormData();
-        fd.append("file", f, f.name);
-        const r = await fetch("/api/wb/intake/image", { method: "POST", body: fd });
-        const d = await r.json();
-        if (!r.ok || d.error) throw new Error(d.error || ("HTTP " + r.status));
-        const taskId = d.task_id;
-        setStatus("busy", "视觉提取中（约10分钟），可先做别的…");
-        // 轮询提取结果：每 30s 查一次，最多 14 分钟
-        let extracted = null;
-        for (let i = 0; i < 28; i++) {
-          await new Promise((res) => setTimeout(res, 30000));
-          try {
-            const rr = await fetch("/api/wb/intake/image/result/" + taskId);
-            const dd = await rr.json();
-            if (dd && dd.fields && dd.fields.length) { extracted = dd; break; }
-          } catch (_) { /* 继续轮询 */ }
-        }
-        if (!extracted) {
-          setStatus("busy", "提取仍在排队，稍后在工作台截图任务中查看");
-          return;
-        }
-        let filled = 0; const skipped = [];
-        for (const fld of (extracted.fields || [])) {
-          const path = IMG_KEYMAP[fld.key];
-          // 税走 data-cf/data-k，其余走 data-in
-          if (fld.key === "taxes_annual" && fld.value) {
-            for (const cf of ["historical", "proforma"]) {
-              if (!state[cf]) state[cf] = {};
-              state[cf].property_tax = parseFloat(fld.value) || 0;
-            }
-            filled++;
-            continue;
+        let d = null;
+        try {
+          const text = await ocrImageInBrowser(f);
+          if (!text || text.trim().length < 20) {
+            throw new Error("OCR 未识别出足够文字，请换更清晰的截图或改用粘贴文本");
           }
-          if (!path) { skipped.push(fld.key); continue; }
-          const el = document.querySelector('[data-in="' + path + '"]');
-          if (el && fld.value != null && fld.value !== "") {
-            el.value = fld.value;
-            el.dispatchEvent(new Event("input", { bubbles: true }));
-            el.style.boxShadow = "0 0 0 2px var(--teal-line)";
-            setTimeout(() => { el.style.boxShadow = ""; }, 1800);
-            filled++;
-          } else { skipped.push(fld.key); }
+          const r = await fetch("/api/uw-commercial/intake/image-text", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text, filename: f.name }),
+          });
+          d = await r.json();
+          if (!r.ok || d.error) throw new Error((d && (d.detail || d.error)) || ("HTTP " + r.status));
+        } catch (ocrErr) {
+          // 回退：服务端直传 OCR（本地/自托管装有 tesseract 时可用）
+          if (/未识别出足够文字/.test(ocrErr.message)) throw ocrErr;
+          const fd = new FormData();
+          fd.append("file", f, f.name);
+          const r2 = await fetch("/api/uw-commercial/intake/image", { method: "POST", body: fd });
+          const d2 = await r2.json().catch(() => null);
+          if (!r2.ok || !d2 || d2.error) {
+            throw new Error(ocrErr.message + "；服务端 OCR 亦不可用：" +
+              ((d2 && (d2.detail || d2.error)) || ("HTTP " + r2.status)));
+          }
+          d = d2;
         }
-        renderAll(false); markDirty();
-        const parts = ["截图已填 " + filled + " 个字段"];
-        if (skipped.length) parts.push("未映射 " + skipped.length + " 项");
-        parts.push("（全部为截图提取口径、待独立验证）");
-        setStatus("ok", parts.join("；"));
+        applyIntakeResult(d);
       } catch (err) {
         setStatus("err", "截图处理失败：" + err.message);
       }
