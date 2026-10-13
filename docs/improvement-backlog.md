@@ -6,8 +6,8 @@
 
 ## 待做（按优先级）
 
-1. [ ] 商业页 390px 移动端 QA：新增"一键 Tear Sheet"按钮后 cmd-ctl 在 390px 是否溢出/可操作；商业页三栏在小屏不溢出。验收：真机/真浏览器 390px 逐项目检通过
-2. [ ] 商业页截图/图片录取（暂缓项回补）：上传房源截图 → OCR/视觉提取 → 填表（标卖方口径待验证）。验收：上传一张真实房源截图，价格/面积/租金字段正确提取并标待验证
+1. [x] 商业页 390px 移动端 QA（2026-10-12 本轮已验收通过，见"已完成"）
+2. [x] 商业页截图/图片录取（2026-10-13 本轮已完成，见"已完成"）
 3. [ ] 扫描版 PDF OCR（暂缓项回补）：图片型 PDF 先 OCR 再走现有提取链路，明确提示"OCR 口径"
 4. [ ] 门覆盖补齐（2026-10-06 数据质量门二期）：截图 intake 的视觉提取结果同样跑质量门（`image_intake` 输出附 quality_gate）；住宅页（d.html）接入商
     业页同款门面板 + 导出前过门。验收：截图/住宅两路各喂一份矛盾材料，fail 正确拦截并标黄
@@ -17,6 +17,8 @@
 8. [ ] PDF 多栏版式阅读顺序校验（2026-10-09 D2 新发现）：pypdf 无 pdftotext -layout 模式，多栏 flyer 文本可能按错误顺序拼接导致数字错位；验收：找一份真实双栏 OM，关键字段提取顺序正确，或明确标注"版式复杂、人工复核"
 9. [ ] 前端 JS 预览与后端 compute_all 口径对齐审计（2026-10-10 D3/D4 本轮新发现）：uw-commercial.js 的 computeAnalysis/computeExit/div/irrOf 是后端 compute_all 的 JS 复刻，本轮 div/irrOf 的 N/A 链修复靠人工同步——两套逻辑独立演进、无自动化一致性校验，下次后端改口径前端必分叉。验收：加一条对照测试（同输入→后端 JSON 与前端 JS 计算的关键比率一致，None/NaN 同判）或落盘血缘清单注明"改后端必改前端"
 10. [ ] 前端 JS amortPayment/remainingBal 仍是按年摊还旧口径、与后端月复利分叉（2026-10-11 本轮新发现）：static/uw-commercial.js 的 `amortPayment` 仍用按年复利公式（n=年数、年利率一次计息）、`remainingBal` 按年迭代；后端 2026-10-04 已切月复利等额本息（panel2 broker 实证差约 1.2%）。前端预览的年供/DSCR/退出测算与后端 compute_all 同输入不一致。验收：同输入下前端预览关键比率与后端一致（可与第 9 项的对照测试合并验收）
+11. [ ] 商业页"流水线读数"条（.pipe/flowstrip）移动端布局（2026-10-12 本轮新发现）：7 个 pnode（min-width 140px）在 390px 下横向滚动（overflow-x:auto，有意设计、页面级不溢出），但无滚动提示、其余 6 个指标可发现性差。验收：≤760px 时改为纵向堆叠（栏间 → 箭头改 ↓ 或隐藏），7 个指标一次可见、无需横滑
+12. [ ] 旧三页 legacy-readonly 冻结与商业页功能线冲突（2026-10-13 本轮新发现）：uw-commercial/workbench/res-legacy 三页被 legacy-readonly.js 全量冻结输入（横幅"旧版只读、2026-11-03 下线、请用新版"），但每日改进的功能（PDF/粘贴/截图 intake、Tear Sheet 等）仍长在商业页上——生产真用户实际点不了、填不了（本轮浏览器 E2E 实证 intakeImg disabled=true，须在测试里手动解冻才能走通 OCR 链路）。验收：定方案并落地——商业核保能力迁到新版入口（/ 的 d.html 线）或正式解冻/延期旧页，二选一后真浏览器验证新入口可完整走通 intake→填表→导出
 
 ## 暂缓（被 Top5 挤掉，未丢弃，消化完按序取回）
 
@@ -42,6 +44,10 @@
 - 债务时间线：C 页债务到期小节（学自 Crexi，可并入 tear sheet 二期）
 
 ## 已完成
+
+- 2026-10-13：商业页截图/图片录取上线（原台账第 2 项）。旧商业页截图流程实证已坏：前端轮询的 `/api/wb/intake/image/result/{id}` 端点从未存在、住宅 pending 队列在 serverless 上也不可达，生产永远拿不到结果。新实现：浏览器端 Tesseract.js 5.0.5 OCR（CDN 懒加载，$0、无服务端依赖）→ 新端点 POST /api/uw-commercial/intake/image-text → 与 PDF/粘贴共用同一抽取引擎（parse_commercial_pdf_text，来源标"截图OCR:<文件名>"）＋数据质量门 → applyIntakeResult 填表；服务端直传端点 POST /api/uw-commercial/intake/image 在无 tesseract 时诚实返回 422（error 明示），不假装排队。证据：commit 1c7902f（noreply 作者，未 push）＋全量 pytest 474 passed（11 新用例 tests/test_image_intake_commercial.py，1 deselect pre-existing test_address_pipeline_degradation）＋生产部署 dpl_Cd9L46qNYM141L4QihnWduHynspX＋生产真浏览器 E2E（Chromium 经 route 代理 serv 生产页，CDN 在本机沙箱代理下由 curl 缓存代取——沙箱代理对 jsdelivr 直连超时系环境限制、非生产问题）：上传 listing 截图 PNG（1500 Atlantic Ave）→ OCR 全文正确 → 已填 11 字段（价格 4350000/面积 12500/NOI 285000）＋2 租户（月租 8500/7200），状态明示"截图 OCR 提取、卖方口径、待独立验证"；质量门正确拦截该样本（NOI $285k＞2 套间部分租约表年化 $188.4k，fail noi_vs_gross_rent＋warn 覆盖 48%）；Node 同版本 Tesseract.js 独立复跑同样全字段 PASS。附带发现：旧三页被 legacy-readonly.js 冻结（见待做第 12 项）；商业截图路径已附 quality_gate（待做第 4 项的截图子项部分达成，住宅页部分未动）。证据文件：goals/vertcity-build-out/hidden_files/dealdesk-improvement-2026-10-13/（listing-screenshot.png / ocr-text.txt / prod-resp.json / prod_image_text_resp.json / prod_browser_e2e.json / prod-after-ocr.png）。
+
+- 2026-10-12：商业页 390px 移动端 QA 通过（原台账第 1 项）。真浏览器（Chromium headless 移动端模拟 390×844＋触屏，page.route 代理绕过本机构建 LNA 拦截）30/30 检查项通过：cmd-ctl 新增"一键 Tear Sheet"按钮后无溢出、全部 7 控件宽 390 内、触控高度 44px、按钮中心点 elementFromPoint 可点无遮挡；uw-flow/c-grid/two-col/kpis 按 media query 折叠（1轨/1轨/2轨）；全页扫描零页面级横向溢出；生产 HTML/JS 与本地字节一致（diff 零差异），结论适用于生产。证据文件：goals/vertcity-build-out/hidden_files/dealdesk-improvement-2026-10-12/（mobile-390-qa.py / qa-run-final.json / 390-cmdbar.png / 390-pipestrip.png / 390-bottom.png）。本轮新发现：商业页"流水线读数"条（.pipe，7 个 pnode）在 390px 下横向滚动（overflow-x:auto 有意设计、页面不溢出），但无滚动提示、可发现性差——已补进待做第 11 项。无代码变更、无需部署。
 
 - 2026-10-11：利率口径统一、埋雷拆除（原台账第 1 项）。`app.finance.monthly_payment/remaining_balance` 用百分制（6.5），而 `app.uw_commercial.amort_payment/remaining_balance` 用小数制（0.065）且内部藏 `*100`——同名函数不同口径，传错即静默 100 倍错数。现四函数统一为百分制：`amort_payment(loan, annual_rate_pct, amort_years)` / `remaining_balance(loan, annual_rate_pct, ...)` 直传 finance 层；`compute_analysis` 做一次 `[DEC]→[PCT]` 边界换算（`rate_pct`，LINT-01 合规——rate 已归一化）；`compute_exit` 参数改名 `rate_pct` 明示口径。审计结论：全部 `monthly_payment` 现存调用方（workbench/scoring_residential/scoring_commercial/wrap_analysis）均为百分制，无一错传，无线上错数。附带：审计发现前端 `static/uw-commercial.js` 的 `amortPayment/remainingBal` 仍是按年摊还旧口径、与后端月复利分叉约 1.2%——已补进待做第 10 项。证据：commit cb881a9（noreply 作者，未 push）＋ 全量 pytest 463 passed ＋ ship-gate released（dpl https://vertciti-dealdesk-pj6ao1a1i-vertciti.vercel.app，SG5 /api/tophap/status 200）＋ 生产 E2E：真 deal（450 W 44th St $4.35M，30% 首付，6.5%/25年）/api/uw/compute → annual_debt_service 246720.7 == monthly_payment(3045000, 6.5, 25)×12、exit.remaining_loan 2757617.88，本地/生产完全一致。证据文件：goals/vertcity-build-out/hidden_files/dealdesk-improvement-2026-10-11/（prod_verify_payload.json / prod_verify_resp.json）。
 
