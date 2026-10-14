@@ -29,6 +29,12 @@ rm -f dealdesk.db && .venv/bin/pytest tests/ -q
   `test_list_sorted_by_cash_to_close` 会误挂。先删库重跑再定责。
 - `/tmp` 是 512M tmpfs：`app/pdf_intake.py` 曾因写 `/tmp` 爆盘；编码/大文件
   一律用 home 分区路径。
+- 真浏览器 E2E 的 route 代理转发坑（2026-10-14 实证）：Chromium 经 CDP 暴露的
+  `post_data_buffer` 对 `fetch(FormData+File)` 只含 multipart 头（实测 196 字节、
+  无文件体），httpx 原样转发后服务端收到空文件、回 400"文件过小或为空"——
+  这是测试脚手架的锅，不是产品 bug（curl/httpx 直传同文件均 200）。E2E 脚本
+  须对上传端点做 multipart 重建（用同一测试文件按原 boundary 补回文件体），
+  或改走非拦截通道；JSON POST 不受此影响。
 
 ## 构建与部署
 
