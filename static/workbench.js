@@ -585,6 +585,45 @@ WB.intakeUrl = function () {
   if (!t) { alert('请先粘贴房源链接'); return; }
   WB._intakeRun('url', t, '链接解析＋');
 };
+/* 扫描版 PDF OCR（台账第 3 项，2026-10-14）：pdf.js 渲染每页为图 +
+   Tesseract.js 逐页 OCR（均 CDN 懒加载），文本回传 pdf-ocr-text 端点 */
+function _wbLoadScript(src, globalName) {
+  if (window[globalName]) return Promise.resolve(window[globalName]);
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = () => resolve(window[globalName]);
+    s.onerror = () => reject(new Error('引擎加载失败（网络）：' + src));
+    document.head.appendChild(s);
+  });
+}
+WB.ocrPdfInBrowser = async function (file) {
+  const pdfjsLib = await _wbLoadScript(
+    'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js', 'pdfjsLib');
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+  const Tesseract = await _wbLoadScript(
+    'https://cdn.jsdelivr.net/npm/tesseract.js@5.0.5/dist/tesseract.min.js', 'Tesseract');
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({data: buf}).promise;
+  const MAX_PAGES = 12;
+  const n = Math.min(pdf.numPages, MAX_PAGES);
+  const texts = [];
+  for (let i = 1; i <= n; i++) {
+    $('#intake-status').textContent = `⏳ 扫描 PDF OCR：第 ${i}/${pdf.numPages} 页识别中…`;
+    const page = await pdf.getPage(i);
+    const viewport = page.getViewport({scale: 2});
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width; canvas.height = viewport.height;
+    await page.render({canvasContext: canvas.getContext('2d'), viewport}).promise;
+    const blob = await new Promise(res => canvas.toBlob(res, 'image/png'));
+    if (!blob) continue;
+    const res2 = await Tesseract.recognize(blob, 'eng');
+    const t = (res2 && res2.data && res2.data.text) || '';
+    if (t.trim()) texts.push(t);
+  }
+  return texts.join('\n');
+};
 WB.intakePdf = async function () {
   const f = $('#in-pdf').files[0];
   if (!f) { alert('请先选择 PDF 文件'); return; }
@@ -594,6 +633,22 @@ WB.intakePdf = async function () {
     const r = await fetch('/api/wb/intake/pdf', {method: 'POST', body: fd});
     if (!r.ok) throw new Error((await r.text()).slice(0, 200));
     const d = await r.json();
+    if (d.needs_ocr || d.error_code === 'scanned_pdf_needs_ocr') {
+      $('#intake-status').textContent = '⏳ 检测到扫描版 PDF（无文本层），启动浏览器端 OCR…';
+      const ocrText = await WB.ocrPdfInBrowser(f);
+      if (!ocrText || ocrText.trim().length < 20) {
+        throw new Error('扫描版 PDF OCR 未识别出足够文字，请换更清晰的扫描件');
+      }
+      const r2 = await fetch('/api/wb/intake/pdf-ocr-text', {method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({text: ocrText, filename: f.name})});
+      const d2 = await r2.json().catch(() => null);
+      if (!r2.ok || !d2 || d2.error) {
+        throw new Error(((d2 && (d2.detail || d2.error)) || ('HTTP ' + r2.status)));
+      }
+      WB.renderIntake(d2);
+      return;
+    }
     if (d.error) $('#intake-status').innerHTML = `<span class="neg">${esc(d.error)}</span>`;
     WB.renderIntake(d);
   } catch (e) {

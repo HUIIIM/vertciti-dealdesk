@@ -759,7 +759,9 @@ async function init() {
     if (skipped.length) parts.push("未映射 " + skipped.length + " 项");
     parts.push(d.mode === "image"
       ? "（全部为截图 OCR 提取、卖方口径、待独立验证）"
-      : "（全部为卖方口径、待独立验证）");
+      : d.mode === "pdf-ocr"
+        ? "（全部为扫描版 PDF OCR 提取、卖方口径、待独立验证）"
+        : "（全部为卖方口径、待独立验证）");
     setStatus("ok", parts.join("；"));
     // 数据质量门：渲染面板 + 标黄矛盾/偏离字段
     if (d.quality_gate) {
@@ -784,7 +786,25 @@ async function init() {
         fd.append("file", f, f.name);
         const r = await fetch("/api/uw-commercial/intake/pdf", { method: "POST", body: fd });
         const d = await r.json();
-        if (!r.ok || d.error) throw new Error(d.error || ("HTTP " + r.status));
+        if (!r.ok) throw new Error((d && d.detail) || ("HTTP " + r.status));
+        if (d.needs_ocr || d.error_code === "scanned_pdf_needs_ocr") {
+          // 扫描版 PDF（台账第 3 项）：无文本层 → 浏览器端 pdf.js 渲染
+          // 每页为图 + Tesseract.js OCR → POST pdf-ocr-text 走同一抽取引擎
+          setStatus("busy", "检测到扫描版 PDF（无文本层），启动浏览器端 OCR…");
+          const ocrText = await ocrPdfInBrowser(f);
+          if (!ocrText || ocrText.trim().length < 20) {
+            throw new Error("扫描版 PDF OCR 未识别出足够文字，请换更清晰的扫描件或改用粘贴文本");
+          }
+          const r2 = await fetch("/api/uw-commercial/intake/pdf-ocr-text", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text: ocrText, filename: f.name }),
+          });
+          const d2 = await r2.json();
+          if (!r2.ok || d2.error) throw new Error((d2 && (d2.detail || d2.error)) || ("HTTP " + r2.status));
+          applyIntakeResult(d2);
+          return;
+        }
+        if (d.error) throw new Error(d.error);
         applyIntakeResult(d);
       } catch (err) {
         setStatus("err", "解析失败：" + err.message);
@@ -1008,6 +1028,60 @@ async function init() {
       },
     });
     return (res && res.data && res.data.text) || "";
+  }
+  // ---- 扫描版 PDF OCR（台账第 3 项，2026-10-14） ----
+  // pdf.js（CDN 懒加载）把每页渲染为 canvas 图 → Tesseract.js 逐页 OCR
+  // → 文本回传 /api/uw-commercial/intake/pdf-ocr-text。上限 12 页，防大
+  // 文件把浏览器拖死；超出页数在状态里明示，不静默截断。
+  const PDFJS_CDN = "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js";
+  const PDFJS_WORKER = "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
+  let _pdfjsLoading = null;
+  function loadPdfJs() {
+    if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+    if (_pdfjsLoading) return _pdfjsLoading;
+    _pdfjsLoading = new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = PDFJS_CDN;
+      s.onload = () => {
+        if (window.pdfjsLib) {
+          window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER;
+          resolve(window.pdfjsLib);
+        } else {
+          reject(new Error("PDF 渲染引擎加载异常"));
+        }
+      };
+      s.onerror = () => reject(new Error("PDF 渲染引擎加载失败（网络）"));
+      document.head.appendChild(s);
+    });
+    return _pdfjsLoading;
+  }
+  async function ocrPdfInBrowser(file) {
+    const pdfjsLib = await loadPdfJs();
+    const Tesseract = await loadTesseract();
+    const buf = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+    const MAX_PAGES = 12;
+    const n = Math.min(pdf.numPages, MAX_PAGES);
+    const texts = [];
+    for (let i = 1; i <= n; i++) {
+      setStatus("busy", "扫描 PDF OCR：第 " + i + "/" + pdf.numPages + " 页渲染识别中…");
+      const page = await pdf.getPage(i);
+      const viewport = page.getViewport({ scale: 2 });
+      const canvas = document.createElement("canvas");
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      const ctx = canvas.getContext("2d");
+      await page.render({ canvasContext: ctx, viewport }).promise;
+      const blob = await new Promise((res) => canvas.toBlob(res, "image/png"));
+      if (!blob) continue;
+      const res2 = await Tesseract.recognize(blob, "eng");
+      const t = (res2 && res2.data && res2.data.text) || "";
+      if (t.trim()) texts.push(t);
+    }
+    if (pdf.numPages > MAX_PAGES) {
+      setStatus("busy", "扫描 PDF 共 " + pdf.numPages + " 页，仅 OCR 前 " + MAX_PAGES + " 页");
+    }
+    return texts.join("\n");
   }
   const intakeImg = $("#intakeImg");
   if (intakeImg) {

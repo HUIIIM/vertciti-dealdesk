@@ -19,6 +19,11 @@ from . import demand_validation as dv
 from . import research_pipeline as rp
 
 CLAIM_LABEL = "卖方材料口径、待独立验证"
+# 扫描版 PDF OCR（台账第 3 项，2026-10-14）：无文本层 PDF 的提取结果
+# 一律走 OCR 口径标注，与普通文本层提取明确区分，绝不混标。
+PDF_OCR_CLAIM_NOTICE = ("以下全部数字为扫描版 PDF OCR 提取、卖方材料口径、待独立验证，"
+                        "须独立验证后方可用于估值/打分")
+SCANNED_TEXT_THRESHOLD = 50  # 全文字符数低于此值视为无文本层（扫描件）
 TALKING_KEYWORDS = ["cap", "noi", "turnkey", "renovat", "cash flow", "appreciation",
                     "below market", "motivated", "as-is", "seller financ",
                     "subject-to", "wrap", "balloon", "upside", "value-add",
@@ -59,6 +64,30 @@ def extract_text(pdf_path: str) -> tuple[str, str]:
     return "\n".join(pages), note
 
 
+def inspect_pdf(pdf_path: str) -> dict:
+    """扫描件检测（台账第 3 项）：返回页数/文本量/是否扫描件/是否加密。
+
+    与 extract_text_pages 的区别：即使文本过少也保留页数与已提取页，
+    供上层决定走 OCR 链路（浏览器端渲染 OCR 或服务端内嵌图 OCR），
+    而不是直接报"请手动录入"。
+    """
+    try:
+        reader = PdfReader(pdf_path)
+        if reader.is_encrypted:
+            return {"pages": [], "page_count": len(reader.pages), "text_chars": 0,
+                    "is_scanned": False, "is_encrypted": True,
+                    "note": "PDF 已加密，无法解析；请解密后上传或手动录入"}
+        pages = [_normalize_page(pg.extract_text()) for pg in reader.pages]
+        chars = sum(len(p) for p in pages)
+        return {"pages": pages, "page_count": len(pages), "text_chars": chars,
+                "is_scanned": chars < SCANNED_TEXT_THRESHOLD,
+                "is_encrypted": False, "note": ""}
+    except Exception as e:  # noqa: BLE001
+        return {"pages": [], "page_count": 0, "text_chars": 0,
+                "is_scanned": False, "is_encrypted": False,
+                "note": f"PDF 解析异常：{str(e)[:150]}"}
+
+
 def _money_offset(text: str, value: float) -> int:
     """找 $金额 在文本中的首次偏移（带/不带千分位逗号都试），找不到返回 -1。"""
     iv = int(round(value))
@@ -87,10 +116,11 @@ class _PageMap:
         return None
 
 
-def parse_pdf_text(text: str, filename: str, pages: list[str] | None = None) -> dict:
+def parse_pdf_text(text: str, filename: str, pages: list[str] | None = None,
+                   source_label: str | None = None) -> dict:
     """从 PDF 文本抽取字段（全部卖方口径）。pages 可选：用于标注字段来源页码。"""
     at = datetime.now().strftime("%Y-%m-%d %H:%M")
-    source = f"PDF:{filename}"
+    source = source_label or f"PDF:{filename}"
     pm = _PageMap(pages)
 
     def F(key, value, display=None, note="", page=None):
@@ -265,21 +295,153 @@ def parse_commercial_pdf_text(text: str, filename: str, pages: list[str] | None 
             "claim_notice": f"以下全部数字为{CLAIM_LABEL}，须独立验证后方可用于估值/打分"}
 
 
+def _scanned_needs_ocr(mode: str, filename: str, info: dict,
+                       extra: dict | None = None) -> dict:
+    """扫描件无文本层时的结构化返回：前端据 needs_ocr 走浏览器端 OCR。
+
+    绝不假装已提取：fields 为空、error 明示原因，并带机器可读标志
+    （needs_ocr / error_code），前端渲染页面为图后 OCR 再回传文本。
+    """
+    d = {"mode": mode, "filename": filename, "fields": [], "tenants": [],
+         "error": ("PDF 为扫描件（无文本层，共 "
+                   f"{info.get('page_count', 0)} 页、仅提取到 "
+                   f"{info.get('text_chars', 0)} 字符），需先 OCR 再提取；"
+                   "页面将自动走浏览器端 OCR，或改用粘贴文本/截图"),
+         "error_code": "scanned_pdf_needs_ocr",
+         "needs_ocr": True, "ocr_required": True, "is_scanned_pdf": True,
+         "page_count": info.get("page_count", 0),
+         "text_chars": info.get("text_chars", 0),
+         "claim_notice": PDF_OCR_CLAIM_NOTICE,
+         "fetched_at": datetime.now().strftime("%Y-%m-%d %H:%M")}
+    if extra:
+        d.update(extra)
+    return d
+
+
+def try_server_pdf_ocr(saved_path: str) -> tuple[str, str]:
+    """服务端扫描 PDF OCR 尝试：提取内嵌扫描图逐张 OCR（需 tesseract）。
+
+    生产 serverless 无 tesseract 时诚实返回空文本＋原因，由前端浏览器
+    端 OCR 接管；绝不编造识别结果。
+    """
+    if not server_ocr_available():
+        return "", "服务端无 OCR 引擎（tesseract 未安装）"
+    try:
+        reader = PdfReader(saved_path)
+    except Exception as e:  # noqa: BLE001
+        return "", f"PDF 解析异常：{str(e)[:150]}"
+    texts: list[str] = []
+    for pg in reader.pages:
+        try:
+            images = list(pg.images)
+        except Exception:  # noqa: BLE001
+            images = []
+        for img in images:
+            try:
+                data = img.data
+            except Exception:  # noqa: BLE001
+                continue
+            if not data:
+                continue
+            t, _note = extract_text_from_image_bytes(data)
+            if t:
+                texts.append(t)
+    joined = "\n".join(texts)
+    if len(joined.strip()) < 20:
+        return "", "服务端 OCR 未识别出足够文本（内嵌图为空或不清晰）"
+    return joined, ""
+
+
 def run_commercial_pdf_upload(saved_path: str, filename: str) -> dict:
     from . import validators
-    pages, note = extract_text_pages(saved_path)
-    text = "\n".join(pages)
-    if not text:
+    info = inspect_pdf(saved_path)
+    if info["note"]:
         return {"mode": "pdf-commercial", "filename": filename, "fields": [],
-                "tenants": [], "error": note,
+                "tenants": [], "error": info["note"],
                 "fetched_at": datetime.now().strftime("%Y-%m-%d %H:%M")}
+    if info["is_scanned"]:
+        # 先试服务端内嵌图 OCR（本地/自托管有 tesseract 时直接闭环）
+        ocr_text, _ocr_note = try_server_pdf_ocr(saved_path)
+        if ocr_text:
+            return run_commercial_pdf_ocr_text(
+                ocr_text, filename, engine="tesseract-server")
+        return _scanned_needs_ocr("pdf-commercial", filename, info)
+    pages = info["pages"]
+    text = "\n".join(pages)
     d = parse_commercial_pdf_text(text, filename, pages=pages)
     d["text_chars"] = len(text)
     d["excerpt"] = text[:500]
+    d["is_scanned_pdf"] = False
     # 2026-10-06：intake 数据质量门 —— fail 拦截、warn 标黄
     d["quality_gate"] = validators.run_quality_gate(
         "commercial", d["fields"], tenants=d.get("tenants"),
         raw_text=text, pages=pages)
+    return d
+
+
+def run_commercial_pdf_ocr_text(text: str, filename: str = "scanned.pdf",
+                                engine: str = "browser-tesseract") -> dict:
+    """扫描版 PDF OCR 文本 intake（台账第 3 项，2026-10-14）。
+
+    扫描 PDF 经 OCR（浏览器端 pdf.js 渲染 + Tesseract.js，或服务端
+    tesseract 内嵌图）转文本后走与普通 PDF 相同的抽取引擎；来源标
+    "扫描PDF OCR:<文件名>"、claim_notice 明示"OCR 口径"，同样跑质量门。
+    """
+    from . import validators
+    text = text or ""
+    at = datetime.now().strftime("%Y-%m-%d %H:%M")
+    fname = (filename or "scanned.pdf").strip() or "scanned.pdf"
+    if len(text.strip()) < 20:
+        return {"mode": "pdf-ocr", "filename": fname, "fields": [], "tenants": [],
+                "error": "OCR 未识别出足够文本（少于 20 字符），请换更清晰的扫描件或改用粘贴文本",
+                "error_code": "ocr_text_too_short",
+                "ocr_engine": engine, "is_scanned_pdf": True,
+                "fetched_at": at, "claim_notice": PDF_OCR_CLAIM_NOTICE}
+    d = parse_commercial_pdf_text(text, fname, pages=None,
+                                  source_label=f"扫描PDF OCR:{fname}")
+    d["mode"] = "pdf-ocr"
+    d["ocr_engine"] = engine
+    d["is_scanned_pdf"] = True
+    d["extraction_method"] = "ocr"
+    d["text_chars"] = len(text)
+    d["excerpt"] = text[:500]
+    d["claim_notice"] = PDF_OCR_CLAIM_NOTICE
+    d["quality_gate"] = validators.run_quality_gate(
+        "commercial", d["fields"], tenants=d.get("tenants"), raw_text=text,
+        pages=None)
+    return d
+
+
+def run_pdf_ocr_text(text: str, filename: str = "scanned.pdf",
+                     engine: str = "browser-tesseract") -> dict:
+    """住宅扫描版 PDF OCR 文本 intake（台账第 3 项，住宅路同款）。
+
+    与商业路共用 OCR 口径标注：来源"扫描PDF OCR:<文件名>"、
+    claim_notice 明示 OCR 口径，附质量门与需求验证清单。
+    """
+    from . import validators
+    text = text or ""
+    at = datetime.now().strftime("%Y-%m-%d %H:%M")
+    fname = (filename or "scanned.pdf").strip() or "scanned.pdf"
+    if len(text.strip()) < 20:
+        return {"mode": "pdf-ocr", "filename": fname, "fields": [],
+                "error": "OCR 未识别出足够文本（少于 20 字符），请换更清晰的扫描件或改用粘贴文本",
+                "error_code": "ocr_text_too_short",
+                "ocr_engine": engine, "is_scanned_pdf": True,
+                "fetched_at": at, "claim_notice": PDF_OCR_CLAIM_NOTICE,
+                "demand_validation": dv.demand_validation_block()}
+    d = parse_pdf_text(text, fname, pages=None,
+                       source_label=f"扫描PDF OCR:{fname}")
+    d["mode"] = "pdf-ocr"
+    d["ocr_engine"] = engine
+    d["is_scanned_pdf"] = True
+    d["extraction_method"] = "ocr"
+    d["text_chars"] = len(text)
+    d["excerpt"] = text[:500]
+    d["claim_notice"] = PDF_OCR_CLAIM_NOTICE
+    d["quality_gate"] = validators.run_quality_gate(
+        "residential", d["fields"], raw_text=text, pages=None)
+    d["demand_validation"] = dv.demand_validation_block()
     return d
 
 
@@ -307,15 +469,25 @@ def run_commercial_text_upload(text: str) -> dict:
 
 def run_pdf_upload(saved_path: str, filename: str) -> dict:
     from . import validators
-    pages, note = extract_text_pages(saved_path)
-    text = "\n".join(pages)
-    if not text:
+    info = inspect_pdf(saved_path)
+    if info["note"]:
         return {"mode": "pdf", "filename": filename, "fields": [],
-                "error": note, "fetched_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                "error": info["note"],
+                "fetched_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
                 "demand_validation": dv.demand_validation_block()}
+    if info["is_scanned"]:
+        ocr_text, _ocr_note = try_server_pdf_ocr(saved_path)
+        if ocr_text:
+            return run_pdf_ocr_text(ocr_text, filename, engine="tesseract-server")
+        return _scanned_needs_ocr(
+            "pdf", filename, info,
+            extra={"demand_validation": dv.demand_validation_block()})
+    pages = info["pages"]
+    text = "\n".join(pages)
     d = parse_pdf_text(text, filename, pages=pages)
     d["text_chars"] = len(text)
     d["excerpt"] = text[:500]
+    d["is_scanned_pdf"] = False
     # 2026-10-06：intake 数据质量门 —— fail 拦截、warn 标黄
     d["quality_gate"] = validators.run_quality_gate(
         "residential", d["fields"], raw_text=text, pages=pages)

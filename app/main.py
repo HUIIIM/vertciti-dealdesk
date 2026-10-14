@@ -748,6 +748,29 @@ async def wb_intake_pdf(request: Request, file: UploadFile = File(...)):
             pass
 
 
+@app.post("/api/wb/intake/pdf-ocr-text")
+def wb_intake_pdf_ocr_text(payload: dict):
+    """住宅扫描版 PDF OCR 文本 intake（台账第 3 项，2026-10-14）。
+
+    扫描 PDF 无文本层时 /api/wb/intake/pdf 返回 needs_ocr；浏览器端
+    pdf.js 渲染 + Tesseract.js OCR 后把文本发到这里，走同一抽取引擎，
+    全部标"扫描版 PDF OCR 提取、卖方材料口径、待独立验证"。
+    """
+    text = str((payload or {}).get("text") or "")
+    filename = str((payload or {}).get("filename") or "scanned.pdf")
+    if not text.strip():
+        raise HTTPException(400, "OCR 文本为空，请换更清晰的扫描件重试")
+    if len(text) > 500_000:
+        raise HTTPException(400, "OCR 文本过长（上限约 500KB）")
+    try:
+        d = pdf_intake.run_pdf_ocr_text(text, filename)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(500, f"提取失败：{str(e)[:200]}")
+    if d.get("error"):
+        raise HTTPException(422, d["error"])
+    return d
+
+
 # ---------------- 商业核保 PDF intake：OM/flyer → 商业字段 → 自动填表 ----------------
 
 @app.post("/api/uw-commercial/intake/pdf")
@@ -777,6 +800,30 @@ async def uw_commercial_intake_pdf(request: Request, file: UploadFile = File(...
             os.remove(path)
         except Exception:
             pass
+
+
+@app.post("/api/uw-commercial/intake/pdf-ocr-text")
+def uw_commercial_intake_pdf_ocr_text(payload: dict):
+    """商业扫描版 PDF OCR 文本 intake（台账第 3 项，2026-10-14）。
+
+    扫描 PDF 无文本层时 /api/uw-commercial/intake/pdf 返回 needs_ocr；
+    浏览器端 pdf.js 渲染 + Tesseract.js OCR 后把文本发到这里，与普通
+    PDF intake 共用同一抽取引擎；返回 fields[]/tenants[]/quality_gate，
+    全部标"扫描版 PDF OCR 提取、卖方材料口径、待独立验证"。
+    """
+    text = str((payload or {}).get("text") or "")
+    filename = str((payload or {}).get("filename") or "scanned.pdf")
+    if not text.strip():
+        raise HTTPException(400, "OCR 文本为空，请换更清晰的扫描件重试")
+    if len(text) > 500_000:
+        raise HTTPException(400, "OCR 文本过长（上限约 500KB）")
+    try:
+        d = pdf_intake.run_commercial_pdf_ocr_text(text, filename)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(500, f"提取失败：{str(e)[:200]}")
+    if d.get("error"):
+        raise HTTPException(422, d["error"])
+    return d
 
 
 # ---------------- 商业核保粘贴文本 intake：粘贴 OM/flyer 文本 → 商业字段 ----------------
