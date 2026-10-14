@@ -8,7 +8,7 @@
 
 1. [x] 商业页 390px 移动端 QA（2026-10-12 本轮已验收通过，见"已完成"）
 2. [x] 商业页截图/图片录取（2026-10-13 本轮已完成，见"已完成"）
-3. [ ] 扫描版 PDF OCR（暂缓项回补）：图片型 PDF 先 OCR 再走现有提取链路，明确提示"OCR 口径"
+3. [x] 扫描版 PDF OCR（暂缓项回补）（2026-10-14 本轮已完成，见"已完成"）
 4. [ ] 门覆盖补齐（2026-10-06 数据质量门二期）：截图 intake 的视觉提取结果同样跑质量门（`image_intake` 输出附 quality_gate）；住宅页（d.html）接入商
     业页同款门面板 + 导出前过门。验收：截图/住宅两路各喂一份矛盾材料，fail 正确拦截并标黄
 5. [ ] RentCast 激活：等董事长绑卡后接入 fallback 链实测（外部阻塞，不占每日名额）
@@ -19,6 +19,9 @@
 10. [ ] 前端 JS amortPayment/remainingBal 仍是按年摊还旧口径、与后端月复利分叉（2026-10-11 本轮新发现）：static/uw-commercial.js 的 `amortPayment` 仍用按年复利公式（n=年数、年利率一次计息）、`remainingBal` 按年迭代；后端 2026-10-04 已切月复利等额本息（panel2 broker 实证差约 1.2%）。前端预览的年供/DSCR/退出测算与后端 compute_all 同输入不一致。验收：同输入下前端预览关键比率与后端一致（可与第 9 项的对照测试合并验收）
 11. [ ] 商业页"流水线读数"条（.pipe/flowstrip）移动端布局（2026-10-12 本轮新发现）：7 个 pnode（min-width 140px）在 390px 下横向滚动（overflow-x:auto，有意设计、页面级不溢出），但无滚动提示、其余 6 个指标可发现性差。验收：≤760px 时改为纵向堆叠（栏间 → 箭头改 ↓ 或隐藏），7 个指标一次可见、无需横滑
 12. [ ] 旧三页 legacy-readonly 冻结与商业页功能线冲突（2026-10-13 本轮新发现）：uw-commercial/workbench/res-legacy 三页被 legacy-readonly.js 全量冻结输入（横幅"旧版只读、2026-11-03 下线、请用新版"），但每日改进的功能（PDF/粘贴/截图 intake、Tear Sheet 等）仍长在商业页上——生产真用户实际点不了、填不了（本轮浏览器 E2E 实证 intakeImg disabled=true，须在测试里手动解冻才能走通 OCR 链路）。验收：定方案并落地——商业核保能力迁到新版入口（/ 的 d.html 线）或正式解冻/延期旧页，二选一后真浏览器验证新入口可完整走通 intake→填表→导出
+13. [ ] 前后端计算黄金样本对照测试（2026-10-13 项目深研复查轮定级 P0，并入深研项 R-1）：建黄金输入 fixture（≥3 个 deal：正常盘/退化输入/边界利率），同输入分别跑后端 compute_all 与前端 uw-commercial.js（Node 执行），关键比率（cap/DSCR/debt_yield/IRR/月供/剩余本金）逐项对照、None/NaN 同判，漂移即红并进 CI。验收：对照测试全绿＋故意改前端一处公式测试变红（附日志）；原第 9、10 项随本项一并验收关闭。依据：deliverables/project-deep-review/2026-10-13/vertciti-dealdesk/（01-#4 研究确认类型代码生成救不了计算复刻，对照测试是对症解法）
+14. [ ] main.py 冻结线 + routers 拆分启动（2026-10-13 项目深研复查轮定级 P1，深研项 R-2）：app/main.py 已涨至 1294 行（2026-10-09 深研时 1240）；即日起新端点一律先进 app/routers/<域>.py（先建 intake 域样板，FastAPI 聚合挂载模式），main.py 只减不增，存量按域逐周迁出、目标 <200 行装配。验收：routers/ + 首个域独立冒烟测试落盘；一周内 wc -l app/main.py 不增；全量测试零回归。本轮（2026-10-14）新增 2 个 intake 端点仍进 main.py（+47 行，与本项立项时存量一并迁出，wc 基线以本项启动日为准）
+15. [ ] 混合型 PDF 逐页 OCR 补齐（2026-10-14 本轮新发现）：扫描版检测现为全文阈值（总字符 <50 判扫描件）——部分页有文本层、部分页是扫描图的混合 OM 会被当普通 PDF 处理，扫描页字段静默丢失。验收：逐页文本量检测，低文本页单独走浏览器 OCR 并与文本层结果合并（来源逐字段标页/标 OCR 口径）；混合样本（1 页文本＋1 页扫描图）两页关键字段都提取到
 
 ## 暂缓（被 Top5 挤掉，未丢弃，消化完按序取回）
 
@@ -35,6 +38,10 @@
 - [ ] **[P1] 引用层跨行业佐证**（学自 Sea "Cora"，S-046）：垂直 AI"每答案必附原文条款"已是共识打法——DealDesk 引用层（每个数字可溯源）继续加固，验收口径：任一 AI 生成数字无来源即 fail。
 - [ ] **[P2] 房地产客户关系自动化跟踪**（Joe AI €2M，法国，B-037）：赛道跟踪。
 
+### 全球 AI 对标植入（2026-10-14 第三轮补写）
+- [ ] **[P0·回执补写] cre-agent-skills 方法论**（B-017，上轮 P0 本轮核查不在册，现补写）：90 个 CRE agent skills 的分解方法论＋每改必跑的 validation suite＋知识库/研究笔记组织法；植入 DealDesk skill 化改造与 Miao Skill Pack 验证套件。双负责人：AI=DealDesk-对标专员，人类=Miao。ETA 2026-10-28。clean-room：学方法自己写，不抄代码。
+- [ ] **[P1] 引用层 2.0：可回溯源数据层**（学自 Pandektes，丹麦，S-058）：先把 comps/法规/合同原文结构化入库建成可回溯源数据层，再让 agent 在其上作答；验收口径同 S-046：任一 AI 生成数字无来源即 fail。双负责人：AI=DealDesk-对标专员，人类=Miao。ETA 2026-11-04。
+
 - Canonical deal schema + connector 注册表（学自 Cherre，架构重构）
 - 轻量 entity resolution：多源字段冲突 flag 而非静默取第一个（学自 Cherre）
 - Buy-box 自动打分：Miao"资金很少"硬约束写成可配置 YAML（学自 Dealpath）
@@ -44,6 +51,8 @@
 - 债务时间线：C 页债务到期小节（学自 Crexi，可并入 tear sheet 二期）
 
 ## 已完成
+
+- 2026-10-14：扫描版 PDF OCR 上线（原台账第 3 项）。此前图片型 PDF 只有一句"提取文本过少、请手动录入"。新实现：`inspect_pdf` 逐文档检测（全文 <50 字符判扫描件）；上传端点先试服务端内嵌图 OCR（有 tesseract 时直接闭环），否则结构化返回 `needs_ocr / error_code=scanned_pdf_needs_ocr`＋页数；前端（商业页＋住宅工作台）浏览器端 pdf.js 渲染每页（上限 12 页）＋Tesseract.js OCR → 新端点 POST /api/uw-commercial/intake/pdf-ocr-text 与 POST /api/wb/intake/pdf-ocr-text → 与普通 PDF 共用同一抽取引擎，来源标"扫描PDF OCR:<文件名>"、claim_notice 明示"扫描版 PDF OCR 提取"口径、附数据质量门。证据：commit 7bfd139（noreply 作者，未 push）＋全量 pytest 487 passed（13 新用例 tests/test_scanned_pdf_ocr.py，1 deselect pre-existing test_address_pipeline_degradation）＋生产部署 dpl_Go2bh9kDpfd1ce1fWoKFbeLRvooC＋生产 API 实证（扫描件 fixture 两路均返回 needs_ocr；OCR 文本两路均正确提取价格 4350000、来源标 OCR 口径）＋生产真浏览器 E2E（Chromium 上传真实扫描 PDF → 浏览器 OCR 全链路 → 已填 11 字段（价格 4350000/面积 12500/NOI 285000/地址 1500 Atlantic Ave）＋2 租户，状态明示"扫描版 PDF OCR 提取、卖方口径、待独立验证"，质量门正确拦截 NOI 与租约年化矛盾）。附带新发现：混合型 PDF（部分页扫描图）逐页检测未做，已补进待做第 15 项。证据文件：goals/vertcity-build-out/hidden_files/dealdesk-improvement-2026-10-14/（scanned-flyer.pdf/png / ocr-text.txt / prod_scanned_*_resp.json / prod_pdf_ocr_text_*.json / prod_browser_e2e.json / prod-after-pdf-ocr.png）。
 
 - 2026-10-13：商业页截图/图片录取上线（原台账第 2 项）。旧商业页截图流程实证已坏：前端轮询的 `/api/wb/intake/image/result/{id}` 端点从未存在、住宅 pending 队列在 serverless 上也不可达，生产永远拿不到结果。新实现：浏览器端 Tesseract.js 5.0.5 OCR（CDN 懒加载，$0、无服务端依赖）→ 新端点 POST /api/uw-commercial/intake/image-text → 与 PDF/粘贴共用同一抽取引擎（parse_commercial_pdf_text，来源标"截图OCR:<文件名>"）＋数据质量门 → applyIntakeResult 填表；服务端直传端点 POST /api/uw-commercial/intake/image 在无 tesseract 时诚实返回 422（error 明示），不假装排队。证据：commit 1c7902f（noreply 作者，未 push）＋全量 pytest 474 passed（11 新用例 tests/test_image_intake_commercial.py，1 deselect pre-existing test_address_pipeline_degradation）＋生产部署 dpl_Cd9L46qNYM141L4QihnWduHynspX＋生产真浏览器 E2E（Chromium 经 route 代理 serv 生产页，CDN 在本机沙箱代理下由 curl 缓存代取——沙箱代理对 jsdelivr 直连超时系环境限制、非生产问题）：上传 listing 截图 PNG（1500 Atlantic Ave）→ OCR 全文正确 → 已填 11 字段（价格 4350000/面积 12500/NOI 285000）＋2 租户（月租 8500/7200），状态明示"截图 OCR 提取、卖方口径、待独立验证"；质量门正确拦截该样本（NOI $285k＞2 套间部分租约表年化 $188.4k，fail noi_vs_gross_rent＋warn 覆盖 48%）；Node 同版本 Tesseract.js 独立复跑同样全字段 PASS。附带发现：旧三页被 legacy-readonly.js 冻结（见待做第 12 项）；商业截图路径已附 quality_gate（待做第 4 项的截图子项部分达成，住宅页部分未动）。证据文件：goals/vertcity-build-out/hidden_files/dealdesk-improvement-2026-10-13/（listing-screenshot.png / ocr-text.txt / prod-resp.json / prod_image_text_resp.json / prod_browser_e2e.json / prod-after-ocr.png）。
 
