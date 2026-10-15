@@ -788,7 +788,8 @@ def wb_intake_pdf_ocr_pages(payload: dict):
     if sum(len(str(p or "")) for p in page_texts) > 500_000:
         raise HTTPException(400, "文本过长（上限约 500KB）")
     try:
-        d = pdf_intake.run_residential_pdf_ocr_pages(page_texts, ocr_pages, filename)
+        d = pdf_intake.run_residential_pdf_ocr_pages(
+            page_texts, ocr_pages, filename, layout=(payload or {}).get("layout"))
     except Exception as e:  # noqa: BLE001
         raise HTTPException(500, f"合并失败：{str(e)[:200]}")
     if d.get("error"):
@@ -868,7 +869,8 @@ def uw_commercial_intake_pdf_ocr_pages(payload: dict):
     if sum(len(str(p or "")) for p in page_texts) > 500_000:
         raise HTTPException(400, "文本过长（上限约 500KB）")
     try:
-        d = pdf_intake.run_commercial_pdf_ocr_pages(page_texts, ocr_pages, filename)
+        d = pdf_intake.run_commercial_pdf_ocr_pages(
+            page_texts, ocr_pages, filename, layout=(payload or {}).get("layout"))
     except Exception as e:  # noqa: BLE001
         raise HTTPException(500, f"合并失败：{str(e)[:200]}")
     if d.get("error"):

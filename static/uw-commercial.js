@@ -775,6 +775,11 @@ async function init() {
         setStatus("busy", parts.join("；"));
       }
     }
+    // 多栏版式标注（台账第 8 项）：检测到多栏/版式复杂时明示人工复核
+    if (d.layout_notice) {
+      parts.push("⚠️ " + d.layout_notice);
+      setStatus("busy", parts.join("；"));
+    }
   }
   if (intakeInput) {
     intakeInput.addEventListener("change", async (e) => {
@@ -817,7 +822,7 @@ async function init() {
           }
           const r3 = await fetch("/api/uw-commercial/intake/pdf-ocr-pages", {
             method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ page_texts: d.page_texts, ocr_pages: ocrPages, filename: f.name }),
+            body: JSON.stringify({ page_texts: d.page_texts, ocr_pages: ocrPages, filename: f.name, layout: d.layout || null }),
           });
           const d3 = await r3.json();
           if (!r3.ok || d3.error) throw new Error((d3 && (d3.detail || d3.error)) || ("HTTP " + r3.status));

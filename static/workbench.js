@@ -429,7 +429,9 @@ WB.renderIntake = function (d) {
       `<tr><td><b>${esc(m.label)}</b></td><td colspan="3"><span class="badge manual">需手动补</span> <span class="src">${esc(m.note || '')}</span></td><td></td><td></td></tr>`).join('');
     const notice = d.claim_notice ? `<div class="disclaimer">⚠️ ${esc(d.claim_notice)}</div>`
       : (d.independent_note ? `<p class="src">ℹ️ ${esc(d.independent_note)}</p>` : '');
-    $('#intake-results').innerHTML = `${notice}
+    const layoutNotice = d.layout_notice
+      ? `<div class="disclaimer">⚠️ ${esc(d.layout_notice)}</div>` : '';
+    $('#intake-results').innerHTML = `${notice}${layoutNotice}
       ${photoHtml}
       <table class="t"><tr><th>字段</th><th>值</th><th>来源</th><th>抓取时间</th><th>可信度</th><th>状态</th></tr>${rows}${manual}</table>
       ${(d.fields || []).length ? `<button class="btn" onclick="WB.fillForm()">📝 一键填入下方表单</button> <span class="src">卖方口径字段会填入但保留"待验证"提示</span>` : ''}`;
@@ -692,7 +694,7 @@ WB.intakePdf = async function () {
       const r3 = await fetch('/api/wb/intake/pdf-ocr-pages', {method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({page_texts: d.page_texts, ocr_pages: ocrPages,
-                              filename: f.name})});
+                              filename: f.name, layout: d.layout || null})});
       const d3 = await r3.json().catch(() => null);
       if (!r3.ok || !d3 || d3.error) {
         throw new Error(((d3 && (d3.detail || d3.error)) || ('HTTP ' + r3.status)));
