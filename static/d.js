@@ -197,7 +197,7 @@ async function boot() {
   // 4) 物业档案（慢，不阻塞）
   setStep(status, 'intake', 'run');
   api('POST', '/api/wb/intake/run', {mode: 'address', text: state.addr})
-    .then(r => { state.intake = r; setStep(status, 'intake', 'done'); renderZone7(); typeNudge(r); })
+    .then(r => { state.intake = r; setStep(status, 'intake', 'done'); renderZone7(); typeNudge(r); runIntakeGate(r); })
     .catch(() => setStep(status, 'intake', 'fail'));
 
 /* B：地址类型自动识别——intake 的 property_type_detail / property_type /
@@ -601,12 +601,126 @@ function sensTableHtml() {
   return h;
 }
 
+/* ---------------- 数据质量门（台账第 4 项，2026-10-15） ----------------
+   住宅页（d.html）接入商业页同款门面板＋导出前过门：fail 拦截并标黄、
+   warn 确认后继续、pass 放行；服务端对显式送达的 gate_fields 同样
+   硬拦 422（/api/memo/pdf、/api/res/report/xlsx、/api/uw/report/xlsx）。 */
+function buildGatePayload() {
+  syncZone7Inputs();
+  const tenants = (state.rentRoll || []).map(t => ({
+    suite: t.suite || '', tenant: t.tenant || '', sf: t.sf, monthly_rent: t.monthly_rent}));
+  if (state.type === 'com') {
+    const flat = {};
+    const ask = getA('ask'); if (ask) flat['analysis.purchase_price'] = ask;
+    const netSf = buildUwInput().property.net_rentable_sf;
+    if (netSf) flat['property.net_rentable_sf'] = netSf;
+    return {deal_type: 'commercial', fields: flat, tenants};
+  }
+  const flat = {};
+  const ask = getA('ask'); if (ask) flat.asking_price = ask;
+  const rent = getA('rent'); if (rent) flat.monthly_rent = rent;
+  for (const k of ['building_sf', 'beds', 'baths', 'year_built']) {
+    const v = intakeField(k)?.value;
+    if (v !== undefined && v !== null && v !== '') flat[k] = v;
+  }
+  return {deal_type: 'residential', fields: flat, tenants: []};
+}
+function clearGateMarks() {
+  document.querySelectorAll('.gate-yellow').forEach(el => el.classList.remove('gate-yellow'));
+}
+function applyGateMarks(gate) {
+  clearGateMarks();
+  const yellow = (gate && gate.yellow_fields) || [];
+  const mark = sel => { const el = document.querySelector(sel); if (el) el.classList.add('gate-yellow'); };
+  if (yellow.includes('asking_price') || yellow.includes('analysis.purchase_price')) {
+    mark('#askBarInput'); mark('#z7Body [data-a="ask"]');
+  }
+  if (yellow.includes('monthly_rent')) mark('#z7Body [data-a="rent"]');
+}
+function renderGate(gate) {
+  const panel = document.getElementById('gatePanel');
+  if (!panel || !gate) return;
+  const chip = gate.status === 'blocked' ? '<span class="gate-chip blocked">⛔ 数据质量门拦截</span>'
+    : gate.status === 'warn' ? '<span class="gate-chip warn">⚠️ 数据质量门告警</span>'
+    : '<span class="gate-chip pass">✅ 数据质量门通过</span>';
+  let html = '<div class="gate-head">' + chip + '<span class="gate-summary">'
+    + esc(gate.summary || '') + '（' + esc(gate.schema_version || '') + '）</span></div>';
+  const items = [];
+  for (const c of (gate.fails || [])) items.push({c, cls: 'sev-fail', tag: '⛔ 拦截'});
+  for (const c of (gate.warns || [])) items.push({c, cls: 'sev-warn', tag: '⚠️ 复核'});
+  if (items.length) {
+    html += '<ul class="gate-list">' + items.map(it =>
+      '<li><span class="' + it.cls + '">' + it.tag + '</span> ' + esc(it.c.title)
+      + (it.c.detail ? '<div class="gate-detail">' + esc(String(it.c.detail).slice(0, 300)) + '</div>' : '')
+      + '</li>').join('') + '</ul>';
+  }
+  const fr = gate.field_report || [];
+  if (fr.length) {
+    html += '<div class="gate-fields">' + fr.map(f => {
+      const cls = f.flagged ? 'gate-f flagged' : (f.low_confidence ? 'gate-f low' : 'gate-f');
+      const page = f.page ? (' · P' + f.page) : '';
+      return '<span class="' + cls + '" title="' + esc(f.source || '') + '">'
+        + esc(f.label || f.key) + page + ' · ' + esc(f.confidence || '') + '</span>';
+    }).join('') + '</div>';
+  }
+  panel.innerHTML = html;
+  panel.classList.toggle('pass', gate.status === 'pass');
+  panel.hidden = false;
+  applyGateMarks(gate);
+}
+/* 导出前过门：blocked → 弹窗列 fail 并终止；warn → 确认后继续。
+   门服务异常不挡路（服务端对 gate_fields 仍会硬拦）。 */
+async function gateCheckForExport(action) {
+  const payload = buildGatePayload();
+  if (!Object.keys(payload.fields).length && !payload.tenants.length) return true;
+  try {
+    const r = await fetch('/api/wb/intake/gate', {method: 'POST',
+      headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)});
+    const g = await r.json();
+    if (!r.ok) return true;
+    renderGate(g);
+    if (g.blocked) {
+      alert('数据质量门拦截（' + action + '）：' + (g.fails || []).map(c => c.title).join('\n')
+        + '\n\n请修正矛盾数据后重试。');
+      return false;
+    }
+    if (g.status === 'warn') {
+      return confirm('数据质量门告警（' + action + '）：\n'
+        + (g.warns || []).map(c => c.title).join('\n')
+        + '\n\n标黄字段请先核实。仍要继续导出吗？');
+    }
+    return true;
+  } catch (_) { return true; }
+}
+/* 地址 intake 回来后：字段含门 schema 键且 fail 时上面板拦截提示
+   （warn 不打扰——公开记录档案常缺字段，缺失只是 warn）。 */
+async function runIntakeGate(intake) {
+  try {
+    const keys = ['asking_price', 'building_sf', 'beds', 'baths', 'year_built',
+      'analysis.purchase_price', 'property.net_rentable_sf',
+      'analysis.underwritten_noi', 'analysis.market_cap_rate'];
+    const flat = {};
+    for (const f of (intake && intake.fields) || []) {
+      if (keys.includes(f.key) && f.value !== null && f.value !== '') flat[f.key] = f.value;
+    }
+    if (!Object.keys(flat).length) return;
+    const dealType = Object.keys(flat).some(k => k.includes('.')) ? 'commercial' : 'residential';
+    const r = await fetch('/api/wb/intake/gate', {method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({deal_type: dealType, fields: flat})});
+    if (!r.ok) return;
+    const g = await r.json();
+    if (g.blocked) renderGate(g);
+  } catch (_) { /* 门失败不打断主流程 */ }
+}
+
 /* ---------------- 导出 ---------------- */
 async function exportPdfMemo() {
   $('#ddPdf').classList.remove('open');
   /* Phase 5 第八轮 P2：待计算态（无 score，或 score 陈旧但收购价被清空——
      renderVerdictEmpty 不清 state.score）点击导出必须弹提示，不许静默无响应 */
   if (!state.score || !getA('ask')) { toast('请先完成分析再导出', 3000); return; }
+  if (!(await gateCheckForExport('备忘录导出'))) return; // 台账第 4 项：fail → 拦截
   toast('正在生成投资备忘录 PDF…');
   try {
     const track = state.type === 'res' ? 'residential' : 'commercial';
@@ -633,6 +747,9 @@ async function exportPdfMemo() {
       has_rent_roll: hasRR,
       dscr_trailing: (hasRR && dd && dd.trailing.dscr != null && isFinite(dd.trailing.dscr))
         ? dd.trailing.dscr : null};
+    // 台账第 4 项：门字段随包送达，服务端导出前硬拦（blocked → 422）
+    const _gp = buildGatePayload();
+    body.gate_fields = _gp.fields; body.gate_deal_type = _gp.deal_type;
     if (state.type === 'com') body.uw_input = buildUwInput();
     const r = await fetch('/api/memo/pdf', {method: 'POST',
       headers: {'Content-Type': 'application/json'},
@@ -652,6 +769,7 @@ async function exportPdfMemo() {
 async function exportUwPdf(variant) {
   $('#ddPdf').classList.remove('open');
   if (!state.uw) { toast('商业 PDF 需要先导入 rent roll 并计算（Zone 4）', 3500); return; }
+  if (!(await gateCheckForExport('商业核保 PDF 导出'))) return; // 台账第 4 项：fail → 拦截
   toast('正在生成商业核保 PDF（' + (variant === 'classic' ? '经典版' : '增强版') + '）…');
   try {
     const plus = state.uw.plus || {};
@@ -675,6 +793,7 @@ async function exportUwPdf(variant) {
 }
 
 async function exportXlsx() {
+  if (!(await gateCheckForExport('Excel 导出'))) return; // 台账第 4 项：fail → 拦截
   toast('正在生成 Excel…');
   try {
     let url, body;
@@ -703,11 +822,15 @@ async function exportXlsx() {
         has_rent_roll: !!plus.has_rent_roll,
         verdict: state.verdict, verdict_word: vd2.word, veto_count: vd2.vetoes,
         bank_noi: plus.has_rent_roll ? (plus.noi_bank_bridge?.bank_noi ?? null) : null};
+      const _gpX = buildGatePayload();
+      body.gate_fields = _gpX.fields; body.gate_deal_type = _gpX.deal_type;
       url = '/api/uw/report/xlsx';
     } else {
       if (!state.score) { toast('先填 Zone 7 假设并计算', 3000); return; }
+      const _gpR = buildGatePayload();
       body = {score: state.score, input: buildScoreInput(), address: state.addr,
         verdict: state.verdict, confidence: state.confidence,
+        gate_fields: _gpR.fields, gate_deal_type: _gpR.deal_type,
         comps: state.comps.filter(c => state.selected.has(c._id))};
       url = '/api/res/report/xlsx';
     }

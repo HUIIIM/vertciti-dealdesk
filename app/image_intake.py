@@ -102,8 +102,46 @@ def list_tasks() -> list[dict]:
     return out
 
 
+def infer_deal_type(fields: list, tenants: list | None = None) -> str:
+    """截图提取结果的 deal 类型推断（台账第 4 项，门覆盖补齐）。
+
+    带租户表或商业键（analysis.*/property.*）→ commercial；其余
+    （asking_price/building_sf 等住宅键）→ residential。
+    """
+    if tenants:
+        return "commercial"
+    keys = {str((f or {}).get("key") or "") for f in fields or []}
+    if any(k.startswith(("analysis.", "property.")) for k in keys):
+        return "commercial"
+    return "residential"
+
+
+def attach_quality_gate(d: dict) -> dict:
+    """截图视觉提取结果附数据质量门（台账第 4 项，2026-10-15）。
+
+    此前 pending 队列的视觉提取结果（extracted.json）原样返回、无
+    quality_gate，截图路成了门覆盖的盲区（商业浏览器 OCR 路已在
+    2026-10-13 补齐）。现统一在取回时现跑门：fail → blocked＋标黄
+    字段（yellow_fields），与 PDF/粘贴/OCR 路口径一致。门运行异常
+    时不吞结果：附 quality_gate_error 说明，绝不假装已过门。
+    """
+    try:
+        from . import validators
+        fields = d.get("fields") or []
+        tenants = d.get("tenants") or []
+        deal_type = str(d.get("deal_type") or infer_deal_type(fields, tenants))
+        if deal_type not in ("commercial", "residential"):
+            deal_type = infer_deal_type(fields, tenants)
+        raw_text = str(d.get("raw_text") or d.get("text") or "")
+        d["quality_gate"] = validators.run_quality_gate(
+            deal_type, fields, tenants=tenants, raw_text=raw_text)
+    except Exception as e:  # noqa: BLE001
+        d["quality_gate_error"] = f"质量门运行失败：{str(e)[:200]}"
+    return d
+
+
 def get_extracted(task_id: str) -> dict:
-    """读取某任务的提取结果；防目录穿越。"""
+    """读取某任务的提取结果；防目录穿越。取回时附 quality_gate。"""
     if not re.fullmatch(r"[0-9a-f]{32}", task_id or ""):
         raise ValueError("非法 task_id")
     ep = os.path.join(PENDING_DIR, task_id, "extracted.json")
@@ -113,4 +151,4 @@ def get_extracted(task_id: str) -> dict:
         d = json.load(f)
     if not isinstance(d, dict) or not isinstance(d.get("fields"), list):
         raise ValueError("提取结果格式损坏")
-    return d
+    return attach_quality_gate(d)

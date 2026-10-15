@@ -522,6 +522,23 @@ def run_quality_gate(deal_type: str, fields: list[dict] | dict,
     }
 
 
+def residential_flat_from_score_input(inp: dict | None) -> dict:
+    """住宅打分输入（d.html buildScoreInput 形状）→ 住宅门扁平字段。
+
+    price→asking_price、monthly_rent 直通，building_sf/beds/baths/
+    year_built 若输入带了也直通；其余打分参数（利率/首付等）不在
+    intake schema 内，不进门。供住宅导出前过门（台账第 4 项）复用。
+    """
+    inp = inp or {}
+    flat = {}
+    if inp.get("price") not in (None, ""):
+        flat["asking_price"] = inp.get("price")
+    for k in ("monthly_rent", "building_sf", "beds", "baths", "year_built"):
+        if inp.get(k) not in (None, ""):
+            flat[k] = inp.get(k)
+    return flat
+
+
 def gate_verdict_for_state(state: dict) -> dict:
     """商业页 state（嵌套）→ 扁平 → 跑门。供报告/Tear Sheet 导出前服务端硬拦。
     state 含应用字段（name/land_acres 等），未知字段不告警（strict_unknown=False）。"""

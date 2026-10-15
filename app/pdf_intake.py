@@ -532,6 +532,39 @@ def run_commercial_image_ocr_text(text: str, filename: str = "screenshot.png",
     return d
 
 
+def run_residential_image_ocr_text(text: str, filename: str = "screenshot.png",
+                                   engine: str = "browser-tesseract") -> dict:
+    """住宅截图 OCR 文本 intake（台账第 4 项，2026-10-15）。
+
+    住宅截图此前只有 pending 队列视觉提取一条路，无同步 OCR 文本路；
+    现与商业路同构：OCR 文本走住宅抽取引擎（parse_pdf_text），来源标
+    "截图OCR:<文件名>"、claim_notice 明示截图 OCR 口径，附住宅数据
+    质量门（residential-v1）＋需求验证清单。矛盾材料 fail 拦截、标黄。
+    """
+    from . import validators
+    text = text or ""
+    at = datetime.now().strftime("%Y-%m-%d %H:%M")
+    fname = (filename or "screenshot.png").strip() or "screenshot.png"
+    if len(text.strip()) < 20:
+        return {"mode": "image", "filename": fname, "fields": [],
+                "error": "OCR 未识别出足够文本（少于 20 字符），请换更清晰的截图或改用粘贴文本",
+                "error_code": "ocr_text_too_short",
+                "ocr_engine": engine, "fetched_at": at,
+                "claim_notice": IMAGE_CLAIM_NOTICE,
+                "demand_validation": dv.demand_validation_block()}
+    d = parse_pdf_text(text, fname, pages=None,
+                       source_label=f"截图OCR:{fname}")
+    d["mode"] = "image"
+    d["ocr_engine"] = engine
+    d["text_chars"] = len(text)
+    d["excerpt"] = text[:500]
+    d["claim_notice"] = IMAGE_CLAIM_NOTICE
+    d["quality_gate"] = validators.run_quality_gate(
+        "residential", d["fields"], raw_text=text, pages=None)
+    d["demand_validation"] = dv.demand_validation_block()
+    return d
+
+
 def server_ocr_available() -> bool:
     """服务端 OCR 是否可用：tesseract 二进制在 PATH，或 pytesseract 可导入。"""
     import shutil

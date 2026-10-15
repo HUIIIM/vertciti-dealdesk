@@ -929,13 +929,52 @@ def wb_intake_pending():
 
 @app.get("/api/wb/intake/extracted/{task_id}")
 def wb_intake_extracted(task_id: str):
-    """取回某截图任务的视觉提取结果（renderIntake 兼容格式）。"""
+    """取回某截图任务的视觉提取结果（renderIntake 兼容格式，附 quality_gate）。"""
     try:
         return image_intake.get_extracted(task_id)
     except FileNotFoundError:
         raise HTTPException(404, "提取结果尚未生成，请稍后刷新")
     except ValueError as e:
         raise HTTPException(400, str(e))
+
+
+@app.post("/api/wb/intake/image-text")
+def wb_intake_image_text(payload: dict):
+    """住宅截图 OCR 文本 intake（台账第 4 项，2026-10-15）。
+
+    浏览器端 OCR 后把文本发到这里，走住宅抽取引擎；返回
+    fields[]/quality_gate（residential-v1），全部标"截图 OCR 提取、
+    卖方材料口径、待独立验证"。与商业截图路同构，补齐住宅截图门覆盖。
+    """
+    text = str((payload or {}).get("text") or "")
+    filename = str((payload or {}).get("filename") or "screenshot.png")
+    if not text.strip():
+        raise HTTPException(400, "OCR 文本为空，请换更清晰的截图重试")
+    if len(text) > 500_000:
+        raise HTTPException(400, "OCR 文本过长（上限约 500KB）")
+    try:
+        d = pdf_intake.run_residential_image_ocr_text(text, filename)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(500, f"提取失败：{str(e)[:200]}")
+    if d.get("error"):
+        raise HTTPException(422, d["error"])
+    return d
+
+
+def _enforce_gate_fields(gate_fields: dict | None, deal_type: str, action: str):
+    """导出前过门（台账第 4 项）：前端显式送来的 gate_fields 跑门，
+    blocked → 422 硬拦（与商业 /api/uw/report 同口径）。
+    未送 gate_fields 时不拦（向后兼容旧调用方）。"""
+    if not gate_fields:
+        return None
+    dt = deal_type if deal_type in ("commercial", "residential") else "residential"
+    g = validators.run_quality_gate(dt, gate_fields, strict_unknown=False)
+    if g["blocked"]:
+        raise HTTPException(422, {
+            "error": f"数据质量门拦截（{action}）：{g['fails_n']} 项自相矛盾，修正后重试",
+            "quality_gate": g,
+        })
+    return g
 
 
 @app.post("/api/wb/ownership/tree")
@@ -1020,6 +1059,10 @@ def uw_report_xlsx(payload: dict):
     """
     data = payload.get("input", payload)
     comps = payload.get("comps") or []
+    # 台账第 4 项：商业 Excel 同样导出前过门（gate_fields 显式送达才拦）
+    _enforce_gate_fields(payload.get("gate_fields"),
+                         payload.get("gate_deal_type") or "commercial",
+                         "Excel 导出")
     try:
         r = uw_commercial.compute_all(data)
         xbytes = excel_uw.build_uw_xlsx(r, data, comps=comps,
@@ -1222,6 +1265,10 @@ class _MemoReq(BaseModel):
     # Phase 5 第五轮 C9：网页 Zone 1 的估值结论（前端 valuationDisplay() 同源文案），
     # 备忘录 PDF 必须带上（放贷人必看）
     valuation_display: str = ""
+    # 台账第 4 项（2026-10-15）：导出前过门——前端送来的 intake 门字段
+    # （住宅 asking_price/building_sf/... 或商业扁平字段）；blocked → 422
+    gate_fields: dict | None = None
+    gate_deal_type: str = ""
 
 
 @app.post("/api/memo/pdf")
@@ -1232,6 +1279,9 @@ def memo_pdf(req: _MemoReq):
     富输入重算，不再导出全零模板。
     """
     from urllib.parse import quote
+    # 台账第 4 项：导出前过门（gate_fields 显式送达才拦，blocked → 422）
+    _enforce_gate_fields(req.gate_fields,
+                         req.gate_deal_type or req.track, "备忘录导出")
     try:
         deal = {"name": req.name, "address": req.address, "verdict": req.verdict,
                 "score": req.score, "comps": req.comps,
@@ -1307,12 +1357,18 @@ class _ResXlsxReq(BaseModel):
     verdict: dict | None = None
     confidence: dict | None = None
     comps: list = []
+    # 台账第 4 项（2026-10-15）：导出前过门（同 _MemoReq）
+    gate_fields: dict | None = None
+    gate_deal_type: str = ""
 
 
 @app.post("/api/res/report/xlsx")
 def res_report_xlsx(req: _ResXlsxReq):
     """住宅核保明细 Excel：总览/现金流/comps/假设."""
     from urllib.parse import quote
+    # 台账第 4 项：导出前过门（gate_fields 显式送达才拦，blocked → 422）
+    _enforce_gate_fields(req.gate_fields,
+                         req.gate_deal_type or "residential", "Excel 导出")
     try:
         xbytes = excel_uw.build_res_xlsx(req.score, req.input, req.address,
                                          req.verdict, req.confidence, req.comps)
