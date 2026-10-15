@@ -95,14 +95,24 @@ function scenario(inp, baseRents, netSf, purchase, autoCam, autoPkg) {
 }
 
 function amortPayment(loan, rate, years) {
+  // 口径对齐（台账第 10/13 项，2026-10-15）：与后端 finance.monthly_payment
+  // 一致改按月摊还——月复利等额本息月供 × 12。此前按年复利，年供系统性
+  // 偏大约 1.2%（后端 2026-10-04 已切、前端漏改，黄金对照测试守住）。
   loan = f(loan); rate = f(rate); const n = Math.round(f(years));
   if (loan <= 0 || n <= 0) return 0;
   if (rate <= 0) return loan / n;
-  return (loan * rate) / (1 - Math.pow(1 + rate, -n));
+  const r = rate / 12, m = n * 12;
+  return (loan * r) / (1 - Math.pow(1 + r, -m)) * 12;
 }
 function remainingBal(loan, rate, years, pmt, afterYears) {
-  let bal = f(loan); const r = f(rate);
-  for (let i = 0; i < Math.max(0, afterYears); i++) bal = bal * (1 + r) - pmt;
+  // 与后端 finance.remaining_balance 同口径：按月复利、月供 = 年供 / 12
+  // 逐月迭代（与后端闭式解在对照容差内一致）；到期/超期 → 0。
+  let bal = f(loan); const r = f(rate) / 12, mp = f(pmt) / 12;
+  const totalMonths = Math.round(f(years) * 12);
+  const months = Math.max(0, Math.round(f(afterYears) * 12));
+  if (bal <= 0 || totalMonths <= 0) return 0;
+  if (months >= totalMonths) return 0;
+  for (let i = 0; i < months; i++) bal = bal * (1 + r) - mp;
   return Math.max(0, bal);
 }
 function irrOf(flows) {
@@ -121,7 +131,12 @@ function irrOf(flows) {
 function computeExit(a, pro, loanBal, rate, amortType, amortYears, annualDebt, netLiq) {
   const holdYears = Math.round(f(a.hold_years, 5));
   // 标准 v1.0 §1.1：输入层 [PCT] → 此处 normalize → [DEC]
-  const growth = f(a.noi_growth, 2) / 100, exitCap = f(a.exit_cap_rate, 5) / 100;
+  const growth = f(a.noi_growth, 2) / 100;
+  // 退出 cap 联动（与后端 compute_exit 同口径，台账第 13 项对齐）：
+  // 显式退出 cap > 联动市场 cap（未填退出 cap 且市场 cap 非默认时）> 5% 硬默认
+  const exitCapRaw = f(a.exit_cap_rate), mktCapRaw = f(a.market_cap_rate);
+  const exitCap = exitCapRaw > 0 ? exitCapRaw / 100
+    : (mktCapRaw > 0 && !a.market_cap_rate_is_default) ? mktCapRaw / 100 : 0.05;
   const exitFeePct = 0.04, abate = f(a.abatements);  // 模板固定 4%，2026-10-01 Miao 决定锁定
   if (holdYears <= 0 || netLiq <= 0)
     return { hold_years: holdYears, irr: NaN, equity_multiple: NaN, sale_price: NaN, sale_proceeds: NaN, remaining_loan: NaN };
@@ -151,7 +166,7 @@ function computeAnalysis(a, hist, pro) {
   // 标准 v1.0 §1.1（终裁①）：输入层 [PCT] → 边界 normalize → [DEC]；
   // down_pct=0.30 / rate=0.06 的小数输入口径已废止，现输入 30 / 6.5
   const downPct = f(a.down_pct) / 100, rate = f(a.rate) / 100;
-  const amortType = (a.amort_type || "IO").toUpperCase();
+  const amortType = (a.amort_type || "AMORTIZING").toUpperCase();  // 默认与后端一致（P0-4）；表单 select 恒传显式值
   const amortYears = f(a.amort_years, 30);
   const loanBal = purchase * (1 - downPct);
   const annualDebt = amortType === "AMORTIZING" ? amortPayment(loanBal, rate, amortYears) : loanBal * rate;

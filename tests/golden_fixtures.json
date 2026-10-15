@@ -1,0 +1,266 @@
+{
+ "deal_degenerate": {
+  "analysis": {
+   "amort_type": "AMORTIZING",
+   "amort_years": 25,
+   "down_pct": 30,
+   "purchase_price": 0,
+   "rate": 6.5
+  },
+  "historical": {},
+  "proforma": {},
+  "property": {},
+  "tenants": [],
+  "vacant_sf": 0
+ },
+ "deal_io_high_rate": {
+  "analysis": {
+   "abatements": 5000,
+   "amort_type": "IO",
+   "amort_years": 30,
+   "building_repairs": 120000,
+   "capital_reserve": 40000,
+   "closing_costs": 60000,
+   "down_pct": 40,
+   "exit_cap_rate": 7.5,
+   "hold_years": 10,
+   "lender_fees": 35000,
+   "market_cap_rate": 6.25,
+   "noi_growth": 3,
+   "purchase_price": 9800000,
+   "rate": 12.75
+  },
+  "historical": {
+   "cam": 30000,
+   "capex": 25000,
+   "general_admin": 15000,
+   "insurance": 28000,
+   "janitor": 18000,
+   "landscape": 6000,
+   "leasing_commissions": 15000,
+   "management_fee": 24000,
+   "other_income": 12000,
+   "payroll": 52000,
+   "property_tax": 120000,
+   "repairs_maintenance": 22000,
+   "replacement_reserve": 10000,
+   "security": 12000,
+   "service_contracts": 20000,
+   "tenant_improvements": 30000,
+   "utilities": 41000,
+   "vacancy_pct": 4
+  },
+  "proforma": {
+   "cam": 30500,
+   "capex": 26000,
+   "general_admin": 15500,
+   "insurance": 28500,
+   "janitor": 18500,
+   "landscape": 6200,
+   "leasing_commissions": 18000,
+   "management_fee": 24500,
+   "other_income": 15000,
+   "payroll": 53000,
+   "property_tax": 123000,
+   "repairs_maintenance": 22500,
+   "replacement_reserve": 10000,
+   "security": 12000,
+   "service_contracts": 20500,
+   "tenant_improvements": 35000,
+   "utilities": 42000,
+   "vacancy_pct": 6
+  },
+  "property": {
+   "net_rentable_sf": 20000,
+   "parking_spaces": 45
+  },
+  "tenants": [
+   {
+    "monthly_cam": 900,
+    "monthly_parking": 200,
+    "monthly_rent": 21000,
+    "sf": 6000,
+    "suite": "100",
+    "tenant": "Clinic"
+   },
+   {
+    "monthly_cam": 700,
+    "monthly_parking": 150,
+    "monthly_rent": 16900,
+    "sf": 4500,
+    "suite": "200",
+    "tenant": "Law Firm"
+   },
+   {
+    "monthly_cam": 260,
+    "monthly_parking": 0,
+    "monthly_rent": 5400,
+    "sf": 1800,
+    "suite": "300",
+    "tenant": "Cafe"
+   }
+  ],
+  "vacant_sf": 2000
+ },
+ "deal_normal": {
+  "analysis": {
+   "abatements": 0,
+   "amort_type": "AMORTIZING",
+   "amort_years": 25,
+   "building_repairs": 50000,
+   "capital_reserve": 25000,
+   "closing_costs": 30000,
+   "down_pct": 30,
+   "exit_cap_rate": 6.0,
+   "hold_years": 5,
+   "lender_fees": 15000,
+   "market_cap_rate": 5.5,
+   "noi_growth": 2,
+   "purchase_price": 3200000,
+   "rate": 6.5
+  },
+  "historical": {
+   "cam": 18000,
+   "capex": 15000,
+   "general_admin": 9000,
+   "insurance": 17000,
+   "janitor": 11000,
+   "landscape": 4000,
+   "leasing_commissions": 8000,
+   "management_fee": 15000,
+   "other_income": 6000,
+   "payroll": 19000,
+   "property_tax": 43000,
+   "repairs_maintenance": 14000,
+   "replacement_reserve": 6250,
+   "security": 0,
+   "service_contracts": 12000,
+   "tenant_improvements": 10000,
+   "utilities": 19000,
+   "vacancy_pct": 5
+  },
+  "proforma": {
+   "cam": 18500,
+   "capex": 18000,
+   "general_admin": 9500,
+   "insurance": 17500,
+   "janitor": 11500,
+   "landscape": 4200,
+   "leasing_commissions": 12000,
+   "management_fee": 15500,
+   "other_income": 9000,
+   "payroll": 20000,
+   "property_tax": 45000,
+   "repairs_maintenance": 14500,
+   "replacement_reserve": 6250,
+   "security": 0,
+   "service_contracts": 12500,
+   "tenant_improvements": 20000,
+   "utilities": 20000,
+   "vacancy_pct": 7
+  },
+  "property": {
+   "net_rentable_sf": 12500,
+   "parking_spaces": 20,
+   "year_built": 1928
+  },
+  "tenants": [
+   {
+    "monthly_cam": 400,
+    "monthly_parking": 0,
+    "monthly_rent": 14500,
+    "sf": 3200,
+    "suite": "1A",
+    "tenant": "Laundromat"
+   },
+   {
+    "monthly_cam": 350,
+    "monthly_parking": 100,
+    "monthly_rent": 12400,
+    "sf": 2800,
+    "suite": "2B",
+    "tenant": "Pizzeria"
+   },
+   {
+    "monthly_cam": 300,
+    "monthly_parking": 50,
+    "monthly_rent": 9900,
+    "sf": 2400,
+    "suite": "3C",
+    "tenant": "Deli Mart"
+   }
+  ],
+  "vacant_sf": 500
+ },
+ "deal_zero_rate_linkage": {
+  "analysis": {
+   "abatements": 0,
+   "amort_type": "AMORTIZING",
+   "amort_years": 20,
+   "building_repairs": 0,
+   "capital_reserve": 0,
+   "closing_costs": 0,
+   "down_pct": 50,
+   "hold_years": 7,
+   "lender_fees": 0,
+   "market_cap_rate": 5.25,
+   "noi_growth": 0,
+   "purchase_price": 2000000,
+   "rate": 0
+  },
+  "historical": {
+   "cam": 9000,
+   "capex": 5000,
+   "general_admin": 5000,
+   "insurance": 9000,
+   "janitor": 6000,
+   "landscape": 2000,
+   "leasing_commissions": 0,
+   "management_fee": 9000,
+   "other_income": 0,
+   "payroll": 18000,
+   "property_tax": 40000,
+   "repairs_maintenance": 7000,
+   "replacement_reserve": 4000,
+   "security": 2000,
+   "service_contracts": 6000,
+   "tenant_improvements": 0,
+   "utilities": 15000,
+   "vacancy_pct": 0
+  },
+  "proforma": {
+   "cam": 9000,
+   "capex": 5000,
+   "general_admin": 5000,
+   "insurance": 9000,
+   "janitor": 6000,
+   "landscape": 2000,
+   "leasing_commissions": 0,
+   "management_fee": 9000,
+   "other_income": 0,
+   "payroll": 18000,
+   "property_tax": 41000,
+   "repairs_maintenance": 7000,
+   "replacement_reserve": 4000,
+   "security": 2000,
+   "service_contracts": 6000,
+   "tenant_improvements": 0,
+   "utilities": 15000,
+   "vacancy_pct": 3
+  },
+  "property": {
+   "net_rentable_sf": 8000
+  },
+  "tenants": [
+   {
+    "monthly_cam": 0,
+    "monthly_parking": 0,
+    "monthly_rent": 20000,
+    "sf": 8000,
+    "suite": "1",
+    "tenant": "Anchor Grocery"
+   }
+  ],
+  "vacant_sf": 0
+ }
+}
