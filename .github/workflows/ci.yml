@@ -25,6 +25,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pytest
+          # tests-only: 6 个测试文件用 PyMuPDF 生成/断言 PDF（app 生产代码用 pypdf，见 D2），不进 requirements.txt 以免污染生产 bundle
+          pip install "PyMuPDF==1.28.2"
       - name: Run tests
         run: |
           # 开发副产品 dealdesk.db（gitignored）与测试 DB 隔离有已知串扰，
