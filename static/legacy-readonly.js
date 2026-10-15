@@ -11,14 +11,33 @@
   else document.addEventListener('DOMContentLoaded', function () {
     document.body.insertBefore(banner, document.body.firstChild);
   });
+  function freezeOne(el) {
+    el.disabled = true;
+    el.title = '旧版已冻结为只读，请用新版';
+  }
   function freeze() {
-    document.querySelectorAll('input,select,textarea').forEach(function (el) {
-      el.disabled = true;
-      el.title = '旧版已冻结为只读，请用新版';
-    });
+    document.querySelectorAll('input,select,textarea').forEach(freezeOne);
   }
   freeze();
   document.addEventListener('DOMContentLoaded', freeze);
+  // 动态渲染的输入（页面 JS 按 schema 后建的表单）在 DOMContentLoaded 后
+  // 才出现，静态两遍 freeze 盖不住——MutationObserver 补冻（2026-10-15
+  // 台账第 12 项实证：res-legacy 4 个动态 checkbox 曾漏冻）。
+  if (window.MutationObserver) {
+    var mo = new MutationObserver(function (muts) {
+      muts.forEach(function (m) {
+        m.addedNodes.forEach(function (n) {
+          if (n.nodeType !== 1) return;
+          if (/^(INPUT|SELECT|TEXTAREA)$/.test(n.tagName)) freezeOne(n);
+          if (n.querySelectorAll) n.querySelectorAll('input,select,textarea').forEach(freezeOne);
+        });
+      });
+    });
+    var startObs = function () {
+      if (document.body) mo.observe(document.body, { childList: true, subtree: true });
+    };
+    if (document.body) startObs(); else document.addEventListener('DOMContentLoaded', startObs);
+  }
   // 兜底：拦截一切表单提交
   document.addEventListener('submit', function (e) {
     e.preventDefault(); e.stopPropagation();
