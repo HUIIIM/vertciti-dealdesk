@@ -10,7 +10,9 @@
   2. 每项信号附来源（TopHap 公共记录 / NYC DOB 公开违规 / 人工覆盖）；
   3. DOB 查询 best-effort（超时/不可达只记 caveat），仅纽约市可用，
      非 NYC 地址该信号记 unavailable；
-  4. ECB 未关闭罚金暂未纳入（后续项），caveat 明示。
+  4. ECB 未关闭罚金已纳入（台账第 7 项，2026-10-15）：Socrata 6bgk-3dad
+     按地址查 balance_due>0，与 DOB 违规同权并入留置权/违规信号，
+     附未清偿案件数与欠款合计来源；无数据诚实降级（caveat 明示）。
 
 数据源：
   - TopHap MCP get_property_detail（last_sale_date / distress / pre_foreclosure）
@@ -18,6 +20,9 @@
   - NYC Open Data DOB Violations（data.cityofnewyork.us，数据集 3h2n-5cm9，
     公开记录、无需鉴权）：house_number + street 匹配，open 判定 =
     无 disposition_date 且 category 非 DISMISSED/RESOLVED/CLOSED。
+  - NYC Open Data OATH/ECB 案件（数据集 6bgk-3dad，公开记录、无需鉴权）：
+    respondent_house_number + respondent_street 匹配（ECB 按被处罚人地址
+    登记，与 DOB 同口径，命中只作压力线索），未清偿判定 = balance_due > 0。
 """
 
 from __future__ import annotations
@@ -46,6 +51,9 @@ _sanitize_proxy_env()
 DOB_DATASET = "3h2n-5cm9"  # DOB Violations（Active and historical）
 DOB_URL = f"https://data.cityofnewyork.us/resource/{DOB_DATASET}.json"
 DOB_TIMEOUT = 15
+ECB_DATASET = "6bgk-3dad"  # OATH Hearings Division Case Status（ECB 罚金案件）
+ECB_URL = f"https://data.cityofnewyork.us/resource/{ECB_DATASET}.json"
+ECB_TIMEOUT = 15
 NEED_VERIFY = "[待验证]"
 
 SIGNALS = (
@@ -56,7 +64,7 @@ SIGNALS = (
     {"id": "refinance", "label": "近期再融资", "points": 15,
      "rule": "24 个月内有再融资记录"},
     {"id": "lien_violation", "label": "留置权/违规压力", "points": 20,
-     "rule": "活跃法拍/留置权预警，或 NYC DOB 有未关闭违规"},
+     "rule": "活跃法拍/留置权预警，或 NYC DOB 有未关闭违规，或 ECB 有未清偿罚金（balance_due>0）"},
     {"id": "zip_sales_trend", "label": "区域成交热度上升", "points": 10,
      "rule": "TopHap CMA 区域最近完整年度成交数 ≥ 前一年 +10%"},
 )
@@ -147,10 +155,38 @@ def dob_open_count(violations: list[dict] | None) -> tuple[int | None, int]:
     return open_n, len(violations)
 
 
+def _parse_money(v) -> float | None:
+    """Socrata 金额字段（字符串，可能带千分位/空）→ float；不可解析 → None。"""
+    if v is None:
+        return None
+    try:
+        return float(str(v).replace(",", "").strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def ecb_balance(cases: list[dict] | None) -> tuple[int | None, float, int]:
+    """ECB 案件：返回 (未清偿案件数|None, 欠款合计, 案件总数)。
+    cases 为 None → 未查询。未清偿判定 = balance_due > 0（台账第 7 项口径）；
+    balance_due 缺失/不可解析的案件不计未清偿（未知保持未知，不凑数）。"""
+    if cases is None:
+        return None, 0.0, 0
+    open_n, due = 0, 0.0
+    for c in cases:
+        if not isinstance(c, dict):
+            continue
+        b = _parse_money(c.get("balance_due"))
+        if b is not None and b > 0:
+            open_n += 1
+            due += b
+    return open_n, due, len(cases)
+
+
 def score(data: dict, today: date | None = None) -> dict:
     """纯函数打分。data 键：
       last_sale_date, distress(bool), pre_foreclosure(list|None),
-      dob_violations(list|None, None=未查询), market_trend(list|None),
+      dob_violations(list|None, None=未查询), ecb_cases(list|None, None=未查询),
+      market_trend(list|None),
       loan_maturity_months(None=无数据), refinance_24mo(None=无数据)。
 
     任一推断/代理指标在 note 中明示；无数据信号 status="unavailable"。"""
@@ -188,7 +224,7 @@ def score(data: dict, today: date | None = None) -> dict:
     caveats.append("再融资信号暂无数据：TopHap 未映射 refinance 事件，"
                    "该项 15 分当前不计入，待贷款历史数据源接入后启用")
 
-    # 4. 留置权/违规压力
+    # 4. 留置权/违规压力（TopHap 预警 + DOB 未关闭违规 + ECB 未清偿罚金，同权）
     distress = bool(data.get("distress"))
     pf = data.get("pre_foreclosure")
     pf_n = len(pf) if isinstance(pf, list) else 0
@@ -199,6 +235,14 @@ def score(data: dict, today: date | None = None) -> dict:
         open_n, dob_total = dob_open_count(dob)
         dob_note = (f"DOB 违规 {dob_total} 条，其中未关闭 {open_n} 条"
                     if dob_total else "DOB 公开记录无违规")
+    ecb = data.get("ecb_cases")
+    if ecb is None:
+        ecb_note, ecb_open_n, ecb_due = "未查询（非 NYC 或查询失败）", None, 0.0
+    else:
+        ecb_open_n, ecb_due, ecb_total = ecb_balance(ecb)
+        ecb_note = (f"ECB 罚金案件 {ecb_total} 案，其中未清偿 {ecb_open_n} 案、"
+                    f"欠款合计 ${ecb_due:,.0f}" if ecb_total
+                    else "ECB 公开记录无案件")
     parts = []
     if distress:
         parts.append("TopHap distress 预警")
@@ -206,19 +250,25 @@ def score(data: dict, today: date | None = None) -> dict:
         parts.append(f"TopHap 法拍预警 {pf_n} 条")
     if open_n:
         parts.append(f"DOB 未关闭违规 {open_n} 条")
-    if dob is None:
-        status, earned = ("hit" if (distress or pf_n) else "miss",
-                          _POINTS["lien_violation"] if (distress or pf_n) else 0)
-        caveats.append("DOB 违规未纳入本次打分（非纽约市地址或查询失败）："
-                       "留置权信号仅基于 TopHap distress/法拍预警")
-    else:
-        status = "hit" if (distress or pf_n or open_n) else "miss"
-        earned = _POINTS["lien_violation"] if status == "hit" else 0
+    if ecb_open_n:
+        parts.append(f"ECB 未清偿罚金 {ecb_open_n} 案（欠款 ${ecb_due:,.0f}）")
+    hit = bool(distress or pf_n or open_n or ecb_open_n)
+    status = "hit" if hit else "miss"
+    earned = _POINTS["lien_violation"] if hit else 0
     total += earned
-    value = "；".join(parts) if parts else ("无压力信号" if dob is not None else "TopHap 无压力信号")
+    if dob is None and ecb is None:
+        caveats.append("DOB 违规与 ECB 罚金未纳入本次打分（非纽约市地址或查询失败）："
+                       "留置权信号仅基于 TopHap distress/法拍预警")
+    elif dob is None:
+        caveats.append("DOB 违规未纳入本次打分（非纽约市地址或查询失败）")
+    elif ecb is None:
+        caveats.append("ECB 罚金未纳入本次打分（非纽约市地址或查询失败）")
+    value = "；".join(parts) if parts else (
+        "无压力信号" if (dob is not None or ecb is not None) else "TopHap 无压力信号")
     signals.append(_sig("lien_violation", status, earned, value,
-                         "TopHap distress/法拍预警（公共记录）＋ NYC DOB 公开违规",
-                         dob_note))
+                        "TopHap distress/法拍预警（公共记录）＋ NYC DOB 公开违规"
+                        " ＋ NYC ECB/OATH 未清偿罚金",
+                        f"{dob_note}；{ecb_note}"))
 
     # 5. 区域成交热度上升
     hit, note = sales_trend_hit(data.get("market_trend"))
@@ -329,6 +379,51 @@ def query_dob_violations(address: str, timeout: int = DOB_TIMEOUT) -> dict:
     return {"ok": True, "violations": hits, "note": note}
 
 
+def query_ecb_cases(address: str, timeout: int = ECB_TIMEOUT) -> dict:
+    """查 NYC ECB/OATH 未清偿罚金案件（Socrata 6bgk-3dad，无需鉴权）。
+
+    返回 {"ok", "cases": [...], "note"}；网络/超时/空结果一律 ok=False +
+    中文 note，不抛异常。case 字段：ecb_violation_number /
+    respondent_house_number / respondent_street / balance_due /
+    penality_imposed / amount_paid / ecb_violation_status / hearing_status /
+    issue_date。ECB 按被处罚人（respondent）地址登记，与 DOB 同口径：
+    门牌号精确匹配 + 街道客户端过滤；命中只作压力线索（respondent 地址
+    可能与物业地址不完全一致）。仅纽约市：调用方负责先判定州为 NY。"""
+    num, toks = parse_house_street(address)
+    if not num or not toks:
+        return {"ok": False, "cases": [],
+                "note": "地址无法解析出门牌号/街道，跳过 ECB 查询"}
+    params = {
+        "$select": ("ecb_violation_number,respondent_house_number,"
+                    "respondent_street,balance_due,penality_imposed,"
+                    "amount_paid,ecb_violation_status,hearing_status,issue_date"),
+        "$where": f"respondent_house_number='{num}'",
+        "$limit": "500",
+    }
+    t0 = time.time()
+    try:
+        r = httpx.get(ECB_URL, params=params, timeout=timeout,
+                      headers={"User-Agent": "dealdesk-sell-readiness/1.0"})
+    except Exception as e:  # noqa: BLE001
+        return {"ok": False, "cases": [],
+                "note": f"ECB 查询失败（网络/超时）：{str(e)[:100]}"}
+    if r.status_code != 200:
+        return {"ok": False, "cases": [],
+                "note": f"ECB 返回 HTTP {r.status_code}"}
+    try:
+        rows = r.json()
+    except Exception:
+        return {"ok": False, "cases": [], "note": "ECB 返回非 JSON"}
+    if not isinstance(rows, list):
+        return {"ok": False, "cases": [], "note": "ECB 返回格式异常"}
+    hits = [c for c in rows if isinstance(c, dict)
+            and str(c.get("respondent_house_number") or "").strip() == num
+            and _street_match(str(c.get("respondent_street") or ""), toks)]
+    note = (f"ECB 公开记录 {len(hits)} 案（门牌 {num}＋街道匹配，"
+            f"查询 {time.time() - t0:.1f}s）")
+    return {"ok": True, "cases": hits, "note": note}
+
+
 _STATE_RE = re.compile(r",\s*([A-Z]{2})\s+\d{5}(?:-\d{4})?\b")
 
 
@@ -338,18 +433,20 @@ def _infer_state(address: str) -> str:
 
 
 def score_for_address(address: str, tophap_fetch=None,
-                      dob_fetch=None) -> dict:
+                      dob_fetch=None, ecb_fetch=None) -> dict:
     """端点编排：TopHap 取 last_sale_date/distress/法拍预警/CMA 趋势
-    （best-effort，不可用则对应信号 unavailable）；NY 地址自动查 DOB 违规。
+    （best-effort，不可用则对应信号 unavailable）；NY 地址自动查 DOB 违规
+    与 ECB 未清偿罚金。
 
-    tophap_fetch / dob_fetch 可注入 mock；默认走真实数据源。
+    tophap_fetch / dob_fetch / ecb_fetch 可注入 mock；默认走真实数据源。
     任一数据源失败只降级对应信号，不抛异常。"""
     address = (address or "").strip()
     if not address:
         return {"ok": False, "address": "", "score": 0,
                 "caveats": ["地址为空"], "generated_at": now_str()}
 
-    data: dict = {"dob_violations": None}  # None = 未查询（非 NYC/失败时保持）
+    # None = 未查询（非 NYC/失败时保持）
+    data: dict = {"dob_violations": None, "ecb_cases": None}
     caveats: list[str] = []
     state = _infer_state(address).upper()
 
@@ -398,9 +495,24 @@ def score_for_address(address: str, tophap_fetch=None,
     else:
         caveats.append(f"DOB 违规仅支持纽约市（该地址州={state}）："
                        "违规信号仅基于 TopHap")
-    # ECB 未关闭罚金暂未纳入：明示
-    caveats.append("ECB 未关闭罚金暂未纳入本分（后续项）："
-                   "留置权压力可能被低估")
+
+    # ECB 未清偿罚金（仅 NY；best-effort，与 DOB 同权，台账第 7 项）
+    if ecb_fetch is None:
+        ecb_fetch = query_ecb_cases
+    if state == "NY" or state == "":
+        try:
+            res = ecb_fetch(address)
+        except Exception as e:  # noqa: BLE001
+            res = {"ok": False, "cases": [],
+                   "note": f"ECB 查询异常：{str(e)[:100]}"}
+        if res.get("ok"):
+            data["ecb_cases"] = res["cases"]
+            caveats.append(res.get("note", ""))
+        else:
+            caveats.append(f"{res.get('note', 'ECB 查询失败')}："
+                           "ECB 罚金未纳入本次打分")
+    else:
+        caveats.append(f"ECB 罚金仅支持纽约市（该地址州={state}）：未纳入")
 
     out = score(data)
     out["address"] = address

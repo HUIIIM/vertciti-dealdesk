@@ -202,10 +202,14 @@ def _mock_dob_ok(address):
     return {"ok": True, "violations": [], "note": "mock DOB：0 条"}
 
 
+def _mock_ecb_ok(address):
+    return {"ok": True, "cases": [], "note": "mock ECB：0 案"}
+
+
 def test_score_for_address_full():
     out = sr.score_for_address("450 W 44th St, New York, NY 10036",
                                tophap_fetch=_mock_tophap_ok,
-                               dob_fetch=_mock_dob_ok)
+                               dob_fetch=_mock_dob_ok, ecb_fetch=_mock_ecb_ok)
     assert out["ok"] is True
     assert out["address"].startswith("450 W 44th St")
     # 持有(2005)>10年 25 + 热度 80→100(+25%) 10 = 35
@@ -215,7 +219,7 @@ def test_score_for_address_full():
 
 def test_score_for_address_empty():
     out = sr.score_for_address("", tophap_fetch=_mock_tophap_ok,
-                               dob_fetch=_mock_dob_ok)
+                               dob_fetch=_mock_dob_ok, ecb_fetch=_mock_ecb_ok)
     assert out["ok"] is False
 
 
@@ -223,7 +227,8 @@ def test_score_for_address_tophap_down():
     def down(addr):
         return {"ok": False, "fields": [], "note": "token 过期"}
     out = sr.score_for_address("450 W 44th St, New York, NY 10036",
-                               tophap_fetch=down, dob_fetch=_mock_dob_ok)
+                               tophap_fetch=down, dob_fetch=_mock_dob_ok,
+                               ecb_fetch=_mock_ecb_ok)
     assert out["ok"] is True
     by_id = {s["id"]: s for s in out["signals"]}
     assert by_id["holding_years"]["status"] == "unavailable"
@@ -235,7 +240,7 @@ def test_score_for_address_dob_down():
         return {"ok": False, "violations": [], "note": "DOB 超时"}
     out = sr.score_for_address("450 W 44th St, New York, NY 10036",
                                tophap_fetch=_mock_tophap_ok,
-                               dob_fetch=dob_fail)
+                               dob_fetch=dob_fail, ecb_fetch=_mock_ecb_ok)
     assert out["ok"] is True
     by_id = {s["id"]: s for s in out["signals"]}
     # DOB 失败 → 违规信号仅基于 TopHap（本例无压力 → miss）
@@ -246,6 +251,109 @@ def test_score_for_address_dob_down():
 def test_score_for_address_non_ny():
     out = sr.score_for_address("1600 Pennsylvania Ave, Washington, DC 20500",
                                tophap_fetch=_mock_tophap_ok,
-                               dob_fetch=_mock_dob_ok)
+                               dob_fetch=_mock_dob_ok, ecb_fetch=_mock_ecb_ok)
     assert out["ok"] is True
     assert any("仅支持纽约市" in c for c in out["caveats"])
+
+
+# ---------- ECB 未清偿罚金（台账第 7 项，2026-10-15） ----------
+
+def test_ecb_balance():
+    assert sr.ecb_balance(None) == (None, 0.0, 0)
+    assert sr.ecb_balance([]) == (0, 0.0, 0)
+    open_n, due, total = sr.ecb_balance([
+        {"balance_due": "1,250.50"},
+        {"balance_due": "0"},
+        {"balance_due": ""},          # 不可解析 → 不计未清偿
+        {"balance_due": "249.50"},
+        {"respondent_name": "无金额字段"},
+    ])
+    assert open_n == 2 and total == 5
+    assert abs(due - 1500.0) < 1e-9
+
+
+def test_score_ecb_hit_alone():
+    """只有 ECB 欠款一个压力源 → 留置权信号命中 +20，value/来源含 ECB 与欠款额。"""
+    out = sr.score({
+        "last_sale_date": "2024-06-01", "distress": False,
+        "pre_foreclosure": [], "dob_violations": [],
+        "ecb_cases": [{"balance_due": "3200"}, {"balance_due": "0"}],
+        "market_trend": None,
+    }, _TODAY)
+    by_id = {s["id"]: s for s in out["signals"]}
+    lien = by_id["lien_violation"]
+    assert lien["status"] == "hit" and lien["earned"] == 20
+    assert "ECB 未清偿罚金 1 案" in lien["value"] and "$3,200" in lien["value"]
+    assert "ECB" in lien["source"]
+
+
+def test_score_ecb_zero_balance_no_hit():
+    """ECB 案件全部结清（balance_due=0）→ 不加分，诚实 miss。"""
+    out = sr.score({
+        "last_sale_date": "2024-06-01", "distress": False,
+        "pre_foreclosure": [], "dob_violations": [],
+        "ecb_cases": [{"balance_due": "0"}, {"balance_due": "0.00"}],
+        "market_trend": None,
+    }, _TODAY)
+    by_id = {s["id"]: s for s in out["signals"]}
+    assert by_id["lien_violation"]["status"] == "miss"
+    assert by_id["lien_violation"]["earned"] == 0
+
+
+def test_score_ecb_not_queried_caveat():
+    """ECB 未查询（None）→ 不臆测，caveat 明示未纳入。"""
+    out = sr.score({
+        "last_sale_date": "2008-01-01", "distress": False,
+        "pre_foreclosure": [], "dob_violations": [],
+        "ecb_cases": None, "market_trend": None,
+    }, _TODAY)
+    assert any("ECB 罚金未纳入" in c for c in out["caveats"])
+
+
+def test_score_for_address_ecb_hit():
+    """编排：ECB 有欠款 → 在 full 基线（35）上再 +20。"""
+    def ecb_hit(addr):
+        return {"ok": True, "note": "mock ECB：1 案",
+                "cases": [{"balance_due": "2500",
+                           "respondent_house_number": "450",
+                           "respondent_street": "WEST 44 STREET"}]}
+    out = sr.score_for_address("450 W 44th St, New York, NY 10036",
+                               tophap_fetch=_mock_tophap_ok,
+                               dob_fetch=_mock_dob_ok, ecb_fetch=ecb_hit)
+    assert out["score"] == 55
+    by_id = {s["id"]: s for s in out["signals"]}
+    assert by_id["lien_violation"]["status"] == "hit"
+
+
+def test_score_for_address_ecb_down():
+    """ECB 查询失败 → 只降级该子源，分数不虚构、caveat 明示。"""
+    def ecb_fail(addr):
+        return {"ok": False, "cases": [], "note": "ECB 超时"}
+    out = sr.score_for_address("450 W 44th St, New York, NY 10036",
+                               tophap_fetch=_mock_tophap_ok,
+                               dob_fetch=_mock_dob_ok, ecb_fetch=ecb_fail)
+    assert out["ok"] is True
+    assert out["score"] == 35  # 与无 ECB 时一致（持有 25 + 热度 10）
+    assert any("ECB 超时" in c for c in out["caveats"])
+
+
+def test_query_ecb_cases_filters_by_house_and_street(monkeypatch):
+    """Socrata 响应客户端过滤：门牌精确 + 街道 token 匹配（与 DOB 同口径）。"""
+    class _Resp:
+        status_code = 200
+
+        def json(self):
+            return [
+                {"respondent_house_number": "450",
+                 "respondent_street": "WEST   44 STREET", "balance_due": "900"},
+                {"respondent_house_number": "450",
+                 "respondent_street": "WEST 45 STREET", "balance_due": "900"},
+                {"respondent_house_number": "452",
+                 "respondent_street": "WEST 44 STREET", "balance_due": "900"},
+            ]
+
+    monkeypatch.setattr(sr.httpx, "get", lambda *a, **k: _Resp())
+    res = sr.query_ecb_cases("450 W 44th St, New York, NY 10036")
+    assert res["ok"] is True
+    assert len(res["cases"]) == 1
+    assert res["cases"][0]["respondent_street"].startswith("WEST")

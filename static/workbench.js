@@ -484,7 +484,7 @@ WB.renderSellReadiness = function (t) {
     + `（动机${esc(t.tier)}）</h4>`
     + `<p class="src">${esc(t.tier_note || '')}</p>${rows}${caveats}`
     + `<p class="src">规则分仅供线索参考：无数据源的信号不计分、不虚构；`
-    + `ECB 未关闭罚金暂未纳入。</p></div>`;
+    + `ECB 未清偿罚金已纳入留置权/违规信号（纽约市地址）。</p></div>`;
 };
 
 /* ---------- 产权穿透树（台账 2026-10-08 第 1 项，学自 Reonomy Top4） ----------
