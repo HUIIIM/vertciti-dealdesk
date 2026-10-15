@@ -9,8 +9,7 @@
 1. [x] 商业页 390px 移动端 QA（2026-10-12 本轮已验收通过，见"已完成"）
 2. [x] 商业页截图/图片录取（2026-10-13 本轮已完成，见"已完成"）
 3. [x] 扫描版 PDF OCR（暂缓项回补）（2026-10-14 本轮已完成，见"已完成"）
-4. [ ] 门覆盖补齐（2026-10-06 数据质量门二期）：截图 intake 的视觉提取结果同样跑质量门（`image_intake` 输出附 quality_gate）；住宅页（d.html）接入商
-    业页同款门面板 + 导出前过门。验收：截图/住宅两路各喂一份矛盾材料，fail 正确拦截并标黄
+4. [x] 门覆盖补齐（2026-10-06 数据质量门二期）（2026-10-15 本轮已完成，见"已完成"）
 5. [ ] RentCast 激活：等董事长绑卡后接入 fallback 链实测（外部阻塞，不占每日名额）
 6. [x] vercel-deploy 静态双副本同步自动化（2026-10-07 本轮新发现；2026-10-09 落地）：vercel-deploy/ 根与 static/ 各有一份静态文件（uw-commercial.html/js 等），失步=生产页面老版本；加部署前自动 diff 门禁（不一致直接 fail）。新脚本 `tools/pre_deploy_diff_gate.sh`：按 AGENTS.md 三条 rsync 规则做 dry-run diff（rsync -rL -n --checksum --delete；-rL 只比文件内容，排除 setgid/mtime 环境噪音），任一处失步→退出 1＋打印失步文件清单；已接进 `tools/deploy.sh` 步骤 5（vc-deploy 调用前必跑，原 diff -rq 校验漏了根副本规则，已替换）。验收证据：① 故意在 vercel-deploy/uw-commercial.html（根副本）加一行→门禁退出 1，清单列出 `uw-commercial.html`（规则 3）；② 恢复文件后门禁退出 0，三方对齐；③ 全量 pytest：449 passed（1 deselect pre-existing test_address_pipeline_degradation）。证据 commit 4b954cc（noreply 作者，未 push）。
 7. [ ] ECB 未关闭罚金接入卖方动机分（2026-10-09 本轮遗留）：Socrata 6bgk-3dad 按地址查 balance_due>0 → 并入 lien_violation 信号（与 DOB 违规同权）；验收：有欠款物业正确加分且附来源
@@ -22,6 +21,7 @@
 13. [ ] 前后端计算黄金样本对照测试（2026-10-13 项目深研复查轮定级 P0，并入深研项 R-1）：建黄金输入 fixture（≥3 个 deal：正常盘/退化输入/边界利率），同输入分别跑后端 compute_all 与前端 uw-commercial.js（Node 执行），关键比率（cap/DSCR/debt_yield/IRR/月供/剩余本金）逐项对照、None/NaN 同判，漂移即红并进 CI。验收：对照测试全绿＋故意改前端一处公式测试变红（附日志）；原第 9、10 项随本项一并验收关闭。依据：deliverables/project-deep-review/2026-10-13/vertciti-dealdesk/（01-#4 研究确认类型代码生成救不了计算复刻，对照测试是对症解法）
 14. [ ] main.py 冻结线 + routers 拆分启动（2026-10-13 项目深研复查轮定级 P1，深研项 R-2）：app/main.py 已涨至 1294 行（2026-10-09 深研时 1240）；即日起新端点一律先进 app/routers/<域>.py（先建 intake 域样板，FastAPI 聚合挂载模式），main.py 只减不增，存量按域逐周迁出、目标 <200 行装配。验收：routers/ + 首个域独立冒烟测试落盘；一周内 wc -l app/main.py 不增；全量测试零回归。本轮（2026-10-14）新增 2 个 intake 端点仍进 main.py（+47 行，与本项立项时存量一并迁出，wc 基线以本项启动日为准）
 15. [ ] 混合型 PDF 逐页 OCR 补齐（2026-10-14 本轮新发现）：扫描版检测现为全文阈值（总字符 <50 判扫描件）——部分页有文本层、部分页是扫描图的混合 OM 会被当普通 PDF 处理，扫描页字段静默丢失。验收：逐页文本量检测，低文本页单独走浏览器 OCR 并与文本层结果合并（来源逐字段标页/标 OCR 口径）；混合样本（1 页文本＋1 页扫描图）两页关键字段都提取到
+16. [ ] 住宅门 seller_points 噪声消除（2026-10-15 本轮新发现）：住宅截图/PDF intake 的 `seller_points`（卖方话术要点，本就是 intake 产物）不在 residential-v1 schema 内，每次被 `schema.unknown_field` warn 并进 yellow_fields 标黄，淹没真矛盾的标黄信号（生产实证：干净样本 yellow 含 seller_points）。验收：schema 登记已知非数值字段或门内对该键豁免 unknown 告警；干净住宅样本 yellow_fields 不含 seller_points、矛盾样本标黄不变
 
 ## 暂缓（被 Top5 挤掉，未丢弃，消化完按序取回）
 
@@ -51,6 +51,8 @@
 - 债务时间线：C 页债务到期小节（学自 Crexi，可并入 tear sheet 二期）
 
 ## 已完成
+
+- 2026-10-15：门覆盖补齐上线（原台账第 4 项，数据质量门二期）。此前两处盲区：① pending 队列截图视觉提取结果（`image_intake.get_extracted`）原样返回、无 quality_gate；② 住宅页（d.html）无门面板、住宅导出（备忘录 PDF/住宅 Excel）不过门（商业截图浏览器 OCR 路已于 2026-10-13 附门、商业报告/Tear Sheet 已服务端硬拦）。新实现：`image_intake.attach_quality_gate` 取回时现跑门（deal 类型按字段推断：租户/商业键→commercial、住宅键→residential）；新增住宅截图 OCR 文本路 POST /api/wb/intake/image-text（`run_residential_image_ocr_text`，与商业路同构、residential-v1 门＋需求验证清单）；d.html 接入商业页同款门面板（gatePanel＋标黄 CSS）＋ `gateCheckForExport` 接进备忘录/商业 PDF/Excel 三导出（fail 弹窗拦截、warn 确认）；服务端对显式送达的 gate_fields 硬拦（/api/memo/pdf、/api/res/report/xlsx、/api/uw/report/xlsx，blocked→422，未送不拦向后兼容）。证据：commit 749bfec（noreply 作者，未 push）＋全量 pytest 501 passed（14 新用例 tests/test_gate_coverage_residential.py，1 deselect pre-existing test_address_pipeline_degradation）＋生产部署 dpl_FKK6QH6c5wgsg1tnmAZjGBewU3xY＋生产 E2E 全过：/api/tophap/status 200；住宅截图矛盾文本（$750k/50 SF）→ image-text blocked＋yellow 含 building_sf、干净文本 → 不拦；/api/wb/intake/gate 住宅矛盾 → blocked；备忘录 PDF 矛盾 gate_fields → 422、干净 → 200 PDF；住宅 Excel 矛盾 → 422、干净 → 200；生产 /d.html、/d.js 与本地字节一致（gatePanel/gateCheckForExport 在位）。附带新发现：住宅门 seller_points unknown-field 标黄噪声，已补进待做第 16 项；另 custom.legacy-vercel 版 vc-deploy 本轮 import 失败（dynamic_credentials 缺失），部署改走 skills 版同名脚本成功（双副本分叉，待工具线收口）。证据文件：goals/vertcity-build-out/hidden_files/dealdesk-improvement-2026-10-15/（prod_image_text_*.json / prod_gate_res_contra.json / prod_memo_* / prod_res_xlsx_* / prod_d.html / prod_d.js）。
 
 - 2026-10-14：扫描版 PDF OCR 上线（原台账第 3 项）。此前图片型 PDF 只有一句"提取文本过少、请手动录入"。新实现：`inspect_pdf` 逐文档检测（全文 <50 字符判扫描件）；上传端点先试服务端内嵌图 OCR（有 tesseract 时直接闭环），否则结构化返回 `needs_ocr / error_code=scanned_pdf_needs_ocr`＋页数；前端（商业页＋住宅工作台）浏览器端 pdf.js 渲染每页（上限 12 页）＋Tesseract.js OCR → 新端点 POST /api/uw-commercial/intake/pdf-ocr-text 与 POST /api/wb/intake/pdf-ocr-text → 与普通 PDF 共用同一抽取引擎，来源标"扫描PDF OCR:<文件名>"、claim_notice 明示"扫描版 PDF OCR 提取"口径、附数据质量门。证据：commit 7bfd139（noreply 作者，未 push）＋全量 pytest 487 passed（13 新用例 tests/test_scanned_pdf_ocr.py，1 deselect pre-existing test_address_pipeline_degradation）＋生产部署 dpl_Go2bh9kDpfd1ce1fWoKFbeLRvooC＋生产 API 实证（扫描件 fixture 两路均返回 needs_ocr；OCR 文本两路均正确提取价格 4350000、来源标 OCR 口径）＋生产真浏览器 E2E（Chromium 上传真实扫描 PDF → 浏览器 OCR 全链路 → 已填 11 字段（价格 4350000/面积 12500/NOI 285000/地址 1500 Atlantic Ave）＋2 租户，状态明示"扫描版 PDF OCR 提取、卖方口径、待独立验证"，质量门正确拦截 NOI 与租约年化矛盾）。附带新发现：混合型 PDF（部分页扫描图）逐页检测未做，已补进待做第 15 项。证据文件：goals/vertcity-build-out/hidden_files/dealdesk-improvement-2026-10-14/（scanned-flyer.pdf/png / ocr-text.txt / prod_scanned_*_resp.json / prod_pdf_ocr_text_*.json / prod_browser_e2e.json / prod-after-pdf-ocr.png）。证据更正（同日复核）：浏览器 E2E 首跑（v1 脚本）实为 FAIL——Chromium 经 CDP 暴露的 post_data_buffer 对 fetch(FormData+File) 只含 multipart 头（实测 196 字节、无文件体），route 代理转发后生产端收到空文件、正确回 400；首跑后一度误读为 PASS，已纠正。修复后 v3 脚本（代理层用同一测试文件按原 boundary 重建 multipart 体，其余全链路真实运行）复跑 PASS，prod_browser_e2e.json 已被 v3 结果覆盖，v1 失败细节见 e2e-v3-run.log 与脚本头注。
 
