@@ -24,6 +24,10 @@ CLAIM_LABEL = "卖方材料口径、待独立验证"
 PDF_OCR_CLAIM_NOTICE = ("以下全部数字为扫描版 PDF OCR 提取、卖方材料口径、待独立验证，"
                         "须独立验证后方可用于估值/打分")
 SCANNED_TEXT_THRESHOLD = 50  # 全文字符数低于此值视为无文本层（扫描件）
+PAGE_TEXT_MIN_CHARS = 50  # 逐页文本量低于此值视为低文本页（混合型 PDF 逐页检测，台账第 15 项）
+MIXED_PDF_CLAIM_NOTICE = ("以下全部数字为卖方材料口径、待独立验证；本文件为混合型 PDF："
+                          "文本层页直接提取，扫描图页经 OCR 提取（字段来源逐页标注，"
+                          "OCR 页字段来源标「扫描页OCR」），OCR 数字更须复核")
 TALKING_KEYWORDS = ["cap", "noi", "turnkey", "renovat", "cash flow", "appreciation",
                     "below market", "motivated", "as-is", "seller financ",
                     "subject-to", "wrap", "balloon", "upside", "value-add",
@@ -65,7 +69,12 @@ def extract_text(pdf_path: str) -> tuple[str, str]:
 
 
 def inspect_pdf(pdf_path: str) -> dict:
-    """扫描件检测（台账第 3 项）：返回页数/文本量/是否扫描件/是否加密。
+    """扫描件检测（台账第 3 项）＋逐页文本量检测（第 15 项）。
+
+    返回页数/文本量/是否扫描件/是否加密，另加逐页口径：
+    low_text_pages = 文本量 < PAGE_TEXT_MIN_CHARS 的页码（1-based）；
+    is_mixed = 全文有文本层但存在低文本页（混合型 PDF：部分页是扫描图，
+    其字段若只走文本层会静默丢失，第 15 项即补此洞）。
 
     与 extract_text_pages 的区别：即使文本过少也保留页数与已提取页，
     供上层决定走 OCR 链路（浏览器端渲染 OCR 或服务端内嵌图 OCR），
@@ -76,15 +85,21 @@ def inspect_pdf(pdf_path: str) -> dict:
         if reader.is_encrypted:
             return {"pages": [], "page_count": len(reader.pages), "text_chars": 0,
                     "is_scanned": False, "is_encrypted": True,
+                    "low_text_pages": [], "is_mixed": False,
                     "note": "PDF 已加密，无法解析；请解密后上传或手动录入"}
         pages = [_normalize_page(pg.extract_text()) for pg in reader.pages]
         chars = sum(len(p) for p in pages)
+        is_scanned = chars < SCANNED_TEXT_THRESHOLD
+        low = [i + 1 for i, p in enumerate(pages) if len(p) < PAGE_TEXT_MIN_CHARS]
         return {"pages": pages, "page_count": len(pages), "text_chars": chars,
-                "is_scanned": chars < SCANNED_TEXT_THRESHOLD,
+                "is_scanned": is_scanned,
+                "low_text_pages": low,
+                "is_mixed": bool(low) and not is_scanned,
                 "is_encrypted": False, "note": ""}
     except Exception as e:  # noqa: BLE001
         return {"pages": [], "page_count": 0, "text_chars": 0,
                 "is_scanned": False, "is_encrypted": False,
+                "low_text_pages": [], "is_mixed": False,
                 "note": f"PDF 解析异常：{str(e)[:150]}"}
 
 
@@ -352,6 +367,143 @@ def try_server_pdf_ocr(saved_path: str) -> tuple[str, str]:
     return joined, ""
 
 
+def try_server_pdf_ocr_pages(saved_path: str, page_numbers: list[int]) -> dict[int, str]:
+    """逐页服务端 OCR（台账第 15 项）：只 OCR 指定页（1-based）的内嵌图。
+
+    返回 {页码: OCR 文本}，只含识别出非空文本的页。无 tesseract 时
+    返回空 dict（诚实降级，由浏览器端逐页 OCR 接管），绝不编造。"""
+    if not page_numbers or not server_ocr_available():
+        return {}
+    try:
+        reader = PdfReader(saved_path)
+    except Exception:  # noqa: BLE001
+        return {}
+    out: dict[int, str] = {}
+    for pno in page_numbers:
+        if pno < 1 or pno > len(reader.pages):
+            continue
+        try:
+            images = list(reader.pages[pno - 1].images)
+        except Exception:  # noqa: BLE001
+            images = []
+        texts: list[str] = []
+        for img in images:
+            try:
+                data = img.data
+            except Exception:  # noqa: BLE001
+                continue
+            if not data:
+                continue
+            t, _note = extract_text_from_image_bytes(data)
+            if t:
+                texts.append(t)
+        joined = _normalize_page("\n".join(texts))
+        if joined:
+            out[pno] = joined
+    return out
+
+
+def merge_ocr_pages(pages: list[str], ocr_by_page: dict[int, str]) -> tuple[list[str], list[int]]:
+    """文本层逐页文本 + 指定页 OCR 文本 → 合并逐页文本。
+
+    OCR 文本只替换其对应页（该页本为低文本页）；返回 (合并页, 实际应用 OCR 的页码)。"""
+    merged = list(pages)
+    applied: list[int] = []
+    for pno, t in (ocr_by_page or {}).items():
+        if 1 <= pno <= len(merged) and (t or "").strip():
+            merged[pno - 1] = t
+            applied.append(pno)
+    return merged, sorted(applied)
+
+
+def _mark_ocr_fields(d: dict, ocr_pages: set[int], filename: str) -> None:
+    """来源逐字段标 OCR 口径：落在 OCR 页的字段，来源改标「扫描页OCR:<文件名>」
+    并加 extraction_method=ocr；文本层页字段保持原来源（逐页标注靠 page 字段）。"""
+    if not ocr_pages:
+        return
+    for f in d.get("fields") or []:
+        if isinstance(f, dict) and f.get("page") in ocr_pages:
+            f["source"] = f"扫描页OCR:{filename}"
+            f["extraction_method"] = "ocr"
+            note = (f.get("note") or "").strip()
+            f["note"] = (note + "；" if note else "") + "该页为扫描图，OCR 提取"
+    for t in d.get("tenants") or []:
+        if isinstance(t, dict) and t.get("page") in ocr_pages:
+            t["extraction_method"] = "ocr"
+
+
+def _parse_merged(filename: str, merged_pages: list[str], ocr_pages: list[int],
+                  commercial: bool, engine: str) -> dict:
+    """合并后逐页文本 → 走对应抽取引擎 + 质量门，字段逐页归属、
+    OCR 页字段标 OCR 来源（台账第 15 项验收口径）。"""
+    from . import validators
+    text = "\n".join(merged_pages)
+    if commercial:
+        d = parse_commercial_pdf_text(text, filename, pages=merged_pages)
+        deal_type = "commercial"
+    else:
+        d = parse_pdf_text(text, filename, pages=merged_pages)
+        deal_type = "residential"
+    _mark_ocr_fields(d, set(ocr_pages), filename)
+    d["mixed_pdf"] = True
+    d["ocr_pages"] = ocr_pages
+    d["ocr_engine"] = engine
+    d["is_scanned_pdf"] = False
+    d["extraction_method"] = "mixed"
+    d["text_chars"] = len(text)
+    d["excerpt"] = text[:500]
+    d["claim_notice"] = MIXED_PDF_CLAIM_NOTICE
+    d["quality_gate"] = validators.run_quality_gate(
+        deal_type, d["fields"], tenants=d.get("tenants"),
+        raw_text=text, pages=merged_pages)
+    if not commercial:
+        d["demand_validation"] = dv.demand_validation_block()
+    return d
+
+
+def _run_mixed_pdf_upload(saved_path: str, filename: str, info: dict,
+                          commercial: bool) -> dict:
+    """混合型 PDF 上传处理（台账第 15 项）。
+
+    先试服务端逐页 OCR（有 tesseract 时直接闭环）；否则文本层页先提取、
+    结构化返回 needs_ocr_pages + page_texts，前端只 OCR 低文本页后经
+    pdf-ocr-pages 端点合并——扫描页字段不再静默丢失，也绝不假装已提取。"""
+    pages = info["pages"]
+    low = info["low_text_pages"]
+    ocr_by_page = try_server_pdf_ocr_pages(saved_path, low)
+    if ocr_by_page:
+        merged, applied = merge_ocr_pages(pages, ocr_by_page)
+        return _parse_merged(filename, merged, applied, commercial,
+                             engine="tesseract-server")
+    # 无服务端 OCR：文本层结果先行 + 明确标注待合并（不静默）
+    text = "\n".join(pages)
+    if commercial:
+        d = parse_commercial_pdf_text(text, filename, pages=pages)
+    else:
+        d = parse_pdf_text(text, filename, pages=pages)
+    from . import validators
+    d["quality_gate"] = validators.run_quality_gate(
+        "commercial" if commercial else "residential", d["fields"],
+        tenants=d.get("tenants"), raw_text=text, pages=pages)
+    if not commercial:
+        d["demand_validation"] = dv.demand_validation_block()
+    d["mixed_pdf"] = True
+    d["partial_extraction"] = True
+    d["needs_ocr_pages"] = low
+    d["is_scanned_pdf"] = False
+    d["text_chars"] = len(text)
+    d["excerpt"] = text[:500]
+    if sum(len(p) for p in pages) <= 300_000:
+        d["page_texts"] = pages  # 供浏览器合并端点重组（无状态设计）
+    else:
+        d["page_texts_omitted"] = True
+    d["notice"] = (f"混合型 PDF：第 {('、'.join(str(p) for p in low))} 页为扫描图"
+                   "（无文本层），已先提取其余页字段；扫描页将走浏览器 OCR 后合并，"
+                   "合并前结果不完整")
+    d["claim_notice"] = MIXED_PDF_CLAIM_NOTICE
+    return d
+
+
 def run_commercial_pdf_upload(saved_path: str, filename: str) -> dict:
     from . import validators
     info = inspect_pdf(saved_path)
@@ -366,6 +518,9 @@ def run_commercial_pdf_upload(saved_path: str, filename: str) -> dict:
             return run_commercial_pdf_ocr_text(
                 ocr_text, filename, engine="tesseract-server")
         return _scanned_needs_ocr("pdf-commercial", filename, info)
+    if info.get("is_mixed"):
+        # 混合型 PDF（台账第 15 项）：低文本页逐页 OCR 补齐，不静默丢字段
+        return _run_mixed_pdf_upload(saved_path, filename, info, commercial=True)
     pages = info["pages"]
     text = "\n".join(pages)
     d = parse_commercial_pdf_text(text, filename, pages=pages)
@@ -445,6 +600,56 @@ def run_pdf_ocr_text(text: str, filename: str = "scanned.pdf",
     return d
 
 
+def _run_pdf_ocr_pages(page_texts, ocr_pages, filename: str,
+                       engine: str, commercial: bool) -> dict:
+    """混合型 PDF 浏览器逐页 OCR 合并（台账第 15 项）。
+
+    page_texts = 上传时服务端提取的文本层逐页文本（响应回传，无状态）；
+    ocr_pages = {"页码": "该页 OCR 文本"}（浏览器只 OCR 低文本页）。
+    合并后重新走抽取引擎：字段逐页归属（page），OCR 页字段来源标
+    「扫描页OCR」；ocr_pages 为空/无有效文本 → 明确报错，不假装合并。"""
+    mode = "pdf-commercial" if commercial else "pdf"
+    fname = (filename or "mixed.pdf").strip() or "mixed.pdf"
+    at = datetime.now().strftime("%Y-%m-%d %H:%M")
+    pages_in = [str(p or "") for p in (page_texts or [])]
+    if not pages_in:
+        return {"mode": mode, "filename": fname, "fields": [], "tenants": [],
+                "error": "缺少文本层逐页文本（page_texts），无法合并；请重新上传 PDF",
+                "error_code": "mixed_merge_missing_pages",
+                "fetched_at": at, "claim_notice": MIXED_PDF_CLAIM_NOTICE}
+    by_page: dict[int, str] = {}
+    for k, v in (ocr_pages or {}).items():
+        try:
+            pno = int(k)
+        except (TypeError, ValueError):
+            continue
+        t = _normalize_page(str(v or ""))
+        if t:
+            by_page[pno] = t
+    merged, applied = merge_ocr_pages(pages_in, by_page)
+    if not applied:
+        return {"mode": mode, "filename": fname, "fields": [], "tenants": [],
+                "error": "浏览器 OCR 未提供任何有效页文本，合并未执行；请重试或改用粘贴文本",
+                "error_code": "mixed_merge_empty_ocr",
+                "fetched_at": at, "claim_notice": MIXED_PDF_CLAIM_NOTICE}
+    d = _parse_merged(fname, merged, applied, commercial, engine=engine)
+    d["mode"] = "pdf-mixed"
+    d["fetched_at"] = at
+    return d
+
+
+def run_commercial_pdf_ocr_pages(page_texts, ocr_pages, filename: str = "mixed.pdf",
+                                 engine: str = "browser-tesseract") -> dict:
+    """商业路混合型 PDF 逐页 OCR 合并入口（端点 pdf-ocr-pages 背后）。"""
+    return _run_pdf_ocr_pages(page_texts, ocr_pages, filename, engine, True)
+
+
+def run_residential_pdf_ocr_pages(page_texts, ocr_pages, filename: str = "mixed.pdf",
+                                  engine: str = "browser-tesseract") -> dict:
+    """住宅路混合型 PDF 逐页 OCR 合并入口（端点 pdf-ocr-pages 背后）。"""
+    return _run_pdf_ocr_pages(page_texts, ocr_pages, filename, engine, False)
+
+
 def run_commercial_text_upload(text: str) -> dict:
     """商业粘贴文本 intake（台账 2026-10-07）：粘贴 OM/flyer 文本 → 结构化字段。
 
@@ -482,6 +687,9 @@ def run_pdf_upload(saved_path: str, filename: str) -> dict:
         return _scanned_needs_ocr(
             "pdf", filename, info,
             extra={"demand_validation": dv.demand_validation_block()})
+    if info.get("is_mixed"):
+        # 混合型 PDF（台账第 15 项）：低文本页逐页 OCR 补齐，不静默丢字段
+        return _run_mixed_pdf_upload(saved_path, filename, info, commercial=False)
     pages = info["pages"]
     text = "\n".join(pages)
     d = parse_pdf_text(text, filename, pages=pages)

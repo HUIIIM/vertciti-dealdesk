@@ -771,6 +771,31 @@ def wb_intake_pdf_ocr_text(payload: dict):
     return d
 
 
+@app.post("/api/wb/intake/pdf-ocr-pages")
+def wb_intake_pdf_ocr_pages(payload: dict):
+    """住宅混合型 PDF 逐页 OCR 合并（台账第 15 项，2026-10-15）。
+
+    混合 PDF 上传返回 needs_ocr_pages + page_texts（文本层逐页文本）；
+    浏览器只 OCR 低文本页后把 {page_texts, ocr_pages} 发到这里合并，
+    字段逐页归属、OCR 页字段标「扫描页OCR」来源。"""
+    page_texts = (payload or {}).get("page_texts") or []
+    ocr_pages = (payload or {}).get("ocr_pages") or {}
+    filename = str((payload or {}).get("filename") or "mixed.pdf")
+    if not isinstance(page_texts, list) or not page_texts:
+        raise HTTPException(400, "缺少 page_texts（文本层逐页文本），请重新上传 PDF")
+    if not isinstance(ocr_pages, dict) or not ocr_pages:
+        raise HTTPException(400, "缺少 ocr_pages（逐页 OCR 文本）")
+    if sum(len(str(p or "")) for p in page_texts) > 500_000:
+        raise HTTPException(400, "文本过长（上限约 500KB）")
+    try:
+        d = pdf_intake.run_residential_pdf_ocr_pages(page_texts, ocr_pages, filename)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(500, f"合并失败：{str(e)[:200]}")
+    if d.get("error"):
+        raise HTTPException(422, d["error"])
+    return d
+
+
 # ---------------- 商业核保 PDF intake：OM/flyer → 商业字段 → 自动填表 ----------------
 
 @app.post("/api/uw-commercial/intake/pdf")
@@ -821,6 +846,31 @@ def uw_commercial_intake_pdf_ocr_text(payload: dict):
         d = pdf_intake.run_commercial_pdf_ocr_text(text, filename)
     except Exception as e:  # noqa: BLE001
         raise HTTPException(500, f"提取失败：{str(e)[:200]}")
+    if d.get("error"):
+        raise HTTPException(422, d["error"])
+    return d
+
+
+@app.post("/api/uw-commercial/intake/pdf-ocr-pages")
+def uw_commercial_intake_pdf_ocr_pages(payload: dict):
+    """商业混合型 PDF 逐页 OCR 合并（台账第 15 项，2026-10-15）。
+
+    混合 PDF 上传返回 needs_ocr_pages + page_texts（文本层逐页文本）；
+    浏览器只 OCR 低文本页后把 {page_texts, ocr_pages} 发到这里合并，
+    字段逐页归属、OCR 页字段标「扫描页OCR」来源。"""
+    page_texts = (payload or {}).get("page_texts") or []
+    ocr_pages = (payload or {}).get("ocr_pages") or {}
+    filename = str((payload or {}).get("filename") or "mixed.pdf")
+    if not isinstance(page_texts, list) or not page_texts:
+        raise HTTPException(400, "缺少 page_texts（文本层逐页文本），请重新上传 PDF")
+    if not isinstance(ocr_pages, dict) or not ocr_pages:
+        raise HTTPException(400, "缺少 ocr_pages（逐页 OCR 文本）")
+    if sum(len(str(p or "")) for p in page_texts) > 500_000:
+        raise HTTPException(400, "文本过长（上限约 500KB）")
+    try:
+        d = pdf_intake.run_commercial_pdf_ocr_pages(page_texts, ocr_pages, filename)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(500, f"合并失败：{str(e)[:200]}")
     if d.get("error"):
         raise HTTPException(422, d["error"])
     return d

@@ -624,6 +624,34 @@ WB.ocrPdfInBrowser = async function (file) {
   }
   return texts.join('\n');
 };
+/* 混合型 PDF 逐页 OCR（台账第 15 项）：只渲染指定页（扫描图页），
+   返回 {页码: 文本}，供 /api/wb/intake/pdf-ocr-pages 与文本层合并。 */
+WB.ocrPdfPagesInBrowser = async function (file, pageNumbers) {
+  const pdfjsLib = await _wbLoadScript(
+    'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js', 'pdfjsLib');
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+  const Tesseract = await _wbLoadScript(
+    'https://cdn.jsdelivr.net/npm/tesseract.js@5.0.5/dist/tesseract.min.js', 'Tesseract');
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({data: buf}).promise;
+  const out = {};
+  for (const i of pageNumbers) {
+    if (i < 1 || i > pdf.numPages) continue;
+    $('#intake-status').textContent = `⏳ 混合 PDF 扫描页 OCR：第 ${i} 页识别中…`;
+    const page = await pdf.getPage(i);
+    const viewport = page.getViewport({scale: 2});
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width; canvas.height = viewport.height;
+    await page.render({canvasContext: canvas.getContext('2d'), viewport}).promise;
+    const blob = await new Promise(res => canvas.toBlob(res, 'image/png'));
+    if (!blob) continue;
+    const res2 = await Tesseract.recognize(blob, 'eng');
+    const t = (res2 && res2.data && res2.data.text) || '';
+    if (t.trim()) out[i] = t;
+  }
+  return out;
+};
 WB.intakePdf = async function () {
   const f = $('#in-pdf').files[0];
   if (!f) { alert('请先选择 PDF 文件'); return; }
@@ -647,6 +675,29 @@ WB.intakePdf = async function () {
         throw new Error(((d2 && (d2.detail || d2.error)) || ('HTTP ' + r2.status)));
       }
       WB.renderIntake(d2);
+      return;
+    }
+    if (d.needs_ocr_pages && d.needs_ocr_pages.length) {
+      // 混合型 PDF（台账第 15 项）：只有低文本页是扫描图 → 只 OCR 这些页，
+      // 与服务端文本层逐页文本合并（pdf-ocr-pages），字段逐页归属
+      if (!d.page_texts) {
+        throw new Error(d.notice || '混合型 PDF 扫描页需 OCR，但文本层数据过大无法合并，请改用粘贴文本');
+      }
+      $('#intake-status').textContent =
+        `⏳ 混合型 PDF：第 ${d.needs_ocr_pages.join('、')} 页为扫描图，启动逐页 OCR…`;
+      const ocrPages = await WB.ocrPdfPagesInBrowser(f, d.needs_ocr_pages);
+      if (!Object.keys(ocrPages).length) {
+        throw new Error('扫描页 OCR 未识别出文字，请换更清晰的扫描件');
+      }
+      const r3 = await fetch('/api/wb/intake/pdf-ocr-pages', {method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({page_texts: d.page_texts, ocr_pages: ocrPages,
+                              filename: f.name})});
+      const d3 = await r3.json().catch(() => null);
+      if (!r3.ok || !d3 || d3.error) {
+        throw new Error(((d3 && (d3.detail || d3.error)) || ('HTTP ' + r3.status)));
+      }
+      WB.renderIntake(d3);
       return;
     }
     if (d.error) $('#intake-status').innerHTML = `<span class="neg">${esc(d.error)}</span>`;

@@ -804,6 +804,26 @@ async function init() {
           applyIntakeResult(d2);
           return;
         }
+        if (d.needs_ocr_pages && d.needs_ocr_pages.length) {
+          // 混合型 PDF（台账第 15 项）：只有低文本页是扫描图 → 只 OCR 这些页，
+          // 与服务端文本层逐页文本合并（pdf-ocr-pages），字段逐页归属
+          if (!d.page_texts) {
+            throw new Error(d.notice || "混合型 PDF 扫描页需 OCR，但文本层数据过大无法合并，请改用粘贴文本");
+          }
+          setStatus("busy", "检测到混合型 PDF：第 " + d.needs_ocr_pages.join("、") + " 页为扫描图，启动浏览器端逐页 OCR…");
+          const ocrPages = await ocrPdfPagesInBrowser(f, d.needs_ocr_pages);
+          if (!Object.keys(ocrPages).length) {
+            throw new Error("扫描页 OCR 未识别出文字，请换更清晰的扫描件或改用粘贴文本");
+          }
+          const r3 = await fetch("/api/uw-commercial/intake/pdf-ocr-pages", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ page_texts: d.page_texts, ocr_pages: ocrPages, filename: f.name }),
+          });
+          const d3 = await r3.json();
+          if (!r3.ok || d3.error) throw new Error((d3 && (d3.detail || d3.error)) || ("HTTP " + r3.status));
+          applyIntakeResult(d3);
+          return;
+        }
         if (d.error) throw new Error(d.error);
         applyIntakeResult(d);
       } catch (err) {
@@ -1082,6 +1102,32 @@ async function init() {
       setStatus("busy", "扫描 PDF 共 " + pdf.numPages + " 页，仅 OCR 前 " + MAX_PAGES + " 页");
     }
     return texts.join("\n");
+  }
+  // 混合型 PDF 逐页 OCR（台账第 15 项）：只渲染指定页（扫描图页），
+  // 返回 {页码: 文本}，供 pdf-ocr-pages 与服务端文本层逐页文本合并。
+  async function ocrPdfPagesInBrowser(file, pageNumbers) {
+    const pdfjsLib = await loadPdfJs();
+    const Tesseract = await loadTesseract();
+    const buf = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+    const out = {};
+    for (const i of pageNumbers) {
+      if (i < 1 || i > pdf.numPages) continue;
+      setStatus("busy", "混合 PDF 扫描页 OCR：第 " + i + " 页渲染识别中…");
+      const page = await pdf.getPage(i);
+      const viewport = page.getViewport({ scale: 2 });
+      const canvas = document.createElement("canvas");
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      const ctx = canvas.getContext("2d");
+      await page.render({ canvasContext: ctx, viewport }).promise;
+      const blob = await new Promise((res) => canvas.toBlob(res, "image/png"));
+      if (!blob) continue;
+      const res2 = await Tesseract.recognize(blob, "eng");
+      const t = (res2 && res2.data && res2.data.text) || "";
+      if (t.trim()) out[i] = t;
+    }
+    return out;
   }
   const intakeImg = $("#intakeImg");
   if (intakeImg) {
