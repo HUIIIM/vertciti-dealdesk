@@ -248,6 +248,11 @@ table.t input.cell-in::placeholder { color: var(--tx3); font-size: 11px; font-fa
   .kpi { border-top: 1px solid var(--line-soft); }
   .kpi:nth-child(-n+2) { border-top: 0; }
   .k-v { font-size: 22px; }
+  /* 流水线读数 → 纵向堆叠（台账第 11 项）：7 个指标一次可见、无需横滑；栏间箭头旋转朝下 */
+  .pipe { flex-direction: column; overflow-x: visible; }
+  .pnode { flex: 0 0 auto; min-width: 0; border-left: 0; border-top: 1px solid var(--line-soft); }
+  .pnode:first-child { border-top: 0; }
+  .parr { transform: rotate(90deg); padding: 2px 0; }
   /* 租户表 → 卡片：每租户一张卡，字段上下排布 */
   #rentTable thead { display: none; }
   #rentTable, #rentTable tbody, #rentTable tfoot { display: block; }
