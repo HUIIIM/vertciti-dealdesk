@@ -35,7 +35,7 @@ def _f(v):
 
 # ---------------- 固定字段 schema（按 deal 类型版本化） ----------------
 # type: money=美元金额 | number=数值 | pct_decimal=小数口径比率(0.065=6.5%) |
-#       int=整数 | str=文本 | year=年份
+#       int=整数 | str=文本 | list_str=文本列表（已知非数值字段） | year=年份
 FIELD_SCHEMA = {
     "commercial": {
         "analysis.purchase_price":   {"type": "money", "label": "购买价格", "required_for_uw": True,
@@ -60,6 +60,8 @@ FIELD_SCHEMA = {
         "property.state":            {"type": "str", "label": "州", "required_for_uw": False},
         "property.zip":              {"type": "str", "label": "邮编", "required_for_uw": False},
         "property.property_type":    {"type": "str", "label": "物业类型", "required_for_uw": False},
+        "seller_points":             {"type": "list_str", "label": "卖方话术要点", "required_for_uw": False,
+                                      "note": "intake 产物（原文摘录列表），非数值字段，不参与规则校验"},
     },
     "residential": {
         "asking_price":  {"type": "money", "label": "售价/要价", "required_for_uw": True,
@@ -77,6 +79,8 @@ FIELD_SCHEMA = {
                           "min": 0, "max": 50},
         "year_built":    {"type": "year", "label": "建造年份", "required_for_uw": False,
                           "min": 1700, "max": 2100},
+        "seller_points": {"type": "list_str", "label": "卖方话术要点", "required_for_uw": False,
+                          "note": "intake 产物（原文摘录列表），非数值字段，不参与规则校验"},
     },
 }
 
@@ -97,7 +101,7 @@ def validate_schema(deal_type: str, flat: dict, strict_unknown: bool = True) -> 
                                "detail": "字段不在固定 schema 内，可能为解析误抓或版本漂移"})
             continue
         t = spec["type"]
-        if t == "str":
+        if t in ("str", "list_str"):
             continue
         v = _f(raw)
         if v is None:
