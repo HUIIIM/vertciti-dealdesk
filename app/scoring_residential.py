@@ -96,42 +96,51 @@ def compute_metrics(d: dict) -> dict:
     }
 
 
-def check_vetoes(d: dict, m: dict) -> list[dict]:
+def check_vetoes(d: dict, m: dict, lang: str = "zh") -> list[dict]:
     """buyer-box.md 第七节：硬否决项（v2.3：负净值不再单独否决，改风险旗＋补偿条件制）。"""
     vetoes = []
     if d.get("rate_type") != "fixed":
-        vetoes.append({"code": "floating_rate", "message": "浮动/可调利率否决：只做固定利率（Miao 亲定）"})
+        vetoes.append({"code": "floating_rate", "message": ("Floating/adjustable-rate veto: fixed rate only (set by Miao)"
+                                                            if lang == "en" else "浮动/可调利率否决：只做固定利率（Miao 亲定）")})
     balloon = d.get("balloon_years")
     if balloon is not None and balloon < 5:
-        vetoes.append({"code": "short_balloon", "message": f"短期 balloon 否决：{balloon} 年内到期 balloon（Miao 亲定）"})
+        vetoes.append({"code": "short_balloon", "message": (f"Short-balloon veto: balloon due within {balloon} years (set by Miao)"
+                                                            if lang == "en" else f"短期 balloon 否决：{balloon} 年内到期 balloon（Miao 亲定）")})
     # P0-2（Phase 5）：退出 / due-on-sale 否决仅在 structure=subject_to 时参与 verdict；
     # 普通购买/贷款购买结构下永不出现。单一"退出策略"输入即可解除对应否决
     # （备选路径硬性要求取消——前端只有一个退出策略入口，选了即解除）。
     if d.get("structure") == "subject_to" and not d.get("exit_primary"):
         vetoes.append({"code": "no_exit",
-                       "message": "无退出预案否决：subject-to 须先选定退出策略（出售/refi/转租购/持有收租）"})
+                       "message": ("No-exit-plan veto: a subject-to deal must first name an exit strategy (sell / refi / lease-option / hold & rent)"
+                                   if lang == "en" else "无退出预案否决：subject-to 须先选定退出策略（出售/refi/转租购/持有收租）")})
     if d.get("structure") == "subject_to" and not d.get("due_on_sale_plan"):
-        vetoes.append({"code": "no_dos_plan", "message": "无 due-on-sale 备用预案否决：subject-to 必须能 refi/出售/转租购三选一落地"})
+        vetoes.append({"code": "no_dos_plan", "message": ("No due-on-sale backup-plan veto: a subject-to deal must be able to land one of refi / sell / lease-option"
+                                                          if lang == "en" else "无 due-on-sale 备用预案否决：subject-to 必须能 refi/出售/转租购三选一落地")})
     if d.get("seller_delinquent_days", 0) > 90 and not d.get("has_discount_hedge"):
-        vetoes.append({"code": "delinquent", "message": "卖方贷款逾期 >90 天且无深度折价对冲"})
+        vetoes.append({"code": "delinquent", "message": ("Seller's loan is 90+ days delinquent with no deep-discount hedge"
+                                                         if lang == "en" else "卖方贷款逾期 >90 天且无深度折价对冲")})
     if not d.get("insurance_available", True):
-        vetoes.append({"code": "no_insurance", "message": "房子买不到保险/无保险路径"})
+        vetoes.append({"code": "no_insurance", "message": ("Property is uninsurable / no insurance path"
+                                                             if lang == "en" else "房子买不到保险/无保险路径")})
     # P0-1（Phase 5）：删除"卖方拒绝签 authorization to release"无条件一票否决——
     # 后端无输入源能证明"拒绝"，属幻觉式否决。改为 Zone 7 交割 checklist 的一项
     # （"交割前向卖方索取 authorization to release"，状态未验证），永不自动否决。
     if d.get("rent_source") == "proforma":
-        vetoes.append({"code": "proforma_rent", "message": "租金是 pro-forma 自嗨、无 comps 支撑"})
+        vetoes.append({"code": "proforma_rent", "message": ("Rent is pro-forma fantasy with no comps support"
+                                                              if lang == "en" else "租金是 pro-forma 自嗨、无 comps 支撑")})
     if d.get("hoa_arrears_severe") or d.get("title_defect"):
-        vetoes.append({"code": "title_hoa", "message": "HOA 巨额欠费 / title 硬伤清不掉"})
+        vetoes.append({"code": "title_hoa", "message": ("Severe HOA arrears / a title defect that cannot be cleared"
+                                                          if lang == "en" else "HOA 巨额欠费 / title 硬伤清不掉")})
     if d.get("fraud_flag"):
-        vetoes.append({"code": "fraud", "message": "要求虚假陈述/结构明显欺诈"})
+        vetoes.append({"code": "fraud", "message": ("Requires misrepresentation / the structure is plainly fraudulent"
+                                                      if lang == "en" else "要求虚假陈述/结构明显欺诈")})
     return vetoes
 
 
-def score(d: dict) -> dict:
+def score(d: dict, lang: str = "zh") -> dict:
     """满分 100 评分，返回 {total, grade, dimensions, vetoes, metrics, checks}."""
     m = compute_metrics(d)
-    vetoes = check_vetoes(d, m)
+    vetoes = check_vetoes(d, m, lang)
     dims = []
 
     # --- 维度1: 现金流 30 分（整套现金流/DSCR/CoC 综合）---

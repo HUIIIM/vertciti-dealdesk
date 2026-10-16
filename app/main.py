@@ -106,11 +106,11 @@ def _startup():
     db.init_db()
 
 
-def score_input(track: str, data: dict) -> dict:
+def score_input(track: str, data: dict, lang: str = "zh") -> dict:
     validated = validate_input(track, data)
     if track == "residential":
-        return scoring_residential.score(validated)
-    return scoring_commercial.score(validated)
+        return scoring_residential.score(validated, lang=lang)
+    return scoring_commercial.score(validated, lang=lang)
 
 
 def _with_fresh_score(p: dict) -> dict:
@@ -222,7 +222,7 @@ def delete_project(pid: int):
 @app.post("/api/score")
 def score_only(payload: ProjectCreate):
     """一键打分（不入库，用于录入时实时预览）。"""
-    return score_input(payload.track, payload.input)
+    return score_input(payload.track, payload.input, payload.lang)
 
 
 @app.post("/api/sensitivity")
@@ -249,13 +249,15 @@ class _VerdictReq(BaseModel):
     score: dict = {}
     confidence: float = 0
     evidence: dict = {}
+    lang: str = "zh"
 
 
 @app.post("/api/verdict")
 def api_verdict(req: _VerdictReq):
     """verdict 三档引擎：住宅 值得买/再看看/别碰；商业 BUY/HOLD/PASS."""
     try:
-        return verdict_mod.verdict(req.track, req.score, req.confidence, req.evidence)
+        return verdict_mod.verdict(req.track, req.score, req.confidence, req.evidence,
+                                   lang=req.lang)
     except ValueError as e:
         raise HTTPException(400, str(e))
 
@@ -265,13 +267,14 @@ class _ConfidenceReq(BaseModel):
     track: str = "residential"
     comps: list = []
     evidence: dict = {}
+    lang: str = "zh"
 
 
 @app.post("/api/confidence")
 def api_confidence(req: _ConfidenceReq):
     """Confidence Score 0-100（证据质量分，非推荐强度），公式公开."""
     try:
-        return conf_mod.compute(req.track, req.comps, req.evidence)
+        return conf_mod.compute(req.track, req.comps, req.evidence, lang=req.lang)
     except ValueError as e:
         raise HTTPException(400, str(e))
 
@@ -1032,6 +1035,7 @@ def uw_compute_plus(payload: dict):
             valuation_range=payload.get("valuation_range"),
             market_vacancy_pct=payload.get("market_vacancy_pct"),
             with_stress=bool(payload.get("with_stress", True)),
+            lang=payload.get("lang") or "zh",
         )
     except Exception as e:  # noqa: BLE001
         raise HTTPException(500, f"计算失败：{str(e)[:200]}")

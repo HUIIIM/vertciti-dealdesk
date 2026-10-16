@@ -38,7 +38,7 @@ def _div(a, b) -> float | None:
 
 
 # ---------------------------------------------------------------- NOI 银行调整桥
-def noi_bank_bridge(result: dict, market_vacancy_pct: float | None = None) -> dict:
+def noi_bank_bridge(result: dict, market_vacancy_pct: float | None = None, lang: str = "zh") -> dict:
     """卖方 NOI → 银行口径 NOI waterfall（专家规范 §2.1）.
 
     每一项单独成行，带金额与一句话依据；规则估算项标 🟡。
@@ -55,15 +55,20 @@ def noi_bank_bridge(result: dict, market_vacancy_pct: float | None = None) -> di
 
     rows = []
     running = seller_noi
-    rows.append({"item": "卖方口径 NOI（历史）", "amount": round(seller_noi, 2),
-                 "basis": "卖方报表口径，未做买方标准化调整", "tag": "yellow"})
+    rows.append({"item": "Seller-basis NOI (historical)" if lang == "en" else "卖方口径 NOI（历史）",
+                 "amount": round(seller_noi, 2),
+                 "basis": "Per seller statements; no buyer normalization applied" if lang == "en" else "卖方报表口径，未做买方标准化调整",
+                 "tag": "yellow"})
 
     # 管理费调整：4-5%，Fannie floor 4%；补足到 4%（现有已计足则 0）
     target_mgmt = egi * 0.04
     mgmt_adj = max(0.0, target_mgmt - existing_mgmt)
     running -= mgmt_adj
-    rows.append({"item": "− 管理费调整（补足至 4%）", "amount": round(-mgmt_adj, 2),
-                 "basis": "Fannie floor 4%；现有管理费 ${:,.0f}，规则估算".format(existing_mgmt),
+    rows.append({"item": "- Management-fee adjustment (topped up to 4%)" if lang == "en" else "− 管理费调整（补足至 4%）",
+                 "amount": round(-mgmt_adj, 2),
+                 "basis": ("Fannie floor 4%; current management fee ${:,.0f} — rule-based estimate".format(existing_mgmt)
+                           if lang == "en" else
+                           "Fannie floor 4%；现有管理费 ${:,.0f}，规则估算".format(existing_mgmt)),
                  "tag": "yellow"})
 
     # replacement reserve：多户 $250/门/年；办公/零售 $0.18/SF/年
@@ -72,10 +77,12 @@ def noi_bank_bridge(result: dict, market_vacancy_pct: float | None = None) -> di
     ptype = str(prop.get("property_type") or "").lower()
     if "multifamily" in ptype or "apartment" in ptype or (units and units >= 5):
         reserve = units * 250.0
-        basis = f"多户 $250/门/年 × {units:.0f} 门（Fannie 标准），规则估算"
+        basis = (f"Multifamily $250/unit/yr x {units:.0f} units (Fannie standard) — rule-based estimate"
+                 if lang == "en" else f"多户 $250/门/年 × {units:.0f} 门（Fannie 标准），规则估算")
     else:
         reserve = sf * 0.18
-        basis = f"办公/零售 $0.18/SF/年 × {sf:,.0f} SF，规则估算"
+        basis = (f"Office/retail $0.18/SF/yr x {sf:,.0f} SF — rule-based estimate"
+                 if lang == "en" else f"办公/零售 $0.18/SF/年 × {sf:,.0f} SF，规则估算")
     running -= reserve
     rows.append({"item": "− Replacement reserve", "amount": round(-reserve, 2),
                  "basis": basis, "tag": "yellow"})
@@ -85,23 +92,30 @@ def noi_bank_bridge(result: dict, market_vacancy_pct: float | None = None) -> di
     target_vac = max(mkt_vac, 0.05)
     vac_adj = max(0.0, (target_vac - cur_vac)) * total_potential
     running -= vac_adj
-    rows.append({"item": "− 空置调整（取市场与 5% 孰高）", "amount": round(-vac_adj, 2),
-                 "basis": "目标空置 {:.1f}% vs 现有 {:.1f}%，规则估算".format(target_vac * 100, cur_vac * 100),
+    rows.append({"item": "- Vacancy adjustment (higher of market vs 5%)" if lang == "en" else "− 空置调整（取市场与 5% 孰高）",
+                 "amount": round(-vac_adj, 2),
+                 "basis": ("Target vacancy {:.1f}% vs current {:.1f}% — rule-based estimate".format(target_vac * 100, cur_vac * 100)
+                           if lang == "en" else
+                           "目标空置 {:.1f}% vs 现有 {:.1f}%，规则估算".format(target_vac * 100, cur_vac * 100)),
                  "tag": "yellow"})
 
     # 税/保险调整：按重估后税额、现行市价保费；无税单时 0 + 注记
     tax_adj = 0.0
-    rows.append({"item": "− 税/保险重估调整", "amount": round(tax_adj, 2),
-                 "basis": "税单未核验，按卖方口径（OpEx 可能低估）", "tag": "yellow"})
+    rows.append({"item": "- Tax/insurance re-estimation adjustment" if lang == "en" else "− 税/保险重估调整",
+                 "amount": round(tax_adj, 2),
+                 "basis": "Tax bill unverified — seller basis used (OpEx may be understated)" if lang == "en" else "税单未核验，按卖方口径（OpEx 可能低估）",
+                 "tag": "yellow"})
 
-    rows.append({"item": "银行口径 NOI", "amount": round(running, 2),
-                 "basis": "DSCR 分子必须用此口径", "tag": "green"})
+    rows.append({"item": "Bank-basis NOI" if lang == "en" else "银行口径 NOI",
+                 "amount": round(running, 2),
+                 "basis": "The DSCR numerator must use this basis" if lang == "en" else "DSCR 分子必须用此口径",
+                 "tag": "green"})
     return {"rows": rows, "bank_noi": round(running, 2),
             "seller_noi": round(seller_noi, 2)}
 
 
 # ---------------------------------------------------------------- DSCR 双轨
-def dscr_dual(result: dict, bank_noi: float | None = None) -> dict:
+def dscr_dual(result: dict, bank_noi: float | None = None, lang: str = "zh") -> dict:
     """DSCR 双轨：trailing 主 / pro forma 辅，每个数字强制口径标注（P0-4）.
 
     口径铁律：分子=银行口径 NOI（有则用，无则回退现金流口径并如实标注）；
@@ -116,19 +130,21 @@ def dscr_dual(result: dict, bank_noi: float | None = None) -> dict:
     amort = ana.get("amort_years")
     amort_type = str(ana.get("amort_type") or "AMORTIZING").upper()
     if amort_type == "AMORTIZING":
-        ds_note = "全额本息按月摊还，{} 年".format(amort)
+        ds_note = ("Fully amortizing monthly P&I, {} years".format(amort) if lang == "en"
+                   else "全额本息按月摊还，{} 年".format(amort))
     else:
-        ds_note = "纯利息（IO），不含本金"
+        ds_note = "Interest-only (IO), no principal" if lang == "en" else "纯利息（IO），不含本金"
     # trailing 分子：优先银行口径 NOI
     if bank_noi:
         trailing_dscr = _div(bank_noi, ds)
-        trailing_num_note = "银行口径 NOI"
+        trailing_num_note = "Bank-basis NOI" if lang == "en" else "银行口径 NOI"
     else:
         # D3：全款（ds=0）或 dscr 缺失 → None（N/A 链）；禁 _f() 压成 0.0
         # （"0.00×" 会被误读为"资不抵债"）
         trailing_dscr = inpl.get("dscr")
         trailing_dscr = None if trailing_dscr is None else _f(trailing_dscr)
-        trailing_num_note = "现金流口径 NOI（银行口径缺失，回退）"
+        trailing_num_note = ("Cash-flow-basis NOI (bank basis missing — fallback)"
+                               if lang == "en" else "现金流口径 NOI（银行口径缺失，回退）")
     proforma_dscr = proj.get("dscr")
     proforma_dscr = None if proforma_dscr is None else _f(proforma_dscr)
 
@@ -138,7 +154,8 @@ def dscr_dual(result: dict, bank_noi: float | None = None) -> dict:
     return {
         "trailing": {
             "dscr": trailing_dscr,
-            "label": ("{}（{} / {}，{:.2f}% 定息假设）"
+            "label": (("{} ({} / {}, {:.2f}% fixed-rate assumption)"
+                       if lang == "en" else "{}（{} / {}，{:.2f}% 定息假设）")
                       .format(_dscr_label(trailing_dscr), trailing_num_note, ds_note, rate * 100)),
             "primary": True,
             "numerator": trailing_num_note,
@@ -146,7 +163,8 @@ def dscr_dual(result: dict, bank_noi: float | None = None) -> dict:
         },
         "proforma": {
             "dscr": proforma_dscr,
-            "label": ("{}（PF：预测口径 NOI / {}，{:.2f}% 定息假设）"
+            "label": (("{} (PF: forecast-basis NOI / {}, {:.2f}% fixed-rate assumption)"
+                       if lang == "en" else "{}（PF：预测口径 NOI / {}，{:.2f}% 定息假设）")
                       .format(_dscr_label(proforma_dscr), ds_note, rate * 100)),
             "primary": False,
             "amort_type": amort_type,
@@ -157,7 +175,7 @@ def dscr_dual(result: dict, bank_noi: float | None = None) -> dict:
 
 
 # ---------------------------------------------------------------- rent roll 摘要
-def rent_roll_summary(result: dict) -> dict:
+def rent_roll_summary(result: dict, lang: str = "zh") -> dict:
     rr = result.get("rent_roll") or {}
     tenants = [t for t in (rr.get("tenants") or []) if isinstance(t, dict)]
     total_annual = sum(_f(t.get("annual_rent")) for t in tenants)
@@ -208,7 +226,10 @@ def rent_roll_summary(result: dict) -> dict:
         "rows": rows,
         "total_annual_rent": round(total_annual, 2),
         "walt_years": walt,
-        "walt_note": "租金加权剩余租期" if walt is not None else "缺租约起止日，无法计算 WALT",
+        "walt_note": (("Rent-weighted remaining lease term" if lang == "en" else "租金加权剩余租期")
+                      if walt is not None else
+                      ("Lease start/end dates missing — WALT cannot be computed"
+                       if lang == "en" else "缺租约起止日，无法计算 WALT")),
         "expiry_buckets": {str(k): round(v, 2) for k, v in buckets.items()},
         "top3_concentration": round(conc3, 4),
         "top3_flag": conc3 > 0.6,
@@ -244,19 +265,19 @@ def _tweak(data: dict, rate_delta: float = 0.0, vac_delta: float = 0.0,
 
 
 def stress_table(data: dict, loan_amount: float | None = None,
-                 market_vacancy_pct: float | None = None) -> dict:
+                 market_vacancy_pct: float | None = None, lang: str = "zh") -> dict:
     """压力测试表：行=档位，列=DSCR / Debt Yield / Breakeven；破红线标红."""
-    scenarios = [("基准", {})]
+    scenarios = [(("Base" if lang == "en" else "基准"), {})]
     for bps in STRESS_TIERS["rate_bps"]:
         # 标准 v1.0：rate 输入 [PCT] —— 100bps = 1.0 个百分点
-        scenarios.append((f"利率 +{bps}bps", {"rate_delta": bps / 100}))
+        scenarios.append(((f"Rate +{bps}bps" if lang == "en" else f"利率 +{bps}bps"), {"rate_delta": bps / 100}))
     for pp in STRESS_TIERS["vacancy_pp"]:
         # P0-1 (2026-10-05): _tweak 操作的是百分制输入，vac_delta 用百分点（pp），不再 /100
-        scenarios.append((f"空置 +{pp}pp", {"vac_delta": pp}))
+        scenarios.append(((f"Vacancy +{pp}pp" if lang == "en" else f"空置 +{pp}pp"), {"vac_delta": pp}))
     for pct in STRESS_TIERS["rent_pct"]:
-        scenarios.append((f"租金 {pct}%", {"rent_mult": 1 + pct / 100}))
+        scenarios.append(((f"Rent {pct}%" if lang == "en" else f"租金 {pct}%"), {"rent_mult": 1 + pct / 100}))
     if STRESS_TIERS["combo"]:
-        scenarios.append(("组合：利率+200bps & 空置+5pp",
+        scenarios.append((("Combo: rate +200bps & vacancy +5pp" if lang == "en" else "组合：利率+200bps & 空置+5pp"),
                           {"rate_delta": 0.02, "vac_delta": 5}))
     rows = []
     for label, kw in scenarios:
@@ -293,13 +314,13 @@ def stress_table(data: dict, loan_amount: float | None = None,
 def compute_plus(data: dict, loan_amount: float | None = None,
                  valuation_range: dict | None = None,
                  market_vacancy_pct: float | None = None,
-                 with_stress: bool = True) -> dict:
+                 with_stress: bool = True, lang: str = "zh") -> dict:
     """compute_all() 输出 ＋ 增补指标（不改 compute_all 逻辑）."""
     data = data or {}
     base = uw_commercial.compute_all(data)
     ana = base["analysis"]
     loan = _f(loan_amount) or _f(ana.get("loan_bal"))
-    bridge = noi_bank_bridge(base, market_vacancy_pct)
+    bridge = noi_bank_bridge(base, market_vacancy_pct, lang)
     bank_noi = bridge["bank_noi"]
     debt_yield = _div(bank_noi, loan)   # D3：loan=0 → None（N/A 链），禁 0.0 冒充
 
@@ -312,31 +333,35 @@ def compute_plus(data: dict, loan_amount: float | None = None,
             "at_range_lo": round(_div(loan, vlo), 4),
             "at_range_hi": round(_div(loan, vhi), 4),
             "range": [vlo, vhi],
-            "note": "银行永远看保守值（区间下限）",
+            "note": "Banks always underwrite to the conservative value (range low)" if lang == "en" else "银行永远看保守值（区间下限）",
         })
     else:
         price = _f(ana.get("purchase_price"))
         ltv_at = _div(loan, price)   # D3：price=0 → None（N/A 链）
         ltv.update({
             "at_purchase": None if ltv_at is None else round(ltv_at, 4),
-            "note": "无估值区间，按收购价计（待估值接入后双算）",
+            "note": "No valuation range — computed on purchase price (dual calc once valuation is connected)" if lang == "en" else "无估值区间，按收购价计（待估值接入后双算）",
         })
 
-    rr = rent_roll_summary(base)
+    rr = rent_roll_summary(base, lang)
     p0_gaps = []
     if not rr["has_rent_roll"]:
-        p0_gaps.append("缺结构化 rent roll（WALT/到期集中度/租户集中度无法验证，NOI 可信度降级）")
+        p0_gaps.append("No structured rent roll (WALT / expiry concentration / tenant concentration unverifiable — NOI credibility downgraded)"
+                       if lang == "en" else "缺结构化 rent roll（WALT/到期集中度/租户集中度无法验证，NOI 可信度降级）")
     hist = base.get("historical") or {}
     if _f(hist.get("noi")) <= 0:
-        p0_gaps.append("T-12 经营数据缺失（DSCR 基于预测口径）")
+        p0_gaps.append("T-12 operating data missing (DSCR on a forecast basis)"
+                       if lang == "en" else "T-12 经营数据缺失（DSCR 基于预测口径）")
     if not _f(ana.get("loan_bal")) and not loan_amount:
-        p0_gaps.append("真实贷款条件未输入（DSCR 按模板假设）")
+        p0_gaps.append("Actual loan terms not entered (DSCR on template assumptions)"
+                       if lang == "en" else "真实贷款条件未输入（DSCR 按模板假设）")
 
     out = dict(base)
     out["plus"] = {
         "debt_yield": None if debt_yield is None else round(debt_yield, 4),
-        "debt_yield_note": "NOI（银行口径）÷ 拟贷款额；≥8-10% 舒适，≥7% agency 多户底线，<6% 机构资金出局",
-        "dscr_dual": dscr_dual(base, bank_noi),
+        "debt_yield_note": ("NOI (bank basis) / proposed loan amount; 8-10%+ comfortable, 7% agency multifamily floor, <6% institutional capital walks"
+                            if lang == "en" else "NOI（银行口径）÷ 拟贷款额；≥8-10% 舒适，≥7% agency 多户底线，<6% 机构资金出局"),
+        "dscr_dual": dscr_dual(base, bank_noi, lang),
         "noi_bank_bridge": bridge,
         "ltv": ltv,
         "rent_roll_detail": rr,
@@ -344,5 +369,5 @@ def compute_plus(data: dict, loan_amount: float | None = None,
         "has_rent_roll": rr["has_rent_roll"],
     }
     if with_stress:
-        out["plus"]["stress"] = stress_table(data, loan, market_vacancy_pct)
+        out["plus"]["stress"] = stress_table(data, loan, market_vacancy_pct, lang=lang)
     return out

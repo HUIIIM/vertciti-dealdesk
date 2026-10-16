@@ -156,3 +156,4 @@ class ProjectCreate(BaseModel):
     name: str = ""
     address: str = ""
     input: dict
+    lang: str = "zh"  # EN 界面（2026-10-16）：叙事/否决文案语言，默认 zh

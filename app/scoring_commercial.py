@@ -224,7 +224,7 @@ def compute_metrics(d: dict, with_stress: bool = True) -> dict:
     }
 
 
-def check_vetoes(d: dict, m: dict) -> list[dict]:
+def check_vetoes(d: dict, m: dict, lang: str = "zh") -> list[dict]:
     """buyer-box-commercial.md 第九节：硬否决项（v1.3：负净值改风险旗；抛售退出软化）。"""
     vetoes = []
     asset = d.get("asset_class", "retail_strip")
@@ -232,58 +232,73 @@ def check_vetoes(d: dict, m: dict) -> list[dict]:
     is_hotel = asset == "hotel"
     if asset == "other":
         vetoes.append({"code": "out_of_scope",
-                       "message": "资产类别不在商业线范围内（开发用地/ground lease/机构级NNN/1-4单元除外；office、酒店 v1.1 已纳入）"})
+                       "message": ("Asset class is outside the commercial line's scope (excludes development land / ground leases / institutional NNN / 1-4 units; office and hotels were added in v1.1)"
+                                   if lang == "en" else "资产类别不在商业线范围内（开发用地/ground lease/机构级NNN/1-4单元除外；office、酒店 v1.1 已纳入）")})
     if is_office:
         # v1.1 office 专项门槛：纯投机性空置办公不看
         if d.get("occupancy_pct", 0) < 80:
             vetoes.append({"code": "office_low_occupancy",
-                           "message": "Office 在租率 <80% 否决：纯投机性空置办公不看（v1.1 专项口径）"})
+                           "message": ("Office occupancy <80% veto: purely speculative vacant office is out (v1.1 office rule)"
+                                       if lang == "en" else "Office 在租率 <80% 否决：纯投机性空置办公不看（v1.1 专项口径）")})
         if d.get("walt_years", 0) < 4:
             vetoes.append({"code": "office_walt",
-                           "message": "Office WALT <4 年否决（v1.1 专项口径）"})
+                           "message": ("Office WALT <4 years veto (v1.1 office rule)"
+                                       if lang == "en" else "Office WALT <4 年否决（v1.1 专项口径）")})
     if is_hotel:
         if not d.get("has_operating_history", True):
             vetoes.append({"code": "hotel_no_history",
-                           "message": "无经营记录的新建/烂尾酒店（一票否决，v1.1 专项口径）"})
+                           "message": ("New-build/stalled hotel with no operating history (hard veto, v1.1 rule)"
+                                       if lang == "en" else "无经营记录的新建/烂尾酒店（一票否决，v1.1 专项口径）")})
         if d.get("revpar_source") == "proforma":
             vetoes.append({"code": "hotel_proforma_revpar",
-                           "message": "卖方 pro-forma RevPAR 不许用（v1.1 专项口径）"})
+                           "message": ("Seller pro-forma RevPAR is not allowed (v1.1 rule)"
+                                       if lang == "en" else "卖方 pro-forma RevPAR 不许用（v1.1 专项口径）")})
     # v1.3：负净值（成交价高于 as-is 评估值）不再单独否决，改风险旗＋补偿条件制（见风险维度）
     # 补偿条件（现金流/DSCR/储备金/退出预案）由对应否决项覆盖。
     for t in d.get("tranches", []):
         if t.get("rate_type") != "fixed":
-            vetoes.append({"code": "floating_rate", "message": "浮动/可调利率否决：只做固定利率（Miao 亲定）"})
+            vetoes.append({"code": "floating_rate", "message": ("Floating/adjustable-rate veto: fixed rate only (set by Miao)"
+                                                                if lang == "en" else "浮动/可调利率否决：只做固定利率（Miao 亲定）")})
             break
         b = t.get("balloon_years")
         if b is not None and b < 5:
             vetoes.append({"code": "short_balloon",
-                           "message": f"短期 balloon 否决：{b} 年内到期 balloon（Miao 亲定）"})
+                           "message": (f"Short-balloon veto: balloon due within {b} years (set by Miao)"
+                                       if lang == "en" else f"短期 balloon 否决：{b} 年内到期 balloon（Miao 亲定）")})
             break
     # P0-2（Phase 5）：退出 / due-on-sale 否决仅在 structure=subject_to 时参与 verdict；
     # 普通购买/贷款购买/其他结构下永不出现。单一"退出策略"输入即可解除对应否决。
     if d.get("structure") == "subject_to" and not d.get("exit_primary"):
         vetoes.append({"code": "no_exit",
-                       "message": "无退出预案否决：subject-to 须先选定退出策略（出售/refi/转租购/持有收租）"})
+                       "message": ("No-exit-plan veto: a subject-to deal must first name an exit strategy (sell / refi / lease-option / hold & rent)"
+                                   if lang == "en" else "无退出预案否决：subject-to 须先选定退出策略（出售/refi/转租购/持有收租）")})
     if d.get("structure") == "subject_to" and not (d.get("exit_backup") or d.get("due_on_sale_plan")):
         vetoes.append({"code": "no_dos_plan",
-                       "message": "subject-to 无 due-on-sale 备用预案（须能 refi/出售/转租购三选一落地）"})
+                       "message": ("Subject-to has no due-on-sale backup plan (must be able to land one of refi / sell / lease-option)"
+                                   if lang == "en" else "subject-to 无 due-on-sale 备用预案（须能 refi/出售/转租购三选一落地）")})
     if not d.get("phase1_clear", True):
-        vetoes.append({"code": "environmental", "message": "环境红旗否决：Phase I 有未解决红旗"})
+        vetoes.append({"code": "environmental", "message": ("Environmental red-flag veto: unresolved Phase I flags"
+                                                            if lang == "en" else "环境红旗否决：Phase I 有未解决红旗")})
     if d.get("ti_lc_unfunded_over_12mo"):
-        vetoes.append({"code": "ti_lc", "message": "TI/LC 否决：单个租约未摊销 TI/LC 超 12 个月租金且无资金覆盖"})
+        vetoes.append({"code": "ti_lc", "message": ("TI/LC veto: one lease carries more than 12 months of rent in unamortized TI/LC with no funding cover"
+                                                        if lang == "en" else "TI/LC 否决：单个租约未摊销 TI/LC 超 12 个月租金且无资金覆盖")})
     walt = d.get("walt_years", 0)
     if walt < 2 and d.get("concentration_12mo_pct", 0) > 40:
         vetoes.append({"code": "rollover_cliff",
-                       "message": "Rollover 悬崖否决：WALT<2 年且 12 个月内到期租金 >40%"})
+                       "message": ("Rollover-cliff veto: WALT <2 years and more than 40% of rent expires within 12 months"
+                                   if lang == "en" else "Rollover 悬崖否决：WALT<2 年且 12 个月内到期租金 >40%")})
     if d.get("noi_evidence") == "proforma":
-        vetoes.append({"code": "proforma_noi", "message": "卖方 pro-forma NOI 无 rent roll/租约支撑"})
+        vetoes.append({"code": "proforma_noi", "message": ("Seller pro-forma NOI has no rent-roll/lease support"
+                                                               if lang == "en" else "卖方 pro-forma NOI 无 rent roll/租约支撑")})
     # P0-1（Phase 5）：删除"卖方拒绝签 authorization to release"无条件一票否决——
     # 后端无输入源能证明"拒绝"，属幻觉式否决。改为 Zone 7 交割 checklist 的一项
     # （"交割前向卖方索取 authorization to release"，状态未验证），永不自动否决。
     if not d.get("zoning_ok", True):
-        vetoes.append({"code": "zoning", "message": "Zoning 不合规且无 variance 路径"})
+        vetoes.append({"code": "zoning", "message": ("Zoning is non-compliant with no variance path"
+                                                          if lang == "en" else "Zoning 不合规且无 variance 路径")})
     if d.get("fraud_flag"):
-        vetoes.append({"code": "fraud", "message": "要求虚假陈述/结构明显欺诈"})
+        vetoes.append({"code": "fraud", "message": ("Requires misrepresentation / the structure is plainly fraudulent"
+                                                      if lang == "en" else "要求虚假陈述/结构明显欺诈")})
     # v1.3 高价抛售退出软化（Miao 亲定 2026-09-28 晚）：不再单独否决；
     # 只有退出完全依赖短期高价抛售、且 refi/持有收租皆不成立时，才否决（无可行退出）。
     # 持有收租不成立的情形：DSCR 不达标（已有 low_dscr 否决）或扣储备/TI-LC 后现金流为负。
@@ -292,7 +307,8 @@ def check_vetoes(d: dict, m: dict) -> list[dict]:
                        and m["net_cf_annual"] > 0)
         if not d.get("refi_cashout_viable", False) and not hold_viable:
             vetoes.append({"code": "no_viable_exit",
-                           "message": "无可行退出否决：退出完全依赖短期高价抛售，且 refi/持有收租皆不成立"})
+                           "message": ("No-viable-exit veto: the exit depends entirely on a quick high-price flip, and neither refi nor hold-and-rent works"
+                                       if lang == "en" else "无可行退出否决：退出完全依赖短期高价抛售，且 refi/持有收租皆不成立")})
     dscr = m["dscr"]
     req = m["required_dscr"]
     if dscr is not None and dscr < req:
@@ -300,17 +316,21 @@ def check_vetoes(d: dict, m: dict) -> list[dict]:
         # 否决理由必须如实写"无 rent roll，DSCR 无法核保（待接数据）"，不许出现 0.00x 当硬数字
         if not d.get("has_rent_roll"):
             vetoes.append({"code": "low_dscr",
-                           "message": "无 rent roll，DSCR 无法核保（待接数据）"})
+                           "message": ("No rent roll — DSCR cannot be underwritten (data pending)"
+                                       if lang == "en" else "无 rent roll，DSCR 无法核保（待接数据）")})
         else:
             vetoes.append({"code": "low_dscr",
-                           "message": f"DSCR {dscr:.2f} < {req:.2f}，直接否决不参与打分"
-                                      + ("（酒店专项 ≥1.35）" if is_hotel else "")})
+                           "message": (f"DSCR {dscr:.2f} < {req:.2f} — hard veto, excluded from scoring"
+                                       + (" (hotel rule: >= 1.35)" if is_hotel else "")
+                                       if lang == "en" else
+                                       f"DSCR {dscr:.2f} < {req:.2f}，直接否决不参与打分"
+                                       + ("（酒店专项 ≥1.35）" if is_hotel else ""))})
     return vetoes
 
 
-def score(d: dict) -> dict:
+def score(d: dict, lang: str = "zh") -> dict:
     m = compute_metrics(d)
-    vetoes = check_vetoes(d, m)
+    vetoes = check_vetoes(d, m, lang)
     dims = []
     asset = d.get("asset_class", "retail_strip")
     is_office = asset == "office"

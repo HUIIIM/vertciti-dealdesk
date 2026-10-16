@@ -22,7 +22,7 @@ const state = {
   rentComps: [],  // 租金 comps（手动录入）
 };
 
-const STRUCT_LABELS = {standard: '普通购买', new_loan: '贷款购买', subject_to: 'subject-to（承接现有贷款）'};
+const STRUCT_LABELS = {standard: T('普通购买'), new_loan: T('贷款购买'), subject_to: T('subject-to（承接现有贷款）')};
 const EXIT_OPTIONS = [
   ['', '未选择'],
   ['出售', '出售'],
@@ -60,15 +60,15 @@ async function api(method, path, body) {
   const ct = r.headers.get('content-type') || '';
   return ct.includes('json') ? r.json() : r.text();
 }
-const srcTag = k => k === 'g' ? '<span class="src g"><i></i>实数已验证</span>'
-  : k === 'y' ? '<span class="src y"><i></i>估算待核验</span>'
-  : '<span class="src w"><i></i>待接数据源</span>';
+const srcTag = k => k === 'g' ? '<span class="src g"><i></i>' + T('实数已验证') + '</span>'
+  : k === 'y' ? '<span class="src y"><i></i>' + T('估算待核验') + '</span>'
+  : '<span class="src w"><i></i>' + T('待接数据源') + '</span>';
 /* B1-09①：数字强制口径后缀。real=实测(green) / est=估算(yellow) / tbd=待验证(white) / calc=测算(yellow)。
    无口径数字不得渲染——调用方必须传口径。 */
-const caliberBadge = k => k === 'real' ? '<span class="caliber c-real">实测</span>'
-  : k === 'est' ? '<span class="caliber c-est">估算</span>'
-  : k === 'tbd' ? '<span class="caliber">待验证</span>'
-  : k === 'calc' ? '<span class="caliber c-est">测算</span>' : '';
+const caliberBadge = k => k === 'real' ? '<span class="caliber c-real">' + T('实测') + '</span>'
+  : k === 'est' ? '<span class="caliber c-est">' + T('估算') + '</span>'
+  : k === 'tbd' ? '<span class="caliber">' + T('待验证') + '</span>'
+  : k === 'calc' ? '<span class="caliber c-est">' + T('测算') + '</span>' : '';
 const pf = '<span class="pf">PF</span>';
 /* Phase 5 第八轮 P1：pro forma 预测数字旁的角标（与图例"角标 PF = 基于卖方预测（pro forma），非实数"承诺一致） */
 const pfSup = '<sup class="pf">PF</sup>';
@@ -95,15 +95,16 @@ const GLOSSARY = {
   '三法分歧': '三种估值方法（比较法/收益法/成本法）算出的价格差太多，机器不敢下结论，转人工。',
 };
 const gterm = t => {
-  const d = GLOSSARY[t];
-  return d ? `<span class="gloss" tabindex="0" title="${esc(d)}">${esc(t)}</span>` : esc(t);
+  const d = (window.GLOSSARY_EN && window.GLOSSARY_EN[t]) || GLOSSARY[t];
+  const disp = (window.TERM_EN && window.TERM_EN[t]) || t;
+  return d ? `<span class="gloss" tabindex="0" title="${esc(d)}">${esc(disp)}</span>` : esc(disp);
 };
 /* 估值区间诚实展示（P0-5）：单点不许包装成区间 */
 const fmtRange = (range, singleNote) => {
-  if (!range || !range[1]) return '估值区间待计算';
+  if (!range || !range[1]) return T('估值区间待计算');
   if (range[0] === range[1])
-    return '估值 ' + fmt$(range[0]) + '（' + (singleNote || 'comps 高度一致，单点') + '）';
-  return '估值区间 ' + fmt$(range[0]) + '–' + fmt$(range[1]);
+    return T('估值 {0}（{1}）', fmt$(range[0]), singleNote || T('comps 高度一致，单点'));
+  return T('估值区间 {0}–{1}', fmt$(range[0]), fmt$(range[1]));
 };
 /* Phase 5 第三轮 R4：单点注释按 $/SF 离散度条件化——spread 大时不许说"高度一致" */
 /* Phase 5 第四轮 C5：核验结论——旧条件只看 $/SF 离散（且需 ≥3 条有面积数据），
@@ -125,27 +126,27 @@ const compsSpread = () => {
 };
 const singlePointNote = () => {
   const sp = compsSpread();
-  if (sp.discrete) return 'comps 离散度高，估值置信度已下调，给区间';
-  return 'comps 高度一致，单点';
+  if (sp.discrete) return T('comps 离散度高，估值置信度已下调，给区间');
+  return T('comps 高度一致，单点');
 };
 /* C5：估值展示——离散超阈值强制给区间；不离散时走原单点逻辑 */
 const valuationDisplay = (emptyText) => {
   const rec = state.valuation?.reconciled;
   const sp = compsSpread();
   if (sp.discrete && sp.lo > 0 && sp.hi > sp.lo)
-    return '估值区间 ' + fmt$(sp.lo) + '–' + fmt$(sp.hi) + '（comps 离散度高，给区间）';
+    return T('估值区间 {0}–{1}（comps 离散度高，给区间）', fmt$(sp.lo), fmt$(sp.hi));
   const t = fmtRange(rec?.range, singlePointNote());
-  return (t === '估值区间待计算' && emptyText) ? emptyText : t;
+  return (t === T('估值区间待计算') && emptyText) ? emptyText : t;
 };
 const intakeField = key => (state.intake?.fields || []).find(f => f.key === key);
 
 /* ---------------- loading 步骤 ---------------- */
 const STEPS = [
-  ['comps', '拉取 TopHap 可比成交（recorded sales）'],
-  ['valuate', '跑比较法估值'],
-  ['markets', '查市场指数'],
-  ['intake', '搜集物业档案（公开记录 enrich）'],
-  ['forecast', '生成趋势外推（实验）'],
+  ['comps', T('拉取 TopHap 可比成交（recorded sales）')],
+  ['valuate', T('跑比较法估值')],
+  ['markets', T('查市场指数')],
+  ['intake', T('搜集物业档案（公开记录 enrich）')],
+  ['forecast', T('生成趋势外推（实验）')],
 ];
 function renderSteps(status) {
   $('#loadSteps').innerHTML = STEPS.map(([id, label]) => {
@@ -158,8 +159,8 @@ function setStep(status, id, s) { status[id] = s; renderSteps(status); }
 
 /* ---------------- 启动链 ---------------- */
 async function boot() {
-  $('#z0Addr').textContent = state.addr || '未输入地址';
-  $('#z0Type').textContent = state.type === 'res' ? '住宅 · 小白模式' : '商业 · 专业模式';
+  $('#z0Addr').textContent = state.addr || T('未输入地址');
+  $('#z0Type').textContent = state.type === 'res' ? T('住宅 · 小白模式') : T('商业 · 专业模式');
   const status = {};
   renderSteps(status);
 
@@ -212,8 +213,8 @@ function typeNudge(intake) {
     const KW = /retail|office|industrial|commercial|strip|mall|plaza|warehouse|mixed[\s-]*use|hospitality|hotel|restaurant|auto[\s-]*repair|gas[\s-]*station|self[\s-]*storage|church|school|daycare|laundromat|car[\s-]*wash/;
     if (!KW.test(txt)) return;
     const bar = $('#typeNudge');
-    $('#typeNudgeText').textContent = '检测到该地址疑似商业物业（' +
-      fields.map(f => String(f.value || '')).join(' ').slice(0, 60) + '），是否切换到商业视角？';
+    $('#typeNudgeText').textContent = T('检测到该地址疑似商业物业（{0}），是否切换到商业视角？',
+      fields.map(f => String(f.value || '')).join(' ').slice(0, 60));
     bar.hidden = false;
     $('#typeNudgeGo').onclick = () => {
       location.href = '/d?addr=' + encodeURIComponent(state.addr) + '&type=com'
@@ -232,9 +233,9 @@ function typeNudge(intake) {
       state.forecast = await api('POST', '/api/wb/forecast',
         {base_value: base, years: 5,
          scenarios: [
-           {name: 'conservative', label: '保守', annual_rate_pct: 1.0},
-           {name: 'base', label: '基准', annual_rate_pct: 3.0},
-           {name: 'optimistic', label: '乐观', annual_rate_pct: 5.0}]});
+           {name: 'conservative', label: T('保守'), annual_rate_pct: 1.0},
+           {name: 'base', label: T('基准'), annual_rate_pct: 3.0},
+           {name: 'optimistic', label: T('乐观'), annual_rate_pct: 5.0}]});
       setStep(status, 'forecast', 'done');
     } else setStep(status, 'forecast', 'fail');
   } catch (e) { setStep(status, 'forecast', 'fail'); }
@@ -244,9 +245,9 @@ function typeNudge(intake) {
   // Phase 5 第七轮 #6（xiaobai）/#9（remote R8）：数据截至必须按用户时区
   // America/New_York 显示＋标注"（美东时间）"——此前用浏览器本地时区，
   // UTC 机器上会显示成"明天"的日期。
-  $('#z0Stamp').textContent = '数据截至 '
-    + state.fetchedAt.toLocaleString('zh-CN', {hour12: false, timeZone: 'America/New_York'})
-    + '（美东时间）';
+  $('#z0Stamp').textContent = T('数据截至 {0}（美东时间）',
+    state.fetchedAt.toLocaleString(window.DD_LANG === 'en' ? 'en-US' : 'zh-CN',
+      {hour12: false, timeZone: 'America/New_York'}));
   renderAll();
   // 有要价 → 自动跑 score 链
   if (state.ask) { setAssumption('ask', state.ask); runScoreChain(); }
@@ -275,17 +276,16 @@ document.addEventListener('DOMContentLoaded', () => {
   // Phase 5 第七轮 R7（remote）：商业线"怎么看这页"不许用住宅 verdict 词表
   // （值得买/再看看/别碰）——商业线换商业词表（BUY/HOLD/PASS，一票否决为 VETO）。
   if (state.type === 'com') {
-    $('#howto').innerHTML = '怎么看这页：<b>先看结论</b>（BUY / HOLD / PASS，一票否决为 VETO）'
-      + '· <b>再看价格证据</b>（Zone 3）· <b>最后看假设</b>（Zone 7，可改数重算）';
+    $('#howto').innerHTML = T('怎么看这页：<b>先看结论</b>（BUY / HOLD / PASS，一票否决为 VETO）· <b>再看价格证据</b>（Zone 3）· <b>最后看假设</b>（Zone 7，可改数重算）');
   }
   if (!state.addr) {
-    $('#loadSteps').innerHTML = '<div class="empty">没有地址参数。<a href="/">回 landing 输入地址</a></div>';
+    $('#loadSteps').innerHTML = T('<div class="empty">没有地址参数。<a href="/">回 landing 输入地址</a></div>');
     return;
   }
   // 顶栏动作
   // P0-11：切换视角是破坏性操作（清空重跑）→ 加确认弹窗，不再静默清空
   $('#btnToggle').addEventListener('click', () => {
-    if (!confirm('切换视角会清空当前分析结果并重新计算，继续吗？')) return;
+    if (!confirm(T('切换视角会清空当前分析结果并重新计算，继续吗？'))) return;
     const t = state.type === 'res' ? 'com' : 'res';
     location.href = '/d?addr=' + encodeURIComponent(state.addr) + '&type=' + t
       + (state.ask ? '&price=' + state.ask : '') + (state.ptype ? '&ptype=' + encodeURIComponent(state.ptype) : '')
@@ -319,14 +319,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
 /* ---------------- Zone 7 假设（可编辑）→ score 链 ---------------- */
 const RES_FIELDS = [
-  ['ask', '收购价/要价 $', true], ['rent', '月租金 $', true],
-  ['rate', '年利率 %（百分制）', false], ['down', '首付 $', false],
-  ['vac', '空置率 %', false], ['tax', '年房产税 $', false], ['ins', '年保险 $', false],
+  ['ask', T('收购价/要价 $'), true], ['rent', T('月租金 $'), true],
+  ['rate', T('年利率 %（百分制）'), false], ['down', T('首付 $'), false],
+  ['vac', T('空置率 %'), false], ['tax', T('年房产税 $'), false], ['ins', T('年保险 $'), false],
 ];
 const COM_FIELDS = [
-  ['ask', '收购价/要价 $', true], ['rentA', '年租金总收入 $', true],
-  ['rate', '年利率 %（百分制）', false], ['downPct', '首付比例 %', false],
-  ['amort', '摊销年数', false], ['vac', '空置率 %', false], ['capMkt', '市场 cap %', false],
+  ['ask', T('收购价/要价 $'), true], ['rentA', T('年租金总收入 $'), true],
+  ['rate', T('年利率 %（百分制）'), false], ['downPct', T('首付比例 %'), false],
+  ['amort', T('摊销年数'), false], ['vac', T('空置率 %'), false], ['capMkt', T('市场 cap %'), false],
 ];
 const DEFAULTS = {rate: 6.5, down: 0, vac: 8, tax: 0, ins: 0, downPct: 30, amort: 25, capMkt: 6, rent: 0, rentA: 0};
 
@@ -343,18 +343,18 @@ function isDefaultA(k) {
   return v === undefined || v === null || v === '';
 }
 const COM_ASSUMP_KEYS = [
-  ['rate', '年利率', v => v + '%'],
-  ['downPct', '首付比例', v => v + '%'],
-  ['amort', '摊销年数', v => v + ' 年'],
-  ['vac', '空置率', v => v + '%'],
-  ['capMkt', '市场 cap', v => v + '%'],
+  ['rate', T('年利率'), v => v + '%'],
+  ['downPct', T('首付比例'), v => v + '%'],
+  ['amort', T('摊销年数'), v => T('{0} 年', v)],
+  ['vac', T('空置率'), v => v + '%'],
+  ['capMkt', T('市场 cap'), v => v + '%'],
 ];
 const RES_ASSUMP_KEYS = [
-  ['rate', '年利率', v => v + '%'],
-  ['down', '首付', v => '$' + Number(v).toLocaleString('en-US')],
-  ['vac', '空置率', v => v + '%'],
-  ['tax', '年房产税', v => '$' + Number(v).toLocaleString('en-US')],
-  ['ins', '年保险', v => '$' + Number(v).toLocaleString('en-US')],
+  ['rate', T('年利率'), v => v + '%'],
+  ['down', T('首付'), v => '$' + Number(v).toLocaleString('en-US')],
+  ['vac', T('空置率'), v => v + '%'],
+  ['tax', T('年房产税'), v => '$' + Number(v).toLocaleString('en-US')],
+  ['ins', T('年保险'), v => '$' + Number(v).toLocaleString('en-US')],
 ];
 function effectiveAssumptions() {
   const keys = state.type === 'com' ? COM_ASSUMP_KEYS : RES_ASSUMP_KEYS;
@@ -441,12 +441,12 @@ async function runScoreChain() {
   syncZone7Inputs();
   const ask = getA('ask');
   if (!ask) { renderVerdictEmpty(); return; }
-  toast('正在计算打分与 verdict…');
+  toast(T('正在计算打分与 verdict…'));
   try {
     const input = buildScoreInput();
     const score = await api('POST', '/api/score',
       {track: state.type === 'res' ? 'residential' : 'commercial',
-       name: state.addr, address: state.addr, input});
+       name: state.addr, address: state.addr, input, lang: window.DD_LANG});
     state.score = score;
     // 商业：跑 compute-plus（rent roll 若已导入则带入）
     if (state.type === 'com') await runUwPlus();
@@ -463,14 +463,15 @@ async function runScoreChain() {
     state.confidence = await api('POST', '/api/confidence', {
       track: state.type === 'res' ? 'residential' : 'commercial',
       comps: state.comps.filter(c => state.selected.has(c._id)),
-      evidence: {noi_evidence: noiEv, cap_evidence: 'none', methods}});
+      evidence: {noi_evidence: noiEv, cap_evidence: 'none', methods},
+      lang: window.DD_LANG});
     // verdict
     const ev = buildVerdictEvidence();
     state.verdict = await api('POST', '/api/verdict', {
       track: state.type === 'res' ? 'residential' : 'commercial',
-      score, confidence: state.confidence.score, evidence: ev});
-    toast('计算完成');
-  } catch (e) { toast('计算失败：' + e.message, 4000); }
+      score, confidence: state.confidence.score, evidence: ev, lang: window.DD_LANG});
+    toast(T('计算完成'));
+  } catch (e) { toast(T('计算失败：{0}', e.message), 4000); }
   renderAll();
 }
 
@@ -510,12 +511,12 @@ function buildVerdictEvidence() {
   }
   if (rec?.range?.[1]) { ev.value_lo = rec.range[0]; ev.value_hi = rec.range[1]; }
   const gaps = [];
-  if (state.comps.filter(c => state.selected.has(c._id)).length < 3) gaps.push('comps 不足 3 个');
+  if (state.comps.filter(c => state.selected.has(c._id)).length < 3) gaps.push(T('comps 不足 3 个'));
   if (state.type === 'com') {
     if (state.uw) gaps.push(...(state.uw.plus.p0_gaps || []));
-    else gaps.push('缺结构化 rent roll（WALT/到期集中度/租户集中度无法验证，NOI 可信度降级）');
+    else gaps.push(T('缺结构化 rent roll（WALT/到期集中度/租户集中度无法验证，NOI 可信度降级）'));
   } else {
-    gaps.push('租金为估算（待与租约/市场核验）');
+    gaps.push(T('租金为估算（待与租约/市场核验）'));
   }
   ev.p0_gaps = gaps;
   // 三法分歧
@@ -566,7 +567,7 @@ async function runUwPlus() {
   const input = buildUwInput();
   try {
     state.uw = await api('POST', '/api/uw/compute-plus',
-      {input, with_stress: true, valuation_range: null});
+      {input, with_stress: true, valuation_range: null, lang: window.DD_LANG});
   } catch (e) { state.uw = null; }
 }
 
@@ -583,8 +584,8 @@ function sensTableHtml() {
   const s = state.sens;
   if (!s || !s.cells || s.cells.length !== 5) return '';
   const offLbl = bps => (bps > 0 ? '+' : '') + bps + 'bps';
-  let h = `<div class="sens-wrap"><p class="zlabel">敏感性矩阵：退出 cap × 租金增长率</p>
-    <div class="tbl-scroll"><table class="sens-table"><thead><tr><th>租金增长 ＼ 退出 cap</th>`;
+  let h = `<div class="sens-wrap"><p class="zlabel">${T('敏感性矩阵：退出 cap × 租金增长率')}</p>
+    <div class="tbl-scroll"><table class="sens-table"><thead><tr><th>${T('租金增长 ＼ 退出 cap')}</th>`;
   s.exit_caps.forEach(c => { h += `<th>${fmtPct(c, 2)}</th>`; });
   h += '</tr></thead><tbody>';
   s.cells.forEach((row, i) => {
@@ -597,7 +598,7 @@ function sensTableHtml() {
     h += '</tr>';
   });
   h += `</tbody></table></div>
-    <p class="sens-note">格子 = IRR / Equity Multiple；中心格（±0bps）为当前基准假设；退出 cap 假设必须披露。改价 / 改假设后点"重新计算"刷新。</p></div>`;
+    <p class="sens-note">${T('格子 = IRR / Equity Multiple；中心格（±0bps）为当前基准假设；退出 cap 假设必须披露。改价 / 改假设后点"重新计算"刷新。')}</p></div>`;
   return h;
 }
 
@@ -640,14 +641,14 @@ function applyGateMarks(gate) {
 function renderGate(gate) {
   const panel = document.getElementById('gatePanel');
   if (!panel || !gate) return;
-  const chip = gate.status === 'blocked' ? '<span class="gate-chip blocked">⛔ 数据质量门拦截</span>'
-    : gate.status === 'warn' ? '<span class="gate-chip warn">⚠️ 数据质量门告警</span>'
-    : '<span class="gate-chip pass">✅ 数据质量门通过</span>';
+  const chip = gate.status === 'blocked' ? '<span class="gate-chip blocked">' + T('⛔ 数据质量门拦截') + '</span>'
+    : gate.status === 'warn' ? '<span class="gate-chip warn">' + T('⚠️ 数据质量门告警') + '</span>'
+    : '<span class="gate-chip pass">' + T('✅ 数据质量门通过') + '</span>';
   let html = '<div class="gate-head">' + chip + '<span class="gate-summary">'
     + esc(gate.summary || '') + '（' + esc(gate.schema_version || '') + '）</span></div>';
   const items = [];
-  for (const c of (gate.fails || [])) items.push({c, cls: 'sev-fail', tag: '⛔ 拦截'});
-  for (const c of (gate.warns || [])) items.push({c, cls: 'sev-warn', tag: '⚠️ 复核'});
+  for (const c of (gate.fails || [])) items.push({c, cls: 'sev-fail', tag: T('⛔ 拦截')});
+  for (const c of (gate.warns || [])) items.push({c, cls: 'sev-warn', tag: T('⚠️ 复核')});
   if (items.length) {
     html += '<ul class="gate-list">' + items.map(it =>
       '<li><span class="' + it.cls + '">' + it.tag + '</span> ' + esc(it.c.title)
@@ -680,14 +681,14 @@ async function gateCheckForExport(action) {
     if (!r.ok) return true;
     renderGate(g);
     if (g.blocked) {
-      alert('数据质量门拦截（' + action + '）：' + (g.fails || []).map(c => c.title).join('\n')
-        + '\n\n请修正矛盾数据后重试。');
+      alert(T('数据质量门拦截（{0}）：', action) + (g.fails || []).map(c => c.title).join('\n')
+        + T('\n\n请修正矛盾数据后重试。'));
       return false;
     }
     if (g.status === 'warn') {
-      return confirm('数据质量门告警（' + action + '）：\n'
+      return confirm(T('数据质量门告警（{0}）：', action) + '\n'
         + (g.warns || []).map(c => c.title).join('\n')
-        + '\n\n标黄字段请先核实。仍要继续导出吗？');
+        + T('\n\n标黄字段请先核实。仍要继续导出吗？'));
     }
     return true;
   } catch (_) { return true; }
@@ -719,9 +720,9 @@ async function exportPdfMemo() {
   $('#ddPdf').classList.remove('open');
   /* Phase 5 第八轮 P2：待计算态（无 score，或 score 陈旧但收购价被清空——
      renderVerdictEmpty 不清 state.score）点击导出必须弹提示，不许静默无响应 */
-  if (!state.score || !getA('ask')) { toast('请先完成分析再导出', 3000); return; }
-  if (!(await gateCheckForExport('备忘录导出'))) return; // 台账第 4 项：fail → 拦截
-  toast('正在生成投资备忘录 PDF…');
+  if (!state.score || !getA('ask')) { toast(T('请先完成分析再导出'), 3000); return; }
+  if (!(await gateCheckForExport(T('备忘录导出')))) return; // 台账第 4 项：fail → 拦截
+  toast(T('正在生成投资备忘录 PDF…'));
   try {
     const track = state.type === 'res' ? 'residential' : 'commercial';
     const input = buildScoreInput();
@@ -760,17 +761,17 @@ async function exportPdfMemo() {
     a.href = URL.createObjectURL(blob);
     a.download = r.headers.get('content-disposition')?.match(/filename\*?=(?:UTF-8''")?([^";]+)/)?.[1] || 'dealdesk_memo.pdf';
     a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
-    toast('已导出 PDF');
-  } catch (e) { toast('PDF 生成失败：' + e.message, 4000); }
+    toast(T('已导出 PDF'));
+  } catch (e) { toast(T('PDF 生成失败：{0}', e.message), 4000); }
 }
 
 /* C：一键导出——商业核保 PDF（经典版 / 增强版），复用 /api/uw/report.
    经典版 = Manny Khoshbin 模板口径；增强版 = DSCR 双轨＋压力测试 */
 async function exportUwPdf(variant) {
   $('#ddPdf').classList.remove('open');
-  if (!state.uw) { toast('商业 PDF 需要先导入 rent roll 并计算（Zone 4）', 3500); return; }
-  if (!(await gateCheckForExport('商业核保 PDF 导出'))) return; // 台账第 4 项：fail → 拦截
-  toast('正在生成商业核保 PDF（' + (variant === 'classic' ? '经典版' : '增强版') + '）…');
+  if (!state.uw) { toast(T('商业 PDF 需要先导入 rent roll 并计算（Zone 4）'), 3500); return; }
+  if (!(await gateCheckForExport(T('商业核保 PDF 导出')))) return; // 台账第 4 项：fail → 拦截
+  toast(T('正在生成商业核保 PDF（{0}）…', variant === 'classic' ? T('经典版') : T('增强版')));
   try {
     const plus = state.uw.plus || {};
     const body = {variant, input: buildUwInput(),
@@ -788,17 +789,17 @@ async function exportUwPdf(variant) {
     a.href = URL.createObjectURL(blob);
     a.download = r.headers.get('content-disposition')?.match(/filename\*?=(?:UTF-8''")?([^";]+)/)?.[1] || ('dealdesk_uw_' + variant + '.pdf');
     a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
-    toast('已导出 PDF');
-  } catch (e) { toast('PDF 生成失败：' + e.message, 4000); }
+    toast(T('已导出 PDF'));
+  } catch (e) { toast(T('PDF 生成失败：{0}', e.message), 4000); }
 }
 
 async function exportXlsx() {
-  if (!(await gateCheckForExport('Excel 导出'))) return; // 台账第 4 项：fail → 拦截
-  toast('正在生成 Excel…');
+  if (!(await gateCheckForExport(T('Excel 导出')))) return; // 台账第 4 项：fail → 拦截
+  toast(T('正在生成 Excel…'));
   try {
     let url, body;
     if (state.type === 'com') {
-      if (!state.uw) { toast('商业 Excel 需要先导入 rent roll 并计算（Zone 4）', 3500); return; }
+      if (!state.uw) { toast(T('商业 Excel 需要先导入 rent roll 并计算（Zone 4）'), 3500); return; }
       // 用 compute-plus 的底层输入重建：直接调 xlsx 端点需 uw input，这里用 rentRoll＋假设重建
       const ask = getA('ask'), downPct = getA('downPct'), rate = getA('rate');
       const tenants = (state.rentRoll || []).map(t => ({...t}));
@@ -826,7 +827,7 @@ async function exportXlsx() {
       body.gate_fields = _gpX.fields; body.gate_deal_type = _gpX.deal_type;
       url = '/api/uw/report/xlsx';
     } else {
-      if (!state.score) { toast('先填 Zone 7 假设并计算', 3000); return; }
+      if (!state.score) { toast(T('先填 Zone 7 假设并计算'), 3000); return; }
       const _gpR = buildGatePayload();
       body = {score: state.score, input: buildScoreInput(), address: state.addr,
         verdict: state.verdict, confidence: state.confidence,
@@ -842,8 +843,8 @@ async function exportXlsx() {
     a.href = URL.createObjectURL(blob);
     a.download = decodeURIComponent(r.headers.get('content-disposition')?.match(/filename\*=UTF-8''([^;]+)/)?.[1] || 'dealdesk.xlsx');
     a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
-    toast('已导出 Excel');
-  } catch (e) { toast('Excel 生成失败：' + e.message, 4000); }
+    toast(T('已导出 Excel'));
+  } catch (e) { toast(T('Excel 生成失败：{0}', e.message), 4000); }
 }
 
 /* ---------------- 渲染 ---------------- */
@@ -888,22 +889,22 @@ function vetoCount() { return (state.score?.vetoes || []).length; }
 function verdictDisplay() {
   const v = state.verdict;
   const n = vetoCount();
-  const raw = v ? v.verdict : '待计算';
+  const raw = v ? v.verdict : T('待计算');
   const code = VERDICT_WORD2CODE[raw] || null;
   if (v && n > 0 && !v.circuit_broken && code && code !== 'VETO')
     return {word: verdictBilingual('VETO'), code: 'VETO', vetoes: n};
   return {word: code ? verdictBilingual(raw) : raw, code, vetoes: n};
 }
 function vetoBadgeHtml(n) {
-  return n > 0 ? `<span class="veto-badge">一票否决 ×${n}</span>` : '';
+  return n > 0 ? `<span class="veto-badge">${T('一票否决 ×{0}', n)}</span>` : '';
 }
 
 /* Zone 1 */
 function renderVerdictEmpty() {
   const z1 = $('#z1'); z1.hidden = false;
-  $('#vWord').textContent = '缺收购价';
+  $('#vWord').textContent = T('缺收购价');
   $('#vWord').className = 'verdict-word v-na';
-  $('#vOne').textContent = '填一下"要价/收购价"（下方 Zone 7），我才能算值不值得买。comps 和估值已经就绪。';
+  $('#vOne').textContent = T('填一下"要价/收购价"（下方 Zone 7），我才能算值不值得买。comps 和估值已经就绪。');
   $('#vConfNum').textContent = '';
   $('#vConfLabel').textContent = '';
   $('#vRange').textContent = '';
@@ -912,7 +913,7 @@ function renderVerdictEmpty() {
   $('#vVetoes').innerHTML = ''; $('#vReasons').innerHTML = '';
   $('#vVetoBadge').innerHTML = '';
   $('#vUsage').textContent = state.type === 'res'
-    ? '筛选辅助工具，不构成投资建议。' : '投资筛选用，非 USPAP 合规评估报告，不能用于贷款/诉讼；未实地勘察、未审阅租约原件。';
+    ? T('筛选辅助工具，不构成投资建议。') : T('投资筛选用，非 USPAP 合规评估报告，不能用于贷款/诉讼；未实地勘察、未审阅租约原件。');
   $('#z1Gaps').innerHTML = '';
   renderZone2(); renderZone3(); renderZone4(); renderZone5(); renderZone6(); renderZone7();
 }
@@ -930,7 +931,9 @@ function glossify(text) {
   while ((m = re.exec(src)) !== null) {
     out += esc(src.slice(last, m.index));
     const t = m[0];
-    out += `<span class="gloss" tabindex="0" title="${esc(GLOSSARY[t])}">${esc(t)}</span>`;
+    const _gd = (window.GLOSSARY_EN && window.GLOSSARY_EN[t]) || GLOSSARY[t];
+    const _td = (window.TERM_EN && window.TERM_EN[t]) || t;
+    out += `<span class="gloss" tabindex="0" title="${esc(_gd)}">${esc(_td)}</span>`;
     last = m.index + t.length;
     if (m.index === re.lastIndex) re.lastIndex++;
   }
@@ -963,35 +966,35 @@ function renderZone1() {
   if (c) {
     $('#vConfFill').style.width = Math.min(100, c.score) + '%';
     $('#vConfNum').textContent = c.score + '/100';
-    $('#vConfLabel').textContent = '（' + c.label + '）';
+    $('#vConfLabel').textContent = window.DD_LANG === 'en' ? '(' + c.label + ')' : '（' + c.label + '）';
   }
   const rec = state.valuation?.reconciled;
   // P0-5：单点不许包装成区间（R4：注释按 $/SF 离散度条件化）
   $('#vRange').innerHTML = valuationDisplay() + (rec ? caliberBadge('est') : '');
   const m = state.score?.metrics || {};
   const cash = m.cash_to_close ?? m.total_cash_required;
-  $('#vCash').innerHTML = cash ? '全口径现金需求 ≈ ' + fmt$(cash) + caliberBadge('calc') + '（首付＋交割＋储备金）' : '';
+  $('#vCash').innerHTML = cash ? T('全口径现金需求 ≈ ') + fmt$(cash) + caliberBadge('calc') + T('（首付＋交割＋储备金）') : '';
   // Phase 5 第三轮 D11：0 首付默认值透明化——小白必须一眼看到当前按 0 首付测算
   const zeroDown = state.type === 'res' ? !(getA('down') > 0) : !(getA('downPct') > 0);
-  $('#vZeroDown').textContent = zeroDown ? '当前按 0 首付（100% 贷款）测算 → 去 Zone 7 调整首付' : '';
+  $('#vZeroDown').textContent = zeroDown ? T('当前按 0 首付（100% 贷款）测算 → 去 Zone 7 调整首付') : '';
   // P0-3＋item 1：否决态徽标与 verdict 词同行——verdict 词永不单独出现
   $('#vVetoBadge').innerHTML = vetoBadgeHtml(vd.vetoes);
   $('#vVetoes').innerHTML = (state.score?.vetoes || []).slice(0, 2).map(x => {
     const msg = x.message || x.code;
-    return `<p class="veto">一票否决：${pfMark(glossify(msg), msg)}</p>`;
+    return `<p class="veto">${T('一票否决：')}${pfMark(glossify(msg), msg)}</p>`;
   }).join('');
   // Phase 5 第三轮 R7 去重：verdict 依据里与上方一票否决红字逐字重复的理由不再重复显示
   const _vetoMsgs = (state.score?.vetoes || []).map(x => x.message || x.code).filter(Boolean);
   $('#vReasons').innerHTML = (v.reasons || []).filter(r => {
     const t = String(r || '');
-    return !(t.startsWith('一票否决：') && _vetoMsgs.some(m => t.includes(m)));
+    return !((t.startsWith('一票否决：') || t.startsWith('Veto: ')) && _vetoMsgs.some(m => t.includes(m)));
   }).map(r =>
     `<p class="reason">· ${glossify(r)}</p>`).join('');
   $('#vUsage').textContent = v.usage || '';
   // P0 缺口（Zone1 右侧）
   const gaps = state.type === 'com' && state.uw ? state.uw.plus.p0_gaps : [];
   $('#z1Gaps').innerHTML = gaps.length
-    ? `<div class="amber"><b>缺口（已保守降级）：</b><br>${gaps.map(g => '· ' + esc(g)).join('<br>')}</div>` : '';
+    ? `<div class="amber"><b>${T('缺口（已保守降级）：')}</b><br>${gaps.map(g => '· ' + esc(g)).join('<br>')}</div>` : '';
   // B1-07：verdict hero 下 5×5 敏感性矩阵（异步，不阻塞）
   renderSensMatrix();
 }
@@ -1009,7 +1012,7 @@ async function renderSensMatrix() {
       const s = state.sens;
       if (!s || !s.cells || s.cells.length !== 5) return;
       const offLbl = bps => (bps > 0 ? '+' : '') + bps + 'bps';
-      let h = '<thead><tr><th>租金增长 ＼ 退出 cap</th>';
+      let h = '<thead><tr><th>' + T('租金增长 ＼ 退出 cap') + '</th>';
       s.exit_caps.forEach(c => { h += `<th>${fmtPct(c, 2)}</th>`; });
       h += '</tr></thead><tbody>';
       s.cells.forEach((row, i) => {
@@ -1023,7 +1026,7 @@ async function renderSensMatrix() {
         h += '</tr>';
       });
       tbl.innerHTML = h + '</tbody>';
-      $('#sensMatrixNote').textContent = '格子 = IRR；中心格为当前基准假设。改价/改假设后点"重新计算"刷新。';
+      $('#sensMatrixNote').textContent = T('格子 = IRR；中心格为当前基准假设。改价/改假设后点"重新计算"刷新。');
     } else {
       const input = buildScoreInput();
       const tiers = {rate_bps: [-200, -100, 0, 100, 200],
@@ -1032,7 +1035,7 @@ async function renderSensMatrix() {
       const r = await api('POST', '/api/sensitivity', {track: 'residential', input, tiers});
       const m = r && r.matrix;
       if (!m || !m.cells || m.cells.length !== 5) return;
-      let h = '<thead><tr><th>空置 ＼ 利率</th>';
+      let h = '<thead><tr><th>' + T('空置 ＼ 利率') + '</th>';
       m.x_labels.forEach(l => { h += `<th>${esc(l)}</th>`; });
       h += '</tr></thead><tbody>';
       m.cells.forEach((row, i) => {
@@ -1046,14 +1049,14 @@ async function renderSensMatrix() {
         h += '</tr>';
       });
       tbl.innerHTML = h + '</tbody>';
-      $('#sensMatrixNote').textContent = '格子 = 月现金流；中心格为当前基准假设。改价/改假设后点"重新计算"刷新。';
+      $('#sensMatrixNote').textContent = T('格子 = 月现金流；中心格为当前基准假设。改价/改假设后点"重新计算"刷新。');
     }
     wrap.hidden = false;
   } catch (e) { /* 静默，不出表 */ }
 }
 
 /* P0-2（2026-10-05）：打分等级用户可见显示：A/B/C/D → "X 档"，"否决"保持原样 */
-function gradeDisplay(g) { return g === '否决' ? '否决' : (g ? g + ' 档' : ''); }
+function gradeDisplay(g) { return g === '否决' ? T('否决') : (g ? g + T(' 档') : ''); }
 
 /* Zone 2 */
 function renderZone2() {
@@ -1063,86 +1066,86 @@ function renderZone2() {
   const kpi = (label, val, sub, note, cls, cal) =>
     `<div class="kpi"><div class="k-label">${label}</div><div class="k-val ${cls || ''}">${val}${caliberBadge(cal)}</div>
      <div class="k-sub">${sub || ''}</div>${note ? `<div class="k-note">${note}</div>` : ''}</div>`;
-  cards.push(`<p class="zlabel">Zone 2 · 关键指标</p>`);
+  cards.push(`<p class="zlabel">${T('Zone 2 · 关键指标')}</p>`);
   if (state.type === 'res') {
     const cf = m.cash_flow_monthly;
     const askV0 = getA('ask');
     // Phase 5 第三轮 D13：未填价默认态文案中性化——不许"贴钱持有"＋"比存银行高"混搭
     let cfSub, cfNote, cfCls;
     if (!askV0) {
-      cfSub = '待填收购价'; cfNote = ''; cfCls = '';
+      cfSub = T('待填收购价'); cfNote = ''; cfCls = '';
     } else if (cf != null && cf < 0) {
       // item 13：文案按正负切换——负现金流时不许再写"比存银行高"
-      cfSub = '贴钱持有'; cfNote = `每月倒贴 ${fmt$(-cf)}，现金流为负`; cfCls = 'k-bad';
+      cfSub = T('贴钱持有'); cfNote = T('每月倒贴 {0}，现金流为负', fmt$(-cf)); cfCls = 'k-bad';
     } else {
-      cfSub = '租金覆盖月供还有剩'; cfNote = '比存银行高，但要自己管租客'; cfCls = 'k-ok';
+      cfSub = T('租金覆盖月供还有剩'); cfNote = T('比存银行高，但要自己管租客'); cfCls = 'k-ok';
     }
-    cards.push(kpi('月现金流', fmt$(cf), cfSub, cfNote, cfCls, 'calc'));
-    cards.push(kpi('现金回报率 CoC', fmtPct(m.cash_on_cash), '年净现金流 ÷ 全口径现金投入', '', '', 'calc'));
+    cards.push(kpi(T('月现金流'), fmt$(cf), cfSub, cfNote, cfCls, 'calc'));
+    cards.push(kpi(T('现金回报率 CoC'), fmtPct(m.cash_on_cash), T('年净现金流 ÷ 全口径现金投入'), '', '', 'calc'));
     // P0-14：月供为 0/未计算时不许显示"$0 vs $0 / 租金能覆盖 — 的月供"破损占位符
     // Phase 5 第七轮 #5（xiaobai）：租金未填时不许写"租金能覆盖 0% 的月供"——
     // 未知≠0，误读成"房子租不出去"。isDefaultA 判定用户亲手填过没有。
     const piti = m.piti;
     const rentMissing = isDefaultA('rent');
-    cards.push(kpi('租金 vs 月供',
-      piti ? fmt$(getA('rent')) + ' vs ' + fmt$(piti) : '待计算',
-      piti ? (rentMissing ? '租金待补，覆盖率无法计算（未知≠0）'
-                         : '租金能覆盖 ' + (getA('rent') / piti * 100).toFixed(0) + '% 的月供（本息+税+保险）')
-           : '填要价并计算后显示', '', '', piti ? 'calc' : 'tbd'));
-    cards.push(kpi('空置假设', fmtPct(getA('vac') / 100), '租金打 ' + (100 - getA('vac')).toFixed(0) + ' 折计', '', '', 'tbd'));
+    cards.push(kpi(T('租金 vs 月供'),
+      piti ? fmt$(getA('rent')) + ' vs ' + fmt$(piti) : T('待计算'),
+      piti ? (rentMissing ? T('租金待补，覆盖率无法计算（未知≠0）')
+                         : T('租金能覆盖 {0}% 的月供（本息+税+保险）', (getA('rent') / piti * 100).toFixed(0)))
+           : T('填要价并计算后显示'), '', '', piti ? 'calc' : 'tbd'));
+    cards.push(kpi(T('空置假设'), fmtPct(getA('vac') / 100), T('租金打 {0} 折计', (100 - getA('vac')).toFixed(0)), '', '', 'tbd'));
     // Phase 5 第七轮 #2（xiaobai）：打分卡必须与 Zone 1 的 deal 评分同步——
     // 此前重算后 state.score 已更新但 Zone 2 没有任何打分卡（只有"待计算"分支），
     // 造成"Zone 1 有 43 分、Zone 2 还在待计算"的脱节。
-    if (!state.score) cards.push(kpi('打分', '待计算', '填要价后计算（上方要价条）', '', '', 'tbd'));
-    else cards.push(kpi('打分', (state.score.total != null ? state.score.total : '—') + ' 分',
-      'deal 评分（' + gradeDisplay(state.score.grade) + '），与 Zone 1 同源',
+    if (!state.score) cards.push(kpi(T('打分'), T('待计算'), T('填要价后计算（上方要价条）'), '', '', 'tbd'));
+    else cards.push(kpi(T('打分'), T('{0} 分', state.score.total != null ? state.score.total : '—'),
+      T('deal 评分（{0}），与 Zone 1 同源', gradeDisplay(state.score.grade)),
       // Phase 5 第七轮 #4（xiaobai）：首付 25% 后 43→28 反直觉——核验结论：
       // 15 分全掉在"首付比例"维度（浮动制：首付越低基础分越高，0%→15 分、25%→0 分），
       // 其余四维没变（租金缺失→现金流维本来就是 0 分；CoC 0 首付"未计算"→25% 后 -22.8% 仍 0 分）。
       // 打的是买盒"策略匹配度"（低首付高杠杆），不是"首付越高越危险"。
-      '首付维按浮动制打"策略匹配度"：首付越低基础分越高（0%→15 分、25%→0 分）；其余维度没变。多付首付≠更危险。', '', 'calc'));
+      T('首付维按浮动制打"策略匹配度"：首付越低基础分越高（0%→15 分、25%→0 分）；其余维度没变。多付首付≠更危险。'), '', 'calc'));
   } else {
     const uw = state.uw?.plus, a = state.uw?.analysis || {};
     const hasRR = !!(uw && uw.has_rent_roll);
     const bankNoi = uw?.noi_bank_bridge?.bank_noi;
     const askV = getA('ask');
-    cards.push(kpi('价格', askV ? fmt$(askV) : '待填要价', '收购价/要价', '', '', 'tbd'));
+    cards.push(kpi(T('价格'), askV ? fmt$(askV) : T('待填要价'), T('收购价/要价 $'), '', '', 'tbd'));
     // item 3：无 rent roll 时 NOI 也不许出现 $0 硬数字——与 DSCR 卡同理显示"待 rent roll"
     // Phase 5 第八轮 P1：无 rent roll = pro forma 路径，标准 NOI 是预测数——强制标注 PF 角标；
     // 有 rent roll 时是实数，不许加（别误伤）
-    cards.push(kpi('NOI（双口径）',
-      hasRR ? (bankNoi != null ? fmt$(bankNoi) : '—') : '待 rent roll',
-      '银行口径' + (m.noi ? '；标准 NOI ' + fmt$(m.noi) + (hasRR ? '' : pfSup) : ''),
-      hasRR ? '' : '导入租约明细后计算（Zone 4）', '', hasRR ? 'real' : 'tbd'));
+    cards.push(kpi(T('NOI（双口径）'),
+      hasRR ? (bankNoi != null ? fmt$(bankNoi) : '—') : T('待 rent roll'),
+      T('银行口径') + (m.noi ? T('；标准 NOI ') + fmt$(m.noi) + (hasRR ? '' : pfSup) : ''),
+      hasRR ? '' : T('导入租约明细后计算（Zone 4）'), '', hasRR ? 'real' : 'tbd'));
     const capIn = bankNoi && getA('ask') ? bankNoi / getA('ask') : null;
     // Phase 5 第六轮微修复 #1（remote N2）：无 rent roll 时 bank_noi 是瀑布
     // 调整的残差（0 起扣管理费/储备金/空置调整，常为小负数），truthy 导致
     // Zone 2 出现幽灵 "-0.34%"——无 NOI 时卡片必须显示"—"，不许单独出数。
     const capDisp = hasRR ? fmtPct(capIn, 2) : '—';
     cards.push(kpi('Trailing cap', capDisp,
-      hasRR ? '市场区间待接 ' + srcTag('w') : '待 rent roll（无 NOI，不单独出数）',
-      '单个 cap 数字不许单独出现', '', hasRR ? 'est' : 'tbd'));
+      hasRR ? T('市场区间待接 ') + srcTag('w') : T('待 rent roll（无 NOI，不单独出数）'),
+      T('单个 cap 数字不许单独出现'), '', hasRR ? 'est' : 'tbd'));
     // P0-4/P0-7：无 rent roll 时 DSCR 不许显示 0.00x——显示"待 rent roll"
     if (hasRR) {
       const dd = uw.dscr_dual;
       const td = dd.trailing.dscr, pd = dd.proforma.dscr;
-      cards.push(kpi('DSCR 双轨',
+      cards.push(kpi(T('DSCR 双轨'),
         (td != null && isFinite(td) ? td.toFixed(2) : '—') + 'x' + caliberBadge('real') + ' / ' +
         (pd != null && isFinite(pd) ? pd.toFixed(2) : '—') + 'x' + caliberBadge('est') + pf,
-        'trailing 主 / pro forma 辅', dd.trailing.label,
+        T('trailing 主 / pro forma 辅'), dd.trailing.label,
         td >= 1.2 ? 'k-ok' : 'k-bad'));
       cards.push(kpi('Debt Yield', fmtPct(uw.debt_yield, 2),
-        'NOI（银行口径）÷ 拟贷款额', '≥8-10% 舒适；<6% 机构资金出局',
+        T('NOI（银行口径）÷ 拟贷款额'), T('≥8-10% 舒适；<6% 机构资金出局'),
         uw.debt_yield >= 0.08 ? 'k-ok' : uw.debt_yield >= 0.06 ? 'k-warn' : 'k-bad'));
       const be = a.breakeven_occupancy;
-      cards.push(kpi('盈亏平衡', fmtPct(be),
-        '缓冲垫 ' + fmtPct(Math.max(0, (uw.rent_roll_detail.occupancy || 0) - be)) ,
-        be > 1 ? '满租都不够还贷 → 别碰' : be > 0.9 ? '偏薄' : '安全边际厚',
+      cards.push(kpi(T('盈亏平衡'), fmtPct(be),
+        T('缓冲垫 ') + fmtPct(Math.max(0, (uw.rent_roll_detail.occupancy || 0) - be)) ,
+        be > 1 ? T('满租都不够还贷 → 别碰') : be > 0.9 ? T('偏薄') : T('安全边际厚'),
         be > 1 ? 'k-bad' : be > 0.9 ? 'k-warn' : 'k-ok'));
     } else {
-      cards.push(kpi('DSCR', '待 rent roll', '导入租约明细后计算（Zone 4）', ''));
-      cards.push(kpi('Debt Yield', '待 rent roll', '', ''));
-      cards.push(kpi('盈亏平衡', '待 rent roll', '', ''));
+      cards.push(kpi('DSCR', T('待 rent roll'), T('导入租约明细后计算（Zone 4）'), ''));
+      cards.push(kpi('Debt Yield', T('待 rent roll'), '', ''));
+      cards.push(kpi(T('盈亏平衡'), T('待 rent roll'), '', ''));
     }
   }
   // P0-5（2026-10-05）：商业敏感性矩阵表放 Zone 2 KPI 卡之后
@@ -1155,7 +1158,7 @@ function renderZone2() {
 async function retryCompsPull() {
   const btn = $('#compsRetry');
   if (btn) btn.disabled = true;
-  toast('正在重新拉取 comps…');
+  toast(T('正在重新拉取 comps…'));
   try {
     const r = await api('POST', '/api/wb/comps/pull', {address: state.addr});
     state.comps = (r.rows || []).map((c, i) => ({...c, _id: i}));
@@ -1172,10 +1175,10 @@ async function retryCompsPull() {
                    prop_type: state.type === 'res' ? 'residential' : 'commercial'},
         comps, comp_weight: 0.5});
     } catch (e2) { /* 估值失败保持空态 */ }
-    toast('comps 拉取成功，估值已更新');
+    toast(T('comps 拉取成功，估值已更新'));
   } catch (e) {
     state.compsErr = e.message;
-    toast('拉取失败：' + e.message + '，可再点重试', 4000);
+    toast(T('拉取失败：{0}，可再点重试', e.message), 4000);
   }
   renderZone3();
 }
@@ -1192,7 +1195,7 @@ function renderZone3() {
     const chev = z3head.querySelector('.chev');
     if (chev) chev.textContent = '▾';
     if (!oldBadge)
-      z3head.querySelector('h2').insertAdjacentHTML('beforeend', ' <span class="fail-badge">拉取失败</span>');
+      z3head.querySelector('h2').insertAdjacentHTML('beforeend', ' <span class="fail-badge">' + T('拉取失败') + '</span>');
   } else if (oldBadge) {
     oldBadge.remove();
   }
@@ -1200,14 +1203,14 @@ function renderZone3() {
   // 但 /api/wb/valuate 空 comps 也会成功返回，val 非空导致失败态被吞。现 compsErr 优先判定，
   // 并区分"拉取失败"（给"重新拉取"按钮，只重试 comps/pull）与"零结果"两种文案。
   if (state.compsErr) {
-    body.innerHTML = `<div class="empty"><b>comps 拉取失败</b>（${esc(state.compsErr)}）<br>
-      <span class="note">不是"没有可比成交"，是数据没拉下来——点下面只重试拉取，不重跑全流程。</span><br>
-      <button class="btn" id="compsRetry" style="margin-top:8px">重新拉取</button></div>`;
+    body.innerHTML = `<div class="empty">${T('<b>comps 拉取失败</b>')}（${esc(state.compsErr)}）<br>
+      <span class="note">${T('不是"没有可比成交"，是数据没拉下来——点下面只重试拉取，不重跑全流程。')}</span><br>
+      <button class="btn" id="compsRetry" style="margin-top:8px">${T('重新拉取')}</button></div>`;
     $('#compsRetry').addEventListener('click', retryCompsPull);
     return;
   }
   if (!val && !comps.length) {
-    body.innerHTML = `<div class="empty">还没有 comps 数据——TopHap 没返回该地址的可比成交（零结果），换个地址或手动导入 CSV ${srcTag('w')}</div>`;
+    body.innerHTML = `<div class="empty">${T('还没有 comps 数据——TopHap 没返回该地址的可比成交（零结果），换个地址或手动导入 CSV ')}${srcTag('w')}</div>`;
     return;
   }
   const cv = val?.comps || {};
@@ -1221,16 +1224,16 @@ function renderZone3() {
   const overPct = (ask && cv.median_adjusted) ? (ask - cv.median_adjusted) / cv.median_adjusted : null;
   // item 4：口径写死——这是"可比成交调整价的中位数"（价格口径），不是 $/SF 口径，
   // 与下方"中位 $/SF"行区分，避免"均值/中位"混淆
-  const verdictLine = overPct == null ? '填要价后对比 comps 调整价中位'
-    : overPct <= -0.05 ? `低于 comps 调整价中位 ${fmtPct(-overPct, 0)}`
-    : overPct >= 0.05 ? `高于 comps 调整价中位 ${fmtPct(overPct, 0)}` : '与 comps 调整价中位基本持平';
+  const verdictLine = overPct == null ? T('填要价后对比 comps 调整价中位')
+    : overPct <= -0.05 ? T('低于 comps 调整价中位 {0}', fmtPct(-overPct, 0))
+    : overPct >= 0.05 ? T('高于 comps 调整价中位 {0}', fmtPct(overPct, 0)) : T('与 comps 调整价中位基本持平');
 
   // 三法区间（商业）
   let methodsHtml = '';
   if (state.type === 'com') {
     const me = buildMethodsEvidence() || {};
     const bar = (name, range, note) => {
-      if (!range) return `<div class="note">${name}：缺数据 ${srcTag('w')}（${note}）</div>`;
+      if (!range) return `<div class="note">${name}：${T('缺数据 ')}${srcTag('w')}（${note}）</div>`;
       return `<div class="frow"><span class="fl">${name}</span>
         <span class="fv">${fmt$(range[0])} – ${fmt$(range[1])}</span></div>`;
     };
@@ -1238,22 +1241,22 @@ function renderZone3() {
     // "NOI 经租约支持"是无源断言；有 rent roll 时才显示权重
     const hasRR3 = !!(state.rentRoll && state.rentRoll.length);
     const weightLine = hasRR3
-      ? '收益法 50%（NOI 经租约支持）/ 比较法 50%'
-      : '收益法：待租约数据（暂不参与）/ 比较法：当前唯一有效方法';
+      ? T('收益法 50%（NOI 经租约支持）/ 比较法 50%')
+      : T('收益法：待租约数据（暂不参与）/ 比较法：当前唯一有效方法');
     // Phase 5 第七轮 R9（remote）：标题"三法区间并列"overclaim——
     // 收益法常缺数据（待租约）、成本法从未接入，根本不是"三法并列"。改诚实标题。
-    methodsHtml = `<p class="zsub">估值方法对照</p><div class="formula">
-      ${bar('收益法 Income', me.income, 'NOI÷cap，需 cap 证据')}
-      ${bar('比较法 Sales', me.sales, 'recorded sales')}
-      ${bar('成本法 Cost', null, '待接数据源')}
-      <div class="frow"><span class="fl">权重披露</span><span class="fv" style="font-weight:500;font-size:12px">${weightLine}</span></div>
+    methodsHtml = `<p class="zsub">${T('估值方法对照')}</p><div class="formula">
+      ${bar(T('收益法 Income'), me.income, T('NOI÷cap，需 cap 证据'))}
+      ${bar(T('比较法 Sales'), me.sales, 'recorded sales')}
+      ${bar(T('成本法 Cost'), null, T('待接数据源'))}
+      <div class="frow"><span class="fl">${T('权重披露')}</span><span class="fv" style="font-weight:500;font-size:12px">${weightLine}</span></div>
     </div>`;
   }
 
   // 横向柱
   const maxP = Math.max(ask || 0, ...sel.map(c => c.adjusted_price || c.price || 0), 1);
   const bars = [
-    ask ? `<div class="hbar-row me"><span>本物业（要价）</span>
+    ask ? `<div class="hbar-row me"><span>${T('本物业（要价）')}</span>
       <div class="hbar-track"><div class="hbar-fill" style="width:${(ask / maxP * 100).toFixed(1)}%"></div></div>
       <span class="hbar-val">${fmt$(ask)}</span></div>` : '',
     ...sel.map(c => {
@@ -1275,8 +1278,8 @@ function renderZone3() {
     const bigAdj = Math.abs(c.adjustment_pct || 0) > 25;
     const dup = keyCount[dupKey(c)] > 1;
     return `<tr class="${on ? '' : 'off'} ${bigAdj ? 'hl-yellow' : ''}" data-cid="${c._id}">
-      <td><input type="checkbox" data-comp="${c._id}" ${on ? 'checked' : ''} aria-label="选用"></td>
-      <td>${esc(c.address || '')}${dup ? ' <span class="dup-tag">重复</span>' : ''}<br><span class="note">${esc(c.sale_date || '')} · ${esc(c.source || '')}</span></td>
+      <td><input type="checkbox" data-comp="${c._id}" ${on ? 'checked' : ''} aria-label="${T('选用')}"></td>
+      <td>${esc(c.address || '')}${dup ? ' <span class="dup-tag">' + T('重复') + '</span>' : ''}<br><span class="note">${esc(c.sale_date || '')} · ${esc(c.source || '')}</span></td>
       <td class="num">${fmt$(c.price)}</td><td class="num">${fmtNum(c.sf)}</td>
       <td class="num">${fmtPsf(c.price_per_sf)}</td>
       <td class="num">${bigAdj ? '⚠ ' : ''}${fmtPct((c.adjustment_pct || 0) / 100, 0)}</td></tr>`;
@@ -1287,14 +1290,14 @@ function renderZone3() {
     thTax = intakeField('tax_assessed_value');
   const reconRows = [
     [thMV ? thMV.display : (thAVM ? thAVM.display : null),
-     thMV ? 'TopHap 市场价值（公共记录口径）' : 'TopHap AVM 模型值',
-     thMV ? 'TopHap 公共记录的市场价值口径' : 'TopHap 算法估算，未考虑房屋实际成色与内部状况'],
-    [cv.estimate ? fmt$(cv.estimate) : null, '比较法估值',
-     '周边真实成交（recorded sales）调整后加权，反映市场实际愿意付的价格'],
-    [ask ? fmt$(ask) : null, '要价',
-     '卖方要价，是谈判起点，不是房子值多少钱'],
-    [thTax ? thTax.display : null, '计税估值',
-     '政府为征税定的价值（' + (thTax ? esc(thTax.note || '') : '') + '），常年滞后于市场，不代表市场价'],
+     thMV ? T('TopHap 市场价值（公共记录口径）') : T('TopHap AVM 模型值'),
+     thMV ? T('TopHap 公共记录的市场价值口径') : T('TopHap 算法估算，未考虑房屋实际成色与内部状况')],
+    [cv.estimate ? fmt$(cv.estimate) : null, T('比较法估值'),
+     T('周边真实成交（recorded sales）调整后加权，反映市场实际愿意付的价格')],
+    [ask ? fmt$(ask) : null, T('要价'),
+     T('卖方要价，是谈判起点，不是房子值多少钱')],
+    [thTax ? thTax.display : null, T('计税估值'),
+     T('政府为征税定的价值（{0}），常年滞后于市场，不代表市场价', thTax ? esc(thTax.note || '') : '')],
   ];
   // Phase 5 第四轮 C6：价格锚 sanity check——四个价格最大/最小比超 5 倍时红色警告
   const _anchorVals = [
@@ -1306,38 +1309,37 @@ function renderZone3() {
   if (_anchorVals.length >= 2) {
     const _ax = Math.max(..._anchorVals) / Math.min(..._anchorVals);
     if (_ax > 5)
-      _anchorWarn = `<p class="anchor-warn">价格锚差异巨大（${_ax >= 10 ? Math.round(_ax) : _ax.toFixed(1)} 倍），需人工核验数据口径</p>`;
+      _anchorWarn = `<p class="anchor-warn">${T('价格锚差异巨大（{0} 倍），需人工核验数据口径', _ax >= 10 ? Math.round(_ax) : _ax.toFixed(1))}</p>`;
   }
-  const reconHtml = `<p class="zsub">价格对账（四个价格，口径不同不许直接比大小）</p>${_anchorWarn}<div class="formula">${
+  const reconHtml = `<p class="zsub">${T('价格对账（四个价格，口径不同不许直接比大小）')}</p>${_anchorWarn}<div class="formula">${
     reconRows.map(([val, label, note]) =>
       `<div class="frow"><span class="fl">${esc(label)}<br><span class="note">${esc(note)}</span></span>
-       <span class="fv">${val ? esc(val) : '— 待接'}</span></div>`).join('')
+       <span class="fv">${val ? esc(val) : '—' + T('— 待接').slice(1)}</span></div>`).join('')
   }</div>`;
 
   body.innerHTML = `
     <p class="zsub">${esc(verdictLine)}${srcTag(state.compsErr ? 'w' : 'g')}</p>
     ${methodsHtml}
     <div class="formula">
-      <div class="frow"><span class="fl">比较法估值</span><span class="fv">${fmt$(cv.estimate)}</span></div>
-      <div class="frow"><span class="fl">成色调整</span><span class="fv" id="condAdjVal">未调整（无依据不做）</span></div>
-      <div class="frow hero"><span class="fl">调和估值</span><span class="fv">${esc(valuationDisplay('—'))}</span></div>
-      <div class="frow"><span class="fl">置信度评分</span><span class="fv">${state.confidence ? state.confidence.score + '/100' : '待计算'}</span></div>
+      <div class="frow"><span class="fl">${T('比较法估值')}</span><span class="fv">${fmt$(cv.estimate)}</span></div>
+      <div class="frow"><span class="fl">${T('成色调整')}</span><span class="fv" id="condAdjVal">${T('未调整（无依据不做）')}</span></div>
+      <div class="frow hero"><span class="fl">${T('调和估值')}</span><span class="fv">${esc(valuationDisplay('—'))}</span></div>
+      <div class="frow"><span class="fl">${T('置信度评分')}</span><span class="fv">${state.confidence ? state.confidence.score + '/100' : T('待计算')}</span></div>
     </div>
     ${reconHtml}
     <div class="fgrid">
-      <div class="field"><label>标的成色（五档）</label>
+      <div class="field"><label>${T('标的成色（五档）')}</label>
         <select id="condTier"><option>Excellent</option><option>Good</option><option selected>Average</option><option>Fair</option><option>Poor</option></select></div>
-      <div class="field"><label>调整依据（必填，无依据不做）</label>
-        <input id="condBasis" placeholder="如：基于 $45/SF 翻新成本 × 12,000 SF"></div>
-      <div class="field"><label>&nbsp;</label><button class="btn" id="condApply">应用成色调整</button></div>
+      <div class="field"><label>${T('调整依据（必填，无依据不做）')}</label>
+        <input id="condBasis" placeholder="${T('如：基于 $45/SF 翻新成本 × 12,000 SF')}"></div>
+      <div class="field"><label>&nbsp;</label><button class="btn" id="condApply">${T('应用成色调整')}</button></div>
     </div>
-    <p class="zsub">本物业 vs 选中 comps（降序）</p>
-    ${bars || '<div class="empty">无 comps</div>'}
-    <p class="zsub" style="margin-top:14px">comp 勾选器（勾选/剔除实时重算汇总）${sel.length} / ${comps.length} 选中 ·
-      中位 $/SF ${medPsf ? fmtPsf(medPsf) : '—'}</p>
-    <table class="data"><thead><tr><th></th><th>地址</th><th class="num">成交价 ${caliberBadge('real')}</th><th class="num">面积</th><th class="num">$/SF</th><th class="num">调整%</th></tr></thead>
+    <p class="zsub">${T('本物业 vs 选中 comps（降序）')}</p>
+    ${bars || '<div class="empty">' + T('无 comps') + '</div>'}
+    <p class="zsub" style="margin-top:14px">${T('comp 勾选器（勾选/剔除实时重算汇总）{0} / {1} 选中 · 中位 $/SF {2}', sel.length, comps.length, medPsf ? fmtPsf(medPsf) : '—')}</p>
+    <table class="data"><thead><tr><th></th><th>${T('地址')}</th><th class="num">${T('成交价')} ${caliberBadge('real')}</th><th class="num">${T('面积')}</th><th class="num">$/SF</th><th class="num">${T('调整%')}</th></tr></thead>
     <tbody>${rows}</tbody></table>
-    <p class="note">comps 只是起点，出价前请核验相似度/日期/位置/成色/市场动向。gross adjustment &gt; 25% 的 comp 已标黄。只认 recorded sales；listing 挂牌价不是证据。</p>
+    <p class="note">${T('comps 只是起点，出价前请核验相似度/日期/位置/成色/市场动向。gross adjustment > 25% 的 comp 已标黄。只认 recorded sales；listing 挂牌价不是证据。')}</p>
     ${state.type === 'com' ? renderRentCompsTab() : ''}`;
 
   body.querySelectorAll('[data-comp]').forEach(cb => cb.addEventListener('change', async () => {
@@ -1362,43 +1364,43 @@ function renderZone3() {
 async function applyConditionAdjust() {
   const basis = $('#condBasis').value.trim();
   const tier = $('#condTier').value;
-  if (!basis) { toast('调整依据必填：无依据宁可不做', 3000); return; }
+  if (!basis) { toast(T('调整依据必填：无依据宁可不做'), 3000); return; }
   try {
     const r = await api('POST', '/api/condition/adjust',
       {subject_tier: tier, comp_tier: 'Average', comp_price: state.valuation?.comps?.median_adjusted || 0, basis});
     $('#condAdjVal').textContent = r.applied
       ? `${r.direction}${(r.rate * 100).toFixed(1)}%（${r.basis.slice(0, 24)}…）`
       : r.reason;
-    toast(r.applied ? '已应用成色调整' : r.reason, 3000);
-  } catch (e) { toast('调整失败：' + e.message, 3000); }
+    toast(r.applied ? T('已应用成色调整') : r.reason, 3000);
+  } catch (e) { toast(T('调整失败：{0}', e.message), 3000); }
 }
 
 /* 租金 comps 页签（商业） */
 function renderRentCompsTab() {
   const rows = state.rentComps.map((r, i) =>
-    `<tr><td>${esc(r.address)}</td><td>${esc(r.date)}</td><td class="num">${fmt$(r.rentNnn, 0)}/SF/年</td>
+    `<tr><td>${esc(r.address)}</td><td>${esc(r.date)}</td><td class="num">${fmt$(r.rentNnn, 0)}${T('/SF/年')}</td>
      <td class="num">${esc(r.freeRent)}</td><td class="num">${fmt$(r.ti, 0)}</td>
-     <td><button class="btn ghost" data-rdel="${i}" style="min-height:36px">删</button></td></tr>`).join('');
-  return `<div style="margin-top:18px"><p class="zsub">租金 comps（lease comps，独立页签）${srcTag(state.rentComps.length ? 'y' : 'w')}</p>
-  ${state.rentComps.length ? `<table class="data"><thead><tr><th>地址</th><th>签约时间</th><th class="num">租金 NNN 等值</th><th class="num">免租期</th><th class="num">TI</th><th></th></tr></thead><tbody>${rows}</tbody></table>`
-    : `<div class="amber"><b>待接数据源：</b>租金 comps 库未接入。字段要求：地址/签约时间/租金 NNN 等值/免租期/TI；所有租金统一 NNN 等值口径（Gross − 当年实际运营费用）。可先手动录入。</div>`}
+     <td><button class="btn ghost" data-rdel="${i}" style="min-height:36px">${T('删')}</button></td></tr>`).join('');
+  return `<div style="margin-top:18px"><p class="zsub">${T('租金 comps（lease comps，独立页签）')}${srcTag(state.rentComps.length ? 'y' : 'w')}</p>
+  ${state.rentComps.length ? `<table class="data"><thead><tr><th>${T('地址')}</th><th>${T('签约时间')}</th><th class="num">${T('租金 NNN 等值')}</th><th class="num">${T('免租期')}</th><th class="num">TI</th><th></th></tr></thead><tbody>${rows}</tbody></table>`
+    : `<div class="amber">${T('<b>待接数据源：</b>租金 comps 库未接入。字段要求：地址/签约时间/租金 NNN 等值/免租期/TI；所有租金统一 NNN 等值口径（Gross − 当年实际运营费用）。可先手动录入。')}</div>`}
   <div class="fgrid">
-    <div class="field"><label>地址</label><input id="rcAddr"></div>
-    <div class="field"><label>签约时间</label><input id="rcDate" placeholder="2026-03"></div>
-    <div class="field"><label>租金 NNN 等值（$/SF/年）</label><input id="rcRent" type="number"></div>
-    <div class="field"><label>免租期</label><input id="rcFree" placeholder="如：3 个月"></div>
+    <div class="field"><label>${T('地址')}</label><input id="rcAddr"></div>
+    <div class="field"><label>${T('签约时间')}</label><input id="rcDate" placeholder="2026-03"></div>
+    <div class="field"><label>${T('租金 NNN 等值（$/SF/年）')}</label><input id="rcRent" type="number"></div>
+    <div class="field"><label>${T('免租期')}</label><input id="rcFree" placeholder="${T('如：3 个月')}"></div>
     <div class="field"><label>TI $</label><input id="rcTi" type="number"></div>
-    <div class="field"><label>&nbsp;</label><button class="btn" id="rcAdd">手动录入</button></div>
+    <div class="field"><label>&nbsp;</label><button class="btn" id="rcAdd">${T('手动录入')}</button></div>
   </div>
-  <p class="note">缺免租期和 TI 的租金没有可比性。</p></div>`;
+  <p class="note">${T('缺免租期和 TI 的租金没有可比性。')}</p></div>`;
 }
 document.addEventListener('click', e => {
   if (e.target.id === 'rcAdd') {
     const rent = parseFloat($('#rcRent').value);
-    if (!$('#rcAddr').value.trim() || !rent) { toast('地址和租金必填', 2500); return; }
+    if (!$('#rcAddr').value.trim() || !rent) { toast(T('地址和租金必填'), 2500); return; }
     state.rentComps.push({address: $('#rcAddr').value.trim(), date: $('#rcDate').value.trim(),
       rentNnn: rent, freeRent: $('#rcFree').value.trim(), ti: parseFloat($('#rcTi').value) || 0});
-    renderZone3(); toast('已录入 1 条租金 comp');
+    renderZone3(); toast(T('已录入 1 条租金 comp'));
   }
   if (e.target.dataset.rdel !== undefined) {
     state.rentComps.splice(parseInt(e.target.dataset.rdel), 1); renderZone3();
@@ -1411,7 +1413,7 @@ function renderZone4() {
   if (state.type === 'res') {
     const m = state.score?.metrics || {};
     if (!state.score) {
-      body.innerHTML = `<div class="empty">填 Zone 7 假设并计算后，这里显示现金流构成与 what-if 滑杆。</div>`;
+      body.innerHTML = `<div class="empty">${T('填 Zone 7 假设并计算后，这里显示现金流构成与 what-if 滑杆。')}</div>`;
       return;
     }
     const rent = getA('rent'), vac = getA('vac') / 100;
@@ -1419,9 +1421,9 @@ function renderZone4() {
     // 后端：cash_flow = rent*(1-vac) − opex − monthly_pi。此前前端错写成
     // rent − vac − (opex − rent*vac) − piti，导致 12000−960−5000−3000=3040 ≠ 净剩 $5K。
     const parts = [
-      ['租金', rent, 'var(--green)'], ['− 空置', -rent * vac, 'var(--amber)'],
-      ['− 税/险/杂', -(m.opex || 0), 'var(--amber)'],
-      ['− 月供（本息）', -(m.monthly_pi || 0), 'var(--red)'], ['= 净现金流', m.cash_flow_monthly, 'var(--teal)'],
+      [T('租金'), rent, 'var(--green)'], [T('− 空置'), -rent * vac, 'var(--amber)'],
+      [T('− 税/险/杂'), -(m.opex || 0), 'var(--amber)'],
+      [T('− 月供（本息）'), -(m.monthly_pi || 0), 'var(--red)'], [T('= 净现金流'), m.cash_flow_monthly, 'var(--teal)'],
     ];
     const maxA = Math.max(...parts.map(p => Math.abs(p[1])), 1);
     // Phase 5 第五轮 B4（remote R4）：瀑布行标签自带"−"时，数值必须显示绝对值——
@@ -1437,23 +1439,23 @@ function renderZone4() {
     // 否则小白会问"你们不是知道税吗"。数字取 intake 档案字段，不硬编码。
     const _thTaxesAnnual = intakeField('taxes_annual');
     const opexNote = (m.opex || 0) > 0
-      ? `税/险/杂 ${fmt$(m.opex)}（含税、保险、维修、capex、管理费）`
-      : `税/险/杂 $0（未填/待核验：税、保险、维修、capex、管理费）` +
+      ? T('税/险/杂 {0}（含税、保险、维修、capex、管理费）', fmt$(m.opex))
+      : T('税/险/杂 $0（未填/待核验：税、保险、维修、capex、管理费）') +
         ((_thTaxesAnnual && _thTaxesAnnual.display)
-          ? `；档案税 ${esc(_thTaxesAnnual.display)} 为公共记录未经核验，本次测算未采用`
+          ? T('；档案税 {0} 为公共记录未经核验，本次测算未采用', esc(_thTaxesAnnual.display))
           : '');
     body.innerHTML = `
-      <p class="zsub">每月净剩 ${fmt$(m.cash_flow_monthly)} ${srcTag('y')}</p>
+      <p class="zsub">${T('每月净剩 {0} ', fmt$(m.cash_flow_monthly))}${srcTag('y')}</p>
       ${bars}
-      <p class="zsub" style="margin-top:12px">what-if（拖动实时重算）</p>
-      <div class="slider-row"><span>租金</span>
-        <input type="range" id="slRent" min="-20" max="20" value="0" step="1" aria-label="租金调整">
+      <p class="zsub" style="margin-top:12px">${T('what-if（拖动实时重算）')}</p>
+      <div class="slider-row"><span>${T('租金')}</span>
+        <input type="range" id="slRent" min="-20" max="20" value="0" step="1" aria-label="${T('租金调整')}">
         <span class="slider-val" id="slRentV">±0%</span></div>
-      <div class="slider-row"><span>利率</span>
-        <input type="range" id="slRate" min="-2" max="2" value="0" step="0.25" aria-label="利率调整">
+      <div class="slider-row"><span>${T('利率')}</span>
+        <input type="range" id="slRate" min="-2" max="2" value="0" step="0.25" aria-label="${T('利率调整')}">
         <span class="slider-val" id="slRateV">±0%</span></div>
-      <p class="note">这意味着什么：月现金流 ${fmt$(m.cash_flow_monthly)}，${m.cash_flow_monthly >= 0 ? '租金能覆盖月供还有剩' : '每月要贴钱'}。
-      月供口径=等额本息 ${fmt$(m.monthly_pi)}（贷款 ${fmt$(Math.max(getA('ask') - getA('down'), 0))}、年利率 ${getA('rate')}%、30 年摊还）＋税/险；${opexNote}。</p>`;
+      <p class="note">${T('这意味着什么：月现金流 {0}，{1}。', fmt$(m.cash_flow_monthly), m.cash_flow_monthly >= 0 ? T('租金覆盖月供还有剩') : T('每月要贴钱'))}
+      ${T('月供口径=等额本息 {0}（贷款 {1}、年利率 {2}%、30 年摊还）＋税/险；{3}。', fmt$(m.monthly_pi), fmt$(Math.max(getA('ask') - getA('down'), 0)), getA('rate'), opexNote)}</p>`;
     const rerun = async () => {
       const rp = parseFloat($('#slRent').value), rt = parseFloat($('#slRate').value);
       $('#slRentV').textContent = (rp >= 0 ? '+' : '') + rp + '%';
@@ -1463,10 +1465,10 @@ function renderZone4() {
       input.rate = Math.max(0, input.rate + rt);
       try {
         state.score = await api('POST', '/api/score',
-          {track: 'residential', name: state.addr, address: state.addr, input});
+          {track: 'residential', name: state.addr, address: state.addr, input, lang: window.DD_LANG});
         const ev = buildVerdictEvidence();
         state.verdict = await api('POST', '/api/verdict',
-          {track: 'residential', score: state.score, confidence: state.confidence.score, evidence: ev});
+          {track: 'residential', score: state.score, confidence: state.confidence.score, evidence: ev, lang: window.DD_LANG});
         renderZone1(); renderZone2(); renderZone4();
       } catch (e) { /* 保持 */ }
     };
@@ -1478,20 +1480,20 @@ function renderZone4() {
   const uw = (state.uw && state.uw.plus && state.uw.plus.has_rent_roll) ? state.uw.plus : null;
   if (!uw) {
     body.innerHTML = `
-      <div class="amber"><b>租约明细待补充：</b>WALT / 到期集中度 / 租户集中度无法验证，NOI 可信度降级。
-      无 rent roll 的 deal 最高只给 HOLD；若触发一票否决，结论为独立的否决态（住宅"否决"/商业"VETO"，红）。</div>
-      <p class="zsub">导入 rent roll（Excel 模板 / 粘贴），再跑银行口径核保</p>
+      <div class="amber"><b>${T('租约明细待补充：')}</b>${T('WALT / 到期集中度 / 租户集中度无法验证，NOI 可信度降级。')}
+      ${T('无 rent roll 的 deal 最高只给 HOLD；若触发一票否决，结论为独立的否决态（住宅"否决"/商业"VETO"，红）。')}</div>
+      <p class="zsub">${T('导入 rent roll（Excel 模板 / 粘贴），再跑银行口径核保')}</p>
       <div class="fgrid">
         <div class="field"><label>&nbsp;</label>
-          <a class="btn" style="display:inline-block;text-decoration:none;line-height:44px;text-align:center" href="/api/uw/rentroll/template.xlsx">下载 Excel 模板</a></div>
-        <div class="field"><label>上传填好的模板</label><input type="file" id="rrFile" accept=".xlsx"></div>
-        <div class="field"><label>&nbsp;</label><button class="btn primary" id="rrGo">导入并核保</button></div>
+          <a class="btn" style="display:inline-block;text-decoration:none;line-height:44px;text-align:center" href="/api/uw/rentroll/template.xlsx">${T('下载 Excel 模板')}</a></div>
+        <div class="field"><label>${T('上传填好的模板')}</label><input type="file" id="rrFile" accept=".xlsx"></div>
+        <div class="field"><label>&nbsp;</label><button class="btn primary" id="rrGo">${T('导入并核保')}</button></div>
       </div>
-      <p class="note">顺序：rent roll 明细 → NOI 调整桥 → DSCR 双轨 → 盈亏平衡 → 压力测试。NOI 是 rent roll 的孩子。</p>`;
+      <p class="note">${T('顺序：rent roll 明细 → NOI 调整桥 → DSCR 双轨 → 盈亏平衡 → 压力测试。NOI 是 rent roll 的孩子。')}</p>`;
     const go = async () => {
       const f = $('#rrFile').files[0];
-      if (!f) { toast('先选择 Excel 文件', 2500); return; }
-      toast('正在导入 rent roll…');
+      if (!f) { toast(T('先选择 Excel 文件'), 2500); return; }
+      toast(T('正在导入 rent roll…'));
       const fd = new FormData(); fd.append('file', f);
       try {
         const r = await fetch('/api/uw/rentroll/parse', {method: 'POST', body: fd});
@@ -1499,14 +1501,14 @@ function renderZone4() {
         const j = await r.json();
         state.rentRoll = j.tenants;
         // P0-13：如实报告跳过的模板示例行与日期解析失败行
-        let msg = `导入 ${j.count} 个租户`;
-        if (j.skipped_example) msg += `（跳过模板示例行 ${j.skipped_example}）`;
-        if (j.bad_dates) msg += `（${j.bad_dates} 行日期解析失败，租期已置空请核对）`;
-        toast(msg + '，正在核保…');
+        let msg = T('导入 {0} 个租户', j.count);
+        if (j.skipped_example) msg += T('（跳过模板示例行 {0}）', j.skipped_example);
+        if (j.bad_dates) msg += T('（{0} 行日期解析失败，租期已置空请核对）', j.bad_dates);
+        toast(msg + T('，正在核保…'));
         await runUwPlus();
         if (state.score) await runScoreChain(); else { renderAll(); }
-        toast('核保完成');
-      } catch (e) { toast('导入失败：' + e.message, 4000); }
+        toast(T('核保完成'));
+      } catch (e) { toast(T('导入失败：{0}', e.message), 4000); }
     };
     $('#rrGo').addEventListener('click', go);
     return;
@@ -1517,7 +1519,7 @@ function renderZone4() {
      <td class="num">${fmt$(t.monthly_rent)}</td><td>${esc(t.lease_start)} → ${esc(t.lease_end)}</td>
      <td>${esc(t.expense_structure)}</td></tr>`).join('');
   const bridge = uw.noi_bank_bridge.rows.map(r =>
-    `<div class="wf-row ${r.item === '银行口径 NOI' ? 'total' : ''}">
+    `<div class="wf-row ${r.item === '银行口径 NOI' || r.item === 'Bank-basis NOI' ? 'total' : ''}">
        <span class="wi">${esc(r.item)} ${srcTag(r.tag === 'green' ? 'g' : 'y')}</span>
        <span class="wv">${fmt$(r.amount)}</span></div>
      <div class="note" style="margin:0 0 4px">${esc(r.basis)}</div>`).join('');
@@ -1535,24 +1537,23 @@ function renderZone4() {
   }).join('');
   const dd = uw.dscr_dual;
   body.innerHTML = `
-    <p class="zsub">rent roll 明细（${rr.tenant_count} 租户）${srcTag('y')}</p>
-    <table class="data"><thead><tr><th>单元</th><th>租户</th><th class="num">面积</th><th class="num">月租金</th><th>租期</th><th>费用结构</th></tr></thead>
-    <tbody>${rows || '<tr><td colspan="6">无租户行</td></tr>'}</tbody></table>
-    <p class="note">WALT ${rr.walt_years != null ? rr.walt_years + ' 年（租金加权）' : '—：' + esc(rr.walt_note)} ·
-      前三租户集中度 ${fmtPct(rr.top3_concentration)}${rr.top3_flag ? '（>60% 单租户风险）' : ''}</p>
-    <p class="zsub">NOI 银行调整桥 waterfall</p>${bridge}
-    <p class="zsub">未来 5 年到期租金（到期悬崖标红）</p>${ladder}
-    <p class="zsub">DSCR 双轨</p>
+    <p class="zsub">${T('rent roll 明细（{0} 租户）', rr.tenant_count)}${srcTag('y')}</p>
+    <table class="data"><thead><tr><th>${T('单元')}</th><th>${T('租户')}</th><th class="num">${T('面积')}</th><th class="num">${T('月租金')}</th><th>${T('租期')}</th><th>${T('费用结构')}</th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="6">' + T('无租户行') + '</td></tr>'}</tbody></table>
+    <p class="note">${T('WALT {0} · 前三租户集中度 {1}{2}', rr.walt_years != null ? rr.walt_years + T(' 年（租金加权）') : '—：' + esc(rr.walt_note), fmtPct(rr.top3_concentration), rr.top3_flag ? T('（>60% 单租户风险）') : '')}</p>
+    <p class="zsub">${T('NOI 银行调整桥 waterfall')}</p>${bridge}
+    <p class="zsub">${T('未来 5 年到期租金（到期悬崖标红）')}</p>${ladder}
+    <p class="zsub">${T('DSCR 双轨')}</p>
     <div class="formula">
-      <div class="frow hero"><span class="fl">Trailing 主</span><span class="fv">${dd.trailing.dscr.toFixed(2)}x</span></div>
+      <div class="frow hero"><span class="fl">${T('Trailing 主')}</span><span class="fv">${dd.trailing.dscr.toFixed(2)}x</span></div>
       <div class="frow"><span class="fl" colspan="2" style="font-size:12px;color:var(--muted)">${esc(dd.trailing.label)}</span></div>
-      <div class="frow"><span class="fl">Pro forma 辅 ${pf}</span><span class="fv">${dd.proforma.dscr.toFixed(2)}x</span></div>
+      <div class="frow"><span class="fl">${T('Pro forma 辅 ')}${pf}</span><span class="fv">${dd.proforma.dscr.toFixed(2)}x</span></div>
       <div class="frow"><span class="fl" colspan="2" style="font-size:12px;color:var(--muted)">${esc(dd.proforma.label)}</span></div>
     </div>
-    <p class="zsub">压力测试表（破红线标红；+200bps 后 DSCR&lt;1.20 即条件通过，破 1.0 结构不可行）</p>
-    <table class="data"><thead><tr><th>档位</th><th class="num">DSCR</th><th class="num">Debt Yield</th><th class="num">Breakeven</th></tr></thead>
+    <p class="zsub">${T('压力测试表（破红线标红；+200bps 后 DSCR<1.20 即条件通过，破 1.0 结构不可行）')}</p>
+    <table class="data"><thead><tr><th>${T('档位')}</th><th class="num">DSCR</th><th class="num">Debt Yield</th><th class="num">Breakeven</th></tr></thead>
     <tbody>${st}</tbody></table>
-    <p class="note">红线：DSCR ≥1.20 / Debt Yield ≥6% / Breakeven ≤100%。</p>`;
+    <p class="note">${T('红线：DSCR ≥1.20 / Debt Yield ≥6% / Breakeven ≤100%。')}</p>`;
 }
 
 /* ---------------- Zone 5：市场 ---------------- */
@@ -1565,53 +1566,52 @@ function renderZone5() {
     const found = (mk.markets || []).some(m =>
       JSON.stringify(m).includes(zip));
     zipBlock = found
-      ? `<div class="note">该邮编 ${zip} 有市场指数覆盖 ${srcTag('g')}</div>`
-      : `<div class="amber"><b>该邮编 ${zip} 暂无市场指数</b>——不许静默用 MSA 代替 ${srcTag('w')}</div>`;
+      ? `<div class="note">${T('该邮编 {0} 有市场指数覆盖 ', zip)}${srcTag('g')}</div>`
+      : `<div class="amber"><b>${T('该邮编 {0} 暂无市场指数', zip)}</b>${T('——不许静默用 MSA 代替 ')}${srcTag('w')}</div>`;
   } else {
-    zipBlock = `<div class="amber"><b>市场指数待查：</b>地址中未识别邮编，或市场库未覆盖 ${srcTag('w')}</div>`;
+    zipBlock = `<div class="amber"><b>${T('市场指数待查：')}</b>${T('地址中未识别邮编，或市场库未覆盖 ')}${srcTag('w')}</div>`;
   }
   // cap 直方图（商业，用 comps 的 cap 代理：成交 NOI 缺失 → 诚实说明）
   let hist = '';
   if (state.type === 'com') {
     const withNoi = state.comps.filter(c => c.noi_annual > 0 && c.price > 0);
     hist = withNoi.length
-      ? `<p class="note">cap 分布基于 ${withNoi.length} 个有 NOI 的 comps</p>`
-      : `<div class="empty">cap 分布：成交 NOI 非公开，整列灰显，仅供参考 ${srcTag('w')}</div>`;
+      ? `<p class="note">${T('cap 分布基于 {0} 个有 NOI 的 comps', withNoi.length)}</p>`
+      : `<div class="empty">${T('cap 分布：成交 NOI 非公开，整列灰显，仅供参考 ')}${srcTag('w')}</div>`;
   }
   // 合同 vs 市场租金 reversion（商业）
   let rev = '';
   if (state.type === 'com') {
-    rev = `<p class="zsub">合同 vs 市场租金 reversion</p>
-      <div class="amber"><b>待接数据源：</b>市场租金缺口——租金 comps 库未接入，reversion 无法计算 ${srcTag('w')}</div>
-      <p class="note">冲突检查：listing 租金涨幅假设 vs 市场实际增速——市场数据缺失时不做断言。</p>`;
+    rev = `<p class="zsub">${T('合同 vs 市场租金 reversion')}</p>
+      <div class="amber"><b>${T('待接数据源：')}</b>${T('市场租金缺口——租金 comps 库未接入，reversion 无法计算 ')}${srcTag('w')}</div>
+      <p class="note">${T('冲突检查：listing 租金涨幅假设 vs 市场实际增速——市场数据缺失时不做断言。')}</p>`;
   }
   body.innerHTML = `
     ${zipBlock}${hist}${rev}
-    <p class="zsub">市场指标（公开指数）</p>
-    <p class="note">数据源：${esc(mk?.methodology || 'FHFA 公开房价指数')} ·
-      发布：${esc(mk?.release || '')} ${esc(mk?.release_date || '')}</p>
+    <p class="zsub">${T('市场指标（公开指数）')}</p>
+    <p class="note">${T('数据源：')}${esc(mk?.methodology || 'FHFA 公开房价指数')}${T(' · 发布：')}${esc(mk?.release || '')} ${esc(mk?.release_date || '')}</p>
     ${(() => {
       // Phase 5 第七轮 #3（xiaobai）：市场指数 0 行时不许渲染空表头＋空白行
       // （看起来像渲染 bug）——收起表格，只留一句话说明。
       const rows = (mk?.markets || []).slice(0, 8);
       if (!rows.length)
-        return `<div class="empty">暂无市场指数数据（待接数据源） ${srcTag('w')}</div>`;
-      return `<table class="data"><thead><tr><th>市场</th><th>说明</th></tr></thead><tbody>
+        return `<div class="empty">${T('暂无市场指数数据（待接数据源） ')}${srcTag('w')}</div>`;
+      return `<table class="data"><thead><tr><th>${T('市场')}</th><th>${T('说明')}</th></tr></thead><tbody>
         ${rows.map(m =>
           `<tr><td>${esc(m.name || m.id || '')}</td><td class="note">${esc(m.note || '')}</td></tr>`).join('')}
         </tbody></table>`;
     })()}
-    <p class="note">每行误差标注：基于公开指数；历史回测误差未在本页披露，以发布机构（FHFA/FRED）口径为准。新增供给 pipeline：待接数据源 ${srcTag('w')}</p>`;
+    <p class="note">${T('每行误差标注：基于公开指数；历史回测误差未在本页披露，以发布机构（FHFA/FRED）口径为准。新增供给 pipeline：待接数据源 ')}${srcTag('w')}</p>`;
 }
 
 /* ---------------- Zone 6：预测 ---------------- */
 function renderZone6() {
   const body = $('#z6Body');
   const fc = state.forecast;
-  const sleeve = '<span class="tag exp">趋势外推（实验）</span>';
+  const sleeve = '<span class="tag exp">' + T('趋势外推（实验）') + '</span>';
   // P0-7：无预测数据时显示"暂无预测数据"，格子里不许出现 $0
   if (!fc || !fc.scenarios || !fc.scenarios.length) {
-    body.innerHTML = `<div class="empty">暂无预测数据 ${sleeve} ${srcTag('w')}</div>`;
+    body.innerHTML = `<div class="empty">${T('暂无预测数据 ')}${sleeve} ${srcTag('w')}</div>`;
     return;
   }
   const base = fc.base_value || 0;
@@ -1625,14 +1625,14 @@ function renderZone6() {
     const pts = ptsOf(s);
     const ptsTxt = pts.map(p => `${p.label}: ${fmt$(p.value)}`).join(' · ');
     const end = pts.length ? pts[pts.length - 1].value : 0;
-    return `<div class="frow"><span class="fl">${esc(s.label)}（${s.annual_rate_pct}%/年）</span>
-      <span class="fv">${end ? fmt$(end) : '暂无预测数据'}</span></div><div class="note" style="margin:0 0 6px">${esc(ptsTxt)}</div>`;
+    return `<div class="frow"><span class="fl">${esc(s.label)}${T('（{0}%/年）', s.annual_rate_pct)}</span>
+      <span class="fv">${end ? fmt$(end) : T('暂无预测数据')}</span></div><div class="note" style="margin:0 0 6px">${esc(ptsTxt)}</div>`;
   }).join('');
   // SVG 折线
   const W = 560, H = 180, P = 30;
   const all = fc.scenarios.flatMap(s => ptsOf(s).map(p => p.value)).filter(v => v > 0);
   if (!all.length) {
-    body.innerHTML = `<div class="empty">暂无预测数据 ${sleeve} ${srcTag('w')}</div>`;
+    body.innerHTML = `<div class="empty">${T('暂无预测数据 ')}${sleeve} ${srcTag('w')}</div>`;
     return;
   }
   const lo = Math.min(...all, base) * 0.95, hi = Math.max(...all, base) * 1.05;
@@ -1645,15 +1645,15 @@ function renderZone6() {
   }).join('');
   const baseEnd = ptsOf(fc.scenarios.find(s => s.name === 'base') || {});
   body.innerHTML = `
-    <p class="zsub">模型预测 5 年后值 ${baseEnd.length ? fmt$(baseEnd[baseEnd.length - 1].value) : '暂无预测数据'} ${sleeve}</p>
-    <svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:640px;background:var(--bg1);border:1px solid var(--line);border-radius:6px" role="img" aria-label="5 年估值预测">
+    <p class="zsub">${T('模型预测 5 年后值 ') + (baseEnd.length ? fmt$(baseEnd[baseEnd.length - 1].value) : T('暂无预测数据'))} ${sleeve}</p>
+    <svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:640px;background:var(--bg1);border:1px solid var(--line);border-radius:6px" role="img" aria-label="${T('5 年估值预测')}">
       ${paths}
-      <text x="${P}" y="${H - 8}" fill="#64748f" font-size="10">现在</text>
-      <text x="${W - P - 30}" y="${H - 8}" fill="#64748f" font-size="10">5 年后</text>
+      <text x="${P}" y="${H - 8}" fill="#64748f" font-size="10">${T('现在')}</text>
+      <text x="${W - P - 30}" y="${H - 8}" fill="#64748f" font-size="10">${T('5 年后')}</text>
     </svg>
     <div class="formula" style="margin-top:10px">${rows}</div>
-    <p class="note">模型预测，基于过去趋势外推，方法未公开；历史回测误差无公开数据，不做断言；不构成投资建议；银行承销不采用。forecast 输出绝不回流进 DSCR/NOI/verdict 计算。</p>
-    ${state.type === 'com' ? '<p class="note">商业逐年表：见上方分情景行（持有/出售决策参考，reversion 故事约束涨幅：预测涨幅不得超过 reversion 能支撑的幅度）。</p>' : ''}`;
+    <p class="note">${T('模型预测，基于过去趋势外推，方法未公开；历史回测误差无公开数据，不做断言；不构成投资建议；银行承销不采用。forecast 输出绝不回流进 DSCR/NOI/verdict 计算。')}</p>
+    ${state.type === 'com' ? '<p class="note">' + T('商业逐年表：见上方分情景行（持有/出售决策参考，reversion 故事约束涨幅：预测涨幅不得超过 reversion 能支撑的幅度）。') + '</p>' : ''}`;
 }
 
 /* ---------------- Zone 7：假设与明细 ---------------- */
@@ -1667,82 +1667,82 @@ function renderZone7() {
   const exitS = state.assumptions.exitStrategy || '';
   const structHtml = `
     <div class="fgrid" style="margin-top:12px">
-      <div class="field"><label>交易结构（决定 verdict 否决规则）</label>
+      <div class="field"><label>${T('交易结构（决定 verdict 否决规则）')}</label>
         <select data-a="structure">
           ${Object.entries(STRUCT_LABELS).map(([v, l]) =>
             `<option value="${v}"${v === struct ? ' selected' : ''}>${esc(l)}</option>`).join('')}
         </select></div>
-      <div class="field"><label>退出策略（选了即解除"无退出预案"否决）</label>
+      <div class="field"><label>${T('退出策略（选了即解除"无退出预案"否决）')}</label>
         <select data-a="exitStrategy">
           ${EXIT_OPTIONS.map(([v, l]) =>
-            `<option value="${v}"${v === exitS ? ' selected' : ''}>${esc(l)}</option>`).join('')}
+            `<option value="${v}"${v === exitS ? ' selected' : ''}>${esc(T(l))}</option>`).join('')}
         </select></div>
       ${state.type === 'res' && struct === 'subject_to' ? `
-      <div class="field"><label>承接贷款余额 $（subject-to：卖家现有贷款余额，空=要价−首付）</label>
+      <div class="field"><label>${T('承接贷款余额 $（subject-to：卖家现有贷款余额，空=要价−首付）')}</label>
         <input data-a="loanBal" type="number" value="${esc(state.assumptions.loanBal ?? '')}"></div>` : ''}
     </div>
-    <p class="note">subject-to 才有"无退出预案 / due-on-sale 备用预案"否决项；普通购买/贷款购买永不触发。
+    <p class="note">${T('subject-to 才有"无退出预案 / due-on-sale 备用预案"否决项；普通购买/贷款购买永不触发。')}
     ${gterm('subject-to')} ${gterm('due-on-sale')} ${gterm('refi')}</p>
     ${struct === 'subject_to' && exitS === '持有收租'
-      ? '<p class="note">提醒：持有收租不能应对银行执行 due-on-sale（要求提前还款），"due-on-sale 备用预案"否决仍在；需另选 refi/出售/转租购之一才能解除。</p>' : ''}`;
+      ? '<p class="note">' + T('提醒：持有收租不能应对银行执行 due-on-sale（要求提前还款），"due-on-sale 备用预案"否决仍在；需另选 refi/出售/转租购之一才能解除。') + '</p>' : ''}`;
   const comps = state.comps.filter(c => state.selected.has(c._id));
   const compRows = comps.map(c =>
     `<tr><td>${esc(c.address || '')}</td><td>${esc(c.sale_date || '')}</td>
      <td class="num">${fmt$(c.price)}</td><td class="num">${fmtNum(c.sf)}</td>
      <td class="num">${fmtPsf(c.price_per_sf)}</td><td class="num">${fmtPct((c.adjustment_pct || 0) / 100, 0)}</td></tr>`).join('');
   const intake = state.intake;
-  const intakeHtml = intake ? `<p class="zsub">物业档案（${esc(intake.primary_provider || '')}，${esc(intake.fetched_at || '')}）</p>
+  const intakeHtml = intake ? `<p class="zsub">${T('物业档案（{0}，{1}）', esc(intake.primary_provider || ''), esc(intake.fetched_at || ''))}</p>
     <table class="data"><tbody>
     ${(intake.fields || []).slice(0, 12).map(f =>
       `<tr><td>${esc(f.label)}</td><td>${esc(f.display || f.value || '')}</td>
        <td><span class="note">${esc(f.source || '')}</span></td></tr>`).join('')}
     </tbody></table>
-    ${(intake.manual_needed || []).length ? `<p class="note">待手动补：${intake.manual_needed.map(m => esc(m.label)).join('、')}</p>` : ''}`
-    : '<p class="note">物业档案搜集中…</p>';
+    ${(intake.manual_needed || []).length ? `<p class="note">${T('待手动补：')}${intake.manual_needed.map(m => esc(m.label)).join(T('、'))}</p>` : ''}`
+    : '<p class="note">' + T('物业档案搜集中…') + '</p>';
   // P0-1：交割 checklist——"authorization to release"只是待办项，永不自动否决
-  const authRow = `<tr><td>Authorization to release（卖方向贷款方索取）</td><td>核实贷款真实余额/利率/逾期</td><td>卖方</td><td>${srcTag('w')}</td></tr>
-    <tr><td colspan="4"><span class="note">状态：未验证——交割前向卖方索取，此项永不作为自动一票否决。</span></td></tr>`;
+  const authRow = `<tr><td>${T('Authorization to release（卖方向贷款方索取）')}</td><td>${T('核实贷款真实余额/利率/逾期')}</td><td>${T('卖方')}</td><td>${srcTag('w')}</td></tr>
+    <tr><td colspan="4"><span class="note">${T('状态：未验证——交割前向卖方索取，此项永不作为自动一票否决。')}</span></td></tr>`;
   const checklists = state.type === 'com' ? `
-    <p class="zsub">交割前必备文件 checklist（银行会要）</p>
-    <table class="data"><thead><tr><th>文件</th><th>为什么</th><th>找谁要</th><th>状态</th></tr></thead><tbody>
-    <tr><td>${gterm('estoppel')} 租户确认函</td><td>核验租约真实性</td><td>卖方/租户</td><td>${srcTag('w')}</td></tr>
-    <tr><td>Phase I 环境报告</td><td>排除污染责任</td><td>环境顾问</td><td>${srcTag('w')}</td></tr>
-    <tr><td>PCA 物业状况报告</td><td>量化 deferred capex</td><td>工程顾问</td><td>${srcTag('w')}</td></tr>
+    <p class="zsub">${T('交割前必备文件 checklist（银行会要）')}</p>
+    <table class="data"><thead><tr><th>${T('文件')}</th><th>${T('为什么')}</th><th>${T('找谁要')}</th><th>${T('状态')}</th></tr></thead><tbody>
+    <tr><td>${gterm('estoppel')}${T(' 租户确认函')}</td><td>${T('核验租约真实性')}</td><td>${T('卖方/租户')}</td><td>${srcTag('w')}</td></tr>
+    <tr><td>${T('Phase I 环境报告')}</td><td>${T('排除污染责任')}</td><td>${T('环境顾问')}</td><td>${srcTag('w')}</td></tr>
+    <tr><td>${T('PCA 物业状况报告')}</td><td>${T('量化 deferred capex')}</td><td>${T('工程顾问')}</td><td>${srcTag('w')}</td></tr>
     ${authRow}
     </tbody></table>
-    <p class="note">Sponsor 声明：本工具评估物业与交易结构，不评估借款人信用。</p>`
+    <p class="note">${T('Sponsor 声明：本工具评估物业与交易结构，不评估借款人信用。')}</p>`
     : `
-    <p class="zsub">交割前 checklist</p>
-    <table class="data"><thead><tr><th>事项</th><th>为什么</th><th>找谁要</th><th>状态</th></tr></thead><tbody>
-    <tr><td>房屋检查（inspection）</td><td>发现结构/水电隐患</td><td>验房师</td><td>${srcTag('w')}</td></tr>
-    <tr><td>产权调查（title search）</td><td>排除留置/欠费/纠纷</td><td>产权公司</td><td>${srcTag('w')}</td></tr>
+    <p class="zsub">${T('交割前 checklist')}</p>
+    <table class="data"><thead><tr><th>${T('事项')}</th><th>${T('为什么')}</th><th>${T('找谁要')}</th><th>${T('状态')}</th></tr></thead><tbody>
+    <tr><td>${T('房屋检查（inspection）')}</td><td>${T('发现结构/水电隐患')}</td><td>${T('验房师')}</td><td>${srcTag('w')}</td></tr>
+    <tr><td>${T('产权调查（title search）')}</td><td>${T('排除留置/欠费/纠纷')}</td><td>${T('产权公司')}</td><td>${srcTag('w')}</td></tr>
     ${authRow}
     </tbody></table>`;
   const conf = state.confidence;
   // P0-9：Confidence 因子用中文名，不再裸奔英文代码
-  const confHtml = conf ? `<p class="zsub">Confidence 因子拆解（公式公开）</p>
-    <table class="data"><thead><tr><th>因子</th><th class="num">权重</th><th class="num">得分</th><th>备注</th></tr></thead><tbody>
+  const confHtml = conf ? `<p class="zsub">${T('Confidence 因子拆解（公式公开）')}</p>
+    <table class="data"><thead><tr><th>${T('因子')}</th><th class="num">${T('权重')}</th><th class="num">${T('得分')}</th><th>${T('备注')}</th></tr></thead><tbody>
     ${Object.entries(conf.factors).map(([k, f]) =>
       `<tr><td>${esc(f.label || k)}</td><td class="num">${f.weight}%</td><td class="num">${f.score}</td><td><span class="note">${esc(f.note)}</span></td></tr>`).join('')}
     </tbody></table><p class="note">${esc(conf.formula)}</p>
     ${(conf.notes || []).map(n => `<p class="note">${esc(n)}</p>`).join('')}` : '';
   body.innerHTML = `
-    <p class="zsub">假设参数（可编辑，改数重算；凡影响 verdict 的输入旁边都有改数入口）</p>
+    <p class="zsub">${T('假设参数（可编辑，改数重算；凡影响 verdict 的输入旁边都有改数入口）')}</p>
     <div class="fgrid">${fields}</div>
     ${structHtml}
-    <button class="btn primary" id="btnRecalc">重新计算</button>
+    <button class="btn primary" id="btnRecalc">${T('重新计算')}</button>
     ${state.type === 'com' ? `<div class="fgrid" style="margin-top:12px">
-      <div class="field"><label>拟贷款额 $（Debt Yield 用；空=模板贷款额）</label><input data-a="loanAmt" type="number"></div>
+      <div class="field"><label>${T('拟贷款额 $（Debt Yield 用；空=模板贷款额）')}</label><input data-a="loanAmt" type="number"></div>
     </div>` : ''}
-    <p class="zsub" style="margin-top:16px">comps 明细（数字右对齐）</p>
-    <table class="data"><thead><tr><th>地址</th><th>成交日</th><th class="num">成交价</th><th class="num">面积</th><th class="num">$/SF</th><th class="num">调整%</th></tr></thead>
-    <tbody>${compRows || '<tr><td colspan="6">无 comps</td></tr>'}</tbody></table>
+    <p class="zsub" style="margin-top:16px">${T('comps 明细（数字右对齐）')}</p>
+    <table class="data"><thead><tr><th>${T('地址')}</th><th>${T('成交日')}</th><th class="num">${T('成交价')}</th><th class="num">${T('面积')}</th><th class="num">$/SF</th><th class="num">${T('调整%')}</th></tr></thead>
+    <tbody>${compRows || '<tr><td colspan="6">' + T('无 comps') + '</td></tr>'}</tbody></table>
     ${confHtml}
     <div style="margin-top:16px">${intakeHtml}</div>
     ${checklists}
-    <p class="zsub" style="margin-top:16px">方法论脚注（人话版）</p>
-    <p class="note">房子值多少，我们看三路证据：① <b>比较法</b>——附近最近真实卖掉的类似房子，按远近加权、取中间值，最抗忽悠；单套调整超过 25% 的标黄提醒。② <b>收益法</b>——房子一年净赚的钱 ÷ 市场回报率（cap），cap 没有市场证据时用"投资带法"估一个宽区间。③ <b>成本法</b>——重盖要花多少钱，数据源还没接。三路价格差太多（分歧>40%）机器就不下结论，转人工。估值基准日：${state.fetchedAt.toLocaleDateString('zh-CN', {timeZone: 'America/New_York'})}（美东时间）。用途限制：${state.type === 'res' ? '筛选辅助工具，不构成投资建议。' : '投资筛选用，非 USPAP 合规评估报告，不能用于贷款/诉讼；未实地勘察、未审阅租约原件。'}</p>
-    <p class="note">术语表：${['subject-to', 'due-on-sale', 'refi', 'pro forma', 'PITI', 'EGI', 'NOI', 'comps', 'CMA', 'DSCR', 'cap rate', 'WALT', 'TI/LC', 'balloon', 'estoppel', 'NNN'].map(gterm).join(' · ')}</p>`;
+    <p class="zsub" style="margin-top:16px">${T('方法论脚注（人话版）')}</p>
+    <p class="note">${T('房子值多少，我们看三路证据：① <b>比较法</b>——附近最近真实卖掉的类似房子，按远近加权、取中间值，最抗忽悠；单套调整超过 25% 的标黄提醒。② <b>收益法</b>——房子一年净赚的钱 ÷ 市场回报率（cap），cap 没有市场证据时用"投资带法"估一个宽区间。③ <b>成本法</b>——重盖要花多少钱，数据源还没接。三路价格差太多（分歧>40%）机器就不下结论，转人工。估值基准日：{0}（美东时间）。用途限制：{1}', state.fetchedAt.toLocaleDateString(window.DD_LANG === 'en' ? 'en-US' : 'zh-CN', {timeZone: 'America/New_York'}), state.type === 'res' ? T('筛选辅助工具，不构成投资建议。') : T('投资筛选用，非 USPAP 合规评估报告，不能用于贷款/诉讼；未实地勘察、未审阅租约原件。'))}</p>
+    <p class="note">${T('术语表：')}${['subject-to', 'due-on-sale', 'refi', 'pro forma', 'PITI', 'EGI', 'NOI', 'comps', 'CMA', 'DSCR', 'cap rate', 'WALT', 'TI/LC', 'balloon', 'estoppel', 'NNN'].map(gterm).join(' · ')}</p>`;
   body.querySelectorAll('[data-a]').forEach(inp =>
     inp.addEventListener('change', () => {
       setAssumption(inp.dataset.a, inp.value);

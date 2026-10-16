@@ -47,57 +47,59 @@
 <body>
 <main class="wrap">
   <div class="hero">
-    <h1>DealDesk <span class="t">·</span> 一页纸的买房决策</h1>
-    <p>打开这个页面，3 秒知道要不要深入看，再往下翻知道为什么。<br>
-    <span style="font-size:13px">选好类型、输入地址——所有分析都在<b>统一决策单页</b>上完成，没有第二入口。</span></p>
+    <h1 data-i18n="一页纸的买房决策">DealDesk <span class="t">·</span> 一页纸的买房决策</h1>
+    <p data-i18n="打开这个页面，3 秒知道要不要深入看，再往下翻知道为什么。">打开这个页面，3 秒知道要不要深入看，再往下翻知道为什么。<br>
+    <span style="font-size:13px"><span data-i18n="选好类型、输入地址——所有分析都在">选好类型、输入地址——所有分析都在</span><b data-i18n="统一决策单页">统一决策单页</b><span data-i18n="上完成，没有第二入口。">上完成，没有第二入口。</span></span></p>
   </div>
 
+  <div style="text-align:right;max-width:880px;margin:0 auto 8px"><span id="langSlot"></span></div>
   <div class="duo" id="duo">
     <button class="card" data-type="res">
-      <h2>住宅 / 个人</h2><span class="mode">小白模式</span>
-      <p style="color:var(--ink2);margin:8px 0 0">买来自住或收租</p>
-      <ul><li>大白话结论：值得买 / 再看看 / 别碰</li>
-      <li>零术语，每个数字配"这意味着什么"</li><li>全程有人带着走</li></ul>
+      <h2 data-i18n="住宅 / 个人">住宅 / 个人</h2><span class="mode" data-i18n="小白模式">小白模式</span>
+      <p style="color:var(--ink2);margin:8px 0 0" data-i18n="买来自住或收租">买来自住或收租</p>
+      <ul><li data-i18n="大白话结论：值得买 / 再看看 / 别碰">大白话结论：值得买 / 再看看 / 别碰</li>
+      <li data-i18n="零术语，每个数字配&quot;这意味着什么&quot;">零术语，每个数字配"这意味着什么"</li><li data-i18n="全程有人带着走">全程有人带着走</li></ul>
     </button>
     <button class="card" data-type="com">
-      <h2>商业</h2><span class="mode">专业模式</span>
-      <p style="color:var(--ink2);margin:8px 0 0">买来做生意或收租</p>
-      <ul><li>cap rate / NOI / DSCR / 压力测试全开</li>
-      <li>缺口明确标出来，不假装有数据</li><li>术语不解释，默认你懂</li></ul>
+      <h2 data-i18n="商业">商业</h2><span class="mode" data-i18n="专业模式">专业模式</span>
+      <p style="color:var(--ink2);margin:8px 0 0" data-i18n="买来做生意或收租">买来做生意或收租</p>
+      <ul><li data-i18n="cap rate / NOI / DSCR / 压力测试全开">cap rate / NOI / DSCR / 压力测试全开</li>
+      <li data-i18n="缺口明确标出来，不假装有数据">缺口明确标出来，不假装有数据</li><li data-i18n="术语不解释，默认你懂">术语不解释，默认你懂</li></ul>
     </button>
   </div>
 
   <div class="step2" id="step2">
-    <p style="color:var(--ink2)"><b id="step2Title">住宅</b> · 第一步：告诉我地址</p>
+    <p style="color:var(--ink2)" data-i18n="· 第一步：告诉我地址"><b id="step2Title" data-i18n="住宅">住宅</b> · 第一步：告诉我地址</p>
     <input class="biginput" id="addrInput" placeholder="输入物业地址，或粘贴 Zillow / Redfin 房源链接或房源文本"
-      autocomplete="off" aria-label="物业地址">
+      autocomplete="off" aria-label="物业地址" data-i18n-ph="输入物业地址，或粘贴 Zillow / Redfin 房源链接或房源文本" data-i18n-aria="物业地址">
     <p class="addr-note" id="addrNote" hidden></p>
     <div class="frow2" id="ptypeRow" hidden>
-      <div class="field"><label>物业类型（选填，用于调 comps 过滤器）</label>
-        <select id="ptype"><option value="">未选择</option><option>写字楼</option><option>零售</option><option>多户</option><option>工业</option></select></div>
+      <div class="field"><label data-i18n="物业类型（选填，用于调 comps 过滤器）">物业类型（选填，用于调 comps 过滤器）</label>
+        <select id="ptype"><option value="" data-i18n="未选择">未选择</option><option value="写字楼" data-i18n="写字楼">写字楼</option><option value="零售" data-i18n="零售">零售</option><option value="多户" data-i18n="多户">多户</option><option value="工业" data-i18n="工业">工业</option></select></div>
     </div>
     <div class="frow2">
-      <div class="field"><label>收购价 / 要价 $（选填，不填可在结果页补）</label>
-        <input id="askInput" type="number" min="0" placeholder="如 850000"></div>
+      <div class="field"><label data-i18n="收购价 / 要价 $（选填，不填可在结果页补）">收购价 / 要价 $（选填，不填可在结果页补）</label>
+        <input id="askInput" type="number" min="0" placeholder="如 850000" data-i18n-ph="如 850000"></div>
     </div>
     <div class="frow2">
-      <div class="field"><label>交易结构（决定 verdict 用哪套否决规则，默认普通购买）</label>
+      <div class="field"><label data-i18n="交易结构（决定 verdict 用哪套否决规则，默认普通购买）">交易结构（决定 verdict 用哪套否决规则，默认普通购买）</label>
         <select id="structSel">
-          <option value="standard" selected>普通购买</option>
-          <option value="new_loan">贷款购买（新办贷款）</option>
-          <option value="subject_to">subject-to（承接现有贷款）</option>
+          <option value="standard" selected data-i18n="普通购买">普通购买</option>
+          <option value="new_loan" data-i18n="贷款购买（新办贷款）">贷款购买（新办贷款）</option>
+          <option value="subject_to" data-i18n="subject-to（承接现有贷款）">subject-to（承接现有贷款）</option>
         </select></div>
       <div class="field"><label>&nbsp;</label>
-        <p class="note" style="margin:0">subject-to 才有"退出预案 / due-on-sale 备用预案"否决项；普通购买/贷款购买永不触发。</p></div>
+        <p class="note" style="margin:0" data-i18n="subject-to 才有&quot;退出预案 / due-on-sale 备用预案&quot;否决项；普通购买/贷款购买永不触发。">subject-to 才有"退出预案 / due-on-sale 备用预案"否决项；普通购买/贷款购买永不触发。</p></div>
     </div>
-    <button class="btn primary go" id="goBtn">开始分析</button>
+    <button class="btn primary go" id="goBtn" data-i18n="开始分析">开始分析</button>
     <div class="steps" id="goSteps" style="display:none"></div>
-    <button class="back" id="backBtn">← 重选住宅 / 商业</button>
+    <button class="back" id="backBtn" data-i18n="← 重选住宅 / 商业">← 重选住宅 / 商业</button>
   </div>
 
-  <p class="foot">筛选辅助工具，不构成投资建议。<br>
-    <a href="/uw-commercial.html">商业核保</a> · <a href="/workbench.html">住宅工作台</a> · <a href="/res-legacy.html">旧版住宅</a>（只读）</p>
+  <p class="foot" data-i18n="筛选辅助工具，不构成投资建议。">筛选辅助工具，不构成投资建议。<br>
+    <a href="/uw-commercial.html" data-i18n="商业核保">商业核保</a> · <a href="/workbench.html" data-i18n="住宅工作台">住宅工作台</a> · <a href="/res-legacy.html" data-i18n="旧版住宅">旧版住宅</a><span data-i18n="（只读）">（只读）</span></p>
 </main>
+<script src="/i18n.js"></script>
 <script>
 const $ = s => document.querySelector(s);
 let type = null;
@@ -106,7 +108,7 @@ document.querySelectorAll('.card').forEach(c => c.addEventListener('click', () =
   document.querySelectorAll('.card').forEach(x => x.classList.remove('sel'));
   c.classList.add('sel');
   $('#step2').classList.add('show');
-  $('#step2Title').textContent = type === 'res' ? '住宅' : '商业';
+  $('#step2Title').textContent = type === 'res' ? T('住宅') : T('商业');
   $('#ptypeRow').hidden = type !== 'com';
   $('#addrInput').focus();
   $('#step2').scrollIntoView({behavior: 'smooth', block: 'center'});
@@ -193,10 +195,10 @@ $('#addrInput').addEventListener('paste', e => {
     const hit = parseListingUrl(t);
     if (hit) {
       $('#addrInput').value = hit.addr;
-      addrNote('已从链接识别地址：' + hit.addr + '（' + hit.src + '）', true);
+      addrNote(T('已从链接识别地址：{0}（{1}）', hit.addr, hit.src), true);
     } else {
       $('#addrInput').value = '';
-      addrNote('无法识别该链接，请粘贴纯地址', false);
+      addrNote(T('无法识别该链接，请粘贴纯地址'), false);
     }
     return;
   }
@@ -204,10 +206,10 @@ $('#addrInput').addEventListener('paste', e => {
   e.preventDefault();
   const p = parseListingText(t);
   const filled = [];
-  if (p.addr) { $('#addrInput').value = p.addr; filled.push('地址'); }
-  if (p.price) { $('#askInput').value = p.price; filled.push('价格 $' + Number(p.price).toLocaleString('en-US')); }
-  if (filled.length) addrNote('已从房源文本识别：' + filled.join('、'), true);
-  else { $('#addrInput').value = ''; addrNote('未识别出地址/价格，请粘贴纯地址', false); }
+  if (p.addr) { $('#addrInput').value = p.addr; filled.push(T('地址')); }
+  if (p.price) { $('#askInput').value = p.price; filled.push(T('价格 {0}', '$' + Number(p.price).toLocaleString('en-US'))); }
+  if (filled.length) addrNote(T('已从房源文本识别：{0}', filled.join(T('、'))), true);
+  else { $('#addrInput').value = ''; addrNote(T('未识别出地址/价格，请粘贴纯地址'), false); }
 });
 $('#goBtn').addEventListener('click', () => {
   let addr = $('#addrInput').value.trim();
@@ -218,9 +220,9 @@ $('#goBtn').addEventListener('click', () => {
     if (hit) {
       addr = hit.addr;
       $('#addrInput').value = addr;
-      addrNote('已从链接识别地址：' + addr + '（' + hit.src + '）', true);
+      addrNote(T('已从链接识别地址：{0}（{1}）', addr, hit.src), true);
     } else {
-      addrNote('无法识别该链接，请粘贴纯地址', false);
+      addrNote(T('无法识别该链接，请粘贴纯地址'), false);
       $('#addrInput').focus();
       return;
     }
@@ -230,7 +232,7 @@ $('#goBtn').addEventListener('click', () => {
   const struct = $('#structSel').value || 'standard';
   const box = $('#goSteps'); box.style.display = 'block'; box.innerHTML = '';
   $('#goBtn').disabled = true;
-  const steps = ['正在拉取 TopHap 数据…', '正在跑 comps…', '正在打开决策单页…'];
+  const steps = [T('正在拉取 TopHap 数据…'), T('正在跑 comps…'), T('正在打开决策单页…')];
   let i = 0;
   const tick = () => {
     if (i > 0) box.children[i - 1].className = 'step done',
@@ -239,7 +241,8 @@ $('#goBtn').addEventListener('click', () => {
       location.href = '/d?addr=' + encodeURIComponent(addr) + '&type=' + type
         + (ask ? '&price=' + encodeURIComponent(ask) : '')
         + (ptype ? '&ptype=' + encodeURIComponent(ptype) : '')
-        + '&struct=' + encodeURIComponent(struct);
+        + '&struct=' + encodeURIComponent(struct)
+        + (window.DD_LANG === 'en' ? '&lang=en' : '');
       return;
     }
     stepLine(box, steps[i], 'run'); i++;
@@ -249,5 +252,6 @@ $('#goBtn').addEventListener('click', () => {
 });
 $('#addrInput').addEventListener('keydown', e => { if (e.key === 'Enter') $('#goBtn').click(); });
 </script>
+<script>if(window.mountLangToggle)mountLangToggle(document.getElementById('langSlot'));</script>
 </body>
 </html>
