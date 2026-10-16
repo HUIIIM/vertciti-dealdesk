@@ -23,6 +23,7 @@ from datetime import datetime
 
 import httpx
 
+from . import demand_validation as dv
 from . import providers
 
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -30,6 +31,10 @@ UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
 BOT_NAME = "DealDeskBot"
 FETCH_TIMEOUT = 15
 MAX_FETCHES = 6
+# 页面大小上限（台账暂缓项回补，2026-10-16）：流式抓取，解码后字节数超限即停，
+# 不再把整页无上限读进内存（与 P0 上传 OOM 同类风险）。房源页 HTML 通常 <1MB，
+# 2MB 留足余量；超限按诚实降级处理（too_large），不截断凑数、不静默用残页提取。
+MAX_PAGE_BYTES = 2_000_000
 
 BLOCK_MARKERS = ["captcha", "are you a robot", "access denied", "press & hold",
                  "perimeterx", "datadome", "verify you are a human",
@@ -146,28 +151,51 @@ def fetch_page(url: str, log: list) -> dict:
         _log(log, f"抓取 {url[:80]}", "skipped", rnote)
         return {"ok": False, "note": rnote}
     try:
-        r = httpx.get(url, headers={"User-Agent": UA,
-                                    "Accept-Language": "en-US,en;q=0.9"},
-                      timeout=FETCH_TIMEOUT, follow_redirects=True)
+        with httpx.stream("GET", url, headers={"User-Agent": UA,
+                                               "Accept-Language": "en-US,en;q=0.9"},
+                          timeout=FETCH_TIMEOUT, follow_redirects=True) as r:
+            if r.status_code in (403, 429, 503):
+                note = f"HTTP {r.status_code}：站点反爬拦截，已停手（降级走手动录入）"
+                _log(log, f"抓取 {url[:80]}", "blocked", note)
+                return {"ok": False, "note": note, "blocked": True}
+            if r.status_code != 200:
+                _log(log, f"抓取 {url[:80]}", "failed", f"HTTP {r.status_code}")
+                return {"ok": False, "note": f"HTTP {r.status_code}"}
+            final_url = str(r.url)
+            encoding = r.encoding or "utf-8"
+            clen = r.headers.get("content-length")
+            try:
+                clen_val = int(clen) if clen is not None else None
+            except (TypeError, ValueError):
+                clen_val = None
+            too_large = clen_val is not None and clen_val > MAX_PAGE_BYTES
+            chunks: list[bytes] = []
+            total = 0
+            if not too_large:
+                for chunk in r.iter_bytes(chunk_size=65536):
+                    total += len(chunk)
+                    if total > MAX_PAGE_BYTES:
+                        too_large = True
+                        break
+                    chunks.append(chunk)
+            if too_large:
+                note = (f"页面过大（超过 {MAX_PAGE_BYTES} 字节上限），已停止抓取"
+                        "（降级走手动录入）")
+                _log(log, f"抓取 {url[:80]}", "failed", note)
+                return {"ok": False, "note": note, "too_large": True}
+            html_text = b"".join(chunks).decode(encoding, errors="replace")
     except Exception as e:  # noqa: BLE001
         _log(log, f"抓取 {url[:80]}", "failed", f"网络异常：{str(e)[:120]}")
         return {"ok": False, "note": f"网络异常：{str(e)[:120]}"}
-    if r.status_code in (403, 429, 503):
-        note = f"HTTP {r.status_code}：站点反爬拦截，已停手（降级走手动录入）"
-        _log(log, f"抓取 {url[:80]}", "blocked", note)
-        return {"ok": False, "note": note, "blocked": True}
-    if r.status_code != 200:
-        _log(log, f"抓取 {url[:80]}", "failed", f"HTTP {r.status_code}")
-        return {"ok": False, "note": f"HTTP {r.status_code}"}
-    text = html_to_text(r.text)
+    text = html_to_text(html_text)
     low = text.lower()
     if any(m in low for m in BLOCK_MARKERS):
         note = "页面返回反爬验证（captcha/验证），已停手（降级走手动录入）"
         _log(log, f"抓取 {url[:80]}", "blocked", note)
         return {"ok": False, "note": note, "blocked": True}
     _log(log, f"抓取 {url[:80]}", "ok", f"HTTP 200，{len(text)} 字符")
-    return {"ok": True, "text": text, "html": r.text,
-            "final_url": str(r.url), "note": ""}
+    return {"ok": True, "text": text, "html": html_text,
+            "final_url": final_url, "note": ""}
 
 
 def html_to_text(html_doc: str) -> str:
@@ -566,6 +594,8 @@ def run_address_pipeline(address: str, log: list | None = None) -> dict:
     result = {"mode": "address", "address": parsed["full"], "parsed": parsed,
               "fields": fields, "manual_needed": manual, "log": log,
               "fetched_at": _now(),
+              # W2（2026-10-05）：有效需求三项独立验证清单，初始 unknown 待评估人逐项确认
+              "demand_validation": dv.demand_validation_block(),
               "primary_provider": chain["primary_provider"],
               "provider_chain": chain["provider_results"]}
     if not chain["ok"]:
@@ -629,6 +659,9 @@ def run_url_pipeline(url: str, log: list | None = None) -> dict:
             {"key": k, "label": FIELD_LABELS[k], "status": "manual_needed",
              "note": "未提取到地址，无法做独立搜集；请手动输入地址"}
             for k in ("building_sf", "taxes_annual", "monthly_rent")]
+    # W2（2026-10-05）：地址模式已在 run_address_pipeline 内附带；url 无地址分支在此补
+    if "demand_validation" not in result:
+        result["demand_validation"] = dv.demand_validation_block()
     return result
 
 

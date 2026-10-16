@@ -59,10 +59,31 @@ def test_robots_parse(monkeypatch):
     assert ok2
 
 
+class _FakeStreamResp:
+    """httpx.stream 的上下文管理器替身（2026-10-16 fetch_page 改流式后同步）."""
+
+    def __init__(self, status_code=200, body=b"", url="https://example.com/",
+                 headers=None):
+        self.status_code = status_code
+        self._body = body
+        self.url = url
+        self.headers = headers or {}
+        self.encoding = "utf-8"
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def iter_bytes(self, chunk_size=65536):
+        for i in range(0, len(self._body), chunk_size):
+            yield self._body[i:i + chunk_size]
+
+
 def test_fetch_blocked_status(monkeypatch):
-    class R:
-        status_code = 403
-    monkeypatch.setattr(rp.httpx, "get", lambda *a, **k: R())
+    resp = _FakeStreamResp(status_code=403)
+    monkeypatch.setattr(rp.httpx, "stream", lambda *a, **k: resp)
     monkeypatch.setattr(rp, "_is_public_url", lambda u: (True, ""))
     monkeypatch.setattr(rp, "robots_allowed", lambda u: (True, ""))
     log = []
@@ -72,11 +93,9 @@ def test_fetch_blocked_status(monkeypatch):
 
 
 def test_fetch_captcha_text(monkeypatch):
-    class R:
-        status_code = 200
-        text = "<html><body>Please verify you are a human, captcha required</body></html>"
-        url = "https://example.com/"
-    monkeypatch.setattr(rp.httpx, "get", lambda *a, **k: R())
+    body = b"<html><body>Please verify you are a human, captcha required</body></html>"
+    resp = _FakeStreamResp(status_code=200, body=body)
+    monkeypatch.setattr(rp.httpx, "stream", lambda *a, **k: resp)
     monkeypatch.setattr(rp, "_is_public_url", lambda u: (True, ""))
     monkeypatch.setattr(rp, "robots_allowed", lambda u: (True, ""))
     log = []
