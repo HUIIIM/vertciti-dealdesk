@@ -1,7 +1,5 @@
 """商业核保引擎测试：锁定模板数字 + 验证全链路联动。"""
-import math
 
-import pytest
 
 from app.uw_commercial import (
     amort_payment,

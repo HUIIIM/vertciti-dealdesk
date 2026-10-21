@@ -1,0 +1,30 @@
+/* vertciti DNA 统一层（DealDesk）v1.0 —— 最后加载，覆盖原深色主题。
+   规则同官网与《品牌规范 v1.0》：黑白为主、信号橙点睛；直角；触控≥44px；焦点框 3px 信号橙；不用毛玻璃。 */
+:root{
+  --bg0:#F5F5F5;--bg1:#FFFFFF;--surface:#FFFFFF;--surface2:#F5F5F5;--surface3:#EEEEEE;--line:#DEDEDE;--line-soft:#ECECEC;
+  --ink:#000000;--ink2:#3F3F3F;--muted:#6B6B6B;--faint:#8A8A8A;
+  --teal:#C93410;--teal-deep:#000000;--teal-ink:#FFFFFF;--teal-dim:rgba(255,71,19,.08);--teal-line:rgba(255,71,19,.45);
+  --green:#1D8348;--green-dim:rgba(29,131,72,.10);--green-line:rgba(29,131,72,.35);
+  --blue:#3F3F3F;--blue-dim:rgba(0,0,0,.05);--blue-line:rgba(0,0,0,.2);
+  --amber:#8A5A00;--amber-dim:rgba(255,206,0,.22);--amber-line:rgba(255,206,0,.7);
+  --red:#B3261E;--red-dim:rgba(179,38,30,.08);--red-line:rgba(179,38,30,.35);
+  --radius:0px;color-scheme:light}
+html,body{background:var(--bg0)!important;color:var(--ink)}
+body,button,input,select,textarea{font-family:"Nunito Sans",-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",sans-serif!important}
+*{border-radius:0!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+.vc-dot,.vc-util .dot{border-radius:50%!important}
+:focus-visible{outline:3px solid #FF4713!important;outline-offset:2px}
+button,.btn,[role="button"],select,input[type="submit"]{min-height:44px}
+input:not([type="checkbox"]):not([type="radio"]),textarea{min-height:44px}
+/* 品牌条：与 vertciti.com 一致 */
+.vc-util{background:#000;color:#fff;font-size:13px;min-height:44px;display:flex;align-items:center;gap:20px;padding:0 24px;position:relative;z-index:60}
+.vc-util a{color:#BDBDBD;text-decoration:none;font-weight:700;min-height:44px;display:inline-flex;align-items:center;border-bottom:3px solid transparent}
+.vc-util a[aria-current]{color:#fff;border-bottom-color:#FF4713}
+.vc-util a:hover{color:#fff}
+.vc-util .sp{flex:1}
+.vc-util .lg{display:inline-flex;align-items:flex-end;font-weight:900;font-size:16px;letter-spacing:-.02em;color:#fff!important}
+.vc-util .lg i{display:inline-block;width:5px;height:5px;background:#FF4713;margin:0 0 3px 2px}
+@media (max-width:600px){.vc-util{gap:14px;padding:0 16px}.vc-util .hide-sm{display:none}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+/* 商业承销页（uw-commercial）独立变量 */
+:root{--bg:#F5F5F5;--panel:#FFFFFF;--well:#F5F5F5;--tx:#000000;--tx2:#3F3F3F;--tx3:#6B6B6B;--auto:#8A5A00;--auto-dim:rgba(255,206,0,.18);--ok:#1D8348;--bad:#B3261E}

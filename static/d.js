@@ -1638,18 +1638,18 @@ function renderZone6() {
   const lo = Math.min(...all, base) * 0.95, hi = Math.max(...all, base) * 1.05;
   const n = Math.max(...fc.scenarios.map(s => ptsOf(s).length), 1);
   const X = i => P + i * (W - 2 * P) / Math.max(n - 1, 1), Y = v => H - P - (v - lo) / (hi - lo) * (H - 2 * P);
-  const colors = {conservative: '#60a5fa', base: '#2dd4bf', optimistic: '#fbbf24'};
+  const colors = {conservative: '#3F3F3F', base: '#C93410', optimistic: '#8A5A00'};
   const paths = fc.scenarios.map(s => {
     const pts = ptsOf(s).map((p, i) => `${X(i).toFixed(0)},${Y(p.value).toFixed(0)}`).join(' ');
-    return `<polyline points="${pts}" fill="none" stroke="${colors[s.name] || '#a3b1c9'}" stroke-width="2" stroke-dasharray="${s.name === 'base' ? 'none' : '5,4'}"/>`;
+    return `<polyline points="${pts}" fill="none" stroke="${colors[s.name] || '#3F3F3F'}" stroke-width="2" stroke-dasharray="${s.name === 'base' ? 'none' : '5,4'}"/>`;
   }).join('');
   const baseEnd = ptsOf(fc.scenarios.find(s => s.name === 'base') || {});
   body.innerHTML = `
     <p class="zsub">${T('模型预测 5 年后值 ') + (baseEnd.length ? fmt$(baseEnd[baseEnd.length - 1].value) : T('暂无预测数据'))} ${sleeve}</p>
     <svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:640px;background:var(--bg1);border:1px solid var(--line);border-radius:6px" role="img" aria-label="${T('5 年估值预测')}">
       ${paths}
-      <text x="${P}" y="${H - 8}" fill="#64748f" font-size="10">${T('现在')}</text>
-      <text x="${W - P - 30}" y="${H - 8}" fill="#64748f" font-size="10">${T('5 年后')}</text>
+      <text x="${P}" y="${H - 8}" fill="#6B6B6B" font-size="10">${T('现在')}</text>
+      <text x="${W - P - 30}" y="${H - 8}" fill="#6B6B6B" font-size="10">${T('5 年后')}</text>
     </svg>
     <div class="formula" style="margin-top:10px">${rows}</div>
     <p class="note">${T('模型预测，基于过去趋势外推，方法未公开；历史回测误差无公开数据，不做断言；不构成投资建议；银行承销不采用。forecast 输出绝不回流进 DSCR/NOI/verdict 计算。')}</p>

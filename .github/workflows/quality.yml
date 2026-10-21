@@ -1,0 +1,32 @@
+name: quality
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions: { contents: read }
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip }
+      - name: Install deps
+        # PyMuPDF 仅测试用（6 个测试文件生成/断言 PDF），不进 requirements.txt；缺它 20 个测试会挂（见 commit 10cce05）
+        run: pip install -r requirements.txt pytest pytest-cov ruff mypy pip-audit "PyMuPDF==1.28.2"
+      - name: Lint (ruff, 真错误规则)
+        run: ruff check app tests
+      - name: Tests + coverage (至少 80%，与 AGENTS.md 覆盖率目标一致)
+        run: |
+          rm -f dealdesk.db
+          pytest --cov=app --cov-report=term --cov-fail-under=80
+      - name: Type check (mypy, 第一阶段只报告不阻塞)
+        run: mypy app || true
+      - name: Dependency vulnerabilities (pip-audit)
+        run: pip-audit -r requirements.txt
+      - name: Frontend JS syntax
+        run: for f in static/*.js; do node --check "$f"; done

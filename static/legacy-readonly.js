@@ -3,10 +3,10 @@
   var banner = document.createElement('div');
   banner.id = 'legacyBanner';
   banner.innerHTML = '<span style="font-weight:700">旧版只读</span>'
-    + '<span>30 天后下线（2026-11-03），请用 <a href="/" style="color:#2dd4bf;font-weight:700">新版 DealDesk</a></span>';
-  banner.setAttribute('style', 'position:sticky;top:0;z-index:9999;background:#3a2b00;color:#fbbf24;'
+    + '<span>30 天后下线（2026-11-03），请用 <a href="/" style="color:#C93410;font-weight:700">新版 DealDesk</a></span>';
+  banner.setAttribute('style', 'position:sticky;top:0;z-index:9999;background:#FFF4CC;color:#8A5A00;'
     + 'padding:10px 16px;font-size:13px;display:flex;gap:12px;align-items:center;justify-content:center;'
-    + 'border-bottom:1px solid #fbbf24');
+    + 'border-bottom:1px solid #8A5A00');
   if (document.body) document.body.insertBefore(banner, document.body.firstChild);
   else document.addEventListener('DOMContentLoaded', function () {
     document.body.insertBefore(banner, document.body.firstChild);

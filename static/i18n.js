@@ -15,6 +15,7 @@
 
   const EN = {
     /* ---- 通用 chrome ---- */
+    '仿冒预警': 'Impersonation alert', 'vertciti 业务版图': 'vertciti portfolio', 'vertciti 官网': 'vertciti website',
     '换地址': 'Change address', '切换视角': 'Switch view',
     '导出 PDF ▾': 'Export PDF ▾', '投资备忘录 PDF': 'Investment memo PDF',
     '页面原样打印': 'Print page as-is', '商业核保 PDF·经典版': 'Commercial UW PDF · Classic',

@@ -7,7 +7,14 @@
 # 用法：bash tools/deploy.sh   （在仓库根或任意目录执行均可）
 # 失败时以非零退出码退出。
 #
+# DEPRECATED（2026-10-09，ship-gate 合并）：新发布一律走统一流水线
+#   ~/workspace/vertcity/deliverables/ship-gate/ship-gate dealdesk
+# 本脚本保留可运行（行为不变，A3 的步骤 5 diff 门禁原样保留），仅作过渡期兜底。
+# 设计见 ~/workspace/vertcity/deliverables/ship-gate/ship-gate-design.md §7。
+#
 set -euo pipefail
+
+echo "[deploy][DEPRECATED] 本脚本已废弃，请改用: ~/workspace/vertcity/deliverables/ship-gate/ship-gate dealdesk" >&2
 
 # ---- 定位仓库根（脚本所在目录的上一级） ----
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

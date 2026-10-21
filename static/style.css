@@ -9,26 +9,26 @@
    装饰强调色只许一个：teal。语义色（涨跌/等级）除外。
 */
 :root {
-  --bg0: #060a13;
-  --bg1: #0a0f1c;
-  --surface: #0d1526;
-  --surface2: #121c31;
-  --surface3: #16223a;
-  --line: #1d2a45;
-  --line-soft: #152036;
-  --ink: #e9eff9;
-  --ink2: #a3b1c9;
-  --muted: #64748f;
-  --faint: #42506a;
-  --teal: #2dd4bf;
-  --teal-deep: #0d9488;
-  --teal-ink: #042f2b;
+  --bg0: #F5F5F5;
+  --bg1: #FFFFFF;
+  --surface: #FFFFFF;
+  --surface2: #F5F5F5;
+  --surface3: #EEEEEE;
+  --line: #DEDEDE;
+  --line-soft: #ECECEC;
+  --ink: #000000;
+  --ink2: #3F3F3F;
+  --muted: #6B6B6B;
+  --faint: #8A8A8A;
+  --teal: #C93410;
+  --teal-deep: #000000;
+  --teal-ink: #FFFFFF;
   --teal-dim: rgba(45, 212, 191, .09);
   --teal-line: rgba(45, 212, 191, .28);
-  --green: #34d399; --green-dim: rgba(52, 211, 153, .10); --green-line: rgba(52, 211, 153, .30);
-  --blue: #60a5fa;  --blue-dim: rgba(96, 165, 250, .10);  --blue-line: rgba(96, 165, 250, .30);
-  --amber: #fbbf24; --amber-dim: rgba(251, 191, 36, .10);  --amber-line: rgba(251, 191, 36, .32);
-  --red: #f87171;   --red-dim: rgba(248, 113, 113, .10);   --red-line: rgba(248, 113, 113, .32);
+  --green: #1D8348; --green-dim: rgba(52, 211, 153, .10); --green-line: rgba(52, 211, 153, .30);
+  --blue: #3F3F3F;  --blue-dim: rgba(96, 165, 250, .10);  --blue-line: rgba(96, 165, 250, .30);
+  --amber: #8A5A00; --amber-dim: rgba(251, 191, 36, .10);  --amber-line: rgba(251, 191, 36, .32);
+  --red: #B3261E;   --red-dim: rgba(248, 113, 113, .10);   --red-line: rgba(248, 113, 113, .32);
   --radius: 6px;
 }
 * { box-sizing: border-box; }
@@ -122,7 +122,7 @@ body {
 .ih-chip .ck { display: flex; align-items: center; gap: 8px; font-weight: 700; }
 .ih-chip .ck .badge { font-size: 11px; padding: 2px 8px; border-radius: 20px; font-weight: 800; }
 .ih-chip .badge.com { background: rgba(45, 212, 191, .15); color: var(--teal); }
-.ih-chip .badge.res { background: rgba(96, 165, 250, .15); color: #60a5fa; }
+.ih-chip .badge.res { background: rgba(96, 165, 250, .15); color: #3F3F3F; }
 .ih-chip .badge.cmd { background: rgba(250, 204, 21, .15); color: #facc15; }
 .ih-chip .cd { color: var(--ink2); }
 .ih-chip .ca { display: flex; gap: 8px; margin-left: auto; }
@@ -159,7 +159,7 @@ body {
 .btn:hover { border-color: #2c3f63; background: var(--surface3); }
 .btn:active { transform: translateY(1px); }
 .btn.primary { background: var(--teal-deep); border-color: var(--teal-deep); color: #fff; font-weight: 700; }
-.btn.primary:hover { background: #0fa08f; border-color: #0fa08f; }
+.btn.primary:hover { background: #000000; border-color: #000000; }
 .btn.danger { color: var(--red); border-color: var(--red-line); background: var(--red-dim); }
 .btn.sm { padding: 5px 11px; font-size: 12.5px; border-radius: 7px; }
 .btn:disabled { opacity: .4; cursor: not-allowed; }

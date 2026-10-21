@@ -1,177 +1,236 @@
-![DealDesk](docs/assets/hero.png)
+<p align="center">
+  <img src="assets/banner.png" alt="vertciti-dealdesk — screen a real-estate deal end to end, every number with its source attached" width="880">
+</p>
 
-[![CI](https://github.com/HUIIIM/vertciti-dealdesk/actions/workflows/ci.yml/badge.svg)](https://github.com/HUIIIM/vertciti-dealdesk/actions/workflows/ci.yml)
-[![Secret scan](https://github.com/HUIIIM/vertciti-dealdesk/actions/workflows/gitleaks.yml/badge.svg)](https://github.com/HUIIIM/vertciti-dealdesk/actions/workflows/gitleaks.yml)
-[![Tests](https://img.shields.io/badge/tests-385%20passed-brightgreen.svg)](#测试实证)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+<p align="center">
+  <strong>Screen a real-estate deal end to end — every number with its source attached.</strong><br>
+  An underwriting desk that gathers the public record, scores the deal, and shows its work.
+</p>
 
-# DealDesk · 房地产交易核保台
+<p align="center">
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
+  <a href="https://github.com/HUIIIM/vertciti-dealdesk/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/HUIIIM/vertciti-dealdesk/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://github.com/HUIIIM/vertciti-dealdesk/actions/workflows/gitleaks.yml"><img alt="Gitleaks scan" src="https://github.com/HUIIIM/vertciti-dealdesk/actions/workflows/gitleaks.yml/badge.svg"></a>
+  <a href="https://vertciti-dealdesk.vercel.app"><img alt="Live demo" src="https://img.shields.io/badge/live%20demo-vertciti--dealdesk-brightgreen.svg"></a>
+  <img alt="Tests: 573 passing" src="https://img.shields.io/badge/tests-573%20passing-brightgreen.svg">
+</p>
 
-**录入一笔 deal 的价格、租金、贷款 → 30 分钟后你手里是一份带图、带分、带结论的中文核保报告，筛 deal 不靠感觉。**
+<p align="center">
+  <a href="README.zh.md">中文版</a> · <a href="https://vertciti-dealdesk.vercel.app">Live demo</a> · <a href="https://vertciti.com">vertciti.com</a> · <a href="https://github.com/HUIIIM">Author</a>
+</p>
 
-[官网](https://vertciti.com) · [快速开始](#快速开始--30-秒) · [核心功能](#核心功能) · [FAQ](#faq)
+> The old way: a broker flyer lands, and the next two hours disappear into
+> spreadsheets, five data sites, and numbers you can't trace back to anything.
+> DealDesk: paste the address, and the desk gathers the public record itself,
+> scores the deal against written rules, and pins a source to every figure —
+> what it can't find, it marks missing instead of inventing it.
 
-DealDesk 是 vertciti 为 Miao 自用的房地产运营工具：住宅 / 商业双轨中文核保工作流，
-统一打分引擎、全口径现金需求测算、敏感性分析、HTML 交互报告＋PDF/Excel 导出，
-每个数字都标注来源＋抓取时间＋可信度，抓不到的绝不编。
+## Demo — a real run, not a mockup
 
-![DealDesk demo](docs/assets/demo.gif)
+![DealDesk live walkthrough](assets/demo.gif)
 
-*上面：一笔 Queens 两家庭交易 → 仪表盘 B 级 68.7 分 → 一键打开带图核保报告。*
+*Recorded live on 2026-10-20 against a local instance of this exact code.
+The subject is a real Astoria, NY duplex whose public record was gathered
+the same day by the production intake (TopHap via MCP: 28 fields with
+sources). The walkthrough values it from its 10 real comparable sales,
+runs the 5-year scenarios, then opens a built-in demo project's stored
+score and the HTML report it generates. Captions on each still below.*
 
-## 快速开始 — 30 秒
+**The intake's subject — a real duplex, public-record figures, nothing staged:**
+
+![Terminal: subject property gathered by the intake](assets/terminal-intake.png)
+
+**Ten real comparable sales become a reconciled estimate ($1,211,530).
+Note the income approach: rent isn't in the public record, so the desk
+says "manual needed" — it never fills the gap with a guess:**
+
+![Terminal: comps valuation](assets/terminal-valuation.png)
+
+**Five-year scenarios ride on the estimate (a scenario is a hypothesis,
+never a promise — the API says so itself):**
+
+![Terminal: forecast scenarios](assets/terminal-forecast.png)
+
+**A scored deal, dimension by dimension — the report at the end is a real
+17 KB HTML file with three inline SVG charts, generated in the same run:**
+
+![Terminal: demo project score and report](assets/terminal-report.png)
+
+**The product UI itself — the mode picker every run starts from
+(residential plain-language mode vs. commercial pro mode):**
+
+![DealDesk web UI: mode picker](assets/ui-main.png)
+
+**The same Astoria duplex as a finished one-page decision sheet in the
+web UI — a live intake at a $1,150,000 ask. The verdict is a PASS:
+deal score 43/100, confidence 64.2, and because rent data is missing the
+sheet says DSCR cannot be underwritten and downgrades itself instead of
+rounding up:**
+
+![DealDesk web UI: decision sheet with verdict](assets/ui-intake.png)
+
+<sub>UI captures, 2026-10-20: browser screenshots of a local instance of
+this repo's code (seed-DB copy), Chromium via Playwright — capture basis
+registered in `assets/ASSETS.md`.</sub>
+
+## What it does
+
+- **Smart intake, three doors in** — a bare address, a listing URL, or a
+  PDF flyer / offering memorandum. The pipeline gathers public listings,
+  public records, taxes, schools, and neighborhood data; every field
+  carries its source, fetch time, and a confidence grade.
+  Seller-supplied figures are labeled *seller's figures — unverified*
+  and stay labeled. ([demo](#demo--a-real-run-not-a-mockup))
+- **A data-quality gate before any math** — missing key fields or an
+  untrusted source stops the deal at the door with a "needs manual input"
+  list. Dirty data never reaches the model.
+- **Two scoring engines, written rules** — residential and commercial
+  tracks score independently (grades A / B / C / reject), with hard
+  vetoes floated to the top in red: floating rates, a balloon inside
+  five years, no exit plan, pro-forma rent with no comps behind it.
+  Every point traces to a written rule in the code — the rules are the
+  code, not tuning knobs.
+- **Full cash-to-close, every time** — down payment + closing costs +
+  first-year capex + reserves, summed automatically. No line item
+  quietly forgotten.
+- **Sensitivity in five bands** — rent ±10%, rate ±2%: watch cash flow,
+  cash-on-cash, DSCR, and entry cap move before the market does it for you.
+- **A workbench next to the desk** — comps valuation (distance-weighted,
+  reconciled with the income approach), market research on embedded
+  public FHFA index data, and a six-dimension market report; one click
+  sends a workbench result into the scoring engine.
+  ([valuation still](#demo--a-real-run-not-a-mockup))
+- **Reports that travel** — an interactive HTML report with inline SVG
+  charts (zero plotting dependencies), a PDF underwriting memo, an
+  Excel model, and a one-page Tear Sheet PDF for partners. Same numbers,
+  same source, every format.
+- **Side-by-side compare** — up to three projects in one table: CoC,
+  DSCR, payback period in the same columns.
+
+## Why it's cheaper / freer
+
+DealDesk is MIT-licensed and self-hosted: no subscription, no per-seat
+or per-deal fee, and your deal data lives in a SQLite file on your own
+machine — it is never uploaded anywhere. The one optional paid layer is
+TopHap public-record enrichment (off by default; priced by TopHap, not
+by us). What it replaces is the manual ritual: hours of spreadsheet
+underwriting and tab-hopping per deal, with numbers you couldn't audit
+afterwards.
+
+## Quick start (≤5 minutes, verified 2026-10-20)
 
 ```bash
-./run.sh        # 自动建虚拟环境、装依赖、初始化数据库
+git clone https://github.com/HUIIIM/vertciti-dealdesk.git && cd vertciti-dealdesk
+./run.sh        # creates the venv, installs deps, inits the DB, serves
 ```
 
-浏览器打开 **http://127.0.0.1:8100**，点「新建项目」，3 分钟看到第一份打分。
+Open **http://127.0.0.1:8100** — create a project, and the first score is
+about three minutes away. (Verified end-to-end on 2026-10-20:
+`./run.sh` brings the app up and `GET /api/health` answers
+`{"ok": true, "service": "dealdesk"}`.)
 
-手动方式：
+Manual equivalent:
 
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+.venv/bin/python -c "from app import db; db.init_db()"
 .venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8100
 ```
 
-## 它是怎么工作的
-
-![架构](docs/assets/architecture.png)
-
-输入交易 → 搜集管线抓公开数据（TopHap 公共记录、可比成交、税费）→
-核保引擎建模（现金流、回本测算、敏感性、评分卡）→ 图表层画图 →
-输出 HTML 交互报告 + PDF/Excel。全程中文，数据不出本机（SQLite）。
-
-## 核心功能
-
-![仪表盘](docs/assets/dashboard.png)
-
-- **交易录入**：住宅 / 商业双轨中文表单，费用与风险字段按保守口径预填
-- **一键打分**：双轨独立打分引擎，A / B / C / 不收录四档；硬否决项
-  （浮动利率、5 年内 balloon、无退出预案、pro-forma 数字等）红色置顶。
-  打分规则来自书面专家规范（`app/confidence.py` 等模块引用 §条目），
-  每条分都有依据条目可查——规则是代码，不是调参
-- **敏感性分析**：租金 ±10%、利率 ±2% 五档 what-if，看现金流 / CoC /
-  DSCR / 入场 cap 变化
-- **三张图讲清结论**：现金流回本测算、敏感性分析、评分构成
-  （HTML 内联 SVG，PDF 嵌入 PNG，零 matplotlib 依赖）
-- **项目对比**：最多 3 个项目并排对比
-- **一键 Tear Sheet**：当前输入直接生成投资一页纸 PDF（备忘录封面＋API）
-- **一键 PDF/Excel 导出**：核保备忘录 PDF、承销模型 Excel，数字与打分同源
-- **全面分析工作台**（`/workbench.html`）：估值评估、可比成交、市场调查、
-  六维市场报告；一键把测算结果送入打分引擎
-- **智能搜集 intake**：纯地址 / 房源链接 / PDF（flyer、OM）三选一，
-  自动搜集公开房源、公共记录、租金、周边、历史价格
-- **intake 数据质量门**：缺关键字段或来源不可信时拦截，标注"需手动补"，
-  不让脏数据进模型
-- **全口径现金需求**：每笔 deal 自动汇总首付＋交割费＋首年 capex＋储备金
-
-![报告图表](docs/assets/report-charts.png)
-
-## 它适合哪些场景
-
-| 场景 | DealDesk 替你干什么 |
-|---|---|
-| 收到中介 flyer / OM | PDF 拖进来自动抽字段，标注"卖方口径、待验证"，3 分钟出打分 |
-| 手里两个项目二选一 | 3 项目并排对比表：CoC、DSCR、回本周期同列，差距一目了然 |
-| 利率涨了还值吗 | 敏感性五档 what-if：利率 +2% 时现金流变多少，立刻看到 |
-| 要不要跟别人合伙 | 一键 Tear Sheet：投资一页纸 PDF，直接发给对方看 |
-| 每月全口径现金盘点 | 自动汇总首付＋交割费＋首年 capex＋储备金，不漏项 |
-
-## 测试实证
-
-| 指标 | 数字 | 说明 |
-|---|---|---|
-| 单元/集成测试 | **385 passed** | 本机 2026-10-06 实测，`pytest tests/` 全过 |
-| 零绘图依赖 | ✅ | 图表全内联 SVG / PNG 嵌入，无 matplotlib |
-| 数据驻留 | 本机 SQLite | 不上传任何交易数据 |
-
-跑测试前先删开发副产品库（避免串扰）：
+Run the tests (delete the dev by-product DB first — a known test-isolation
+quirk, documented in [AGENTS.md](AGENTS.md); 573 passed, run 2026-10-20):
 
 ```bash
-rm -f dealdesk.db   # 服务运行时先停服务再删库
-.venv/bin/python -m pytest tests/ -q
+rm -f dealdesk.db
+PYTHONPATH=. .venv/bin/pytest tests/ -q
 ```
 
-## 诚实约定
+## Architecture
 
-这是筛选辅助工具，**不构成投资建议**。核心规则：
-
-- 每个字段标注来源＋抓取时间＋可信度；抓不到的标"需手动补"，绝不编数
-- 房源页 / PDF 的数字一律标"卖方口径、待验证"，独立验证先于任何结论
-- 只碰公开页面、遵守 robots.txt；被反爬拦截立刻停手并记录，降级走手动录入
-- 每笔真实交易签约 / 交割 / 报税前，必须经持牌本地房地产律师、
-  CPA / 税务师、title company 审查
-
-## 数据源（可选 enrich）
-
-DealDesk 可接入 TopHap（公共房产记录聚合，MCP 协议）补充公共记录口径字段
-（估值参考＋区间、贷款与产权历史、计税估值、法拍预警、可比成交等）。
-默认**关闭**；打开前工作台照常走公开搜集 pipeline。
-可信度标定：公共记录 = 高，算法估值 / CMA = 中（含区间），算法租金 = 低。
-
-## 项目结构
-
-```
-dealdesk/
-  app/            # FastAPI 后端：打分引擎、敏感性分析、SQLite 项目库、报告
-  tools/          # 一次性脚本（如 TopHap OAuth 首次授权）
-  docs/           # 集成说明文档 + assets
-  static/        # 中文前端（无构建，纯 HTML/JS/CSS）
-  tests/          # 单元/集成测试（385 个，2026-10-06 全过）
-  run.sh          # 一键启动
-  requirements.txt
-  ATTRIBUTION.md  # 开源致谢与协议说明
+```mermaid
+flowchart LR
+    IN["Address · listing URL · PDF flyer/OM"] --> PIPE["Research pipeline<br/>public web, robots-respecting"]
+    PIPE --> ENR["TopHap MCP enrichment<br/>(optional, off by default)"]
+    ENR --> GATE{"Data-quality gate<br/>missing/untrusted → stop"}
+    GATE --> RES["Residential scoring<br/>buyer-box rules + hard vetoes"]
+    GATE --> COM["Commercial scoring"]
+    GATE --> WB["Workbench<br/>comps valuation · forecast · markets"]
+    RES --> SENS["Sensitivity<br/>rent ±10% · rate ±2%"]
+    SENS --> OUT["HTML report (inline SVG)<br/>PDF memo · Excel · Tear Sheet"]
+    COM --> OUT
+    WB --> OUT
+    RES <--> DB[("SQLite<br/>on your machine")]
+    COM <--> DB
 ```
 
-## 路线图（方向级摘要，真实来源见 [ROADMAP.md](ROADMAP.md)）
+## The honesty contract
 
-**近期（每日改进台账待做）：**
-扫描版 PDF OCR（intake 能力补齐）· Buy-box 自动打分（"资金很少"硬约束写成可配置 YAML）·
-In-context 估值栏（cap rate/$/SF/GRM 一键反推）· Deal watchlist（跟踪中 deal 每周重跑估值＋漂移推送）·
-债务时间线 · DealDesk MCP Server（pipeline/comps/承销结果暴露给自然语言查询）
+This is a screening aid, **not investment advice**, and it is built to
+refuse the usual shortcuts:
 
-**长期：** N=1 主线——只服务 Miao 一人；不做多租户、不做交易执行。
+- Every field shows its source, fetch time, and confidence. What can't
+  be fetched is rendered as missing — never as a plausible-looking
+  number. (In the demo above, the income approach returns N/A because
+  rent is not a public-record field.)
+- Listing-page and PDF figures are *seller's figures — unverified*
+  until independently checked.
+- Public pages only, `robots.txt` respected; when a site blocks the
+  fetch, the pipeline stops, logs it, and degrades to manual entry.
+- Before any real signing, closing, or tax filing, a licensed local
+  real-estate attorney, a CPA, and a title company review the deal.
+  The desk screens; professionals close.
 
-**明确不做：** AI 代采购 / AI Data Go 相关内容（已撤销产品线）；RentCast（需外部绑卡，阻塞中）。
+## Status — where it stands (2026-10-20)
 
-## FAQ
+DealDesk is vertciti's working showcase, built for an audience of one
+(Miao) and run in production at
+[vertciti-dealdesk.vercel.app](https://vertciti-dealdesk.vercel.app).
+It improves on a daily cadence — one backlog item implemented, tested,
+deployed, and production-smoked every day (the log lives in
+[docs/improvement-backlog.md](docs/improvement-backlog.md)).
 
-**要多少钱？**
-代码 MIT 免费自用；可选的 TopHap 数据 enrich 按 TopHap 自己的定价，默认关闭不花钱。
+- **Test suite: 573 passed** (1 pre-existing deselect), re-run
+  2026-10-20. Charts are all inline SVG / embedded PNG — zero plotting
+  dependencies.
+- **Primary data source in production: TopHap** (public-record
+  aggregation over MCP — valuation reference with range, loan and
+  title history, tax assessments, foreclosure signals, comparable
+  sales), verified live on 2026-10-20. The public-web pipeline and a
+  U.S. Census geocoder act as fallbacks.
+- **RentCast: adapter built, not active.** It stays off until its
+  account is funded — an external blocker, stated plainly rather than
+  papered over.
+- **Known limits:** the public-web search layer is at the mercy of
+  search-engine anti-bot walls (when blocked, fields degrade to
+  "manual needed" — visible in the run log, never silent); scanned-PDF
+  OCR exists but complex two-column offering memoranda are flagged
+  for human review instead of being guessed at.
 
-**这是投资建议吗？**
-不是。输出是筛选辅助结论，每笔真实交易签约 / 交割 / 报税前必须经持牌本地房地产律师、CPA / 税务师、title company 审查。
+## Roadmap (planned — labeled, not shipped)
 
-**我的交易数据会上传吗？**
-不会。数据只存本机 SQLite，不出你的机器。
+- **One-sentence verdict entry** — ask in natural language; the desk
+  orchestrates comps → underwriting → tear sheet and answers with a
+  cited decision.
+- **Buy-box auto-scoring** — your written constraints as config;
+  incoming deals scored against them automatically.
+- **Deal watchlist** — tracked deals re-valued weekly, with drift alerts.
+- **DealDesk MCP server** — pipeline, comps, and underwriting results
+  queryable by an AI agent in natural language.
 
-**和 Zillow / Redfin 有什么区别？**
-它们是房源展示；DealDesk 是你自己的核保台——打分、敏感性、现金需求全口径测算都在你手里，数字来源可查。
+Direction and receipts: [ROADMAP.md](ROADMAP.md) ·
+[docs/improvement-backlog.md](docs/improvement-backlog.md)
 
-**为什么打分前会先拦我补数据？**
-intake 数据质量门：缺关键字段或来源不可信时拦截进模型。脏数据进、脏结论出——拦你是为你好。
+## Contributing
 
-**为什么跑测试前要删 dealdesk.db？**
-仓库根的 `dealdesk.db` 是开发副产品（测试隔离有个预先存在的 bug），有脏库时一条用例会误挂。删了再跑，30 秒的事。
+Issues and PRs welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md);
+the house rules are simple: tests pin the headline numbers, comments
+state their assumptions, and no figure is ever fabricated.
 
-## 贡献
+## License
 
-欢迎 Issue 与 PR。先读 [CONTRIBUTING.md](CONTRIBUTING.md)，
-核心原则：测试必须钉住 headline 数字、代码注释如实标注假设、绝不编造数据。
+MIT — see [LICENSE](LICENSE). Created by Jiahui Miao
+([vertciti](https://vertciti.com)).
 
-## 关于 vertciti
+---
 
-vertciti 为 Miao 构建运营人生的个人 AI 基础设施；DealDesk 是其中
-"把工具做扎实"的一种证明。
-
-- 官网：[vertciti.com](https://vertciti.com)
-- 创始人 X：[@Miaojiahuii](https://x.com/Miaojiahuii)
-
-## 许可证
-
-| 模块 | 许可证 | 白话 |
-|---|---|---|
-| 全部代码（含 app / static / tests / tools） | MIT | 可商用、可改、闭源发布也行，保留版权声明即可 |
-
-见 [LICENSE](LICENSE)。
+[vertciti.com](https://vertciti.com) · [github.com/HUIIIM](https://github.com/HUIIIM)

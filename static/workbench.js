@@ -4,7 +4,8 @@ const WB = {
 };
 
 const $ = s => document.querySelector(s);
-const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+// 与 safe.js（vcSafe.esc）同口径：五字符全转义，属性值单/双引号都安全
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const money = x => x == null ? '—' : '$' + Number(x).toLocaleString('en-US', {maximumFractionDigits: 0});
 const pct1 = x => x == null ? '—' : (Number(x) * 100).toFixed(1) + '%';
 const pctp = x => x == null ? '—' : (Number(x) > 0 ? '+' : '') + Number(x).toFixed(2) + '%';
@@ -109,7 +110,7 @@ WB.renderComps = function () {
     const bars = st.bins.map((b, i) => {
       const h = Math.max(2, (H - 2 * P) * b.count / mxc);
       const x = P + i * bw;
-      return `<rect x="${(x + 1).toFixed(1)}" y="${(H - P - h).toFixed(1)}" width="${(bw - 2).toFixed(1)}" height="${h.toFixed(1)}" fill="#2dd4bf" rx="2">`
+      return `<rect x="${(x + 1).toFixed(1)}" y="${(H - P - h).toFixed(1)}" width="${(bw - 2).toFixed(1)}" height="${h.toFixed(1)}" fill="#C93410" rx="2">`
         + `<title>$${b.lo.toFixed(0)}–$${b.hi.toFixed(0)}/SF：${b.count} 个</title></rect>`
         + `<text x="${(x + bw / 2).toFixed(1)}" y="${(H - 2).toFixed(1)}" font-size="9" text-anchor="middle" fill="#8a94a6">${b.count}</text>`;
     }).join('');

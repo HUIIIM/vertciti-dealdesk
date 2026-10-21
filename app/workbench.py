@@ -15,7 +15,7 @@ from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from . import finance
+from . import brand, finance
 from .data import hpi
 
 ESTIMATE_TAG = "估算"          # 估值类输出统一标注
@@ -568,17 +568,10 @@ def render_research_report(data: dict) -> str:
     return f"""<!DOCTYPE html>
 <html lang="zh-CN"><head><meta charset="utf-8">
 <title>市场调查报告 - {html.escape(data.get('address') or '未命名')}</title>
-<style>
- body {{ font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; max-width: 960px; margin: 24px auto; padding: 0 20px; color: #1a1a1a; }}
- h1 {{ font-size: 22px; }} h2 {{ font-size: 17px; border-bottom: 2px solid #222; padding-bottom: 4px; margin-top: 28px; }}
- table {{ width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 14px; }}
- th, td {{ border: 1px solid #ccc; padding: 6px 10px; text-align: left; vertical-align: top; }}
- th {{ background: #f4f4f4; width: 22%; }}
- .meta {{ color: #555; font-size: 13px; }} .mono {{ font-family: monospace; font-size: 13px; }}
- .warn {{ color: #b45309; font-weight: 700; }}
- .disclaimer {{ font-size: 12px; color: #666; border-top: 1px solid #ccc; margin-top: 32px; padding-top: 8px; }}
- @media print {{ .noprint {{ display: none; }} body {{ margin: 0; }} }}
+<style>{brand.REPORT_CSS}
+ body {{ max-width: 960px; }} th {{ width: 22%; }}
 </style></head><body>
+{brand.REPORT_BRAND_BAR}
 <p class="noprint"><button onclick="window.print()">🖨️ 打印 / 另存为 PDF</button></p>
 <h1>市场调查报告</h1>
 <p class="meta">vertciti 房地产收购部 · 生成时间 {html.escape(data.get('generated_at', ''))}</p>

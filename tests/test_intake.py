@@ -46,10 +46,22 @@ def test_ddg_unwrap():
 
 
 def test_robots_parse(monkeypatch):
+    # 2026-10-17 台账第 18 项：robots 改流式抓取，替身同步为 stream 接口
     class R:
         status_code = 200
-        text = "User-agent: *\nDisallow: /private/\nDisallow: /tmp\n"
-    monkeypatch.setattr(rp.httpx, "get", lambda *a, **k: R())
+        headers = {}
+        encoding = "utf-8"
+        _body = b"User-agent: *\nDisallow: /private/\nDisallow: /tmp\n"
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def iter_bytes(self, chunk_size=65536):
+            yield self._body
+    monkeypatch.setattr(rp.httpx, "stream", lambda *a, **k: R())
     rp._robots_cache.clear()
     d = rp.robots_disallows("example.com")
     assert "/private/" in d

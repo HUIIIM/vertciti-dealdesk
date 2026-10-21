@@ -59,7 +59,10 @@ def redirect_uri() -> str:
     回显页看到 code 也无风险。"""
     return os.environ.get("TOPHAP_REDIRECT_URI") or f"http://127.0.0.1:{CALLBACK_PORT}{CALLBACK_PATH}"
 USER_TIMEOUT = 10 * 60  # 等用户点 Approve 最长 10 分钟
-NET_TIMEOUT = 15
+# NET_TIMEOUT 2026-10-19 由 15s 提至 45s：当日 17:25 轮实测 TopHap token 端点 POST
+# 延迟约 26s，15s 连超 3 次、第 4 次才成。45s = 实测值 +约 70% 余量；本常数同时用于
+# metadata/注册端点（同网络路径），一并受益。详见 protocol-team-ledger #55。
+NET_TIMEOUT = 45
 
 
 def log(msg: str) -> None:
@@ -259,7 +262,86 @@ def exchange_code(as_meta: dict, client_id: str, client_secret: str | None,
     return tok
 
 
+def phase1(state_file: str) -> None:
+    """两阶段模式 Phase 1：生成 OAuth state 并落盘，不等待 code。
+    供 cron worker 调用：state 进持久文件（~/workspace 下），不依赖后台进程 stdin。
+    输出：授权 URL（打印到 stdout，worker 取最后一行）。
+    """
+    mcp = mcp_url()
+    as_meta = discover_auth_server(mcp)
+    reg = register_client(as_meta)
+    client_id = reg["client_id"]
+    client_secret = reg.get("client_secret")
+    verifier, challenge = pkce_pair()
+    state = secrets.token_urlsafe(16)
+    auth_url = build_authorize_url(as_meta, client_id, challenge, state,
+                                   scope="openid profile email")
+    payload = {
+        "mcp": mcp,
+        "as_meta": as_meta,
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "verifier": verifier,
+        "state": state,
+        "redirect_uri": redirect_uri(),
+        "created_at": int(time.time()),
+    }
+    Path(state_file).write_text(json.dumps(payload))
+    os.chmod(state_file, 0o600)
+    print(auth_url, flush=True)
+
+
+def phase2(state_file: str, code: str) -> None:
+    """两阶段模式 Phase 2：用 state 文件 + code 换 token 并写 .env。"""
+    payload = json.loads(Path(state_file).read_text())
+    # state 年龄上限是我方自设检查（非服务端返回）——2026-10-19 由 600s 放宽至 1800s：
+    # 当日两轮生产重授权均死于此检查（浏览器 handoff 往返 >10 分钟），code 从未送达
+    # 服务端验证。若 TopHap 的 code 本身只有 10 分钟寿命，Phase 2 会在换 token 端点
+    # 以服务端错误干净失败（可定责），不因此检查白白作废一轮授权。安全评估：state
+    # 文件 0600 本地权限、含 PKCE verifier（与一次性 code 绑定、换后即焚），放宽本地
+    # 中止窗不扩大可用面。详见 protocol-team-ledger #54。
+    if int(time.time()) - payload.get("created_at", 0) > 1800:
+        raise SystemExit("state 文件已超过 30 分钟，code/verifier 可能失效，中止")
+    tok = exchange_code(payload["as_meta"], payload["client_id"],
+                        payload.get("client_secret"), code.strip(),
+                        payload["verifier"])
+    updates = {
+        "TOPHAP_MCP_URL": payload["mcp"],
+        "TOPHAP_ACCESS_TOKEN": tok["access_token"],
+        "TOPHAP_TOKEN_ENDPOINT": payload["as_meta"]["token_endpoint"],
+        "TOPHAP_CLIENT_ID": payload["client_id"],
+    }
+    if tok.get("refresh_token"):
+        updates["TOPHAP_REFRESH_TOKEN"] = tok["refresh_token"]
+        log("授权服务器下发了 refresh_token，已写入 .env（TOPHAP_REFRESH_TOKEN）")
+    else:
+        log("授权服务器未下发 refresh_token（TopHap 目前仅下发 access_token）")
+    if tok.get("expires_in"):
+        try:
+            updates["TOPHAP_TOKEN_EXPIRES_AT"] = str(
+                int(time.time()) + int(tok["expires_in"]))
+        except (TypeError, ValueError):
+            log(f"expires_in 非法（{tok['expires_in']!r}），跳过过期时间戳")
+    write_dotenv(updates)
+    log(".env 已写入：access token＋绝对过期时间戳（TOPHAP_TOKEN_EXPIRES_AT，epoch 秒）")
+    # 用后即焚：state 含 verifier，换完就删
+    try:
+        Path(state_file).unlink()
+    except OSError:
+        pass
+
+
 def main() -> None:
+    # 两阶段模式（cron 自助重授权用，不依赖后台进程 stdin）
+    if "--phase1" in sys.argv:
+        sf = sys.argv[sys.argv.index("--state-file") + 1]
+        phase1(sf)
+        return
+    if "--phase2" in sys.argv:
+        sf = sys.argv[sys.argv.index("--state-file") + 1]
+        code = sys.argv[sys.argv.index("--code") + 1]
+        phase2(sf, code)
+        return
     manual = "--manual" in sys.argv
     mcp = mcp_url()
 

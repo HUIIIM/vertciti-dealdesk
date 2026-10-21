@@ -10,7 +10,7 @@ DSCR / IRR / Equity Multiple 用 Excel 原生公式（改假设可重算），
 from __future__ import annotations
 
 import io
-from datetime import date, datetime
+from datetime import datetime
 from zoneinfo import ZoneInfo
 
 # Phase 5 第七轮 #6/#9（xiaobai/R8）：报告日期按用户时区 America/New_York——
@@ -25,22 +25,24 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
+from . import brand
 from .pdf_uw import _ASSUMP_LABELS, _ASSUMP_VALUE_LABELS  # 假设中文标签/值标签（item 12，与 PDF 同源）
 from .pdf_uw import _comp_dup_key, _comp_dup_set  # Phase 5 第七轮 R10：重复 comps 检测（与 PDF 同源）
 
-HDR_FILL = PatternFill("solid", fgColor="0F2B26")
-HDR_FONT = Font(bold=True, color="E9EFF9", name="Microsoft YaHei", size=11)
-SUB_FILL = PatternFill("solid", fgColor="13202B")
-SUB_FONT = Font(bold=True, color="2DD4BF", name="Microsoft YaHei", size=11)
+# 配色：vertciti DNA（墨黑表头＋信号橙点睛，见 app/brand.py）
+HDR_FILL = PatternFill("solid", fgColor=brand.INK[1:])
+HDR_FONT = Font(bold=True, color=brand.PAPER[1:], name="Microsoft YaHei", size=11)
+SUB_FILL = PatternFill("solid", fgColor=brand.MIST[1:])
+SUB_FONT = Font(bold=True, color=brand.ORANGE_TEXT[1:], name="Microsoft YaHei", size=11)
 BODY_FONT = Font(name="Microsoft YaHei", size=11)
 # P0-5（2026-10-05）：敏感性矩阵 sheet 的可改输入格（黄色）
-INPUT_FILL = PatternFill("solid", fgColor="FFF2CC")
+INPUT_FILL = PatternFill("solid", fgColor=brand.YELLOW_TINT[1:])
 INPUT_FONT = Font(name="Microsoft YaHei", size=11, bold=True)
-BASE_FILL = PatternFill("solid", fgColor="D9EAD3")  # 基准格高亮
+BASE_FILL = PatternFill("solid", fgColor=brand.GREEN_TINT[1:])  # 基准格高亮
 MONEY = '#,##0'
 MONEY2 = '$#,##0'
 PCT = '0.00%'
-THIN = Side(style="thin", color="1D2A45")
+THIN = Side(style="thin", color=brand.LINE[1:])
 BORDER = Border(left=THIN, right=THIN, top=THIN, bottom=THIN)
 
 
@@ -441,7 +443,7 @@ def _build_sensitivity_sheet(wb, result: dict, inputs: dict) -> None:
         c.border = BORDER
         if o == 0:
             c.fill = BASE_FILL
-            c.font = Font(bold=True, color="0F2B26", name="Microsoft YaHei", size=11)
+            c.font = Font(bold=True, color=brand.INK[1:], name="Microsoft YaHei", size=11)
     # 每格现金流数组（Excel 原生公式；行分隔符 ; 为 en-US 规范，Excel 按区域自动转义）
     terms = []   # Y1..YH（不含退出所得）
     for y in range(1, hold + 1):
@@ -457,7 +459,7 @@ def _build_sensitivity_sheet(wb, result: dict, inputs: dict) -> None:
         c.border = BORDER
         if o == 0:
             c.fill = BASE_FILL
-            c.font = Font(bold=True, color="0F2B26", name="Microsoft YaHei", size=11)
+            c.font = Font(bold=True, color=brand.INK[1:], name="Microsoft YaHei", size=11)
         for j in range(5):
             cc = f"{_gcl(2 + j)}${r0}"
             arr_terms = [t.format(gr=gr) for t in terms]

@@ -5,7 +5,7 @@ from __future__ import annotations
 import html
 from datetime import datetime
 
-from . import charts, report_narrative, sensitivity
+from . import brand, charts, report_narrative, sensitivity
 
 # P0-2（2026-10-05）：打分等级显示统一为 A/B/C/D 档（旧 verdict 词退役）
 GRADE_LABELS = {"A": "A 档（日报头条）", "B": "B 档（日报收录）", "C": "C 档（观察名单）",
@@ -109,30 +109,23 @@ def render(project: dict) -> str:
     return f"""<!DOCTYPE html>
 <html lang="zh-CN"><head><meta charset="utf-8">
 <title>DealDesk 打分报告 - {html.escape(p['name'])}</title>
-<style>
- body {{ font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; max-width: 900px; margin: 24px auto; padding: 0 20px; color: #1a1a1a; }}
- h1 {{ font-size: 22px; }} h2 {{ font-size: 17px; border-bottom: 2px solid #222; padding-bottom: 4px; margin-top: 28px; }}
- table {{ width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 14px; }}
- th, td {{ border: 1px solid #ccc; padding: 6px 10px; text-align: left; }}
- th {{ background: #f4f4f4; width: 34%; }}
- .grade {{ font-size: 40px; font-weight: 800; }}
- .grade.A {{ color: #0a7a2f; }} .grade.B {{ color: #1a56db; }} .grade.C {{ color: #b45309; }}
- .grade.否决 {{ color: #c00; }}
- .veto li {{ color: #c00; font-weight: 600; }} .ok {{ color: #0a7a2f; font-weight: 600; }}
- .downgrade li {{ color: #b45309; font-weight: 600; }}
- .meta {{ color: #555; font-size: 13px; }}
- .lead {{ background: #f6f9fb; border-left: 4px solid #0f766e; padding: 12px 16px; margin: 18px 0 4px; font-size: 14.5px; line-height: 1.75; }}
+<style>{brand.REPORT_CSS}
+ .grade {{ font-size: 48px; font-weight: 300; letter-spacing: -.03em; line-height: 1; }}
+ .grade.A {{ color: {brand.GRADE_COLORS["A"]}; }} .grade.B {{ color: {brand.GRADE_COLORS["B"]}; }} .grade.C {{ color: {brand.GRADE_COLORS["C"]}; }}
+ .grade.否决 {{ color: {brand.RED}; }}
+ .veto li {{ color: {brand.RED}; font-weight: 700; }} .ok {{ color: {brand.GREEN}; font-weight: 700; }}
+ .downgrade li {{ color: {brand.AMBER_TEXT}; font-weight: 700; }}
+ .lead {{ background: {brand.PAPER}; border-left: 6px solid {brand.ORANGE}; padding: 14px 18px; margin: 18px 0 4px; font-size: 14.5px; line-height: 1.75; box-shadow: inset 0 0 0 1px {brand.LINE}; }}
  .lead p {{ margin: 6px 0; }}
- figure.chart {{ margin: 14px 0 6px; }}
+ figure.chart {{ margin: 16px 0 8px; }}
  figure.chart svg {{ display: block; }}
- figcaption {{ font-size: 12.5px; color: #64748b; margin-top: 6px; line-height: 1.6; }}
- .conclusion {{ background: #f6f9fb; border: 1px solid #dbe3ec; border-radius: 8px; padding: 12px 18px; margin: 10px 0; font-size: 14.5px; line-height: 1.8; }}
+ figcaption {{ font-size: 12.5px; color: {brand.STONE}; margin-top: 8px; line-height: 1.6; }}
+ .conclusion {{ background: {brand.PAPER}; border-top: 4px solid {brand.INK}; box-shadow: inset 0 0 0 1px {brand.LINE}; padding: 12px 20px; margin: 12px 0; font-size: 14.5px; line-height: 1.8; }}
  .conclusion p {{ margin: 8px 0; }}
- td.num {{ text-align: right; font-variant-numeric: tabular-nums; }}
+ th {{ width: 34%; }}
  th.nw {{ white-space: nowrap; }}
- .disclaimer {{ font-size: 12px; color: #666; border-top: 1px solid #ccc; margin-top: 32px; padding-top: 8px; }}
- @media print {{ body {{ margin: 0; }} .noprint {{ display: none; }} }}
 </style></head><body>
+{brand.REPORT_BRAND_BAR}
 <p class="noprint"><button onclick="window.print()">🖨️ 打印 / 另存为 PDF</button></p>
 <h1>DealDesk 打分报告</h1>
 <p class="meta">vertciti 房地产收购部 · {now} · 赛道：{"住宅" if track=="residential" else "商业"}</p>

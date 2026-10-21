@@ -27,6 +27,8 @@ def _now_et() -> str:
     return datetime.now(_ET).strftime("%Y-%m-%d %H:%M")
 
 from reportlab.lib.colors import HexColor
+
+from . import brand
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
@@ -58,21 +60,21 @@ def _register_fonts() -> str:
     return FONT
 
 
-# 经典版配色：贴近 Excel 的素色网格
-INK = HexColor("#1a1a1a")
-MUTED = HexColor("#595959")
-GRID = HexColor("#bfbfbf")
-HDR_BG = HexColor("#d9d9d9")
-TITLE_BG = HexColor("#404040")
-TITLE_FG = HexColor("#ffffff")
+# 经典版配色：贴近 Excel 的素色网格（vertciti DNA 黑白灰，见 app/brand.py）
+INK = HexColor(brand.INK)
+MUTED = HexColor(brand.STONE)
+GRID = HexColor(brand.NAV_GREY)
+HDR_BG = HexColor(brand.MIST)
+TITLE_BG = HexColor(brand.INK)
+TITLE_FG = HexColor(brand.PAPER)
 
-# 增强版配色：DealDesk 深色机构风
-DK_BG = HexColor("#101418")
-DK_PANEL = HexColor("#1a2027")
-GOLD = HexColor("#e8a33d")
-DK_GRID = HexColor("#2c343d")
-DK_MUT = HexColor("#8a94a0")
-WHITE = HexColor("#ffffff")
+# 增强版配色：vertciti DNA 浅底（白底黑字、信号橙点睛；黑色只留给品牌条/表头，打印不费墨）
+EN_BG = HexColor(brand.PAPER)
+EN_PANEL = HexColor(brand.PAPER)
+EN_ACCENT = HexColor(brand.ORANGE_TEXT)   # 白底强调字（对比度 ≥ 4.5:1）
+EN_GRID = HexColor(brand.LINE)
+EN_MUT = HexColor(brand.STONE)
+EN_FG = HexColor(brand.INK)
 
 
 # ---------------------------------------------------------------- 假设标签
@@ -460,7 +462,7 @@ def build_enhanced_pdf(r: dict, deal: dict | None = None,
         story.extend(_ts.tearsheet_story(_ts_data, cw))
         story.append(PageBreak())
 
-    def dp(text, size=9, color=WHITE, bold=False, align="left"):
+    def dp(text, size=9, color=EN_FG, bold=False, align="left"):
         align_i = {"left": 0, "center": 1, "right": 2}[align]
         return Paragraph(
             f"<font face='{FONT}' size='{size}' color='{color}'>"
@@ -489,30 +491,30 @@ def build_enhanced_pdf(r: dict, deal: dict | None = None,
         vword = str(deal.get("verdict_word") or v.get("verdict"))
         veto_n = int(deal.get("veto_count") or 0)
         vword_style = ParagraphStyle("vword", alignment=0, leading=15,
-                                     fontName=FONT, textColor=GOLD, fontSize=11)
+                                     fontName=FONT, textColor=EN_ACCENT, fontSize=11)
         if veto_n:
             # Phase 5 第四轮 A1：否决态主词红色＋"一票否决 ×N"徽标同行
             vword_para = Paragraph(
-                f"<font face='{FONT}' size='11' color='#f87171'><b>{_esc(vword)}</b></font>"
-                f"<font face='{FONT}' size='9' color='#f87171'><b>　"
+                f"<font face='{FONT}' size='11' color='#B3261E'><b>{_esc(vword)}</b></font>"
+                f"<font face='{FONT}' size='9' color='#B3261E'><b>　"
                 f"一票否决 ×{veto_n}</b></font>",
                 vword_style)
         else:
-            vword_para = dp(vword, 11, GOLD, True)
+            vword_para = dp(vword, 11, EN_ACCENT, True)
         vrows = [
-            [dp("verdict", 8.5, DK_MUT, True), vword_para],
-            [dp("一句话原因", 8.5, DK_MUT, True), dp(str(v.get("one_liner") or ""), 8.5, WHITE)],
+            [dp("verdict", 8.5, EN_MUT, True), vword_para],
+            [dp("一句话原因", 8.5, EN_MUT, True), dp(str(v.get("one_liner") or ""), 8.5, EN_FG)],
         ]
         for reason in (v.get("reasons") or [])[:4]:
-            vrows.append([dp("依据", 8.5, DK_MUT), dp("· " + str(reason), 8.5, WHITE)])
+            vrows.append([dp("依据", 8.5, EN_MUT), dp("· " + str(reason), 8.5, EN_FG)])
         # Phase 5 第二轮 item 7④：PDF 必须带 USPAP 用途限制声明（网页/Excel 都有，
         # PDF 正是会被转发的那份）
-        vrows.append([dp("用途限制", 8.5, DK_MUT, True),
+        vrows.append([dp("用途限制", 8.5, EN_MUT, True),
                       dp("投资筛选用，非 USPAP 合规评估报告，不能用于贷款/诉讼；"
-                         "未实地勘察、未审阅租约原件。", 8.5, WHITE)])
+                         "未实地勘察、未审阅租约原件。", 8.5, EN_FG)])
         vt = Table(vrows, colWidths=[cw * 0.22, cw * 0.78])
-        vt.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), DK_PANEL),
-                                ("GRID", (0, 0), (-1, -1), 0.5, DK_GRID),
+        vt.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), EN_PANEL),
+                                ("GRID", (0, 0), (-1, -1), 0.5, EN_GRID),
                                 ("VALIGN", (0, 0), (-1, -1), "TOP"),
                                 ("TOPPADDING", (0, 0), (-1, -1), 4),
                                 ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
@@ -537,7 +539,7 @@ def build_enhanced_pdf(r: dict, deal: dict | None = None,
                 "阈值 1.0 为生死线（<1.0 即贴钱持有）；否决依据引用打分口径 DSCR "
                 f"{float(_dscr_score_v):.2f}×（评分模型 NOI，未做银行标准化调整），"
                 f"阈值 {float(_req_thr):.2f} 为机构承销底线（低于即直接否决）。两个口径的分子不同，"
-                "数字本来就不一样，不是笔误。", 7.5, DK_MUT))
+                "数字本来就不一样，不是笔误。", 7.5, EN_MUT))
         story.append(Spacer(1, 4 * mm))
 
         # P0-8：comps（真实选中 comps）
@@ -546,20 +548,20 @@ def build_enhanced_pdf(r: dict, deal: dict | None = None,
         if comps:
             story.append(_section_title("可比成交 comps", cw))
             story.append(Spacer(1, 2 * mm))
-            crows = [[dp("地址", 8.5, DK_MUT, True), dp("成交价", 8.5, DK_MUT, True, "right"),
-                      dp("面积 SF", 8.5, DK_MUT, True, "right"), dp("$/SF", 8.5, DK_MUT, True, "right")]]
+            crows = [[dp("地址", 8.5, EN_MUT, True), dp("成交价", 8.5, EN_MUT, True, "right"),
+                      dp("面积 SF", 8.5, EN_MUT, True, "right"), dp("$/SF", 8.5, EN_MUT, True, "right")]]
             for c in comps[:12]:
                 _addr = str(c.get("address") or "")
                 # Phase 5 第七轮 R10（remote）：重复抓取的 comps 标注"（重复）"
                 if _comp_dup_key(c) in _dups:
                     _addr += "（重复）"
-                crows.append([dp(_addr, 8, WHITE),
-                          dp(_money(c.get("adjusted_price") or c.get("price")), 8, WHITE, False, "right"),
-                          dp(f"{(c.get('sf') or 0):,.0f}", 8, WHITE, False, "right"),
-                          dp(_money2(c.get("price_per_sf")), 8, WHITE, False, "right")])
+                crows.append([dp(_addr, 8, EN_FG),
+                          dp(_money(c.get("adjusted_price") or c.get("price")), 8, EN_FG, False, "right"),
+                          dp(f"{(c.get('sf') or 0):,.0f}", 8, EN_FG, False, "right"),
+                          dp(_money2(c.get("price_per_sf")), 8, EN_FG, False, "right")])
             ct = Table(crows, colWidths=[cw * 0.46, cw * 0.2, cw * 0.17, cw * 0.17])
-            ct.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), DK_PANEL),
-                                    ("GRID", (0, 0), (-1, -1), 0.5, DK_GRID),
+            ct.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), EN_PANEL),
+                                    ("GRID", (0, 0), (-1, -1), 0.5, EN_GRID),
                                     ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
                                     ("TOPPADDING", (0, 0), (-1, -1), 3),
                                     ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
@@ -571,7 +573,7 @@ def build_enhanced_pdf(r: dict, deal: dict | None = None,
         _val_disp = str(deal.get("valuation_display") or "").strip()
         if _val_disp and "待计算" not in _val_disp:
             story.append(Spacer(1, 2 * mm))
-            story.append(dp(_val_disp, 9, GOLD, True))
+            story.append(dp(_val_disp, 9, EN_ACCENT, True))
         story.append(Spacer(1, 4 * mm))
 
     # P0-8：假设（真实输入假设）
@@ -592,17 +594,17 @@ def build_enhanced_pdf(r: dict, deal: dict | None = None,
                 _disp = str(x.get("display") or x.get("value"))
                 if x.get("is_default") and "（默认）" not in _disp and "（联动" not in _disp:
                     _disp += "（默认）"
-                arows.append([dp(str(x.get("label") or x.get("key")), 8.5, DK_MUT),
-                              dp(_disp, 8.5, WHITE, False, "right")])
+                arows.append([dp(str(x.get("label") or x.get("key")), 8.5, EN_MUT),
+                              dp(_disp, 8.5, EN_FG, False, "right")])
         else:
             for k, val in list(assumps.items())[:14]:
                 label = _ASSUMP_LABELS.get(str(k), str(k))
                 disp_val = _ASSUMP_VALUE_LABELS.get(str(k), {}).get(str(val), val)
-                arows.append([dp(label, 8.5, DK_MUT),
-                              dp(str(disp_val), 8.5, WHITE, False, "right")])
+                arows.append([dp(label, 8.5, EN_MUT),
+                              dp(str(disp_val), 8.5, EN_FG, False, "right")])
         at = Table(arows, colWidths=[cw * 0.55, cw * 0.45])
-        at.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), DK_PANEL),
-                                ("GRID", (0, 0), (-1, -1), 0.5, DK_GRID),
+        at.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), EN_PANEL),
+                                ("GRID", (0, 0), (-1, -1), 0.5, EN_GRID),
                                 ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
                                 ("TOPPADDING", (0, 0), (-1, -1), 3),
                                 ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
@@ -632,8 +634,8 @@ def build_enhanced_pdf(r: dict, deal: dict | None = None,
     ]
     kflat = []
     for k, v in kpis:
-        inner = Table([[dp(k, 8, DK_MUT, align="center")],
-                       [dp(v, 13, GOLD, True, "center")]],
+        inner = Table([[dp(k, 8, EN_MUT, align="center")],
+                       [dp(v, 13, EN_ACCENT, True, "center")]],
                       colWidths=[cw / 6 - 2])
         inner.setStyle(TableStyle([("ALIGN", (0, 0), (-1, -1), "CENTER"),
                                    ("TOPPADDING", (0, 0), (-1, -1), 3),
@@ -641,29 +643,29 @@ def build_enhanced_pdf(r: dict, deal: dict | None = None,
         kflat.append(inner)
     kt = Table([kflat], colWidths=[cw / 6] * 6)
     kt.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, -1), DK_PANEL),
-        ("GRID", (0, 0), (-1, -1), 0.5, DK_GRID),
+        ("BACKGROUND", (0, 0), (-1, -1), EN_PANEL),
+        ("GRID", (0, 0), (-1, -1), 0.5, EN_GRID),
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
         ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0),
     ]))
     story.append(kt)
     story.append(Spacer(1, 2 * mm))
     if not resale_ok:
-        story.append(dp("注：退出类指标需市场 cap 证据；缺失时显示'—'，不编造。", 7.5, DK_MUT))
+        story.append(dp("注：退出类指标需市场 cap 证据；缺失时显示'—'，不编造。", 7.5, EN_MUT))
         story.append(Spacer(1, 2 * mm))
     else:
         story.append(Spacer(1, 2 * mm))
 
     def drow(label, hv, pv, bold=False):
-        return [dp(label, 8.5, DK_MUT, bold),
-                dp(hv, 8.5, WHITE, bold, "right"),
-                dp(pv, 8.5, WHITE, bold, "right")]
+        return [dp(label, 8.5, EN_MUT, bold),
+                dp(hv, 8.5, EN_FG, bold, "right"),
+                dp(pv, 8.5, EN_FG, bold, "right")]
 
     # 现金流对比
     story.append(_section_title("现金流（历史 / 预测）", cw))
     story.append(Spacer(1, 2 * mm))
-    cf = [[dp("项目", 8.5, DK_MUT, True), dp("历史", 8.5, DK_MUT, True, "right"),
-           dp("预测", 8.5, DK_MUT, True, "right")]]
+    cf = [[dp("项目", 8.5, EN_MUT, True), dp("历史", 8.5, EN_MUT, True, "right"),
+           dp("预测", 8.5, EN_MUT, True, "right")]]
 
     def _expense_money(v):
         # Phase 5 第二轮 item 7③：费用 $0 必须标注"待接/未填"，不许零披露
@@ -689,8 +691,8 @@ def build_enhanced_pdf(r: dict, deal: dict | None = None,
               else pfmt(pro.get(k)))
         cf.append(drow(lbl, hv, pv, lbl == "NOI"))
     cft = Table(cf, colWidths=[cw * 0.4, cw * 0.3, cw * 0.3])
-    cft.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), DK_PANEL),
-                             ("GRID", (0, 0), (-1, -1), 0.5, DK_GRID),
+    cft.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), EN_PANEL),
+                             ("GRID", (0, 0), (-1, -1), 0.5, EN_GRID),
                              ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
                              ("TOPPADDING", (0, 0), (-1, -1), 3), ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
                              ("LEFTPADDING", (0, 0), (-1, -1), 6), ("RIGHTPADDING", (0, 0), (-1, -1), 6)]))
@@ -748,26 +750,26 @@ def build_enhanced_pdf(r: dict, deal: dict | None = None,
     for i in range(0, len(newm), 2):
         row = []
         for k, v in newm[i:i + 2]:
-            row += [dp(k, 8.5, DK_MUT), dp(v, 8.5, WHITE, True, "right")]
+            row += [dp(k, 8.5, EN_MUT), dp(v, 8.5, EN_FG, True, "right")]
         nrows.append(row)
     nt = Table(nrows, colWidths=[cw * 0.28, cw * 0.22, cw * 0.28, cw * 0.22])
-    nt.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), DK_PANEL),
-                            ("GRID", (0, 0), (-1, -1), 0.5, DK_GRID),
+    nt.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), EN_PANEL),
+                            ("GRID", (0, 0), (-1, -1), 0.5, EN_GRID),
                             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
                             ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
                             ("LEFTPADDING", (0, 0), (-1, -1), 6), ("RIGHTPADDING", (0, 0), (-1, -1), 6)]))
     story.append(nt)
     if _def_keys:
         story.append(Spacer(1, 2 * mm))
-        story.append(dp("注：标 * 的数字按默认假设测算（假设取值见上方关键假设栏）。", 7.5, DK_MUT))
+        story.append(dp("注：标 * 的数字按默认假设测算（假设取值见上方关键假设栏）。", 7.5, EN_MUT))
     story.append(Spacer(1, 4 * mm))
 
     # 持有期现金流（退出分析）
     story.append(_section_title("持有期现金流与退出", cw))
     story.append(Spacer(1, 2 * mm))
     flows = ex.get("cash_flows", []) or []
-    ef = [[dp("年份", 8.5, DK_MUT, True), dp("年度现金流", 8.5, DK_MUT, True, "right"),
-           dp("备注", 8.5, DK_MUT, True)]]
+    ef = [[dp("年份", 8.5, EN_MUT, True), dp("年度现金流", 8.5, EN_MUT, True, "right"),
+           dp("备注", 8.5, EN_MUT, True)]]
     shown = flows[: ex.get("hold_years", 0) + 2]
     for i, f in enumerate(shown):
         # Phase 5 第四轮 B3：退出净所得为"—"（resale_ok 假）时不许写"含退出净所得"
@@ -792,8 +794,8 @@ def build_enhanced_pdf(r: dict, deal: dict | None = None,
         drow("退出 IRR", _pct(ex.get("irr")) if resale_ok else "—", ""),
     ]
     eft = Table(ef + exit_rows, colWidths=[cw * 0.2, cw * 0.35, cw * 0.45])
-    eft.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), DK_PANEL),
-                             ("GRID", (0, 0), (-1, -1), 0.5, DK_GRID),
+    eft.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), EN_PANEL),
+                             ("GRID", (0, 0), (-1, -1), 0.5, EN_GRID),
                              ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
                              ("TOPPADDING", (0, 0), (-1, -1), 3), ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
                              ("LEFTPADDING", (0, 0), (-1, -1), 6), ("RIGHTPADDING", (0, 0), (-1, -1), 6)]))
@@ -805,19 +807,19 @@ def build_enhanced_pdf(r: dict, deal: dict | None = None,
     story.append(dp("注：预测转售价值 = 当期预测 NOI ÷ 市场 cap（当期口径）；"
                     "退出售价 = 持有期末 NOI ÷ 退出 cap（期末口径）——"
                     "两个口径不同，不是同一个数字。",
-                    7.5, DK_MUT))
+                    7.5, EN_MUT))
     story.append(Spacer(1, 6 * mm))
     # "商业核保"是旧版命名残留，新线叫"商业·专业模式"（panel2 remote #11）
-    story.append(dp(f"DealDesk 生成 · {now}（美东时间） · 数据来自商业·专业模式实时计算", 7.5, DK_MUT, align="center"))
+    story.append(dp(f"DealDesk 生成 · {now}（美东时间） · 数据来自商业·专业模式实时计算", 7.5, EN_MUT, align="center"))
 
-    # 深色底
+    # 页面底色（DNA 纸白）
     def _bg(canvas, doc):
         canvas.saveState()
         # Tear Sheet 封面页（第 1 页）用白底：浅色一页纸版式在深底上不可读
         if cover_tearsheet and getattr(doc, "page", 0) == 1:
-            canvas.setFillColor(WHITE)
+            canvas.setFillColor(EN_FG)
         else:
-            canvas.setFillColor(DK_BG)
+            canvas.setFillColor(EN_BG)
         canvas.rect(0, 0, A4[0], A4[1], fill=1, stroke=0)
         canvas.restoreState()
 

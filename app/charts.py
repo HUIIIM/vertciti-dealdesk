@@ -6,7 +6,7 @@
 3. 评分构成 — 各维度得分 / 权重横向条形图
 
 纪律：只用 scoring / sensitivity 已有计算结果，不编数；缺数渲染"—"占位。
-配色沿用 pdf_report.py 的 token（INK / TEAL / MUTED / HAIRLINE / 否决红），不引入新色。
+配色统一取 app/brand.py（vertciti DNA：黑白为主、信号橙点睛、直角），不引入新色。
 不依赖 matplotlib（Vercel serverless 保持轻量）；Pillow 仅用于服务端 PNG 手绘。
 """
 
@@ -15,23 +15,22 @@ from __future__ import annotations
 import io
 import os
 
-# ---------------------------------------------------------------- 配色（与 pdf_report.py 一致）
-INK = "#16202e"
-TEAL = "#0f766e"
-MUTED = "#64748b"
-HAIRLINE = "#dbe3ec"
-RED = "#b91c1c"          # GRADE_COLORS["否决"]
-TRACK_BG = "#eef2f6"
+from . import brand
 
-_RGB = {
-    INK: (22, 32, 46),
-    TEAL: (15, 118, 110),
-    MUTED: (100, 116, 139),
-    HAIRLINE: (219, 227, 236),
-    RED: (185, 28, 28),
-    TRACK_BG: (238, 242, 246),
-    "#ffffff": (255, 255, 255),
-}
+# ---------------------------------------------------------------- 配色（vertciti DNA，见 app/brand.py）
+INK = brand.INK
+ACCENT = brand.ORANGE            # 图形标记：信号橙
+ACCENT_TEXT = brand.ORANGE_TEXT  # 白底小字强调（对比度 ≥ 4.5:1）
+MUTED = brand.STONE
+HAIRLINE = brand.LINE
+RED = brand.RED                  # GRADE_COLORS["否决"]
+TRACK_BG = brand.MIST
+PANEL_BG = brand.MIST
+
+_RGB = {c: brand.rgb(c) for c in
+        (INK, ACCENT, ACCENT_TEXT, MUTED, HAIRLINE, RED, TRACK_BG, brand.PAPER)}
+_RGB["#ffffff"] = brand.rgb(brand.PAPER)
+_AREA_FILL = brand.rgb(brand.ORANGE_TINT)
 
 _FONT_PATH = os.path.join(os.path.dirname(__file__), "fonts", "WQY-MicroHei.ttf")
 
@@ -125,13 +124,13 @@ def _fmt_money(v: float) -> str:
 # ---------------------------------------------------------------- SVG（HTML 报告内联，矢量零依赖）
 _SVG_HEAD = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" '
              'width="100%" role="img" aria-label="{label}">')
-_SVG_FONT = "font-family=\"-apple-system,'PingFang SC','Microsoft YaHei',sans-serif\""
+_SVG_FONT = 'font-family="' + brand.FONT_STACK.replace('"', "'") + '"'
 
 
 def svg_placeholder(title: str, w: int = 760, h: int = 120) -> str:
     return (
         _SVG_HEAD.format(w=w, h=h, label=title)
-        + f'<rect x="1" y="1" width="{w-2}" height="{h-2}" rx="6" fill="#f6f9fb" stroke="{HAIRLINE}"/>'
+        + f'<rect x="1" y="1" width="{w-2}" height="{h-2}" fill="{PANEL_BG}" stroke="{HAIRLINE}"/>'
         + f'<text x="{w/2}" y="{h/2+6}" text-anchor="middle" font-size="15" fill="{MUTED}" {_SVG_FONT}>'
         + f'— {title}：数据不足，暂无图表</text></svg>'
     )
@@ -177,8 +176,8 @@ def svg_cashflow(prep: dict | None) -> str:
     # 面积 + 折线
     pts = " ".join(f"{X(i):.1f},{Y(v):.1f}" for i, v in enumerate(cum))
     parts.append(f'<polygon points="{L},{Y(0):.1f} {pts} {W-R},{Y(0):.1f}" '
-                 f'fill="{TEAL}" fill-opacity="0.08"/>')
-    parts.append(f'<polyline points="{pts}" fill="none" stroke="{TEAL}" stroke-width="2.5"/>')
+                 f'fill="{ACCENT}" fill-opacity="0.08"/>')
+    parts.append(f'<polyline points="{pts}" fill="none" stroke="{ACCENT}" stroke-width="2.5"/>')
     # 回本点
     be = prep["breakeven"]
     if be is not None:
@@ -190,11 +189,11 @@ def svg_cashflow(prep: dict | None) -> str:
             bx = X(i0) + frac * (X(i0 + 1) - X(i0))
             bv = cum[i0] + frac * (cum[i0 + 1] - cum[i0])
         by = Y(bv)
-        parts.append(f'<circle cx="{bx:.1f}" cy="{by:.1f}" r="5" fill="{TEAL}"/>')
+        parts.append(f'<circle cx="{bx:.1f}" cy="{by:.1f}" r="5" fill="{ACCENT}"/>')
         tag = "首年即回本" if be == 0 else f"约 {be:.1f} 年回本"
         tx = min(max(bx + 10, L + 60), W - R - 120)
         parts.append(f'<text x="{tx:.1f}" y="{by-12:.1f}" font-size="12" font-weight="700" '
-                     f'fill="{TEAL}" {_SVG_FONT}>{tag}</text>')
+                     f'fill="{ACCENT_TEXT}" {_SVG_FONT}>{tag}</text>')
     else:
         parts.append(f'<text x="{W-R}" y="{T+16}" text-anchor="end" font-size="12" '
                      f'fill="{RED}" {_SVG_FONT}>10 年内未回本（按当前现金流线性外推）</text>')
@@ -227,9 +226,9 @@ def _sens_bars_svg(parts: list, rows: list, title: str, ox: int, pw: int,
         else:
             yv = Y(v)
             y_top, y_bot = (yv, y0) if v >= 0 else (y0, yv)
-            color = TEAL if r["label"] == "基准" else (RED if v < 0 else MUTED)
+            color = ACCENT if r["label"] == "基准" else (RED if v < 0 else MUTED)
             parts.append(f'<rect x="{cx-bw/2:.1f}" y="{y_top:.1f}" width="{bw:.1f}" '
-                         f'height="{max(y_bot-y_top, 1.5):.1f}" rx="3" fill="{color}"/>')
+                         f'height="{max(y_bot-y_top, 1.5):.1f}" fill="{color}"/>')
             ly = y_top - 8 if v >= 0 else y_bot + 16
             parts.append(f'<text x="{cx:.1f}" y="{ly:.1f}" text-anchor="middle" font-size="10.5" '
                          f'fill="{INK}" {_SVG_FONT}>{_fmt_money(v)}</text>')
@@ -275,11 +274,11 @@ def svg_dimensions(prep: list) -> str:
         parts.append(f'<text x="{label_w-8}" y="{cy+5:.1f}" text-anchor="end" font-size="13" '
                      f'fill="{INK}" {_SVG_FONT}>{d["label"]}</text>')
         parts.append(f'<rect x="{tx0}" y="{cy-9:.1f}" width="{tx1-tx0}" height="18" '
-                     f'rx="4" fill="{TRACK_BG}"/>')
+                     f'fill="{TRACK_BG}"/>')
         fw = (tx1 - tx0) * d["ratio"]
         if fw > 0.5:
             parts.append(f'<rect x="{tx0}" y="{cy-9:.1f}" width="{fw:.1f}" height="18" '
-                         f'rx="4" fill="{TEAL}"/>')
+                         f'fill="{ACCENT}"/>')
         txt = (f"{d['points']:.0f}" if float(d['points']).is_integer()
                else f"{d['points']:.1f}") + f" / {d['weight']:.0f}"
         parts.append(f'<text x="{tx1+10}" y="{cy+5:.1f}" font-size="13" fill="{INK}" '
@@ -316,7 +315,7 @@ def png_placeholder(title: str, scale: int = 2) -> io.BytesIO:
     W, H = 760 * scale, 120 * scale
     img = Image.new("RGB", (W, H), _RGB["#ffffff"])
     d = ImageDraw.Draw(img)
-    d.rounded_rectangle([2, 2, W - 2, H - 2], radius=12, outline=_RGB[HAIRLINE],
+    d.rounded_rectangle([2, 2, W - 2, H - 2], radius=0, outline=_RGB[HAIRLINE],
                         width=2 * scale)
     f = _pil_font(15, scale)
     d.text((W / 2, H / 2), f"— {title}：数据不足，暂无图表", font=f,
@@ -361,8 +360,8 @@ def png_cashflow(prep: dict | None, scale: int = 2) -> io.BytesIO:
                anchor="mm")
     pts = [(X(i), Y(v)) for i, v in enumerate(cum)]
     # 面积
-    d.polygon([(L, Y(0))] + pts + [(W - R, Y(0))], fill=(236, 243, 242))
-    d.line(pts, fill=_RGB[TEAL], width=int(2.5 * scale), joint="curve")
+    d.polygon([(L, Y(0))] + pts + [(W - R, Y(0))], fill=_AREA_FILL)
+    d.line(pts, fill=_RGB[ACCENT], width=int(2.5 * scale), joint="curve")
     be = prep["breakeven"]
     if be is not None:
         i0 = int(be)
@@ -374,10 +373,10 @@ def png_cashflow(prep: dict | None, scale: int = 2) -> io.BytesIO:
             bv = cum[i0] + frac * (cum[i0 + 1] - cum[i0])
         by = Y(bv)
         r = 5 * scale
-        d.ellipse([bx - r, by - r, bx + r, by + r], fill=_RGB[TEAL])
+        d.ellipse([bx - r, by - r, bx + r, by + r], fill=_RGB[ACCENT])
         tag = "首年即回本" if be == 0 else f"约 {be:.1f} 年回本"
         tx = min(max(bx + 10 * scale, L + 60 * scale), W - R - 120 * scale)
-        d.text((tx, by - 12 * scale), tag, font=f_tag, fill=_RGB[TEAL], anchor="lm")
+        d.text((tx, by - 12 * scale), tag, font=f_tag, fill=_RGB[ACCENT_TEXT], anchor="lm")
     else:
         d.text((W - R, T + 8 * scale), "10 年内未回本（按当前现金流线性外推）",
                font=f_tag, fill=_RGB[RED], anchor="ra")
@@ -407,9 +406,9 @@ def _png_sens_panel(d, rows, title, ox, pw, T, B, H, gmin, gmax, scale):
         else:
             yv = Y(v)
             y_top, y_bot = (yv, y0) if v >= 0 else (y0, yv)
-            color = _RGB[TEAL] if r["label"] == "基准" else (_RGB[RED] if v < 0 else _RGB[MUTED])
+            color = _RGB[ACCENT] if r["label"] == "基准" else (_RGB[RED] if v < 0 else _RGB[MUTED])
             d.rounded_rectangle([cx - bw / 2, y_top, cx + bw / 2, max(y_bot, y_top + 2)],
-                                radius=3 * scale, fill=color)
+                                radius=0, fill=color)
             ly = y_top - 8 * scale if v >= 0 else y_bot + 8 * scale
             anch = "ma" if v >= 0 else "md"
             d.text((cx, ly), _fmt_money(v), font=f_v, fill=_RGB[INK], anchor=anch)
@@ -455,11 +454,11 @@ def png_dimensions(prep: list, scale: int = 2) -> io.BytesIO:
         d.text((label_w - 8 * scale, cy), r["label"], font=f_l, fill=_RGB[INK],
                anchor="rm")
         d.rounded_rectangle([tx0, cy - 9 * scale, tx1, cy + 9 * scale],
-                            radius=4 * scale, fill=_RGB[TRACK_BG])
+                            radius=0, fill=_RGB[TRACK_BG])
         fw = (tx1 - tx0) * r["ratio"]
         if fw > 1:
             d.rounded_rectangle([tx0, cy - 9 * scale, tx0 + fw, cy + 9 * scale],
-                                radius=4 * scale, fill=_RGB[TEAL])
+                                radius=0, fill=_RGB[ACCENT])
         txt = ((f"{r['points']:.0f}" if float(r['points']).is_integer()
                 else f"{r['points']:.1f}") + f" / {r['weight']:.0f}")
         d.text((tx1 + 10 * scale, cy), txt, font=f_v, fill=_RGB[INK], anchor="lm")

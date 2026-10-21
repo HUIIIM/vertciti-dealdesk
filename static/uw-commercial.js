@@ -477,7 +477,7 @@ function renderKvs() {
 function fmtDscr(v) { return Number.isFinite(v) ? v.toFixed(3) + "×" : "—"; }
 
 /* ---------------- helpers ---------------- */
-const esc = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const num = (v) => (v === 0 || v == null ? "" : Math.round(v * 100) / 100);
 const money2 = (v) => (Number.isFinite(v) ? "$" + v.toFixed(2) : "—");
 

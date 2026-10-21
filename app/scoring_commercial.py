@@ -19,7 +19,7 @@ refi 后能拿出钱）；只有退出完全依赖短期高价抛售且 refi/持
 
 from __future__ import annotations
 
-from .finance import clamp, floating_down_payment_score, lin_map, monthly_payment, safe_div
+from .finance import clamp, floating_down_payment_score, monthly_payment, safe_div
 
 ASSET_LABELS = {
     "small_bay_industrial": "Small-bay industrial（小单间工业）",

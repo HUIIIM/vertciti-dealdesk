@@ -22,7 +22,7 @@ header.top .sub { color: var(--muted); font-size: 12.5px; margin-top: 6px; }
 .wb table.t th, .wb table.t td { border: 1px solid var(--line-soft); padding: 7px 10px; text-align: left; }
 .wb table.t th { background: var(--surface2); color: var(--ink2); font-weight: 700; font-size: 12px; }
 .wb table.t td { font-variant-numeric: tabular-nums; }
-.wb .btn { background: var(--teal); color: #042f2b; border: 0; border-radius: 8px; padding: 10px 20px; font-size: 14px; font-weight: 700; cursor: pointer; margin: 6px 8px 6px 0; font-family: inherit; }
+.wb .btn { background: var(--teal); color: #FFFFFF; border: 0; border-radius: 8px; padding: 10px 20px; font-size: 14px; font-weight: 700; cursor: pointer; margin: 6px 8px 6px 0; font-family: inherit; }
 .wb .btn:hover { filter: brightness(1.08); }
 .wb .btn.ghost { background: transparent; color: var(--ink2); border: 1px solid var(--line); }
 .wb .btn.ghost:hover { border-color: var(--teal-deep); color: var(--ink); }
@@ -84,14 +84,16 @@ header.top .sub { color: var(--muted); font-size: 12.5px; margin-top: 6px; }
 /* 产权穿透树（2026-10-08）：L0/L1/L2 纵向树 */
 .wb .tree-node { border-left: 3px solid var(--line); padding: 8px 12px; margin: 8px 0 8px 0; background: var(--bg1); border-radius: 0 8px 8px 0; }
 .wb .tree-node.lv0 { border-color: var(--teal); margin-left: 0; }
-.wb .tree-node.lv1 { border-color: var(--blue, #60a5fa); margin-left: 18px; }
+.wb .tree-node.lv1 { border-color: var(--blue, #3F3F3F); margin-left: 18px; }
 .wb .tree-node.lv2 { border-color: var(--amber); margin-left: 36px; }
 .wb .tree-lv { font-size: 12px; font-weight: 700; margin-right: 6px; }
 .wb .card.slim { margin-top: 12px; }
 </style>
+<link rel="stylesheet" href="/vc-dna.css">
 </head>
 <body>
-<div style="background:#13202B;border-bottom:1px solid #2DD4BF;color:#E9EFF9;font-size:13px;padding:8px 16px;text-align:center">统一结论口径：值得买 · BUY / 再看看 · HOLD / 别碰 · PASS（一票否决 · VETO 为独立第 4 状态）</div>
+<div class="vc-util" role="navigation" aria-label="vertciti"><a class="lg" href="https://vertciti.com" aria-label="vertciti 官网" data-i18n-title="vertciti 官网">vertciti<i></i></a><a href="/" aria-current="page">DealDesk</a><span class="sp"></span><a class="hide-sm" href="https://vertciti.com/trust/" data-i18n="仿冒预警">仿冒预警</a><a href="https://vertciti.com/business/" data-i18n="vertciti 业务版图">vertciti 业务版图</a></div>
+<div style="background:#FFFFFF;border-bottom:1px solid #C93410;color:#000000;font-size:13px;padding:8px 16px;text-align:center">统一结论口径：值得买 · BUY / 再看看 · HOLD / 别碰 · PASS（一票否决 · VETO 为独立第 4 状态）</div>
 <header class="top">
   <div>
     <h1>全面分析工作台</h1>
@@ -268,6 +270,7 @@ header.top .sub { color: var(--muted); font-size: 12.5px; margin-top: 6px; }
 </section>
 
 </main>
+<script src="/safe.js"></script>
 <script src="/workbench.js"></script>
 </body>
 </html>

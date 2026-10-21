@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import html as _html
 import ipaddress
+import logging
 import os
 import re
 import socket
@@ -26,6 +27,8 @@ import httpx
 from . import demand_validation as dv
 from . import providers
 
+logger = logging.getLogger(__name__)
+
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/126.0 Safari/537.36")
 BOT_NAME = "DealDeskBot"
@@ -35,6 +38,19 @@ MAX_FETCHES = 6
 # 不再把整页无上限读进内存（与 P0 上传 OOM 同类风险）。房源页 HTML 通常 <1MB，
 # 2MB 留足余量；超限按诚实降级处理（too_large），不截断凑数、不静默用残页提取。
 MAX_PAGE_BYTES = 2_000_000
+# robots.txt 大小上限（台账第 18 项，2026-10-17）：与页面抓取共用同一上限常量
+# 与流式 helper——robots.txt 通常只有几 KB，恶意/异常站点返回超大响应时
+# 按"无 Disallow 信息"诚实降级（不把整页读进内存、不截断残页凑解析）。
+MAX_ROBOTS_BYTES = MAX_PAGE_BYTES
+# robots 成功缓存 TTL（台账第 21 项，2026-10-20）：24 小时。依据：RFC 9309
+# 未规定缓存时长，业界通行做法（Google robots.txt 规范说明）是爬虫可缓存
+# robots.txt 最长 24 小时；站点修改 robots.txt（如新增 Disallow）应在
+# 24h 内被长驻进程重新抓取生效，同时避免每次抓取都先打一发 robots 请求。
+ROBOTS_CACHE_TTL_SECONDS = 24 * 60 * 60
+# DDG 搜索响应大小上限（台账第 22 项，2026-10-21）：与页面抓取共用同一上限
+# 值与流式 helper——搜索结果页通常只有几十 KB，异常/恶意端点返回超大响应
+# 时按该端点失败诚实降级（转下一端点/空结果），不整页读入内存、不截断凑解析。
+MAX_SEARCH_BYTES = MAX_PAGE_BYTES
 
 BLOCK_MARKERS = ["captcha", "are you a robot", "access denied", "press & hold",
                  "perimeterx", "datadome", "verify you are a human",
@@ -68,7 +84,7 @@ def _sanitize_proxy_env() -> None:
 
 _sanitize_proxy_env()
 
-_robots_cache: dict[str, list[str]] = {}
+_robots_cache: dict[str, tuple[float, list[tuple[str, str]]]] = {}
 
 
 def _now() -> str:
@@ -79,44 +95,186 @@ def _log(log: list, step: str, status: str, note: str = ""):
     log.append({"step": step, "status": status, "note": note, "at": _now()})
 
 
+# ---------------- 流式大小上限 helper ----------------
+
+def _collect_capped(resp, limit: int) -> tuple[bytes | None, bool]:
+    """流式读取响应体并执行字节上限（fetch_page 与 robots 共用）。
+
+    返回 (body, too_large)：Content-Length 超限在读 body 前停手；
+    无预告长度时流式累计、超限中途停手。too_large=True 时 body=None，
+    调用方不得用残页凑数，必须诚实降级。
+    """
+    clen = resp.headers.get("content-length")
+    try:
+        clen_val = int(clen) if clen is not None else None
+    except (TypeError, ValueError):
+        clen_val = None
+    if clen_val is not None and clen_val > limit:
+        return None, True
+    chunks: list[bytes] = []
+    total = 0
+    for chunk in resp.iter_bytes(chunk_size=65536):
+        total += len(chunk)
+        if total > limit:
+            return None, True
+        chunks.append(chunk)
+    return b"".join(chunks), False
+
+
 # ---------------- robots.txt ----------------
 
-def robots_disallows(host: str) -> list[str]:
-    """返回该 host 对通用爬虫 Disallow 的路径前缀（缓存）。"""
-    if host in _robots_cache:
-        return _robots_cache[host]
-    disallows: list[str] = []
+def _parse_robots_rules(text: str) -> list[tuple[str, str]]:
+    """按组解析 robots.txt，返回适用于本爬虫的 (kind, path) 规则列表。
+
+    kind 为 "allow" / "disallow"。组解析（台账第 19 项，RFC 9309 口径）：
+    - 连续多行 User-agent 同属一组（空行/注释不拆组——Google 的 robots.txt
+      每行之间都夹空行，* 与 Yandex 同组即此形态）；一组出现规则行之后，
+      再出现的 User-agent 行开启新组。
+    - 组内 Disallow/Allow 一并收集；其他机器人专属组的规则不适用于本爬虫。
+    - 存在本爬虫专属组（UA 含 BOT_NAME）时专属组优先于 * 组；否则用 * 组。
+    """
+    groups: list[tuple[list[str], list[tuple[str, str]]]] = []
+    agents: list[str] = []
+    rules: list[tuple[str, str]] = []
+    seen_rule = False
+
+    def _flush():
+        nonlocal agents, rules, seen_rule
+        if agents:
+            groups.append((agents, rules))
+        agents, rules, seen_rule = [], [], False
+
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        low = line.lower()
+        if low.startswith("user-agent:"):
+            if seen_rule:
+                _flush()
+            agents.append(low.split(":", 1)[1].strip())
+        elif low.startswith("disallow:") or low.startswith("allow:"):
+            if not agents:
+                continue  # 无组归属的规则行不生效
+            seen_rule = True
+            kind = "disallow" if low.startswith("disallow:") else "allow"
+            path = line.split(":", 1)[1].strip()
+            if path:
+                rules.append((kind, path))
+        # 其余指令（Sitemap/Crawl-delay 等）不影响分组
+    _flush()
+
+    bot = BOT_NAME.lower()
+    specific = [r for a, r in groups
+                if any(a_ != "*" and bot in a_ for a_ in a)]
+    if specific:
+        return [rule for rs in specific for rule in rs]
+    return [rule for a, r in groups if "*" in a for rule in r]
+
+
+def _robots_pattern_matches(pattern: str, target: str) -> bool:
+    """robots 路径模式匹配：支持 * 通配与尾部 $ 锚定（RFC 9309）。"""
+    if "*" not in pattern and not pattern.endswith("$"):
+        return target.startswith(pattern)
+    anchored = pattern.endswith("$")
+    core = pattern[:-1] if anchored else pattern
+    regex = "^" + ".*".join(re.escape(p) for p in core.split("*"))
+    if anchored:
+        regex += "$"
+    return re.match(regex, target) is not None
+
+
+def _robots_rules(host: str) -> list[tuple[str, str]]:
+    """抓取并解析该 host 适用于本爬虫的 robots 规则（缓存）。
+
+    流式抓取＋MAX_ROBOTS_BYTES 上限（台账第 18 项）：超限按"无规则信息"
+    诚实降级——返回空列表并留 warning log，绝不整页读入内存、
+    绝不截断残页凑解析。
+
+    缓存口径（台账第 20 项，2026-10-19）：二选一取「失败不缓存」——
+    只有确定性结果进缓存：200 成功解析的规则、以及 404（该 host
+    真无 robots.txt 文件，按 RFC 9309 无限制、放行正确）。失败结果
+    （网络异常／超时／非 200 且非 404，含 429 与 5xx／超限降级）
+    只对本次调用按"无规则"放行处理，绝不写入 _robots_cache：
+    一次瞬时故障不得让该 host 被当作"无限制"放行；下一次同进程
+    调用会重新抓取，站点恢复后即可拿到真实规则。
+
+    缓存 TTL（台账第 21 项，2026-10-20）：成功缓存条目带抓取时间戳
+    （time.monotonic），有效期 ROBOTS_CACHE_TTL_SECONDS（24h，依据
+    见常量注释）；未过期直接返回不重抓，过期则删除旧条目重新抓取
+    ——站点事后修改 robots.txt 最迟 24h 后在长驻进程里生效。过期后
+    重抓失败仍按第 20 项口径：不回退到过期旧规则、不写缓存，
+    本次按"无规则"放行，下次调用重试。
+    """
+    cached = _robots_cache.get(host)
+    if cached is not None:
+        fetched_at, cached_rules = cached
+        if time.monotonic() - fetched_at < ROBOTS_CACHE_TTL_SECONDS:
+            return cached_rules
+        del _robots_cache[host]
+    rules: list[tuple[str, str]] = []
+    cacheable = False
     try:
-        r = httpx.get(f"https://{host}/robots.txt", headers={"User-Agent": UA},
-                      timeout=10, follow_redirects=True)
-        if r.status_code == 200:
-            ua_star, ua_bot = False, False
-            for line in r.text.splitlines():
-                line = line.strip()
-                if not line or line.startswith("#"):
-                    continue
-                low = line.lower()
-                if low.startswith("user-agent:"):
-                    agent = low.split(":", 1)[1].strip()
-                    ua_star = agent == "*"
-                    ua_bot = BOT_NAME.lower() in agent
-                elif low.startswith("disallow:") and (ua_star or ua_bot):
-                    path = line.split(":", 1)[1].strip()
-                    if path:
-                        disallows.append(path)
-    except Exception:
-        pass
-    _robots_cache[host] = disallows
-    return disallows
+        with httpx.stream("GET", f"https://{host}/robots.txt",
+                          headers={"User-Agent": UA},
+                          timeout=10, follow_redirects=True) as r:
+            if r.status_code == 200:
+                body, too_large = _collect_capped(r, MAX_ROBOTS_BYTES)
+                if too_large:
+                    logger.warning(
+                        "robots.txt 过大（超过 %s 字节上限），已停止抓取，"
+                        "按无 Disallow 信息降级（不缓存，下次重试）：host=%s",
+                        MAX_ROBOTS_BYTES, host)
+                    body = None
+                if body is not None:
+                    text = body.decode(r.encoding or "utf-8",
+                                       errors="replace")
+                    rules = _parse_robots_rules(text)
+                    cacheable = True
+            elif r.status_code == 404:
+                # 真无 robots.txt：确定性"无规则"，维持放行且可长期缓存
+                cacheable = True
+            else:
+                logger.warning(
+                    "robots.txt 抓取失败（HTTP %s），按无规则放行本次调用"
+                    "（不缓存，下次重试）：host=%s", r.status_code, host)
+    except Exception as e:  # noqa: BLE001
+        logger.warning(
+            "robots.txt 抓取异常，按无规则放行本次调用"
+            "（不缓存，下次重试）：host=%s err=%s", host, str(e)[:120])
+    if cacheable:
+        _robots_cache[host] = (time.monotonic(), rules)
+    return rules
+
+
+def robots_disallows(host: str) -> list[str]:
+    """返回该 host 对本爬虫 Disallow 的路径模式（缓存）。"""
+    return [p for kind, p in _robots_rules(host) if kind == "disallow"]
 
 
 def robots_allowed(url: str) -> tuple[bool, str]:
+    """按最长匹配裁决：匹配规则里路径最长者胜出，同长时 Allow 优先。
+
+    匹配对象为 path＋query（robots 模式可含 ? 与 *，如 Google 的
+    Disallow: /? 与 Zillow 的 Allow: /homes/for_sale/$）。
+    """
     try:
         parts = urllib.parse.urlparse(url)
         host = parts.hostname or ""
-        for d in robots_disallows(host):
-            if parts.path.startswith(d):
-                return False, f"robots.txt 禁止抓取该路径（{d}）"
+        target = parts.path or "/"
+        if parts.query:
+            target += "?" + parts.query
+        best_len = -1
+        best_kind: str | None = None
+        best_path = ""
+        for kind, pattern in _robots_rules(host):
+            if not _robots_pattern_matches(pattern, target):
+                continue
+            plen = len(pattern.rstrip("$"))
+            if plen > best_len or (plen == best_len and kind == "allow"):
+                best_len, best_kind, best_path = plen, kind, pattern
+        if best_kind == "disallow":
+            return False, f"robots.txt 禁止抓取该路径（{best_path}）"
         return True, ""
     except Exception as e:  # noqa: BLE001
         return True, f"robots 检查异常，按允许处理：{e}"
@@ -163,27 +321,13 @@ def fetch_page(url: str, log: list) -> dict:
                 return {"ok": False, "note": f"HTTP {r.status_code}"}
             final_url = str(r.url)
             encoding = r.encoding or "utf-8"
-            clen = r.headers.get("content-length")
-            try:
-                clen_val = int(clen) if clen is not None else None
-            except (TypeError, ValueError):
-                clen_val = None
-            too_large = clen_val is not None and clen_val > MAX_PAGE_BYTES
-            chunks: list[bytes] = []
-            total = 0
-            if not too_large:
-                for chunk in r.iter_bytes(chunk_size=65536):
-                    total += len(chunk)
-                    if total > MAX_PAGE_BYTES:
-                        too_large = True
-                        break
-                    chunks.append(chunk)
+            body, too_large = _collect_capped(r, MAX_PAGE_BYTES)
             if too_large:
                 note = (f"页面过大（超过 {MAX_PAGE_BYTES} 字节上限），已停止抓取"
                         "（降级走手动录入）")
                 _log(log, f"抓取 {url[:80]}", "failed", note)
                 return {"ok": False, "note": note, "too_large": True}
-            html_text = b"".join(chunks).decode(encoding, errors="replace")
+            html_text = (body or b"").decode(encoding, errors="replace")
     except Exception as e:  # noqa: BLE001
         _log(log, f"抓取 {url[:80]}", "failed", f"网络异常：{str(e)[:120]}")
         return {"ok": False, "note": f"网络异常：{str(e)[:120]}"}
@@ -336,18 +480,35 @@ def _parse_ddg_links(html_text: str, max_results: int) -> list[dict]:
 
 
 def ddg_search(query: str, log: list, max_results: int = 8) -> list[dict]:
-    """DuckDuckGo 搜索（免 key）。lite 端点优先，html 端点兜底。返回 [{title, url}]。"""
+    """DuckDuckGo 搜索（免 key）。lite 端点优先，html 端点兜底。返回 [{title, url}]。
+
+    流式抓取＋MAX_SEARCH_BYTES 上限（台账第 22 项）：超限按该端点失败
+    诚实降级——留痕（pipeline log＋warning log）后转下一端点，两端点都
+    超限/失败则返回空结果；绝不整页读入内存、绝不截断残页凑解析。
+    """
     for ep in ("https://lite.duckduckgo.com/lite/",
                "https://html.duckduckgo.com/html/"):
         host = ep.split("/")[2]
         try:
-            r = httpx.get(ep, params={"q": query},
-                          headers={"User-Agent": UA}, timeout=FETCH_TIMEOUT)
-            if r.status_code != 200:
-                _log(log, f"搜索({host})：{query[:36]}", "failed",
-                     f"HTTP {r.status_code}")
-                continue
-            out = _parse_ddg_links(r.text, max_results)
+            with httpx.stream("GET", ep, params={"q": query},
+                              headers={"User-Agent": UA},
+                              timeout=FETCH_TIMEOUT) as r:
+                if r.status_code != 200:
+                    _log(log, f"搜索({host})：{query[:36]}", "failed",
+                         f"HTTP {r.status_code}")
+                    continue
+                encoding = r.encoding or "utf-8"
+                body, too_large = _collect_capped(r, MAX_SEARCH_BYTES)
+                if too_large:
+                    note = (f"搜索响应过大（超过 {MAX_SEARCH_BYTES} 字节上限），"
+                            "已停止读取（该端点降级）")
+                    logger.warning(
+                        "ddg_search 响应过大（超过 %s 字节上限），已停止读取，"
+                        "该端点降级：host=%s", MAX_SEARCH_BYTES, host)
+                    _log(log, f"搜索({host})：{query[:36]}", "failed", note)
+                    continue
+                text = (body or b"").decode(encoding, errors="replace")
+            out = _parse_ddg_links(text, max_results)
             if out:
                 _log(log, f"搜索：{query[:36]}", "ok", f"得到 {len(out)} 个结果")
                 return out

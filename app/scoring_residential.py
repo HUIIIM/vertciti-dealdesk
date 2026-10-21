@@ -12,7 +12,7 @@ v2.3（CEO 终裁，Miao 授权）：负净值不再单独否决，改"负净值
 
 from __future__ import annotations
 
-from .finance import clamp, floating_down_payment_score, lin_map, monthly_payment, safe_div
+from .finance import clamp, floating_down_payment_score, monthly_payment, safe_div
 
 STRUCTURE_LABELS = {
     "standard": "普通购买",

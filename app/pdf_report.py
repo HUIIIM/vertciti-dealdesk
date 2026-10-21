@@ -22,6 +22,7 @@ def _now_et() -> str:
 
 from reportlab.lib import colors
 from reportlab.lib.colors import HexColor
+from . import brand
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
@@ -62,25 +63,17 @@ FONT = "WQY"  # _register_fonts() 会按实际可用情况重设
 
 
 # ---------------------------------------------------------------- 配色（v3 机构气质，打印友好浅底）
-INK = HexColor("#16202e")
-TEAL = HexColor("#0f766e")
-TEAL_DARK = HexColor("#115e59")
-MUTED = HexColor("#64748b")
-HAIRLINE = HexColor("#dbe3ec")
-PANEL_BG = HexColor("#f6f9fb")
+INK = HexColor(brand.INK)
+TEAL = HexColor(brand.ORANGE)          # 名称沿用，值为 vertciti 信号橙
+TEAL_DARK = HexColor(brand.ORANGE_TEXT)
+MUTED = HexColor(brand.STONE)
+HAIRLINE = HexColor(brand.LINE)
+PANEL_BG = HexColor(brand.MIST)
 GRADE_COLORS = {
-    "A": HexColor("#15803d"),
-    "B": HexColor("#1d4ed8"),
-    "C": HexColor("#b45309"),
-    "否决": HexColor("#b91c1c"),
-    "D": HexColor("#64748b"),
+    k: HexColor(v) for k, v in brand.GRADE_COLORS.items()
 }
 GRADE_BG = {
-    "A": HexColor("#e8f5ec"),
-    "B": HexColor("#e8eefc"),
-    "C": HexColor("#fbf3e4"),
-    "否决": HexColor("#fbe9e9"),
-    "D": HexColor("#eef1f5"),
+    k: HexColor(v) for k, v in brand.GRADE_BG.items()
 }
 # P0-2（2026-10-05）：打分等级显示统一为 A/B/C/D 档（旧 verdict 词退役）
 GRADE_LABELS = {"A": "A 档 · 收录（日报头条）", "B": "B 档 · 收录（日报收录）",
@@ -188,7 +181,7 @@ def _header_footer(canvas, doc):
 # ---------------------------------------------------------------- 组件
 def _section_title(st: dict, text: str):
     """带 teal 左线的小节标题。"""
-    t = Table([[Paragraph(f"<font color=\"#0f766e\">▍</font> {text}", st["section"])]],
+    t = Table([[Paragraph(f"<font color=\"#FF4713\">▍</font> {text}", st["section"])]],
               colWidths=[CONTENT_W])
     t.setStyle(TableStyle([
         ("LEFTPADDING", (0, 0), (-1, -1), 0),
@@ -208,7 +201,7 @@ def _verdict_panel(st: dict, s: dict, verdict: dict | None = None) -> Table:
 
     score_cell = [
         Paragraph(f"<font size=44><b>{total}</b></font>"
-                  f"<font size=14 color=\"#64748b\"> / 100</font>", st["score_num"]),
+                  f"<font size=14 color=\"#6B6B6B\"> / 100</font>", st["score_num"]),
     ]
     badge = Table([[Paragraph(f"<b>{grade}</b>",
                               ParagraphStyle("bd", fontName=FONT,
@@ -237,19 +230,19 @@ def _verdict_panel(st: dict, s: dict, verdict: dict | None = None) -> Table:
     if s.get("vetoes"):
         for v in s["vetoes"]:
             verdict_lines.append(Paragraph(
-                f"<font color=\"#b91c1c\">✕ {v['message']}</font>", st["body"]))
+                f"<font color=\"#B3261E\">✕ {v['message']}</font>", st["body"]))
     else:
         dg = s.get("downgrades") or []
         for d in dg:
             verdict_lines.append(Paragraph(
-                f"<font color=\"#b45309\">▲ {d['message']}</font>", st["body"]))
+                f"<font color=\"#8A5A00\">▲ {d['message']}</font>", st["body"]))
         # Phase 5 第三轮 B5：新 verdict 引擎的降级理由（"缺关键数据，结论降一档"）
         # 与旧 s["downgrades"] 同源判断——有降级提示时页眉不许写"无降级提示"
         v_reasons = (verdict or {}).get("reasons") or []
         has_v_dg = any(("降级" in str(r) or "降一档" in str(r)) for r in v_reasons)
         if not dg and not has_v_dg:
             verdict_lines.append(Paragraph(
-                "<font color=\"#15803d\">✓ 无否决项、无降级提示</font>", st["body"]))
+                "<font color=\"#1D8348\">✓ 无否决项、无降级提示</font>", st["body"]))
     right_data = [[p] for p in verdict_lines]
     right = Table(right_data, colWidths=[CONTENT_W - 170])
     right.setStyle(TableStyle([("LEFTPADDING", (0, 0), (-1, -1), 12),
@@ -309,12 +302,12 @@ def _check_list(st: dict, title: str, items: list, ok_color: str) -> list:
     rows = []
     for it in items:
         msg = it["message"] if isinstance(it, dict) else str(it)
-        rows.append([Paragraph(f"<font color=\"#b91c1c\">✕</font>", st["cell"]),
+        rows.append([Paragraph(f"<font color=\"#B3261E\">✕</font>", st["cell"]),
                      Paragraph(msg, st["cell"])])
     t = Table(rows, colWidths=[16, CONTENT_W - 16])
     t.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, -1), HexColor("#fdf2f2")),
-        ("BOX", (0, 0), (-1, -1), 0.6, HexColor("#f3c2c2")),
+        ("BACKGROUND", (0, 0), (-1, -1), HexColor("#F7E9E8")),
+        ("BOX", (0, 0), (-1, -1), 0.6, HexColor("#E6B8B4")),
         ("TOPPADDING", (0, 0), (-1, -1), 5),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
         ("LEFTPADDING", (0, 0), (-1, -1), 8),
@@ -338,13 +331,13 @@ def _dimensions_table(st: dict, dims: list) -> Table:
         ratio = max(0.0, min(1.0, (pts / w) if w else 0))
         bar_w = 52
         fill = int(bar_w * ratio)
-        bar = (f"<font color=\"#0f766e\">█</font>" * fill
-               + f"<font color=\"#dbe3ec\">█</font>" * (bar_w - fill))
+        bar = (f"<font color=\"#FF4713\">█</font>" * fill
+               + f"<font color=\"#DEDEDE\">█</font>" * (bar_w - fill))
         rows.append([
             Paragraph(d["label"], st["cell_b"]),
             Paragraph(f"{w} 分", st["cell"]),
-            Paragraph(f"<b>{pts}</b> <font color=\"#64748b\">/ {w}</font>", st["cell"]),
-            Paragraph(f"{bar}<br/><font size=8 color=\"#64748b\">{d['detail']}</font>",
+            Paragraph(f"<b>{pts}</b> <font color=\"#6B6B6B\">/ {w}</font>", st["cell"]),
+            Paragraph(f"{bar}<br/><font size=8 color=\"#6B6B6B\">{d['detail']}</font>",
                       st["cell_m"]),
         ])
     col_w = [92, 44, 70, CONTENT_W - 92 - 44 - 70]
@@ -358,7 +351,7 @@ def _dimensions_table(st: dict, dims: list) -> Table:
         ("LEFTPADDING", (0, 0), (-1, -1), 6),
         ("RIGHTPADDING", (0, 0), (-1, -1), 6),
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, HexColor("#fafbfc")]),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, HexColor("#F5F5F5")]),
     ]
     t.setStyle(TableStyle(style))
     return t
@@ -370,8 +363,8 @@ def _checks_table(st: dict, checks: list) -> Table:
              Paragraph("<b>状态</b>", st["cell_b"]),
              Paragraph("<b>备注</b>", st["cell_b"])]]
     for c in checks:
-        mark = ("<font color=\"#15803d\">✓</font>" if c["ok"]
-                else "<font color=\"#b91c1c\">✕</font>")
+        mark = ("<font color=\"#1D8348\">✓</font>" if c["ok"]
+                else "<font color=\"#B3261E\">✕</font>")
         rows.append([Paragraph(f"{mark} {c['label']}", st["cell"]),
                      Paragraph("通过" if c["ok"] else "未通过", st["cell"]),
                      Paragraph(c["note"], st["cell_m"])])
@@ -385,7 +378,7 @@ def _checks_table(st: dict, checks: list) -> Table:
         ("LEFTPADDING", (0, 0), (-1, -1), 6),
         ("RIGHTPADDING", (0, 0), (-1, -1), 6),
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, HexColor("#fafbfc")]),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, HexColor("#F5F5F5")]),
     ]))
     return t
 
@@ -474,10 +467,10 @@ def build_pdf(project: dict) -> bytes:
         story.append(_section_title(st, "verdict 结论"))
         _vword = str(p.get("verdict_word") or v.get("verdict"))
         _veto_n = int(p.get("veto_count") or 0)
-        _vword_color = "#b91c1c" if _veto_n else "#111111"
+        _vword_color = "#B3261E" if _veto_n else "#000000"
         _vline = f"<b><font color=\"{_vword_color}\">{_esc(_vword)}</font></b>"
         if _veto_n:
-            _vline += (f"　<font color=\"#b91c1c\"><b>一票否决 ×{_veto_n}</b></font>")
+            _vline += (f"　<font color=\"#B3261E\"><b>一票否决 ×{_veto_n}</b></font>")
         story.append(Paragraph(
             f"{_vline} —— {_esc(str(v.get('one_liner') or ''))}",
             st["body"]))
@@ -503,7 +496,7 @@ def build_pdf(project: dict) -> bytes:
                      for k, val in list(assumps.items())[:14]]
         at = Table(arows, colWidths=[CONTENT_W * 0.55, CONTENT_W * 0.45])
         at.setStyle(TableStyle([
-            ("GRID", (0, 0), (-1, -1), 0.5, HexColor("#e2e8f0")),
+            ("GRID", (0, 0), (-1, -1), 0.5, HexColor("#DEDEDE")),
             ("TOPPADDING", (0, 0), (-1, -1), 4),
             ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
             ("LEFTPADDING", (0, 0), (-1, -1), 8),
@@ -524,7 +517,7 @@ def build_pdf(project: dict) -> bytes:
                 Paragraph(_esc(_money(c.get("price_per_sf"))), st["cell"])])
         ct = Table(crows, colWidths=[CONTENT_W * 0.6, CONTENT_W * 0.2, CONTENT_W * 0.2])
         ct.setStyle(TableStyle([
-            ("GRID", (0, 0), (-1, -1), 0.5, HexColor("#e2e8f0")),
+            ("GRID", (0, 0), (-1, -1), 0.5, HexColor("#DEDEDE")),
             ("TOPPADDING", (0, 0), (-1, -1), 4),
             ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
             ("LEFTPADDING", (0, 0), (-1, -1), 8),
@@ -551,16 +544,16 @@ def build_pdf(project: dict) -> bytes:
         "起点为初始现金投入；数据缺失处标“—”。", st))
 
     # 一票否决
-    story.extend(_check_list(st, "一票否决检查", s.get("vetoes") or [], "#15803d"))
+    story.extend(_check_list(st, "一票否决检查", s.get("vetoes") or [], "#1D8348"))
     dg = s.get("downgrades") or []
     if dg:
         flow = [_section_title(st, "降级提示（封顶降级，非一票否决）")]
-        rows = [[Paragraph(f"<font color=\"#b45309\">▲</font>", st["cell"]),
+        rows = [[Paragraph(f"<font color=\"#8A5A00\">▲</font>", st["cell"]),
                  Paragraph(d["message"], st["cell"])] for d in dg]
         t = Table(rows, colWidths=[16, CONTENT_W - 16])
         t.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, -1), HexColor("#fffbeb")),
-            ("BOX", (0, 0), (-1, -1), 0.6, HexColor("#f0d9a8")),
+            ("BACKGROUND", (0, 0), (-1, -1), HexColor("#FFF5CC")),
+            ("BOX", (0, 0), (-1, -1), 0.6, HexColor("#FFCE00")),
             ("TOPPADDING", (0, 0), (-1, -1), 5),
             ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
             ("LEFTPADDING", (0, 0), (-1, -1), 8),

@@ -15,12 +15,14 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from reportlab.lib.colors import HexColor
+
+from . import brand
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.platypus import (PageBreak, Paragraph, SimpleDocTemplate, Spacer,
+from reportlab.platypus import (Paragraph, SimpleDocTemplate, Spacer,
                                 Table, TableStyle)
 
 _ET = ZoneInfo("America/New_York")
@@ -47,16 +49,16 @@ def _register_fonts() -> str:
 
 
 # 浅色专业版式（Dealpath 式一页纸）
-INK = HexColor("#1a2332")
-MUTED = HexColor("#5a6678")
-GRID = HexColor("#d5dbe3")
-HDR_BG = HexColor("#1a2332")
-HDR_FG = HexColor("#ffffff")
-ACCENT = HexColor("#b7791f")
-PANEL = HexColor("#f4f6f9")
-GOOD = HexColor("#1e7e34")
-WARN = HexColor("#b7791f")
-BAD = HexColor("#b3261e")
+INK = HexColor(brand.INK)
+MUTED = HexColor(brand.STONE)
+GRID = HexColor(brand.LINE)
+HDR_BG = HexColor(brand.INK)
+HDR_FG = HexColor(brand.PAPER)
+ACCENT = HexColor(brand.ORANGE_TEXT)
+PANEL = HexColor(brand.MIST)
+GOOD = HexColor(brand.GREEN)
+WARN = HexColor(brand.AMBER_TEXT)
+BAD = HexColor(brand.RED)
 
 
 def _ok(v) -> bool:
