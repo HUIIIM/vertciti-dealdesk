@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>DealDesk · 全面分析工作台</title>
 <link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="/css/vc-product.css">
+<style>/* vc-product 兼容复位：本页沿用既有深色工作台主题，body 基础色/字体在此复位为本页原值，避免 DNA 浅色 body 规则破坏深色组件对比度；品牌条/主栏/组件层走 vc-product.css */body.vc{background:var(--bg0);color:var(--ink);font-family:"Inter",-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",sans-serif;font-size:14px}.vc-top{color:#000}</style>
 <style>
 .wb { max-width: 1180px; margin: 0 auto; padding: 12px 16px 60px; }
 header.top { max-width: 1180px; margin: 0 auto; padding: 18px 16px 6px; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
@@ -90,7 +92,10 @@ header.top .sub { color: var(--muted); font-size: 12.5px; margin-top: 6px; }
 .wb .card.slim { margin-top: 12px; }
 </style>
 </head>
-<body>
+<body class="vc">
+<!-- vc-product DNA 壳：黑色品牌条 vc-util + 白色主栏 vc-top（官方 SVG Logo）；本页功能条/结构与 JS 绑定原样保留 -->
+<div class="vc-util"><a href="https://vertciti.com"><img src="/assets/vertciti-logo-reversed-white.svg" alt="vertciti" style="height:16px;width:auto"></a><a href="/" aria-current="page">DealDesk</a><span style="flex:1"></span><a href="https://vertciti.com/trust/">仿冒预警</a></div>
+<header class="vc-top" style="position:static"><a class="logo" href="/" aria-label="vertciti"><img src="/assets/vertciti-logo-primary-black.svg" alt="vertciti" style="height:24px;width:auto;display:block"></a><span class="prod">DealDesk</span></header>
 <div style="background:#13202B;border-bottom:1px solid #2DD4BF;color:#E9EFF9;font-size:13px;padding:8px 16px;text-align:center">统一结论口径：值得买 · BUY / 再看看 · HOLD / 别碰 · PASS（一票否决 · VETO 为独立第 4 状态）</div>
 <header class="top">
   <div>

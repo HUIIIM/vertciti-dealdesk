@@ -552,7 +552,7 @@ def render_research_report(data: dict) -> str:
                     f"<p class='mono'>{html.escape(pts)}</p>"
                     f"<p>最新 {html.escape(str(yoy.get('latest_q', '')))}：{yoy.get('latest', '—')}；"
                     f"同比 {yoy.get('yoy_pct', '—')}%</p>"
-                    f"<p class='meta'>来源：{html.escape(m.get('source', ''))}；"
+                    f"<p class='meta vc-src'>来源：{html.escape(m.get('source', ''))}；"
                     f"更新：{html.escape(m.get('vintage', ''))}"
                     + (f"；{html.escape(m.get('series_vintage', ''))}" if m.get("series_vintage") else "")
                     + "</p>")
@@ -561,7 +561,7 @@ def render_research_report(data: dict) -> str:
         ch_txt = "、".join(f"{k} {v:+.2f}%" for k, v in ch.items()) or "—"
         hpi_html = (f"<p>{html.escape(m.get('geo', ''))}</p>"
                     f"<p>官方发布涨幅：{html.escape(ch_txt)}</p>"
-                    f"<p class='meta'>来源：{html.escape(m.get('source', ''))}；"
+                    f"<p class='meta vc-src'>来源：{html.escape(m.get('source', ''))}；"
                     f"更新：{html.escape(m.get('vintage', ''))}。"
                     f"{html.escape(m.get('series_note', ''))}</p>")
 
@@ -569,17 +569,18 @@ def render_research_report(data: dict) -> str:
 <html lang="zh-CN"><head><meta charset="utf-8">
 <title>市场调查报告 - {html.escape(data.get('address') or '未命名')}</title>
 <style>
- body {{ font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; max-width: 960px; margin: 24px auto; padding: 0 20px; color: #1a1a1a; }}
- h1 {{ font-size: 22px; }} h2 {{ font-size: 17px; border-bottom: 2px solid #222; padding-bottom: 4px; margin-top: 28px; }}
+ body {{ font-family: "Nunito Sans",-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",sans-serif; max-width: 960px; margin: 24px auto; padding: 0 20px; color: #000; }}
+ h1 {{ font-size: 22px; }} h2 {{ font-size: 17px; border-bottom: 2px solid #000; padding-bottom: 4px; margin-top: 28px; }}
  table {{ width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 14px; }}
- th, td {{ border: 1px solid #ccc; padding: 6px 10px; text-align: left; vertical-align: top; }}
- th {{ background: #f4f4f4; width: 22%; }}
- .meta {{ color: #555; font-size: 13px; }} .mono {{ font-family: monospace; font-size: 13px; }}
- .warn {{ color: #b45309; font-weight: 700; }}
- .disclaimer {{ font-size: 12px; color: #666; border-top: 1px solid #ccc; margin-top: 32px; padding-top: 8px; }}
+ th, td {{ border: 1px solid #DEDEDE; padding: 6px 10px; text-align: left; vertical-align: top; }}
+ th {{ background: #F5F5F5; width: 22%; }}
+ .meta {{ color: #6B6B6B; font-size: 13px; }} .vc-src {{ font-size: 12.5px; color: #6B6B6B; }} .mono {{ font-family: monospace; font-size: 13px; }}
+ .warn {{ color: #FF4713; font-weight: 700; }}
+ .disclaimer {{ font-size: 12px; color: #6B6B6B; border-top: 1px solid #DEDEDE; margin-top: 32px; padding-top: 8px; }}
  @media print {{ .noprint {{ display: none; }} body {{ margin: 0; }} }}
 </style></head><body>
 <p class="noprint"><button onclick="window.print()">🖨️ 打印 / 另存为 PDF</button></p>
+<div style="background:#000;color:#fff;padding:10px 16px;margin-bottom:16px"><img src="/assets/vertciti-logo-reversed-white.svg" alt="vertciti" style="height:16px;width:auto;vertical-align:middle"><span style="font-weight:800;margin-left:12px">DealDesk</span></div>
 <h1>市场调查报告</h1>
 <p class="meta">vertciti 房地产收购部 · 生成时间 {html.escape(data.get('generated_at', ''))}</p>
 <h2>调查对象</h2>

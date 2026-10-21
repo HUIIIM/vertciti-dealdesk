@@ -110,30 +110,31 @@ def render(project: dict) -> str:
 <html lang="zh-CN"><head><meta charset="utf-8">
 <title>DealDesk 打分报告 - {html.escape(p['name'])}</title>
 <style>
- body {{ font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; max-width: 900px; margin: 24px auto; padding: 0 20px; color: #1a1a1a; }}
- h1 {{ font-size: 22px; }} h2 {{ font-size: 17px; border-bottom: 2px solid #222; padding-bottom: 4px; margin-top: 28px; }}
+ body {{ font-family: "Nunito Sans",-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",sans-serif; max-width: 900px; margin: 24px auto; padding: 0 20px; color: #000; }}
+ h1 {{ font-size: 22px; }} h2 {{ font-size: 17px; border-bottom: 2px solid #000; padding-bottom: 4px; margin-top: 28px; }}
  table {{ width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 14px; }}
- th, td {{ border: 1px solid #ccc; padding: 6px 10px; text-align: left; }}
- th {{ background: #f4f4f4; width: 34%; }}
+ th, td {{ border: 1px solid #DEDEDE; padding: 6px 10px; text-align: left; }}
+ th {{ background: #F5F5F5; width: 34%; }}
  .grade {{ font-size: 40px; font-weight: 800; }}
- .grade.A {{ color: #0a7a2f; }} .grade.B {{ color: #1a56db; }} .grade.C {{ color: #b45309; }}
- .grade.否决 {{ color: #c00; }}
- .veto li {{ color: #c00; font-weight: 600; }} .ok {{ color: #0a7a2f; font-weight: 600; }}
- .downgrade li {{ color: #b45309; font-weight: 600; }}
- .meta {{ color: #555; font-size: 13px; }}
- .lead {{ background: #f6f9fb; border-left: 4px solid #0f766e; padding: 12px 16px; margin: 18px 0 4px; font-size: 14.5px; line-height: 1.75; }}
+ .grade.A {{ color: #1D8348; }} .grade.B {{ color: #3F3F3F; }} .grade.C {{ color: #FF4713; }}
+ .grade.否决 {{ color: #B3261E; }}
+ .veto li {{ color: #B3261E; font-weight: 600; }} .ok {{ color: #1D8348; font-weight: 600; }}
+ .downgrade li {{ color: #FF4713; font-weight: 600; }}
+ .meta {{ color: #6B6B6B; font-size: 13px; }} .vc-src {{ display: block; font-size: 12.5px; color: #6B6B6B; margin-top: 6px; }}
+ .lead {{ background: #F5F5F5; border-left: 4px solid #FF4713; padding: 12px 16px; margin: 18px 0 4px; font-size: 14.5px; line-height: 1.75; }}
  .lead p {{ margin: 6px 0; }}
  figure.chart {{ margin: 14px 0 6px; }}
  figure.chart svg {{ display: block; }}
- figcaption {{ font-size: 12.5px; color: #64748b; margin-top: 6px; line-height: 1.6; }}
- .conclusion {{ background: #f6f9fb; border: 1px solid #dbe3ec; border-radius: 8px; padding: 12px 18px; margin: 10px 0; font-size: 14.5px; line-height: 1.8; }}
+ figcaption {{ font-size: 12.5px; color: #6B6B6B; margin-top: 6px; line-height: 1.6; }}
+ .conclusion {{ background: #F5F5F5; border: 1px solid #DEDEDE; border-radius: 0; padding: 12px 18px; margin: 10px 0; font-size: 14.5px; line-height: 1.8; }}
  .conclusion p {{ margin: 8px 0; }}
  td.num {{ text-align: right; font-variant-numeric: tabular-nums; }}
  th.nw {{ white-space: nowrap; }}
- .disclaimer {{ font-size: 12px; color: #666; border-top: 1px solid #ccc; margin-top: 32px; padding-top: 8px; }}
+ .disclaimer {{ font-size: 12px; color: #6B6B6B; border-top: 1px solid #DEDEDE; margin-top: 32px; padding-top: 8px; }}
  @media print {{ body {{ margin: 0; }} .noprint {{ display: none; }} }}
 </style></head><body>
 <p class="noprint"><button onclick="window.print()">🖨️ 打印 / 另存为 PDF</button></p>
+<div style="background:#000;color:#fff;padding:10px 16px;margin-bottom:16px"><img src="/assets/vertciti-logo-reversed-white.svg" alt="vertciti" style="height:16px;width:auto;vertical-align:middle"><span style="font-weight:800;margin-left:12px">DealDesk</span></div>
 <h1>DealDesk 打分报告</h1>
 <p class="meta">vertciti 房地产收购部 · {now} · 赛道：{"住宅" if track=="residential" else "商业"}</p>
 <h2>项目</h2>
@@ -141,7 +142,7 @@ def render(project: dict) -> str:
 {row("项目名称", html.escape(p['name']))}
 {row("地址", html.escape(p['address']))}
 {row("结构", struct)}
-{row("总分", f"<span class='grade {html.escape(grade)}'>{s['total']} / {html.escape(grade)}</span>")}
+{row("总分", f"<span class='grade {html.escape(grade)}'>{s['total']} / {html.escape(grade)}</span><span class='vc-src'>来源：DealDesk 评分引擎 · 数据截至 {now}</span>")}
 {row("等级说明", GRADE_LABELS.get(grade, grade))}
 </table>
 <h2>导语</h2>

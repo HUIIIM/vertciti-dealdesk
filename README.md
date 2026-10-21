@@ -1,4 +1,4 @@
-![DealDesk](docs/assets/hero.png)
+![DealDesk](docs/assets/social-preview.png)
 
 [![CI](https://github.com/HUIIIM/vertciti-dealdesk/actions/workflows/ci.yml/badge.svg)](https://github.com/HUIIIM/vertciti-dealdesk/actions/workflows/ci.yml)
 [![Secret scan](https://github.com/HUIIIM/vertciti-dealdesk/actions/workflows/gitleaks.yml/badge.svg)](https://github.com/HUIIIM/vertciti-dealdesk/actions/workflows/gitleaks.yml)
@@ -14,6 +14,8 @@
 DealDesk 是 vertciti 为 Miao 自用的房地产运营工具：住宅 / 商业双轨中文核保工作流，
 统一打分引擎、全口径现金需求测算、敏感性分析、HTML 交互报告＋PDF/Excel 导出，
 每个数字都标注来源＋抓取时间＋可信度，抓不到的绝不编。
+
+> 状态：🟢 已验证 · 数据截至 2026-10-21
 
 ![DealDesk demo](docs/assets/demo.gif)
 

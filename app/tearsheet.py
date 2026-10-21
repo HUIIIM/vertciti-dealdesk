@@ -46,16 +46,17 @@ def _register_fonts() -> str:
     return FONT
 
 
-# 浅色专业版式（Dealpath 式一页纸）
-INK = HexColor("#1a2332")
-MUTED = HexColor("#5a6678")
-GRID = HexColor("#d5dbe3")
-HDR_BG = HexColor("#1a2332")
+# 浅色专业版式（Dealpath 式一页纸）；色值对齐 vc-product DNA 令牌（黑/石墨/线/信号橙/已验证绿）。
+# PDF 字体仍用仓内嵌 WQY-MicroHei（中文渲染必需）：系统字体栈无法在 PDF 内引用，故只对齐品牌色。
+INK = HexColor("#000000")
+MUTED = HexColor("#6B6B6B")
+GRID = HexColor("#DEDEDE")
+HDR_BG = HexColor("#000000")
 HDR_FG = HexColor("#ffffff")
-ACCENT = HexColor("#b7791f")
-PANEL = HexColor("#f4f6f9")
-GOOD = HexColor("#1e7e34")
-WARN = HexColor("#b7791f")
+ACCENT = HexColor("#FF4713")
+PANEL = HexColor("#F5F5F5")
+GOOD = HexColor("#1D8348")
+WARN = HexColor("#FF4713")
 BAD = HexColor("#b3261e")
 
 
