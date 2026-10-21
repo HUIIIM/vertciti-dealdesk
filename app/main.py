@@ -6,22 +6,34 @@
 
 from __future__ import annotations
 
+import io
 import math
 import os
 import re
 from datetime import date
-import io
 
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, ValidationError
 
-from . import db, image_intake, ownership, pdf_intake, pdf_report, pdf_uw, report, research_pipeline, scoring_commercial, scoring_residential, sell_readiness, sensitivity, uw_commercial, validators, workbench
-from . import commercial_plus, condition_adjust, confidence as conf_mod, excel_uw, verdict as verdict_mod
-from .data import hpi
-from .models import CommercialInput, ProjectCreate, ResidentialInput
-from .workbench import WbComp, WbProperty, WbResearch, WbScenario
+from app.data import hpi
+from app.domain import (
+    commercial_plus,
+    condition_adjust,
+    scoring_commercial,
+    scoring_residential,
+    sensitivity,
+    uw_commercial,
+    validators,
+)
+from app.domain import confidence as conf_mod
+from app.domain import verdict as verdict_mod
+from app.domain.models import CommercialInput, ProjectCreate, ResidentialInput
+from app.services import db, image_intake, ownership, pdf_intake, research_pipeline, sell_readiness, workbench
+from app.services.render import excel_uw, pdf_report, pdf_uw, report
+from app.services.workbench import WbComp, WbProperty, WbResearch, WbScenario
+
 from .routers import intake as intake_router
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -137,8 +149,8 @@ def tax_estimate(payload: dict | None = None):
     查不到州或税率时返回 {"state": None, ...}，前端不填数、不报错。
     口径：州平均税率估算，待独立验证（county 实际税率可差 ±50%）。
     """
-    from . import geocode as _geocode
-    from .data import state_tax_rates as _tax
+    from app.data import state_tax_rates as _tax
+    from app.services import geocode as _geocode
     payload = payload or {}
     raw_addr = payload.get("address") or ""
     if not isinstance(raw_addr, str):
@@ -154,7 +166,7 @@ def tax_estimate(payload: dict | None = None):
         raise HTTPException(422, "price 必须是非负有限数字")
     try:
         g = _geocode.geocode_state(address)
-    except Exception as e:  # noqa: BLE001
+    except Exception:  # noqa: BLE001
         # geocode 异常不 500：按"查不到"降级
         g = {"state": None, "matched_address": None}
     rate = _tax.get_rate(g["state"]) if g.get("state") else None
@@ -173,7 +185,7 @@ def tax_estimate(payload: dict | None = None):
 @app.get("/api/tophap/status")
 def tophap_status():
     """TopHap 数据源状态：开关 / 授权 / 连通性 / tool 面（OAuth 授权后的校验入口）。"""
-    from . import tophap  # 懒导入：未启用时不增加启动依赖
+    from app.services import tophap  # 懒导入：未启用时不增加启动依赖
     return tophap.status()
 
 
@@ -464,7 +476,7 @@ def uw_tearsheet(payload: dict):
     data = payload.get("input", payload)
     _enforce_quality_gate(data, "Tear Sheet")
     try:
-        from app import tearsheet
+        from app.services.render import tearsheet
         r = uw_commercial.compute_all(data)
         deal = {"name": payload.get("name") or (r.get("property", {}) or {}).get("name", ""),
                 "address": payload.get("address") or (r.get("property", {}) or {}).get("address", ""),
@@ -1044,6 +1056,7 @@ def uw_compute_plus(payload: dict):
 def _deal_slug(text: str) -> str:
     """文件名 slug：中文地址用拼音；纯符号时回退短 hash."""
     import hashlib
+
     from pypinyin import lazy_pinyin
     t = (text or "").strip()
     parts = []
@@ -1127,7 +1140,8 @@ def _parse_rr_date(v) -> str:
     if v is None or v == "":
         return ""
     try:
-        from datetime import date as _date, datetime as _dt
+        from datetime import date as _date
+        from datetime import datetime as _dt
         if isinstance(v, _dt):
             return v.date().isoformat()
         if isinstance(v, _date):
