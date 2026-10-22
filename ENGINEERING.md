@@ -1,4 +1,10 @@
-# DealDesk 工程化与设计改造路线（v1，2026-10-21）
+# DealDesk 工程化与设计改造路线
+
+> **2026-10-22 v2 现状**：main.py ~35 行；v2 代码 ruff ALL 规则 + mypy strict 0 错（CI 阻塞）；
+> 测试 633 个（金标准 0 偏离）+ vitest 51 + Playwright 11；新前端零 innerHTML（ESLint 禁止）。
+> 架构决策见 docs/adr/，运维见 docs/RUNBOOK.md。下文为 2026-10-21 的 v1 体检与路线，保留作历史。
+
+## （历史）v1 体检与路线（2026-10-21）
 
 ## 现状体检（脚本实测）
 | 指标 | 数值 | 企业级目标 |

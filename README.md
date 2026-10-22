@@ -12,7 +12,7 @@
   <a href="https://github.com/HUIIIM/vertciti-dealdesk/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/HUIIIM/vertciti-dealdesk/actions/workflows/ci.yml/badge.svg"></a>
   <a href="https://github.com/HUIIIM/vertciti-dealdesk/actions/workflows/gitleaks.yml"><img alt="Gitleaks scan" src="https://github.com/HUIIIM/vertciti-dealdesk/actions/workflows/gitleaks.yml/badge.svg"></a>
   <a href="https://vertciti-dealdesk.vercel.app"><img alt="Live demo" src="https://img.shields.io/badge/live%20demo-vertciti--dealdesk-brightgreen.svg"></a>
-  <img alt="Tests: 573 passing" src="https://img.shields.io/badge/tests-573%20passing-brightgreen.svg">
+  <img alt="Tests: 633 passing" src="https://img.shields.io/badge/tests-633%20passing-brightgreen.svg">
 </p>
 
 <p align="center">
@@ -162,6 +162,34 @@ flowchart LR
     RES <--> DB[("SQLite<br/>on your machine")]
     COM <--> DB
 ```
+
+## DealDesk v2 — the deal workbench (built 2026-10-22, not yet deployed)
+
+v2 adds a deal-lifecycle workbench at `/app/` on top of everything above,
+with **every v1 calculation unchanged** — 1,500+ recorded v1 outputs are
+replayed on every test run and must match byte for byte
+([ADR 0001](docs/adr/0001-golden-master.md)).
+
+- **Pipeline** (kanban / table) → **deal page**: a verdict card, a
+  verification progress bar, and tabs for rent roll, T12, model, red team,
+  market, files & evidence, committee, holding and log.
+- **Every number has a passport** — source, page, extraction method,
+  confidence, who reviewed it, how fresh it is. Conflicting sources are
+  logged and must be resolved with a written reason.
+- **Max bid, worked backwards** from IRR / DSCR / cash-on-cash targets and
+  your kill criteria — and it names the constraint that sets the price.
+- **Seven-stage lifecycle with gates** (no skipping; going back needs a
+  reason), committee votes and pack, a decision log that freezes the
+  numbers at the moment of decision, and post-hoc attribution once held.
+- Roles (chairman / analyst / viewer), audit log, Postgres support, JSON
+  logs with request IDs. Keyboard-first (⌘K, J/K, ?), dark mode, mobile
+  read-only, WCAG AA (axe-clean).
+
+Engineering: `domain / services / api` layers, SQLAlchemy 2 + Alembic,
+TypeScript + React with an OpenAPI-generated client; CI runs ruff (all
+rules on v2), mypy strict, property tests, a Postgres suite, Playwright
+E2E, CodeQL and dependency audits. See [CHANGELOG](CHANGELOG.md),
+[runbook](docs/RUNBOOK.md) and [ADRs](docs/adr/).
 
 ## The honesty contract
 

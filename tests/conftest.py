@@ -38,3 +38,11 @@ def _restore_session_db():
     before = os.environ["DEALDESK_DB"]
     yield
     os.environ["DEALDESK_DB"] = before
+
+
+@pytest.fixture(autouse=True)
+def _reset_auth_throttle():
+    # 令牌失败限流是进程级状态：每个测试从零计数，避免前面测试的错令牌把后面测试封成 429
+    from app.core.hardening import AUTH_THROTTLE
+    AUTH_THROTTLE.reset()
+    yield

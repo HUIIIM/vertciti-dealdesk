@@ -12,7 +12,7 @@
   <a href="https://github.com/HUIIIM/vertciti-dealdesk/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/HUIIIM/vertciti-dealdesk/actions/workflows/ci.yml/badge.svg"></a>
   <a href="https://github.com/HUIIIM/vertciti-dealdesk/actions/workflows/gitleaks.yml"><img alt="密钥扫描" src="https://github.com/HUIIIM/vertciti-dealdesk/actions/workflows/gitleaks.yml/badge.svg"></a>
   <a href="https://vertciti-dealdesk.vercel.app"><img alt="在线演示" src="https://img.shields.io/badge/live%20demo-vertciti--dealdesk-brightgreen.svg"></a>
-  <img alt="测试: 573 通过" src="https://img.shields.io/badge/tests-573%20passing-brightgreen.svg">
+  <img alt="测试: 633 通过" src="https://img.shields.io/badge/tests-633%20passing-brightgreen.svg">
 </p>
 
 <p align="center">
@@ -142,6 +142,24 @@ flowchart LR
     RES <--> DB[("SQLite<br/>只存你的机器")]
     COM <--> DB
 ```
+
+## DealDesk v2 — 交易工作台（2026-10-22 完成，尚未部署）
+
+v2 在 `/app/` 新增交易全生命周期工作台，**v1 所有计算结果不变**——1,500 多条 v1 录制输出
+每次测试都逐字节回放比对（[ADR 0001](docs/adr/0001-golden-master.md)）。
+
+- **流水线**（看板 / 表格）→ **交易页**：结论卡、核对进度条，标签页含租金表、T12、模型、红队、
+  市场、文件与证据、投委会、持有、日志。
+- **每个数字都有护照**：来源、页码、抽取方式、可信度、谁复核、多新鲜；来源打架会登记，须写理由裁决。
+- **反推最高出价**：按 IRR / DSCR / 现金回报目标与淘汰条件倒算，并写明是哪条约束卡住了价格。
+- **七阶段生命周期 + 关卡**（不能跳，回退须写原因）、投委会投票与投委会包、决策日志冻结当时数字、
+  持有期事后归因。
+- 角色（董事长 / 分析 / 只读）、审计日志、Postgres、带请求编号的 JSON 日志；键盘优先（⌘K、J/K、?）、
+  暗色模式、手机只读、WCAG AA（axe 零违规）。
+
+工程：domain / services / api 分层、SQLAlchemy 2 + Alembic、TypeScript + React + OpenAPI 生成客户端；
+CI 跑 ruff（v2 全规则）、mypy strict、性质测试、Postgres 套件、Playwright E2E、CodeQL 与依赖审计。
+见 [CHANGELOG](CHANGELOG.md)、[运维手册](docs/RUNBOOK.md)、[ADR](docs/adr/)。
 
 ## 诚实约定
 

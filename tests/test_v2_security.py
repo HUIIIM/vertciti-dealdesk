@@ -137,3 +137,44 @@ def test_json_log_format():
     import json
     d = json.loads(observability.JsonFormatter().format(rec))
     assert d["msg"] == "hello x" and d["level"] == "INFO" and d["path"] == "/api/x" and "ts" in d
+
+
+# ---------------------------------------------------------------- HTTP 加固
+def test_security_headers_and_strict_csp_on_app():
+    c = TestClient(app)
+    r = c.get("/api/v2/health")
+    assert r.headers["X-Content-Type-Options"] == "nosniff"
+    assert r.headers["X-Frame-Options"] == "DENY"
+    assert "Content-Security-Policy" not in r.headers  # v1 页面 CSP 由 vercel.json hash 管
+    html = c.get("/app/")
+    csp = html.headers["Content-Security-Policy"]
+    assert "script-src 'self'" in csp and "frame-ancestors 'none'" in csp and "unsafe-inline" not in csp
+
+
+def test_cookie_token_is_ignored_no_csrf_surface(env):
+    c, tok = env
+    c.cookies.set("dd_token", tok["chairman"])
+    assert c.get("/api/v2/deals").status_code == 401  # 只认 Authorization 头
+
+
+def test_bad_token_bruteforce_is_throttled(env, monkeypatch):
+    from app.core.hardening import AuthThrottle
+    monkeypatch.setattr(observability, "AUTH_THROTTLE", AuthThrottle(limit=3, window=60))
+    c, tok = env
+    for _ in range(3):
+        assert c.get("/api/v2/deals", headers=H("dd_guess")).status_code == 401
+    r = c.get("/api/v2/deals", headers=H("dd_guess"))
+    assert r.status_code == 429 and int(r.headers["Retry-After"]) >= 1
+    # 被封期间连正确令牌也挡（防止撞库者拿到“对了”的信号），没带令牌的请求不计数
+    assert c.get("/api/v2/deals", headers=H(tok["viewer"])).status_code == 429
+    assert c.get("/api/v2/health").status_code == 200
+
+
+def test_throttle_window_slides():
+    from app.core.hardening import AuthThrottle
+    t = AuthThrottle(limit=2, window=10)
+    t.fail("ip", now=0)
+    t.fail("ip", now=1)
+    assert t.blocked("ip", now=2) == pytest.approx(8)
+    assert t.blocked("ip", now=10.5) == 0  # 第一次失败滑出窗口
+    assert t.blocked("other", now=2) == 0

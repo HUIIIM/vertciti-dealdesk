@@ -89,9 +89,16 @@ test.describe("无障碍（有真实数据）", () => {
   test(`${name}页无严重 / 关键问题`, async ({ page }) => {
     const path = tab === null ? "/app/#/" : tab === "compare" ? `/app/#/compare?ids=${seeded}` : tab === "settings" ? "/app/#/settings/templates"
       : `/app/#/deals/${seeded}${tab}`;
+    // 严格 CSP（app/core/hardening.py）下页面不得触发任何违规：样式 / 脚本 / 图片都只能同源
+    await page.addInitScript(() => {
+      const w = window as unknown as { __csp: string[] };
+      w.__csp = [];
+      document.addEventListener("securitypolicyviolation", (e) => w.__csp.push(`${e.violatedDirective} ${e.blockedURI}`));
+    });
     await page.goto(path);
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(500);
+    expect(await page.evaluate(() => (window as unknown as { __csp: string[] }).__csp)).toEqual([]);
     const r = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
     const bad = r.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
     expect(bad.map((v) => `${v.id}: ${v.help} (${v.nodes.length}) ${v.nodes.slice(0, 2).map((n) => n.target.join(" ")).join(" | ")}`)).toEqual([]);

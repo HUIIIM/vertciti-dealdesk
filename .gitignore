@@ -13,3 +13,4 @@ frontend/playwright-report/
 e2e.db
 .coverage
 frontend/coverage/
+backups/

@@ -2,10 +2,11 @@
 
 运行模式：
 - DEALDESK_AUTH 未设或为 off（缺省，与 v1 单用户本机工具一致）：所有请求视为本机用户 local（董事长）。
-- DEALDESK_AUTH=on：v2 接口需 `Authorization: Bearer <token>`（或 cookie dd_token）；无有效 token 的请求
-  身份为匿名只读（GET 可读公开端点，写操作 401）。另设 DEALDESK_AUTH_PROTECT_V1=1 时，v1 的项目
+- DEALDESK_AUTH=on：v2 接口需 `Authorization: Bearer <token>`（只认请求头、不读 cookie → 无 CSRF 面）；
+  无有效 token 的请求身份为匿名只读（GET 可读公开端点，写操作 401）。另设 DEALDESK_AUTH_PROTECT_V1=1 时，v1 的项目
   增删改端点同样要求“分析”及以上。
 token 只存 sha256（users.token_sha256），明文只在创建时显示一次。
+同一来源 IP 带错令牌过多会被限流 429（见 app/core/hardening.py）。
 命令行：python -m app.core.security add-user <username> <chairman|analyst|viewer> [显示名]
 """
 

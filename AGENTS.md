@@ -24,9 +24,19 @@ rm -f dealdesk.db && .venv/bin/pytest tests/ -q
   `PYTHONPATH=.`，即 `PYTHONPATH=. .venv/bin/pytest tests/ -q`。
   （2026-10-09 实证）
 
-- **跑测试前必删 `dealdesk.db`**（仓库根的开发副产品库）：`DEALDESK_DB` 环境变量
-  在 `app.db` import 之后才生效，测试隔离有预先存在的 bug；根目录有脏库时
-  `test_list_sorted_by_cash_to_close` 会误挂。先删库重跑再定责。
+- **跑测试前必删 `dealdesk.db`**（仓库根的开发副产品库）：历史上 `DEALDESK_DB` 在
+  `app.db` import 之后才生效、脏库会让 `test_list_sorted_by_cash_to_close` 误挂。
+  v2 起连库改为懒读（tests/conftest.py 会话级临时库），但删库成本为零，仍保留此步。
+- v2 质量门（CI 同款，提交前本机全跑）：
+  - `ruff check app tests tools`
+  - `ruff check --config ruff-strict.toml app/domain/v2 app/services/v2 app/api/v2 app/core app/services/persistence app/paths.py --exclude app/services/persistence/migrations`
+  - `mypy app`（v2 模块 strict 必须 0 错；v1 只报告）
+  - 金标准 `tests/test_golden_v1.py` 偏离即失败：**改 v1 报告字节（哪怕折一行 CSS）也会挂**，
+    这是有意的（docs/adr/0001-golden-master.md）。
+  - Postgres：`PG_ADMIN_URL=postgresql://… pytest -p tests.pg_plugin tests/test_persistence.py tests/test_v2_*.py`
+  - 前端（`cd frontend`）：`npx -y npm@11.21.0 ci` → `npm run typecheck && npm run lint && npm run test:cov && npm run build`
+    → `git diff --exit-code -- ../static/app`；E2E：`CHROMIUM_PATH=… npm run e2e`。
+    改了后端 v2 接口必须 `npm run gen:api` 并提交 `openapi.json` 与 `src/api/schema.d.ts`。
 - `/tmp` 是 512M tmpfs：`app/pdf_intake.py` 曾因写 `/tmp` 爆盘；编码/大文件
   一律用 home 分区路径。
 - 真浏览器 E2E 的 route 代理转发坑（2026-10-14 实证）：Chromium 经 CDP 暴露的
@@ -38,7 +48,9 @@ rm -f dealdesk.db && .venv/bin/pytest tests/ -q
 
 ## 构建与部署
 
-- 本地即生产形态：无构建步骤，后端 `app/`＋静态 `static/` 直接跑。
+- 本地即生产形态：无构建步骤，后端 `app/`＋静态 `static/` 直接跑。v2 前端源码在 `frontend/`，
+  构建产物 `static/app/` 入库（随 `static/` 一起同步到 vercel-deploy/）。
+- v2 运维（环境变量、用户与权限、备份恢复、排障、迁移）：见 `docs/RUNBOOK.md`。
 - 生产部署源是 `vercel-deploy/`（`app/`、`static/`、根静态文件、`requirements.txt`
   必须与仓库根对齐，全量同步）。部署命令：
   `~/workspace/skills/vercel/bin/vc-deploy` → Vercel 项目 `vertciti-dealdesk`。
@@ -83,6 +95,9 @@ rm -f dealdesk.db && .venv/bin/pytest tests/ -q
 |---|---|
 | 启动 | `./run.sh` |
 | 测试 | `rm -f dealdesk.db && .venv/bin/pytest tests/ -q` |
+| v2 工作台 | `http://127.0.0.1:8100/app/` |
+| 加用户 | `.venv/bin/python -m app.core.security add-user <名> <chairman\|analyst\|viewer>` |
+| 备份 | `.venv/bin/python tools/db_backup.py backup ~/backups` |
 | 查 TopHap 状态 | `curl http://127.0.0.1:8100/api/tophap/status` |
 | 生产状态 | `curl https://vertciti-dealdesk.vercel.app/api/tophap/status` |
 | 敏感扫描 | `bash ~/workspace/vertcity/security-watch/data-room-gate.sh` |

@@ -27,8 +27,10 @@ def monthly_payment(principal: float, annual_rate_pct: float, years: float) -> f
     if r == 0:
         return principal / n
     factor = _safe_pow(1 + r, n)
-    if factor is None or factor == 1:
+    if factor is None:
         return 0.0
+    if factor == 1:  # 利率小到 (1+r)^n 在浮点下等于 1：按零利率摊还，而不是月供 0（性质测试发现）
+        return principal / n
     return principal * r * factor / (factor - 1)
 
 
@@ -50,6 +52,8 @@ def remaining_balance(principal: float, annual_rate_pct: float, years: float,
     f1 = _safe_pow(1 + r, k)
     if f1 is None:
         return 0.0
+    if f1 == 1:  # 同上：浮点下等同零利率
+        return principal - pmt * k
     return principal * f1 - pmt * ((f1 - 1) / r)
 
 

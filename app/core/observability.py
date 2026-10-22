@@ -28,6 +28,7 @@ from starlette.responses import JSONResponse, Response
 
 from app.core import security
 from app.core.context import current_actor, current_request_id, reset_actor, set_actor, set_request_id
+from app.core.hardening import AUTH_THROTTLE, headers_for
 
 log = logging.getLogger("dealdesk")
 access_log = logging.getLogger("dealdesk.access")
@@ -77,17 +78,26 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
         rid = request.headers.get("x-request-id", "")
         rid = rid if _RID_OK.match(rid) else uuid.uuid4().hex
         rid_tok = set_request_id(rid)
+        # 只认 Authorization 头（不读 cookie）：浏览器不会自动携带，天然免疫 CSRF
         auth = request.headers.get("authorization", "")
-        token = auth[7:].strip() if auth.lower().startswith("bearer ") else request.cookies.get("dd_token")
-        actor = security.resolve_token(token)
+        token = auth[7:].strip() if auth.lower().startswith("bearer ") else None
+        client = request.client.host if request.client else "-"
+        wait = AUTH_THROTTLE.blocked(client) if token and security.auth_enabled() else 0.0
+        actor = security.ANONYMOUS if wait else security.resolve_token(token)
+        if token and not wait and actor is security.ANONYMOUS:
+            AUTH_THROTTLE.fail(client)
+            log.warning("invalid token", extra={"extra_fields": {"client": client}})
         act_tok = set_actor(actor)
         t0 = time.perf_counter()
         path, method = request.url.path, request.method
         try:
-            if (security.protect_v1() and method in ("POST", "PUT", "DELETE") and _V1_PROTECTED.match(path)
+            if wait:
+                resp: Response = JSONResponse({"detail": "令牌错误次数过多，请稍后再试", "request_id": rid},
+                                              status_code=429, headers={"Retry-After": str(int(wait) + 1)})
+            elif (security.protect_v1() and method in ("POST", "PUT", "DELETE") and _V1_PROTECTED.match(path)
                     and not security.can(actor, "deal.write")):
-                resp: Response = JSONResponse({"detail": "需要“分析”及以上角色", "request_id": rid},
-                                              status_code=401 if actor is security.ANONYMOUS else 403)
+                resp = JSONResponse({"detail": "需要“分析”及以上角色", "request_id": rid},
+                                    status_code=401 if actor is security.ANONYMOUS else 403)
             else:
                 resp = await call_next(request)
         except Exception as e:
@@ -99,6 +109,8 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
             _report(err)
             resp = JSONResponse({"detail": "服务器内部错误", "request_id": rid}, status_code=500)
         resp.headers["X-Request-ID"] = rid
+        for k, v in headers_for(path).items():
+            resp.headers.setdefault(k, v)
         if path.startswith("/api/"):  # 在重置身份之前写，日志里的 actor 才是本次请求的操作人
             access_log.info("request", extra={"extra_fields": {
                 "method": method, "path": path, "status": resp.status_code,
