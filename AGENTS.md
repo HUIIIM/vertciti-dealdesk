@@ -75,6 +75,9 @@ rm -f dealdesk.db && .venv/bin/pytest tests/ -q
 ## Git 规范
 
 - Conventional commits；作者邮箱用 GitHub noreply，**绝不发明邮箱**
+  - 正确的 noreply 是 `HUIIIM <130162274+HUIIIM@users.noreply.github.com>`（130162274 = HUIIIM 的账号 ID）。
+    历史上用过的 `102184733+HUIIIM@…` 的 ID 属于另一个账号（crfairbanks-sps），提交会算到别人名下，
+    官网仓的 Vercel 预览因此被拦（2026-10-22 实证）——不要再用。
  （曾用 `javis@vertciti.com` 导致 Vercel 部署被 block）。
 - **绝不提交**：`.env`（600 权限，含 TopHap token）、`dealdesk.db`、
   `.tophap-oauth-state.json`、`__pycache__/`。
