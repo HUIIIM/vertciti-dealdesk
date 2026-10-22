@@ -46,3 +46,26 @@ def test_zh_is_untouched():
     )
     out = subprocess.run([NODE, "-e", script], capture_output=True, text=True, check=True).stdout.strip()
     assert out == "undefined"  # zh: the EN layer installs nothing (only the toggle button)
+
+
+UWC = JS.parent / "i18n-uwc.js"
+UWC_CASES = {
+    "投资分析": "Investment analysis",
+    "已填 5 个字段": "Filled 5 fields",
+    "未映射 3 项": "Unmapped 3 item(s)",
+    "全面分析工作台": "Full Analysis Workbench",  # workbench dict still present
+    "卡拉特公司": "卡拉特公司",  # a tenant name typed in Chinese stays as is
+}
+
+
+@pytest.mark.skipif(NODE is None, reason="node not installed")
+def test_per_page_dictionary_merges():
+    script = (
+        "global.window={DD_LANG:'en',DD_EN_DICT:{},alert(){},confirm(){}};"
+        "global.document={readyState:'loading',addEventListener(){}};"
+        f"require({json.dumps(str(UWC))});require({json.dumps(str(JS))});"
+        f"const c={json.dumps(list(UWC_CASES))};"
+        "console.log(JSON.stringify(c.map(s=>window.WB_T(s))));"
+    )
+    out = subprocess.run([NODE, "-e", script], capture_output=True, text=True, check=True).stdout
+    assert dict(zip(UWC_CASES, json.loads(out))) == UWC_CASES

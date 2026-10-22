@@ -1,4 +1,4 @@
-/* DealDesk workbench i18n (EN layer for workbench.html / workbench.js).
+/* DealDesk page i18n engine (EN layer for workbench.html, uw-commercial.html …).
  * Loads after i18n.js. zh stays the default; only runs when DD_LANG === 'en'.
  * workbench renders most of its text from JS templates, so instead of adding
  * data-i18n to hundreds of nodes this walks text nodes (and placeholder /
@@ -13,8 +13,11 @@
 (function () {
   /* language toggle on both zh and en pages (i18n.js provides mountLangToggle) */
   const mountToggle = () => {
-    const host = document.querySelector('header.top');
-    if (host && window.mountLangToggle) window.mountLangToggle(host);
+    const host = document.querySelector('header.top, header.cmdbar .cmd-ctl');
+    if (host && window.mountLangToggle) {
+      const btn = window.mountLangToggle(host);
+      if (host.classList.contains('cmd-ctl')) btn.className = 'btn sm';   // match the command-bar buttons
+    }
   };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mountToggle); else mountToggle();
   if (window.DD_LANG !== 'en') return;
@@ -230,10 +233,12 @@
       'sold = recorded sale price; under_contract = contract price (reference); for_sale = list price (reference only)',
   };
 
+  Object.assign(W, window.DD_EXTRA_DICT || {});   // per-page dictionaries (e.g. i18n-uwc.js)
+
   /* number-bound fragments: "3 个" / "第 2 年" / "5 条" … */
   const PATTERNS = [
     [/第\s*(\d+)\s*年/g, 'Year $1'],
-    [/(\d+)\s*个/g, '$1'], [/(\d+)\s*条/g, '$1'], [/(\d+)\s*年/g, '$1 yr'], [/条（/g, ' ('], [/），新增/g, '), added'], [/条。/g, '.'],
+    [/(\d+)\s*个/g, '$1'], [/(\d+)\s*条/g, '$1'], [/(\d+)\s*项/g, '$1 item(s)'], [/(\d+)\s*页/g, '$1 page(s)'], [/(\d+)\s*年/g, '$1 yr'], [/条（/g, ' ('], [/），新增/g, '), added'], [/条。/g, '.'],
   ];
   Object.assign(W, {
     '⏳ 扫描 PDF OCR：第': '⏳ Scanned PDF OCR: page ', '⏳ 混合 PDF 扫描页 OCR：第': '⏳ Mixed PDF OCR: page ',
