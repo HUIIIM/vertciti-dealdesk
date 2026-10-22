@@ -84,7 +84,8 @@ def noi_bank_bridge(result: dict, market_vacancy_pct: float | None = None, lang:
         basis = (f"Office/retail $0.18/SF/yr x {sf:,.0f} SF — rule-based estimate"
                  if lang == "en" else f"办公/零售 $0.18/SF/年 × {sf:,.0f} SF，规则估算")
     running -= reserve
-    rows.append({"item": "− Replacement reserve", "amount": round(-reserve, 2),
+    rows.append({"item": "− Replacement reserve" if lang == "en" else "− 替换储备金（replacement reserve）",
+                 "amount": round(-reserve, 2),
                  "basis": basis, "tag": "yellow"})
 
     # 空置调整：取市场空置率与 5% 孰高，补足差额

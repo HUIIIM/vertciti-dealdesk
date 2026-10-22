@@ -10,16 +10,17 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
-  pull-requests: read   # PR 扫描要列出 PR 的提交
+  pull-requests: read
 jobs:
   scan:
     name: gitleaks
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - uses: gitleaks/gitleaks-action@v3
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}   # 扫描 PR 必需
-          GITLEAKS_CONFIG: .gitleaks.toml              # 该 action 不认 config-path 输入，配置走环境变量
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: .gitleaks.toml
