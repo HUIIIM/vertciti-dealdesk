@@ -13,7 +13,10 @@ import { fmt, fmtShort, type Unit } from "@/lib/format";
 import { useHotkeys } from "@/lib/hotkeys";
 import { useTween } from "@/lib/motion";
 import { getPath, setPath, type JsonObj } from "@/lib/paths";
+import { prefillKey } from "@/lib/prefill";
 import { DEAL_TABS, navigate, type DealTab } from "@/lib/router";
+import { useAdopt } from "./adopt";
+import type { Candidate } from "@/api/types";
 
 // 标签页按需加载（各自一个包），概览随交易页一起预取
 const CommitteeTab = lazy(() => import("./CommitteeTab").then((m) => ({ default: m.CommitteeTab })));
@@ -131,6 +134,7 @@ export function DealPage({ id, tab }: { id: number; tab: DealTab }) {
   const pct = ver_.key_total ? Math.round((ver_.key_reviewed / ver_.key_total) * 100) : 0;
   return (
     <DealCtx.Provider value={ctx}>
+      <Prefill id={id} />
       <div className="deal-head">
         <section className={`verdict-card ${kill.triggered.length ? "risk" : kill.clear ? "ok" : ""}`} aria-label={T("结论卡")}>
           <p className="eyebrow">{d.track === "commercial" ? T("商业") : T("住宅")} · {d.stage_label}{o.version ? T(" · 第 {0} 版", [(o.version as { version_no: number }).version_no]) : T(" · 尚未承销")}</p>
@@ -365,4 +369,15 @@ function VerifyFirst({ id, version, stamp }: { id: number; version: number; stam
       </ol>
     </section>
   );
+}
+
+/** 新建交易时“自动搜集”带入的候选值：交易页第一次打开时写进草稿并登记来源，只执行一次。 */
+function Prefill({ id }: { id: number }) {
+  const adopt = useAdopt();
+  useEffect(() => {
+    let items: Candidate[] = [];
+    try { items = JSON.parse(localStorage.getItem(prefillKey(id)) ?? "[]") as Candidate[]; localStorage.removeItem(prefillKey(id)); } catch { return; }
+    if (items.length) void adopt(items);
+  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps -- 只在打开时执行一次
+  return null;
 }

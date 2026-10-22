@@ -28,7 +28,7 @@ test("纯键盘：新建交易 → 承销（租金表 / T12 / 模型）→ 保�
   await page.keyboard.type("键盘验收 · 120 Grand St");               // 焦点已在“交易名称”
   await page.keyboard.press("Tab");
   await page.keyboard.type("120 Grand St, Brooklyn, NY");
-  await page.keyboard.press("Tab");
+  await tabTo(page, /要价/);                                         // 中间隔着“自动搜集公开信息”按钮
   await page.keyboard.type("3,200,000");
   await page.keyboard.press("Enter");                               // 表单提交（淘汰条件已按商业默认模板预填）
   await expect(page).toHaveURL(/#\/deals\/\d+\/model$/);
@@ -200,4 +200,17 @@ test("中英切换：点 EN 后整页英文（用户数据除外），刷新不�
   await page.getByRole("button", { name: "切换到中文" }).click();
   await page.waitForLoadState("load");
   await expect(page.getByRole("tab", { name: "概览" }).or(page.getByText("概览").first())).toBeVisible();
+});
+
+test("导出：真后端生成备忘录 PDF 与 Excel，浏览器真的下载到文件", async ({ page, request }) => {
+  const tpl = await (await request.get("/api/uw/template")).json();
+  const d = await (await request.post("/api/v2/deals", { data: { name: "导出验收", track: "commercial", address: "3 Export St",
+    kill_criteria: [{ metric: "dscr", op: "<", threshold: 1.0 }] } })).json();
+  await request.post(`/api/v2/deals/${d.id}/versions`, { data: { inputs: tpl.example_39_main, label: "样例" } });
+  await page.goto(`/app/#/deals/${d.id}`);
+  const card = page.getByRole("region", { name: "导出" });
+  for (const [name, ext] of [["投资备忘录 PDF", "pdf"], ["核保明细 Excel", "xlsx"], ["一页纸 Tear Sheet", "pdf"]] as const) {
+    const [dl] = await Promise.all([page.waitForEvent("download"), card.getByRole("button", { name }).click()]);
+    expect(dl.suggestedFilename()).toMatch(new RegExp(`^dealdesk_3-Export-St_\\w+_v1_\\d{8}\\.${ext}$`));
+  }
 });

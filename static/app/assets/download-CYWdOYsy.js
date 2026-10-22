@@ -1,0 +1,2 @@
+function e(e,t){let n=e.headers.get(`content-disposition`)??``,r=/filename\*=UTF-8''([^;]+)/i.exec(n);if(r?.[1])try{return decodeURIComponent(r[1])}catch{}return/filename="?([^";]+)"?/i.exec(n)?.[1]??t}async function t(t,n){let r=e(t,n),i=URL.createObjectURL(await t.blob()),a=document.createElement(`a`);return a.href=i,a.download=r,a.click(),URL.revokeObjectURL(i),r}export{t};
+//# sourceMappingURL=download-CYWdOYsy.js.map

@@ -424,6 +424,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v2/deals/{deal_id}/documents/{doc_id}/extract": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Extract
+         * @description 从已上传的 PDF（OM / flyer / 卖方材料）提取候选字段与租户行；不改承销，逐条采用后才写入。
+         */
+        post: operations["extract_api_v2_deals__deal_id__documents__doc_id__extract_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v2/deals/{deal_id}/events": {
         parameters: {
             query?: never;
@@ -458,6 +478,28 @@ export interface paths {
          * @description 登记一个数字的来源；与其他来源数值不一致时自动开一条矛盾。
          */
         post: operations["add_evidence_api_v2_deals__deal_id__evidence_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/deals/{deal_id}/export/{kind}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export
+         * @description 按当前承销版本导出。
+         *
+         *     memo 投资备忘录 PDF · model 核保明细 Excel · tearsheet 一页纸（商业）· report 经典核保报告（商业）。
+         */
+        get: operations["export_api_v2_deals__deal_id__export__kind__get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -794,6 +836,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v2/legacy/projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Legacy Projects
+         * @description 老版（v1）保存过的项目，标出已导入到哪笔交易。
+         */
+        get: operations["legacy_projects_api_v2_legacy_projects_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/legacy/projects/{kind}/{pid}/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Legacy Import
+         * @description 把一个老版项目导入为新交易，输入原样带成第一版承销；同一项目不重复导入。
+         */
+        post: operations["legacy_import_api_v2_legacy_projects__kind___pid__import_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v2/me": {
         parameters: {
             query?: never;
@@ -845,6 +927,26 @@ export interface paths {
         get: operations["portfolio_api_v2_portfolio_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/research": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Research
+         * @description 按地址或房源链接搜集公开信息（慢：多次公网抓取，约 30–90 秒）；每个字段带来源与可信度。
+         */
+        post: operations["research_api_v2_research_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1166,6 +1268,46 @@ export interface components {
         Body_wb_intake_pdf_api_wb_intake_pdf_post: {
             /** File */
             file: string;
+        };
+        /**
+         * CandidateOut
+         * @description 提取 / 搜集到的一个候选值：path 为空表示只作参考（不是承销输入或值不可用）。
+         */
+        CandidateOut: {
+            /**
+             * Confidence
+             * @enum {string}
+             */
+            confidence: "high" | "medium" | "low";
+            /** Confidence Label */
+            confidence_label: string;
+            /** Display */
+            display: string;
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /**
+             * Method
+             * @enum {string}
+             */
+            method: "pdf" | "api";
+            /** Note */
+            note: string;
+            /** Page */
+            page: number | null;
+            /** Path */
+            path: string | null;
+            /** Seller Claimed */
+            seller_claimed: boolean;
+            /** Source */
+            source: string;
+            /** Source Url */
+            source_url: string;
+            /** Value */
+            value: number | string | null;
+        } & {
+            [key: string]: unknown;
         };
         /** CatalogOut */
         CatalogOut: {
@@ -1633,6 +1775,41 @@ export interface components {
         } & {
             [key: string]: unknown;
         };
+        /** ExtractOut */
+        ExtractOut: {
+            /** Candidates */
+            candidates: components["schemas"]["CandidateOut"][];
+            /** Document Id */
+            document_id: number;
+            /** Filename */
+            filename: string;
+            /** Notice */
+            notice: string;
+            /** Tenants */
+            tenants: components["schemas"]["ExtractedTenantOut"][];
+            /**
+             * Track
+             * @enum {string}
+             */
+            track: "residential" | "commercial";
+        } & {
+            [key: string]: unknown;
+        };
+        /** ExtractedTenantOut */
+        ExtractedTenantOut: {
+            /** Monthly Rent */
+            monthly_rent?: number | null;
+            /** Page */
+            page?: number | null;
+            /** Sf */
+            sf?: number | null;
+            /** Suite */
+            suite?: string | null;
+            /** Tenant */
+            tenant?: string | null;
+        } & {
+            [key: string]: unknown;
+        };
         /** GateCheck */
         GateCheck: {
             /** Detail */
@@ -1786,6 +1963,40 @@ export interface components {
             threshold: number;
             /** Value */
             value: number | null;
+        } & {
+            [key: string]: unknown;
+        };
+        /** LegacyImportOut */
+        LegacyImportOut: {
+            deal: components["schemas"]["DealOut"];
+            version: components["schemas"]["VersionOut"] | null;
+            /** Warning */
+            warning: string;
+        } & {
+            [key: string]: unknown;
+        };
+        /** LegacyProjectOut */
+        LegacyProjectOut: {
+            /** Address */
+            address: string;
+            /** Id */
+            id: number;
+            /** Imported Deal Id */
+            imported_deal_id: number | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "project" | "uw";
+            /** Name */
+            name: string;
+            /**
+             * Track
+             * @enum {string}
+             */
+            track: "residential" | "commercial";
+            /** Updated At */
+            updated_at: number | null;
         } & {
             [key: string]: unknown;
         };
@@ -2128,6 +2339,42 @@ export interface components {
             source_hint: string;
             /** Swing Bps */
             swing_bps: number;
+        } & {
+            [key: string]: unknown;
+        };
+        /** ResearchIn */
+        ResearchIn: {
+            /**
+             * Mode
+             * @default address
+             * @enum {string}
+             */
+            mode: "address" | "url";
+            /** Text */
+            text: string;
+            /**
+             * Track
+             * @enum {string}
+             */
+            track: "residential" | "commercial";
+        };
+        /** ResearchOut */
+        ResearchOut: {
+            /** Address */
+            address: string;
+            /** Candidates */
+            candidates: components["schemas"]["CandidateOut"][];
+            /** Error */
+            error: string;
+            /** Manual Needed */
+            manual_needed: string[];
+            /** Mode */
+            mode: string;
+            /**
+             * Track
+             * @enum {string}
+             */
+            track: "residential" | "commercial";
         } & {
             [key: string]: unknown;
         };
@@ -3953,6 +4200,38 @@ export interface operations {
             };
         };
     };
+    extract_api_v2_deals__deal_id__documents__doc_id__extract_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                deal_id: number;
+                doc_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExtractOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     events_api_v2_deals__deal_id__events_get: {
         parameters: {
             query?: {
@@ -4008,6 +4287,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EvidenceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_api_v2_deals__deal_id__export__kind__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                deal_id: number;
+                kind: "memo" | "model" | "tearsheet" | "report";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                    "application/pdf": unknown;
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": unknown;
                 };
             };
             /** @description Validation Error */
@@ -4637,6 +4950,58 @@ export interface operations {
             };
         };
     };
+    legacy_projects_api_v2_legacy_projects_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LegacyProjectOut"][];
+                };
+            };
+        };
+    };
+    legacy_import_api_v2_legacy_projects__kind___pid__import_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kind: "project" | "uw";
+                pid: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LegacyImportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     me_api_v2_me_get: {
         parameters: {
             query?: never;
@@ -4710,6 +5075,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PortfolioOut"];
+                };
+            };
+        };
+    };
+    research_api_v2_research_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResearchIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

@@ -8,6 +8,7 @@ import { Empty, Status, useToast } from "@/components/ui";
 import { STAGES } from "@/domain/fields";
 import { fmt, fmtDate } from "@/lib/format";
 import { useDeal } from "./Deal";
+import { ExportCard } from "./ExportCard";
 
 export function OverviewTab() {
   const { id, ov, reload } = useDeal();
@@ -57,7 +58,7 @@ export function OverviewTab() {
         <Tasks />
         <Approvals />
       </div>
-      <Decisions />
+      <div><Decisions /><ExportCard /></div>
     </div>
   );
 }

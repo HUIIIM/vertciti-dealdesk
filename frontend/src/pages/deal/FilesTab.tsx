@@ -2,17 +2,22 @@
 import { T } from "@/i18n";
 import { useRef, useState } from "react";
 import { api, call, raw } from "@/api/client";
-import type { ConflictRow, Doc } from "@/api/types";
+import type { ConflictRow, Doc, Extract } from "@/api/types";
 import { useApi } from "@/api/useApi";
 import { useApp } from "@/app-context";
+import { Candidates } from "@/components/Candidates";
 import { passportStatus } from "@/components/Passport";
 import { Empty, Status, useToast } from "@/components/ui";
 import { fieldLabel } from "@/domain/fields";
 import { fmtDate } from "@/lib/format";
+import { useAdopt } from "./adopt";
 import { useDeal } from "./Deal";
 
 export function FilesTab() {
-  const { id, passports, openPassport, reload } = useDeal();
+  const { id, track, draft, set, passports, openPassport, reload } = useDeal();
+  const adopt = useAdopt();
+  const [ex, setEx] = useState<Extract | null>(null);
+  const [extracting, setExtracting] = useState<number | null>(null);
   const { can } = useApp();
   const toast = useToast();
   const docs = useApi(() => call(api.GET("/api/v2/deals/{deal_id}/documents", { params: { path: { deal_id: id } } })), [id]);
@@ -28,6 +33,17 @@ export function FilesTab() {
     try { const r = await raw(`/api/v2/deals/${id}/documents/${d.id}`); const url = URL.createObjectURL(await r.blob());
       const a = document.createElement("a"); a.href = url; a.download = d.filename; a.click(); URL.revokeObjectURL(url); } catch (e) { toast.err(e); }
   };
+  const extract = async (d: Doc) => {
+    setExtracting(d.id);
+    try { setEx(await call(api.POST("/api/v2/deals/{deal_id}/documents/{doc_id}/extract", { params: { path: { deal_id: id, doc_id: d.id } } }))); }
+    catch (e) { toast.err(e); } finally { setExtracting(null); }
+  };
+  const adoptTenants = (rows: Extract["tenants"]) => {
+    const cur = (draft.tenants as unknown[] | undefined) ?? [];
+    set("tenants", [...cur, ...rows.map((t) => ({ suite: t.suite ?? "", tenant: t.tenant ?? "", sf: t.sf ?? 0, monthly_rent: t.monthly_rent ?? 0 }))]);
+    toast.ok(T("已加入 {0} 个租户到租金表草稿：记得核对并保存一版", [rows.length]));
+  };
+  const isPdf = (d: Doc) => d.content_type.includes("pdf") || d.filename.toLowerCase().endsWith(".pdf");
   const resolve = async (c: ConflictRow, value: unknown) => {
     const note = window.prompt(T("裁决「{0}」：为什么采用 {1}？", [fieldLabel(c.field), String(value)]));
     if (!note) return;
@@ -37,6 +53,17 @@ export function FilesTab() {
   const ps = Object.values(passports);
   return (
     <>
+      {ex ? <section className="card" aria-label={T("提取结果")}>
+        <div className="row" style={{ justifyContent: "space-between" }}><h2 style={{ margin: 0 }}>{T("从「{0}」提取", [ex.filename])}</h2>
+          <button className="btn ghost sm" type="button" onClick={() => setEx(null)}>{T("关闭")}</button></div>
+        <p className="sub">{ex.notice}</p>
+        <Candidates key={ex.document_id} items={ex.candidates} onAdopt={(c) => void adopt(c, ex.document_id).then(() => setEx(null))} />
+        {track === "commercial" && ex.tenants.length ? <div style={{ marginTop: 16 }}>
+          <h3 style={{ fontSize: 15 }}>{T("租约表行（{0}）", [ex.tenants.length])}</h3>
+          <ul className="checks">{ex.tenants.slice(0, 8).map((t, i) => <li key={i}><span className="chip">{t.suite}</span>
+            <span>{t.tenant}<div className="d">{t.sf ?? "—"} SF · ${t.monthly_rent ?? "—"}{T("/月")}{t.page ? ` · p.${t.page}` : ""}</div></span></li>)}</ul>
+          <button className="btn" type="button" onClick={() => adoptTenants(ex.tenants)}>{T("加入租金表（{0}）", [ex.tenants.length])}</button></div> : null}
+      </section> : null}
       <section className="card" aria-label={T("跨来源矛盾")}>
         <h2>{T("跨来源矛盾登记")}</h2><p className="sub">{T("同一字段两个来源差异 &gt; 0.5% 自动登记；未裁决的矛盾会挡住进投委会的关卡。")}</p>
         {cons.data?.length ? <ul className="checks">{cons.data.map((c) => (
@@ -66,7 +93,9 @@ export function FilesTab() {
             <button className="btn" type="button" onClick={() => file.current?.click()}>{T("上传文件")}</button></div> : null}
           {docs.data?.length ? <ul className="checks">{docs.data.map((d) => <li key={d.id}><span className="chip">{d.category}</span>
             <span><button className="btn ghost sm" type="button" onClick={() => void download(d)}>{d.filename}</button>
-              <div className="d mono">{(d.size / 1024).toFixed(1)} KB · sha256 {d.sha256.slice(0, 16)}… · {d.created_by} · {fmtDate(d.created_at, true)}</div></span></li>)}</ul>
+              <div className="d mono">{(d.size / 1024).toFixed(1)} KB · sha256 {d.sha256.slice(0, 16)}… · {d.created_by} · {fmtDate(d.created_at, true)}</div>
+              {isPdf(d) && can("document.write") ? <button className="btn sm" type="button" style={{ marginTop: 4 }} disabled={extracting !== null}
+                onClick={() => void extract(d)}>{extracting === d.id ? T("提取中…") : T("提取字段")}</button> : null}</span></li>)}</ul>
             : <p className="muted">{T("还没有文件。")}</p>}
         </section>
       </div>

@@ -617,6 +617,117 @@
     "title": "Body_wb_intake_pdf_api_wb_intake_pdf_post",
     "type": "object"
    },
+   "CandidateOut": {
+    "additionalProperties": true,
+    "description": "提取 / 搜集到的一个候选值：path 为空表示只作参考（不是承销输入或值不可用）。",
+    "properties": {
+     "confidence": {
+      "enum": [
+       "high",
+       "medium",
+       "low"
+      ],
+      "title": "Confidence",
+      "type": "string"
+     },
+     "confidence_label": {
+      "title": "Confidence Label",
+      "type": "string"
+     },
+     "display": {
+      "title": "Display",
+      "type": "string"
+     },
+     "key": {
+      "title": "Key",
+      "type": "string"
+     },
+     "label": {
+      "title": "Label",
+      "type": "string"
+     },
+     "method": {
+      "enum": [
+       "pdf",
+       "api"
+      ],
+      "title": "Method",
+      "type": "string"
+     },
+     "note": {
+      "title": "Note",
+      "type": "string"
+     },
+     "page": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Page"
+     },
+     "path": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Path"
+     },
+     "seller_claimed": {
+      "title": "Seller Claimed",
+      "type": "boolean"
+     },
+     "source": {
+      "title": "Source",
+      "type": "string"
+     },
+     "source_url": {
+      "title": "Source Url",
+      "type": "string"
+     },
+     "value": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "integer"
+       },
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Value"
+     }
+    },
+    "required": [
+     "key",
+     "label",
+     "path",
+     "value",
+     "display",
+     "page",
+     "source",
+     "source_url",
+     "confidence",
+     "confidence_label",
+     "seller_claimed",
+     "note",
+     "method"
+    ],
+    "title": "CandidateOut",
+    "type": "object"
+   },
    "CatalogOut": {
     "additionalProperties": true,
     "properties": {
@@ -1834,6 +1945,117 @@
     "title": "EvidenceOut",
     "type": "object"
    },
+   "ExtractOut": {
+    "additionalProperties": true,
+    "properties": {
+     "candidates": {
+      "items": {
+       "$ref": "#/components/schemas/CandidateOut"
+      },
+      "title": "Candidates",
+      "type": "array"
+     },
+     "document_id": {
+      "title": "Document Id",
+      "type": "integer"
+     },
+     "filename": {
+      "title": "Filename",
+      "type": "string"
+     },
+     "notice": {
+      "title": "Notice",
+      "type": "string"
+     },
+     "tenants": {
+      "items": {
+       "$ref": "#/components/schemas/ExtractedTenantOut"
+      },
+      "title": "Tenants",
+      "type": "array"
+     },
+     "track": {
+      "enum": [
+       "residential",
+       "commercial"
+      ],
+      "title": "Track",
+      "type": "string"
+     }
+    },
+    "required": [
+     "document_id",
+     "filename",
+     "track",
+     "candidates",
+     "tenants",
+     "notice"
+    ],
+    "title": "ExtractOut",
+    "type": "object"
+   },
+   "ExtractedTenantOut": {
+    "additionalProperties": true,
+    "properties": {
+     "monthly_rent": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Monthly Rent"
+     },
+     "page": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Page"
+     },
+     "sf": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Sf"
+     },
+     "suite": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Suite"
+     },
+     "tenant": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Tenant"
+     }
+    },
+    "title": "ExtractedTenantOut",
+    "type": "object"
+   },
    "GateCheck": {
     "additionalProperties": true,
     "properties": {
@@ -2207,6 +2429,101 @@
      "text"
     ],
     "title": "KillItemOut",
+    "type": "object"
+   },
+   "LegacyImportOut": {
+    "additionalProperties": true,
+    "properties": {
+     "deal": {
+      "$ref": "#/components/schemas/DealOut"
+     },
+     "version": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/VersionOut"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "warning": {
+      "title": "Warning",
+      "type": "string"
+     }
+    },
+    "required": [
+     "deal",
+     "version",
+     "warning"
+    ],
+    "title": "LegacyImportOut",
+    "type": "object"
+   },
+   "LegacyProjectOut": {
+    "additionalProperties": true,
+    "properties": {
+     "address": {
+      "title": "Address",
+      "type": "string"
+     },
+     "id": {
+      "title": "Id",
+      "type": "integer"
+     },
+     "imported_deal_id": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Imported Deal Id"
+     },
+     "kind": {
+      "enum": [
+       "project",
+       "uw"
+      ],
+      "title": "Kind",
+      "type": "string"
+     },
+     "name": {
+      "title": "Name",
+      "type": "string"
+     },
+     "track": {
+      "enum": [
+       "residential",
+       "commercial"
+      ],
+      "title": "Track",
+      "type": "string"
+     },
+     "updated_at": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Updated At"
+     }
+    },
+    "required": [
+     "kind",
+     "id",
+     "track",
+     "name",
+     "address",
+     "updated_at",
+     "imported_deal_id"
+    ],
+    "title": "LegacyProjectOut",
     "type": "object"
    },
    "MaxBidIn": {
@@ -3060,6 +3377,89 @@
      "material"
     ],
     "title": "RedTeamRowOut",
+    "type": "object"
+   },
+   "ResearchIn": {
+    "additionalProperties": false,
+    "properties": {
+     "mode": {
+      "default": "address",
+      "enum": [
+       "address",
+       "url"
+      ],
+      "title": "Mode",
+      "type": "string"
+     },
+     "text": {
+      "maxLength": 500,
+      "minLength": 1,
+      "title": "Text",
+      "type": "string"
+     },
+     "track": {
+      "enum": [
+       "residential",
+       "commercial"
+      ],
+      "title": "Track",
+      "type": "string"
+     }
+    },
+    "required": [
+     "track",
+     "text"
+    ],
+    "title": "ResearchIn",
+    "type": "object"
+   },
+   "ResearchOut": {
+    "additionalProperties": true,
+    "properties": {
+     "address": {
+      "title": "Address",
+      "type": "string"
+     },
+     "candidates": {
+      "items": {
+       "$ref": "#/components/schemas/CandidateOut"
+      },
+      "title": "Candidates",
+      "type": "array"
+     },
+     "error": {
+      "title": "Error",
+      "type": "string"
+     },
+     "manual_needed": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Manual Needed",
+      "type": "array"
+     },
+     "mode": {
+      "title": "Mode",
+      "type": "string"
+     },
+     "track": {
+      "enum": [
+       "residential",
+       "commercial"
+      ],
+      "title": "Track",
+      "type": "string"
+     }
+    },
+    "required": [
+     "track",
+     "mode",
+     "address",
+     "candidates",
+     "manual_needed",
+     "error"
+    ],
+    "title": "ResearchOut",
     "type": "object"
    },
    "ReviewIn": {
@@ -6386,6 +6786,58 @@
     ]
    }
   },
+  "/api/v2/deals/{deal_id}/documents/{doc_id}/extract": {
+   "post": {
+    "description": "从已上传的 PDF（OM / flyer / 卖方材料）提取候选字段与租户行；不改承销，逐条采用后才写入。",
+    "operationId": "extract_api_v2_deals__deal_id__documents__doc_id__extract_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "deal_id",
+      "required": true,
+      "schema": {
+       "title": "Deal Id",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "path",
+      "name": "doc_id",
+      "required": true,
+      "schema": {
+       "title": "Doc Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ExtractOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Extract",
+    "tags": [
+     "v2 · intake & exports"
+    ]
+   }
+  },
   "/api/v2/deals/{deal_id}/events": {
    "get": {
     "description": "日志标签页：阶段推进、版本、证据、矛盾、投票、决策、文件……按时间倒序。",
@@ -6495,6 +6947,64 @@
     "summary": "Add Evidence",
     "tags": [
      "v2 · documents"
+    ]
+   }
+  },
+  "/api/v2/deals/{deal_id}/export/{kind}": {
+   "get": {
+    "description": "按当前承销版本导出。\n\nmemo 投资备忘录 PDF · model 核保明细 Excel · tearsheet 一页纸（商业）· report 经典核保报告（商业）。",
+    "operationId": "export_api_v2_deals__deal_id__export__kind__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "deal_id",
+      "required": true,
+      "schema": {
+       "title": "Deal Id",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "path",
+      "name": "kind",
+      "required": true,
+      "schema": {
+       "enum": [
+        "memo",
+        "model",
+        "tearsheet",
+        "report"
+       ],
+       "title": "Kind",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       },
+       "application/pdf": {},
+       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {}
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Export",
+    "tags": [
+     "v2 · intake & exports"
     ]
    }
   },
@@ -7422,6 +7932,88 @@
     ]
    }
   },
+  "/api/v2/legacy/projects": {
+   "get": {
+    "description": "老版（v1）保存过的项目，标出已导入到哪笔交易。",
+    "operationId": "legacy_projects_api_v2_legacy_projects_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/LegacyProjectOut"
+         },
+         "title": "Response Legacy Projects Api V2 Legacy Projects Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Legacy Projects",
+    "tags": [
+     "v2 · intake & exports"
+    ]
+   }
+  },
+  "/api/v2/legacy/projects/{kind}/{pid}/import": {
+   "post": {
+    "description": "把一个老版项目导入为新交易，输入原样带成第一版承销；同一项目不重复导入。",
+    "operationId": "legacy_import_api_v2_legacy_projects__kind___pid__import_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "kind",
+      "required": true,
+      "schema": {
+       "enum": [
+        "project",
+        "uw"
+       ],
+       "title": "Kind",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "pid",
+      "required": true,
+      "schema": {
+       "title": "Pid",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/LegacyImportOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Legacy Import",
+    "tags": [
+     "v2 · intake & exports"
+    ]
+   }
+  },
   "/api/v2/me": {
    "get": {
     "operationId": "me_api_v2_me_get",
@@ -7521,6 +8113,48 @@
     "summary": "Portfolio",
     "tags": [
      "v2 · portfolio"
+    ]
+   }
+  },
+  "/api/v2/research": {
+   "post": {
+    "description": "按地址或房源链接搜集公开信息（慢：多次公网抓取，约 30–90 秒）；每个字段带来源与可信度。",
+    "operationId": "research_api_v2_research_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ResearchIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ResearchOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Research",
+    "tags": [
+     "v2 · intake & exports"
     ]
    }
   },

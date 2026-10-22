@@ -795,3 +795,70 @@ class PortfolioOut(Out):
     total_price: float
     weighted_coc_pct: float | None
     deals: list[DealListItem]
+
+
+# ---------------------------------------------------------------- 取数与导出（老版功能搬进 v2）
+class CandidateOut(Out):
+    """提取 / 搜集到的一个候选值：path 为空表示只作参考（不是承销输入或值不可用）。"""
+
+    key: str
+    label: str
+    path: str | None
+    value: float | int | str | None
+    display: str
+    page: int | None
+    source: str
+    source_url: str
+    confidence: Literal["high", "medium", "low"]
+    confidence_label: str
+    seller_claimed: bool
+    note: str
+    method: Literal["pdf", "api"]
+
+
+class ExtractedTenantOut(Out):
+    suite: str | None = None
+    tenant: str | None = None
+    sf: float | None = None
+    monthly_rent: float | None = None
+    page: int | None = None
+
+
+class ExtractOut(Out):
+    document_id: int
+    filename: str
+    track: Track
+    candidates: list[CandidateOut]
+    tenants: list[ExtractedTenantOut]
+    notice: str
+
+
+class ResearchIn(In):
+    track: Track
+    mode: Literal["address", "url"] = "address"
+    text: str = Field(min_length=1, max_length=500)
+
+
+class ResearchOut(Out):
+    track: Track
+    mode: str
+    address: str
+    candidates: list[CandidateOut]
+    manual_needed: list[str]
+    error: str
+
+
+class LegacyProjectOut(Out):
+    kind: Literal["project", "uw"]
+    id: int
+    track: Track
+    name: str
+    address: str
+    updated_at: float | None
+    imported_deal_id: int | None
+
+
+class LegacyImportOut(Out):
+    deal: DealOut
+    version: VersionOut | None
+    warning: str

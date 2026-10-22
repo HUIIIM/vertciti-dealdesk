@@ -1,8 +1,11 @@
 // 租金表：商业逐租户（面积、月租、承销年租），合计与出租率实时算；住宅为收入字段。
 import { T } from "@/i18n";
+import { useRef } from "react";
+import { raw } from "@/api/client";
 import { FieldInput, NumberInput } from "@/components/FieldInput";
 import { passportStatus } from "@/components/Passport";
-import { NumCell } from "@/components/ui";
+import { NumCell, useToast } from "@/components/ui";
+import { saveResponse } from "@/lib/download";
 import { RES_INCOME } from "@/domain/fields";
 import { getPath } from "@/lib/paths";
 import { useDeal } from "./Deal";
@@ -11,6 +14,8 @@ interface Tenant { suite?: string; tenant?: string; sf?: number; monthly_rent?: 
 
 export function RentRollTab() {
   const { track, draft, set, preview, passports, openPassport } = useDeal();
+  const toast = useToast();
+  const xf = useRef<HTMLInputElement>(null);
   if (track === "residential") {
     return (
       <section className="card"><h2>{T("租金与收入")}</h2>
@@ -22,10 +27,27 @@ export function RentRollTab() {
   const totSf = tenants.reduce((a, t) => a + (t.sf ?? 0), 0);
   const totM = tenants.reduce((a, t) => a + (t.monthly_rent ?? 0), 0);
   const upd = (i: number, k: keyof Tenant, v: unknown) => set(`tenants.${i}.${k}`, v);
+  const template = async () => {
+    try { await saveResponse(await raw("/api/uw/rentroll/template.xlsx"), "dealdesk_rentroll_template.xlsx"); } catch (e) { toast.err(e); }
+  };
+  const importXlsx = async (f: File) => {
+    const fd = new FormData(); fd.append("file", f);
+    try {
+      const r = await (await raw("/api/uw/rentroll/parse", { method: "POST", body: fd })).json() as { tenants: Tenant[]; skipped_example?: number; bad_dates?: number };
+      if (!r.tenants.length) { toast.err(T("表里没有租户行（示例行已跳过）")); return; }
+      if (tenants.length && !window.confirm(T("用表里的 {0} 个租户替换当前 {1} 行？", [r.tenants.length, tenants.length]))) return;
+      set("tenants", r.tenants);
+      toast.ok(T("已导入 {0} 个租户", [r.tenants.length]) + (r.bad_dates ? T("；{0} 行日期没认出来，已留空", [r.bad_dates]) : ""));
+    } catch (e) { toast.err(e); }
+  };
   return (
     <section className="card">
       <div className="row" style={{ justifyContent: "space-between" }}><h2 style={{ margin: 0 }}>{T("租金表")}</h2>
-        <button className="btn sm" type="button" onClick={() => set("tenants", [...tenants, { suite: String(tenants.length + 1), tenant: "", sf: 0, monthly_rent: 0 }])}>{T("+ 加租户")}</button></div>
+        <div className="row">
+          <button className="btn ghost sm" type="button" onClick={() => void template()}>{T("下载 Excel 模板")}</button>
+          <input ref={xf} type="file" accept=".xlsx" className="sr-only" aria-label={T("选择租金表 Excel")} onChange={(e) => { const f = e.target.files?.[0]; if (f) void importXlsx(f); e.target.value = ""; }} />
+          <button className="btn sm" type="button" onClick={() => xf.current?.click()}>{T("从 Excel 导入")}</button>
+          <button className="btn sm" type="button" onClick={() => set("tenants", [...tenants, { suite: String(tenants.length + 1), tenant: "", sf: 0, monthly_rent: 0 }])}>{T("+ 加租户")}</button></div></div>
       <p className="sub">{T("年租 = 月租 × 12；承销年租留空则按合同口径。数字旁“源”可登记来源（租约、租金表第几页）。")}</p>
       <div className="table-wrap" style={{ maxHeight: "none" }}>
         <table className="t">

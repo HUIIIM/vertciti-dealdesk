@@ -35,5 +35,6 @@ def install_error_handlers(app: FastAPI) -> None:
 
 def routers() -> list[APIRouter]:
     # 延迟导入：子路由模块会反向导入本包（deps / schemas），放顶层会形成循环
-    from app.api.v2 import admin, committee, deals, documents, portfolio, underwriting  # noqa: PLC0415
-    return [deals.router, underwriting.router, documents.router, committee.router, portfolio.router, admin.router]
+    from app.api.v2 import admin, committee, deals, documents, intake, portfolio, underwriting  # noqa: PLC0415
+    return [deals.router, underwriting.router, documents.router, intake.router, committee.router, portfolio.router,
+            admin.router]
