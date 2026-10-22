@@ -186,9 +186,9 @@ export function InstModel() {
         </ul> : null}
         <h3 style={{ marginTop: 20, fontSize: 15 }}>{T("逐年现金流（$）")}</h3>
         {cre ? <div className="table-wrap" tabIndex={0} role="region" aria-label={T("逐年现金流（$）")}><table className="t">
-          <thead><tr><th scope="col">{T("科目")}</th>{years.map((y) => <th key={y} scope="col" className="num">{T("第 {0} 年", [y + 1])}</th>)}</tr></thead>
-          <tbody>{ROWS.map(([k, label, total]) => <tr key={k} className={total ? "total" : undefined}><td>{label}</td>{years.map((y) => <NumCell key={y} v={val(k, y)} unit="usd" />)}</tr>)}
-            <tr><td>{T("平均出租率")}</td>{years.map((y) => <NumCell key={y} v={cre.annual.occupancy_pct?.[y]} unit="pct" />)}</tr></tbody></table></div>
+          <thead><tr><th scope="col" style={{ whiteSpace: "nowrap" }}>{T("科目")}</th>{years.map((y) => <th key={y} scope="col" className="num">{T("第 {0} 年", [y + 1])}</th>)}</tr></thead>
+          <tbody>{ROWS.map(([k, label, total]) => <tr key={k} className={total ? "total" : undefined}><td style={{ whiteSpace: "nowrap" }}>{label}</td>{years.map((y) => <NumCell key={y} v={val(k, y)} unit="usd" />)}</tr>)}
+            <tr><td style={{ whiteSpace: "nowrap" }}>{T("平均出租率")}</td>{years.map((y) => <NumCell key={y} v={cre.annual.occupancy_pct?.[y]} unit="pct" />)}</tr></tbody></table></div>
           : <p className="muted">{T("填好交易、租约与市场假设后，这里出逐年现金流。")}</p>}
       </section>
     </div>
