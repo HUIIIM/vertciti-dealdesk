@@ -90,3 +90,12 @@ describe("hotkeys.matches", () => {
     expect(matches(ev("S", { metaKey: true }), "mod+s")).toBe(true);
   });
 });
+
+describe("手机端只读", () => {
+  it("手机上只保留 *.read 权限，电脑上原样", async () => {
+    const { effectivePermissions } = await import("@/lib/media");
+    const perms = ["deal.read", "deal.write", "payment.approve", "audit.read"];
+    expect(effectivePermissions(perms, true)).toEqual(["deal.read", "audit.read"]);
+    expect(effectivePermissions(perms, false)).toEqual(perms);
+  });
+});

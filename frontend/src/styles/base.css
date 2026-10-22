@@ -232,4 +232,6 @@ table.t a.rowlink:hover { text-decoration: underline; }
   .desktop-only { display: none !important; }
   .kanban { grid-auto-columns: minmax(78vw, 1fr); }
 }
+.phone-note { margin: 0 0 var(--s4); padding: var(--s2) var(--s3); border-left: 3px solid var(--orange); background: var(--surface);
+  font-size: 13px; color: var(--text-2); }
 @media print { .brandbar, .appbar, .tabs, .draftbar, .no-print { display: none !important; } body { background: #fff; } }

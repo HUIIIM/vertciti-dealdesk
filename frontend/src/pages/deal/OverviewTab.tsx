@@ -33,13 +33,13 @@ export function OverviewTab() {
           <p className="sub">只能逐级前进；每一级都有关卡。回退不设关卡，但必须写原因（记入日志）。</p>
           {ov.next_stage ? (
             <div className="row">
-              <button className="btn primary" type="button" disabled={!can("deal.advance")} onClick={() => advance(ov.next_stage!)}>
-                推进到「{STAGES.find(([s]) => s === ov.next_stage)?.[1]}」</button>
+              {can("deal.advance") ? <button className="btn primary" type="button" onClick={() => advance(ov.next_stage!)}>
+                推进到「{STAGES.find(([s]) => s === ov.next_stage)?.[1]}」</button> : null}
               {ov.next_gate && !ov.next_gate.allowed ? <Status s="building">关卡未通过</Status> : <Status s="verified">关卡已满足</Status>}
             </div>) : <p>已在最后阶段。</p>}
           {blocked ? <ul className="checks" style={{ marginTop: 12 }}>{(blocked.checks ?? []).filter((c) => !c.ok).map((c) =>
             <li key={c.key}><Status s={c.status}>{c.status_label}</Status><span>{c.label}{c.detail ? <div className="d">{c.detail}</div> : null}</span></li>)}</ul> : null}
-          <details style={{ marginTop: 16 }}>
+          {can("deal.advance") ? <details style={{ marginTop: 16 }}>
             <summary style={{ cursor: "pointer", fontWeight: 700 }}>回退或放弃</summary>
             <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
               <label className="field">原因（必填）<input className="input" value={reason} onChange={(e) => setReason(e.target.value)} /></label>
@@ -49,7 +49,7 @@ export function OverviewTab() {
               </div>
               <p className="muted" style={{ fontSize: 13, margin: 0 }}>放弃前须先在右侧记一条 PASS 决策（理由 + 当时的数字快照），便于复盘。</p>
             </div>
-          </details>
+          </details> : null}
         </section>
         <Tasks />
         <Approvals />

@@ -165,7 +165,7 @@ export function DealPage({ id, tab }: { id: number; tab: DealTab }) {
             <h3 style={{ marginTop: 16, fontSize: 15 }}>进入「{STAGES.find(([s]) => s === o.next_stage)?.[1]}」的关卡</h3>
             <ul className="checks">{(o.next_gate.checks ?? []).map((c) => <li key={c.key}><Status s={c.status}>{c.status_label}</Status><span>{c.label}{c.detail ? <div className="d">{c.detail}</div> : null}</span></li>)}</ul>
           </>) : null}
-          <div style={{ marginTop: 12 }}><a className="btn sm" href={`#/deals/${id}`}>去推进阶段 →</a></div>
+          {can("deal.advance") ? <div style={{ marginTop: 12 }}><a className="btn sm" href={`#/deals/${id}`}>去推进阶段 →</a></div> : null}
         </section>
       </div>
       <nav className="tabs" role="tablist" aria-label="交易标签页">
@@ -182,7 +182,7 @@ export function DealPage({ id, tab }: { id: number; tab: DealTab }) {
           <span>草稿有改动 · 结果为实时重算{previewing ? "（计算中…）" : ""}{preview?.error ? ` · ${preview.error}` : ""}</span>
           <span style={{ flex: 1 }} />
           <button className="btn sm" type="button" onClick={() => setEdit(null)}>放弃改动</button>
-          <button className="btn sm primary" type="button" onClick={save}>保存为新版本 <Kbd k="⌘ S" /></button>
+          {can("deal.write") ? <button className="btn sm primary" type="button" onClick={save}>保存为新版本 <Kbd k="⌘ S" /></button> : null}
         </div>) : !vid && can("deal.write") ? (
         <div className="draftbar"><span>还没有承销版本：在“租金表 / T12 / 模型”填好假设后保存第一版</span><span style={{ flex: 1 }} />
           <button className="btn sm primary" type="button" onClick={save}>保存第一版 <Kbd k="⌘ S" /></button></div>) : null}

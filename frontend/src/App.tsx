@@ -9,6 +9,7 @@ import { CommandPalette, type Command } from "@/components/CommandPalette";
 import { ShortcutHelp } from "@/components/ShortcutHelp";
 import { ErrorBox, Skeleton } from "@/components/ui";
 import { useHotkeys } from "@/lib/hotkeys";
+import { effectivePermissions, PHONE_QUERY, useMediaQuery } from "@/lib/media";
 import { useAppearance } from "@/lib/prefs";
 import { navigate, useRoute } from "@/lib/router";
 import { Compare } from "@/pages/Compare";
@@ -21,6 +22,7 @@ import { Settings } from "@/pages/Settings";
 export function App() {
   const route = useRoute();
   const { density, setDensity, theme, setTheme } = useAppearance();
+  const phone = useMediaQuery(PHONE_QUERY);
   const [authTick, setAuthTick] = useState(0);
   const boot = useApi(async () => {
     const me = (await call(api.GET("/api/v2/me"))) as unknown as Me;
@@ -57,10 +59,12 @@ export function App() {
   if (boot.loading && !boot.data) return <main className="page"><Skeleton rows={6} h={32} /></main>;
   if (!boot.data?.catalog || (boot.error instanceof ApiError && boot.error.status === 401)) return <Login onDone={() => setAuthTick((t) => t + 1)} />;
   const { me, catalog } = boot.data;
-  const can = (p: string) => me.permissions.includes(p);
+  const perms = effectivePermissions(me.permissions, phone);
+  const can = (p: string) => perms.includes(p);
   return (
     <Ctx.Provider value={{ me, catalog, can, refreshDeals, dealsVersion }}>
       <AppShell route={route} onCmdk={() => setCmdk(true)} density={density} setDensity={setDensity} theme={theme} setTheme={setTheme}>
+        {phone ? <p className="phone-note" role="note">手机端为只读视图：看数字、进度与记录；编辑、审批、投票请用电脑。</p> : null}
         {route.name === "pipeline" ? <Pipeline /> : route.name === "deal" ? <DealPage key={route.id} id={route.id} tab={route.tab} />
           : route.name === "compare" ? <Compare ids={route.ids} /> : route.name === "settings" ? <Settings section={route.section} />
           : <ErrorBox error={new Error(`页面不存在：${route.path}`)} />}

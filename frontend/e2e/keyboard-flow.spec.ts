@@ -115,3 +115,18 @@ test("v1 页面回归：首页与工作台加载无 JS 报错", async ({ page })
   }
   expect(errs).toEqual([]);
 });
+
+test("手机 390 宽：只读——看得到数字与进度，没有任何写操作入口", async ({ browser, request }) => {
+  const d = await (await request.post("/api/v2/deals", { data: { name: "手机只读", track: "commercial", address: "1 St", kill_criteria: [] } })).json();
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  await page.goto(`/app/#/deals/${d.id}`);
+  await expect(page.getByRole("note")).toContainText("只读");
+  await expect(page.getByRole("heading", { name: "手机只读" })).toBeVisible();
+  await expect(page.getByRole("link", { name: /去推进阶段/ })).toHaveCount(0);
+  for (const name of [/添加/, /申请付款/, /记录决策/, /推进到/, /保存第一版/]) {
+    await expect(page.getByRole("button", { name })).toHaveCount(0);
+  }
+  await page.goto("/app/#/");
+  await expect(page.getByRole("button", { name: /新建交易/ })).toHaveCount(0);
+  await page.close();
+});
