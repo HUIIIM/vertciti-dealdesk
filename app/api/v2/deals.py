@@ -12,12 +12,15 @@ from app.api.v2.schemas import (
     DealOut,
     DealPatch,
     GateOut,
-    Generic,
+    CompareOut,
+    DiffOut,
+    EventOut,
     OverviewOut,
     RunOut,
     RunVerifyOut,
     Stage,
     StageAdvance,
+    StageResultOut,
     Track,
     VersionCreate,
     VersionOut,
@@ -63,7 +66,7 @@ def gate(deal_id: int, target: Stage):
     return analysis.gate_check(deal_id, target)
 
 
-@router.post("/deals/{deal_id}/stage", response_model=Generic, dependencies=[need("deal.advance")])
+@router.post("/deals/{deal_id}/stage", response_model=StageResultOut, dependencies=[need("deal.advance")])
 def advance(deal_id: int, body: StageAdvance):
     """推进 / 回退阶段。关卡未过 → 409，响应 gate 字段列出逐项检查。"""
     return workflow.advance(deal_id, body.target, body.reason)
@@ -86,13 +89,13 @@ def get_version(deal_id: int, version_id: int):
     return deals.get_version(deal_id, version_id)
 
 
-@router.get("/deals/{deal_id}/diff", response_model=Generic, dependencies=[need("deal.read")])
+@router.get("/deals/{deal_id}/diff", response_model=DiffOut, dependencies=[need("deal.read")])
 def diff(deal_id: int, a: int, b: int):
     """任意两版并排：假设与结果的逐项差异。"""
     return analysis.diff_versions(deal_id, a, b)
 
 
-@router.get("/deals/{deal_id}/events", response_model=list[Generic], dependencies=[need("deal.read")])
+@router.get("/deals/{deal_id}/events", response_model=list[EventOut], dependencies=[need("deal.read")])
 def events(deal_id: int, limit: int = Query(200, ge=1, le=1000)):
     """日志标签页：阶段推进、版本、证据、矛盾、投票、决策、文件……按时间倒序。"""
     return deals.events(deal_id, limit)
@@ -110,7 +113,7 @@ def verify_run(run_id: str):
     return deals.verify_run(run_id)
 
 
-@router.get("/compare", response_model=Generic, dependencies=[need("deal.read")])
+@router.get("/compare", response_model=CompareOut, dependencies=[need("deal.read")])
 def compare(ids: str = Query(..., description="2–4 个交易 id，逗号分隔")):
     try:
         id_list = [int(x) for x in ids.split(",") if x.strip()]

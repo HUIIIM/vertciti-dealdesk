@@ -26,7 +26,7 @@ class Metric:
     key: str
     label: str
     label_en: str
-    unit: Literal["usd", "pct", "x", "usd_month"]
+    unit: Literal["usd", "pct", "x", "usd_month", "pts"]
     better: Literal["higher", "lower"]
 
 
@@ -42,7 +42,7 @@ METRICS: dict[str, Metric] = {m.key: m for m in (
     Metric("cash_to_close", "全口径现金需求", "Cash to close", "usd", "lower"),
     Metric("ltv_pct", "LTV", "LTV", "pct", "lower"),
     Metric("breakeven_occupancy_pct", "盈亏平衡出租率", "Breakeven occupancy", "pct", "lower"),
-    Metric("score", "deal 评分", "Deal score", "x", "higher"),
+    Metric("score", "deal 评分", "Deal score", "pts", "higher"),
 )}
 
 # 每条赛道的“主回报指标”：红队面板、情景加权、事后归因都围绕它

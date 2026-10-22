@@ -1,0 +1,36 @@
+/* vertciti DNA 令牌（源：_brand-dna/tokens.json）。颜色只表意义：绿=达标/已验证，黄=待复核，红=触发淘汰/风险，
+   橙=品牌强调与焦点；其余黑白灰。对比度 ≥ 4.5:1。浅色默认，深色供长时间建模。 */
+:root {
+  --ink: #000000; --paper: #ffffff; --orange: #ff4713; --orange-text: #c93410; --yellow: #ffce00;
+  --green: #1d8348; --graphite: #3f3f3f; --stone: #6b6b6b; --line: #dedede; --line-soft: #ececec; --mist: #f5f5f5;
+  --red: #b3261e; --amber-text: #8a5a00;
+  --bg: var(--mist); --surface: var(--paper); --surface-2: var(--mist); --text: var(--ink); --text-2: var(--graphite);
+  --text-3: var(--stone); --border: var(--line); --hover: #f0f0f0; --selected: #fff3ee;
+  --ok: var(--green); --ok-bg: #e8f3ec; --warn: var(--amber-text); --warn-bg: #fff5cc; --risk: var(--red);
+  --risk-bg: #f7e9e8; --plan: var(--stone); --plan-bg: var(--mist); --accent: var(--orange); --accent-text: var(--orange-text);
+  --font: "Nunito Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  /* 8 点网格 */
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px; --s7: 48px; --s8: 64px;
+  /* 密度：舒适（缺省）行高 44 / 15px；紧凑 32 / 13px */
+  --row-h: 44px; --fs: 15px; --fs-sm: 13px; --fs-xs: 12px; --cell-px: 12px;
+  --ease: cubic-bezier(.2, .7, .2, 1); --dur: 200ms;
+  --shadow: 0 1px 0 var(--line), 0 8px 24px rgba(0, 0, 0, .08);
+  color-scheme: light;
+}
+:root[data-density="compact"] { --row-h: 32px; --fs: 13px; --fs-sm: 12px; --fs-xs: 11px; --cell-px: 8px; }
+:root[data-theme="dark"] {
+  --bg: #0b0b0b; --surface: #141414; --surface-2: #1c1c1c; --text: #f2f2f2; --text-2: #c8c8c8; --text-3: #9a9a9a;
+  --border: #2e2e2e; --hover: #1f1f1f; --selected: #2a1710;
+  --ok: #5fc48a; --ok-bg: #12261a; --warn: #f2c94c; --warn-bg: #2a2410; --risk: #ff8a80; --risk-bg: #2b1513;
+  --plan: #9a9a9a; --plan-bg: #1c1c1c; --accent-text: #ff7a52; --shadow: 0 1px 0 #2e2e2e, 0 8px 24px rgba(0, 0, 0, .5);
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="dark"])[data-theme-auto="1"] {
+    --bg: #0b0b0b; --surface: #141414; --surface-2: #1c1c1c; --text: #f2f2f2; --text-2: #c8c8c8; --text-3: #9a9a9a;
+    --border: #2e2e2e; --hover: #1f1f1f; --selected: #2a1710; --ok: #5fc48a; --ok-bg: #12261a; --warn: #f2c94c;
+    --warn-bg: #2a2410; --risk: #ff8a80; --risk-bg: #2b1513; --accent-text: #ff7a52; color-scheme: dark;
+  }
+}
+@media (prefers-reduced-motion: reduce) { :root { --dur: 0ms; } }

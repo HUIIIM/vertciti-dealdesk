@@ -284,3 +284,426 @@ class EvidenceOut(Out):
 
 class Generic(Out):
     """结构较深的分析结果（红队、情景、反推、对比、归因）：字段见各端点说明。"""
+
+
+# ---------------------------------------------------------------- 分析类响应（前端类型由此生成，杜绝手写类型漂移）
+class KillItemOut(Out):
+    metric: str
+    op: str
+    threshold: float
+    value: float | None
+    state: Literal["ok", "triggered", "unknown"]
+    text: str
+
+
+class KillEvalOut(Out):
+    items: list[KillItemOut]
+    triggered: list[KillItemOut]
+    unknown: list[KillItemOut]
+    defined: bool
+    clear: bool
+
+
+class ShockOut(Out):
+    value: float
+    delta_pct_points: float
+
+
+class RedTeamRowOut(Out):
+    key: str
+    label: str
+    paths: list[str]
+    source_hint: str
+    minus: ShockOut
+    plus: ShockOut
+    swing_bps: float
+    material: bool
+
+
+class SkippedOut(Out):
+    key: str
+    label: str
+    reason: str
+
+
+class RedTeamOut(Out):
+    metric: str
+    metric_label: str
+    base: float | None
+    shock_pct: float
+    material_bps: float
+    top: list[RedTeamRowOut]
+    all: list[RedTeamRowOut]
+    skipped: list[SkippedOut]
+    key_assumptions: list[str]
+    key_fields: list[str]
+    note: str
+    version_id: int
+    read: bool
+
+
+class RedTeamReadOut(Out):
+    version_id: int
+    read: bool
+
+
+class ScenarioRowOut(Out):
+    name: str
+    probability: float
+    changes: list[dict[str, Any]]
+    metrics: dict[str, float | None]
+    primary: float | None
+    loss: bool | None
+
+
+class ScenariosOut(Out):
+    metric: str
+    metric_label: str
+    scenarios: list[ScenarioRowOut]
+    expected: float | None
+    loss_probability_pct: float | None
+    note: str
+
+
+class ConstraintOut(Out):
+    source: Literal["target", "kill_criteria"]
+    metric: str
+    label: str
+    price: float | None
+    status: Literal["ok", "above_range", "infeasible", "unknown"]
+    reason: str
+
+
+class MaxBidOut(Out):
+    asking: float
+    max_bid: float | None
+    binding: ConstraintOut | None
+    constraints: list[ConstraintOut]
+    headroom_pct: float | None
+    note: str
+
+
+class DiffRowOut(Out):
+    path: str
+    kind: Literal["added", "removed", "changed"]
+    before: Any = None
+    after: Any = None
+    delta: float | None = None
+    delta_pct: float | None = None
+
+
+class DiffSideOut(Out):
+    id: int
+    version_no: int
+    label: str
+    run_id: str
+
+
+class DiffOut(Out):
+    a: DiffSideOut
+    b: DiffSideOut
+    inputs: list[DiffRowOut]
+    metrics: list[DiffRowOut]
+    changed_inputs: int
+    changed_metrics: int
+
+
+class TallyOut(Out):
+    approve: int
+    reject: int
+    abstain: int
+    chairman_vote: str | None
+    result: Literal["approved", "rejected", "pending"]
+    why: str
+    votes: int
+
+
+class VoteOut(Out):
+    id: int
+    voter: str
+    vote: Literal["approve", "reject", "abstain"]
+    comment: str
+    role: str
+    role_label: str
+    created_at: str
+
+
+class CommitteeStatusOut(Out):
+    version_id: int
+    votes: list[VoteOut]
+    tally: TallyOut
+    rules: str
+
+
+class PackOut(Out):
+    id: int
+    deal_id: int
+    version_id: int
+    run_id: str
+    kind: Literal["pdf", "xlsx"]
+    sha256: str
+    size: int
+    created_at: str
+    created_by: str
+
+
+class VerifyOut(Out):
+    genuine: bool
+    sha256: str
+    message: str
+    run_id: str | None = None
+    deal_id: int | None = None
+    version_id: int | None = None
+
+
+class EventOut(Out):
+    id: int
+    deal_id: int
+    kind: str
+    payload: dict[str, Any]
+    created_at: str
+    created_by: str
+
+
+class DecisionOut(Out):
+    id: int
+    deal_id: int
+    verdict: Literal["BUY", "HOLD", "PASS"]
+    rationale: str
+    snapshot: dict[str, Any]
+    run_id: str | None
+    stage: str
+    created_at: str
+    created_by: str
+
+
+class TaskOut(Out):
+    id: int
+    deal_id: int
+    title: str
+    status: Literal["open", "done"]
+    stage: str
+    assignee: str
+    due: str
+    created_by: str
+
+
+class ApprovalOut(Out):
+    id: int
+    deal_id: int
+    kind: Literal["payment", "general", "stage_override"]
+    title: str
+    amount: float | None
+    status: Literal["pending", "approved", "rejected"]
+    created_by: str
+    decided_by: str | None
+    decided_at: str | None
+    note: str
+
+
+class DocOut(Out):
+    id: int
+    deal_id: int
+    filename: str
+    content_type: str
+    size: int
+    sha256: str
+    category: str
+    created_at: str
+    created_by: str
+
+
+class ConflictOut(Out):
+    id: int
+    deal_id: int
+    field: str
+    value_a: Any = None
+    source_a: str
+    value_b: Any = None
+    source_b: str
+    diff_pct: float | None
+    status: Literal["open", "resolved"]
+    resolved_value: Any = None
+    resolution_note: str
+    resolved_by: str | None
+
+
+class VarianceCellOut(Out):
+    actual: float | None
+    underwritten: float | None
+    variance: float | None
+    variance_pct: float | None
+
+
+class VarianceRowOut(Out):
+    period: str
+    year: int
+    noi: VarianceCellOut
+    cash_flow: VarianceCellOut
+    occupancy_pct: float | None
+
+
+class AttributionStepOut(Out):
+    key: str
+    label: str
+    underwritten: Any = None
+    actual: Any = None
+    contribution_pct_points: float | None
+
+
+class AttributionOut(Out):
+    available: bool
+    reason: str | None = None
+    metric: str | None = None
+    underwritten: float | None = None
+    actual_implied: float | None = None
+    total_pct_points: float | None = None
+    steps: list[AttributionStepOut] | None = None
+    note: str | None = None
+
+
+class HoldingBasisOut(Out):
+    version_id: int
+    version_no: int
+    run_id: str
+    from_buy_decision: bool
+
+
+class ActualOut(Out):
+    period: str
+    noi: float | None = None
+    occupancy_pct: float | None = None
+    capex: float | None = None
+    debt_service: float | None = None
+    cash_flow: float | None = None
+
+
+class HoldingOut(Out):
+    basis: HoldingBasisOut
+    actuals: list[ActualOut]
+    variance: list[VarianceRowOut]
+    attribution: AttributionOut
+
+
+class MetricMetaOut(Out):
+    label: str
+    label_en: str
+    unit: Literal["usd", "pct", "x", "usd_month", "pts"]
+    better: Literal["higher", "lower"]
+
+
+class AssumptionOut(Out):
+    key: str
+    label: str
+    paths: list[str]
+    source_hint: str
+
+
+class CatalogOut(Out):
+    metrics: dict[str, MetricMetaOut]
+    primary_metric: dict[str, str]
+    assumptions: dict[str, list[AssumptionOut]]
+    kill_criteria_defaults: dict[str, list[KillCriterion]]
+    scenario_defaults: dict[str, list[Scenario]]
+
+
+class MeOut(Out):
+    username: str
+    role: str
+    role_label: str
+    display_name: str
+    auth: bool
+    permissions: list[str]
+
+
+class CompareDealOut(Out):
+    deal: DealOut
+    metrics: dict[str, float | None]
+    version: dict[str, Any] | None
+    kill: KillEvalOut | None
+
+
+class CompareOut(Out):
+    deals: list[CompareDealOut]
+    best: dict[str, int]
+
+
+class ModelOut(Out):
+    track: Track
+    metrics: dict[str, float | None]
+    detail: dict[str, Any]
+
+
+class StageResultOut(Out):
+    deal: DealOut
+    gate: GateOut
+
+
+class HealthDbOut(Out):
+    ok: bool
+    revision: str | None
+    kind: Literal["postgres", "sqlite"]
+    error: str
+
+
+class HealthOut(Out):
+    ok: bool
+    service: str
+    version: str
+    engine_version: str
+    db: HealthDbOut
+    auth: Literal["on", "off"]
+    uptime_s: float
+
+
+class TemplateOut(Out):
+    id: int | None
+    kind: str
+    name: str
+    payload: dict[str, Any]
+    builtin: bool = False
+
+
+class ViewOut(Out):
+    id: int
+    name: str
+    config: dict[str, Any]
+
+
+class UserOut(Out):
+    id: int
+    username: str
+    display_name: str
+    role: str
+    active: bool
+
+
+class UserCreatedOut(UserOut):
+    token: str = Field(description="访问令牌，只在创建时返回这一次")
+    note: str
+
+
+class AuditOut(Out):
+    id: int
+    entity: str
+    entity_id: str
+    action: str
+    actor: str
+    before: Any = None
+    after: Any = None
+    request_id: str
+    at: str
+
+
+class DataSourceOut(Out):
+    key: str
+    label: str
+    configured: bool
+    detail: str
+
+
+class PortfolioOut(Out):
+    count: int
+    total_price: float
+    weighted_coc_pct: float | None
+    deals: list[DealListItem]

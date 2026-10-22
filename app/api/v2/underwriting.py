@@ -6,7 +6,17 @@ from typing import Any
 from fastapi import APIRouter
 
 from app.api.v2.deps import need
-from app.api.v2.schemas import Generic, MaxBidIn, ScenariosIn, Track
+from app.api.v2.schemas import (
+    CatalogOut,
+    MaxBidIn,
+    MaxBidOut,
+    ModelOut,
+    RedTeamOut,
+    RedTeamReadOut,
+    ScenariosIn,
+    ScenariosOut,
+    Track,
+)
 from app.domain.v2 import kill_criteria, scenarios
 from app.domain.v2.assumptions import BY_TRACK
 from app.domain.v2.model import METRICS, PRIMARY_METRIC, ModelInputError, run_model
@@ -16,7 +26,7 @@ from app.services.v2.errors import Invalid
 router = APIRouter(prefix="/api/v2", tags=["v2 · underwriting"])
 
 
-@router.post("/model/{track}", response_model=Generic, dependencies=[need("deal.read")])
+@router.post("/model/{track}", response_model=ModelOut, dependencies=[need("deal.read")])
 def preview(track: Track, inputs: dict[str, Any]):
     """不保存的试算（模型页左改假设、右侧实时更新）。"""
     try:
@@ -26,7 +36,7 @@ def preview(track: Track, inputs: dict[str, Any]):
     return r
 
 
-@router.get("/catalog", response_model=Generic, dependencies=[need("deal.read")])
+@router.get("/catalog", response_model=CatalogOut, dependencies=[need("deal.read")])
 def catalog():
     """指标、假设、默认淘汰条件、默认情景目录（前端表单与说明文字的唯一来源）。"""
     return {
@@ -41,26 +51,26 @@ def catalog():
     }
 
 
-@router.get("/deals/{deal_id}/redteam", response_model=Generic, dependencies=[need("deal.read")])
+@router.get("/deals/{deal_id}/redteam", response_model=RedTeamOut, dependencies=[need("deal.read")])
 def redteam(deal_id: int):
     """最可能出错的 5 个假设 + 每个 ±10% 对主回报的影响（龙卷风图）；同时给出客观定义的关键数字。"""
     return analysis.redteam_for(deal_id)
 
 
-@router.post("/deals/{deal_id}/redteam/read", response_model=Generic, dependencies=[need("deal.write")])
+@router.post("/deals/{deal_id}/redteam/read", response_model=RedTeamReadOut, dependencies=[need("deal.write")])
 def redteam_read(deal_id: int):
     """标记当前版本的红队面板已读（进投委会关卡之一）。"""
     return analysis.mark_redteam_read(deal_id)
 
 
-@router.post("/deals/{deal_id}/scenarios", response_model=Generic, dependencies=[need("deal.read")])
+@router.post("/deals/{deal_id}/scenarios", response_model=ScenariosOut, dependencies=[need("deal.read")])
 def run_scenarios(deal_id: int, body: ScenariosIn):
     """基准 / 乐观 / 悲观加概率：期望回报与亏损概率。不传 scenarios 用默认三情景。"""
     custom = [s.model_dump(exclude_none=True) for s in body.scenarios] if body.scenarios else None
     return analysis.scenarios_for(deal_id, custom)
 
 
-@router.post("/deals/{deal_id}/max-bid", response_model=Generic, dependencies=[need("deal.read")])
+@router.post("/deals/{deal_id}/max-bid", response_model=MaxBidOut, dependencies=[need("deal.read")])
 def max_bid(deal_id: int, body: MaxBidIn):
     """输入目标 IRR / DSCR 等，反算最高出价；同时满足淘汰条件，写明卡住价格的约束。"""
     return analysis.max_bid_for(deal_id, [t.model_dump() for t in body.targets], body.include_kill_criteria)

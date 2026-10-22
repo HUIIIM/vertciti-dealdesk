@@ -7,7 +7,20 @@ from fastapi import APIRouter, Query
 from sqlalchemy import text
 
 from app.api.v2.deps import need
-from app.api.v2.schemas import Generic, TemplateIn, UserIn, ViewIn
+from app.api.v2.schemas import (
+    AuditOut,
+    DataSourceOut,
+    Generic,
+    HealthOut,
+    MeOut,
+    TemplateIn,
+    TemplateOut,
+    UserCreatedOut,
+    UserIn,
+    UserOut,
+    ViewIn,
+    ViewOut,
+)
 from app.core import security
 from app.core.context import current_actor
 from app.core.observability import RECENT_ERRORS
@@ -19,7 +32,7 @@ router = APIRouter(prefix="/api/v2", tags=["v2 · admin"])
 _STARTED = time.time()
 
 
-@router.get("/health", response_model=Generic)
+@router.get("/health", response_model=HealthOut)
 def health():
     """存活 + 数据库连通 + 迁移版本 + 引擎版本（部署后第一动作）。"""
     db_ok, rev, err = True, None, ""
@@ -36,7 +49,7 @@ def health():
             "auth": "on" if security.auth_enabled() else "off", "uptime_s": round(time.time() - _STARTED, 1)}
 
 
-@router.get("/me", response_model=Generic)
+@router.get("/me", response_model=MeOut)
 def me():
     a = current_actor()
     return {"username": a.username, "role": a.role, "role_label": security.ROLE_LABEL.get(a.role, a.role),
@@ -49,38 +62,38 @@ def errors(limit: int = Query(50, ge=1, le=100)):
     return list(RECENT_ERRORS)[:limit]
 
 
-@router.get("/admin/users", response_model=list[Generic], dependencies=[need("users.manage")])
+@router.get("/admin/users", response_model=list[UserOut], dependencies=[need("users.manage")])
 def users():
     return settings.list_users()
 
 
-@router.post("/admin/users", response_model=Generic, status_code=201, dependencies=[need("users.manage")])
+@router.post("/admin/users", response_model=UserCreatedOut, status_code=201, dependencies=[need("users.manage")])
 def create_user(body: UserIn):
     """创建用户并返回一次性访问令牌（只显示这一次）。"""
     return settings.create_user(body.username, body.role, body.display_name)
 
 
-@router.get("/admin/audit", response_model=list[Generic], dependencies=[need("audit.read")])
+@router.get("/admin/audit", response_model=list[AuditOut], dependencies=[need("audit.read")])
 def audit(entity: str | None = None, entity_id: str | None = None, limit: int = Query(200, ge=1, le=1000)):
     return settings.audit_log(entity, entity_id, limit)
 
 
-@router.get("/settings/templates", response_model=list[Generic], dependencies=[need("deal.read")])
+@router.get("/settings/templates", response_model=list[TemplateOut], dependencies=[need("deal.read")])
 def templates(kind: str | None = None):
     return settings.list_templates(kind)
 
 
-@router.put("/settings/templates", response_model=Generic, dependencies=[need("settings.write")])
+@router.put("/settings/templates", response_model=TemplateOut, dependencies=[need("settings.write")])
 def save_template(body: TemplateIn):
     return settings.save_template(body.kind, body.name, body.payload)
 
 
-@router.get("/settings/views", response_model=list[Generic], dependencies=[need("deal.read")])
+@router.get("/settings/views", response_model=list[ViewOut], dependencies=[need("deal.read")])
 def views():
     return settings.list_views()
 
 
-@router.put("/settings/views", response_model=Generic, dependencies=[need("deal.write")])
+@router.put("/settings/views", response_model=ViewOut, dependencies=[need("deal.write")])
 def save_view(body: ViewIn):
     return settings.save_view(body.name, body.config)
 
@@ -90,6 +103,6 @@ def delete_view(view_id: int):
     settings.delete_view(view_id)
 
 
-@router.get("/settings/data-sources", response_model=list[Generic], dependencies=[need("deal.read")])
+@router.get("/settings/data-sources", response_model=list[DataSourceOut], dependencies=[need("deal.read")])
 def data_sources():
     return settings.data_sources()

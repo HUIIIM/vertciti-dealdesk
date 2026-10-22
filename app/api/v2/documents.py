@@ -8,18 +8,27 @@ from fastapi.responses import Response
 
 from app.api.common import _check_upload_size
 from app.api.v2.deps import need
-from app.api.v2.schemas import ConflictResolve, EvidenceIn, EvidenceOut, Generic, PassportDetail, PassportOut, ReviewIn
+from app.api.v2.schemas import (
+    ConflictOut,
+    ConflictResolve,
+    DocOut,
+    EvidenceIn,
+    EvidenceOut,
+    PassportDetail,
+    PassportOut,
+    ReviewIn,
+)
 from app.services.v2 import evidence, workflow
 
 router = APIRouter(prefix="/api/v2", tags=["v2 · documents"])
 
 
-@router.get("/deals/{deal_id}/documents", response_model=list[Generic], dependencies=[need("deal.read")])
+@router.get("/deals/{deal_id}/documents", response_model=list[DocOut], dependencies=[need("deal.read")])
 def list_documents(deal_id: int):
     return workflow.list_documents(deal_id)
 
 
-@router.post("/deals/{deal_id}/documents", response_model=Generic, status_code=201,
+@router.post("/deals/{deal_id}/documents", response_model=DocOut, status_code=201,
              dependencies=[need("document.write")])
 async def upload_document(deal_id: int, request: Request, file: UploadFile = File(...),
                           category: str = Form("other")):
@@ -65,12 +74,12 @@ def review(deal_id: int, body: ReviewIn):
     return evidence.review(deal_id, body.field, body.note)
 
 
-@router.get("/deals/{deal_id}/conflicts", response_model=list[Generic], dependencies=[need("deal.read")])
+@router.get("/deals/{deal_id}/conflicts", response_model=list[ConflictOut], dependencies=[need("deal.read")])
 def conflicts(deal_id: int, status: str | None = None):
     return evidence.list_conflicts(deal_id, status)
 
 
-@router.post("/deals/{deal_id}/conflicts/{conflict_id}/resolve", response_model=Generic,
+@router.post("/deals/{deal_id}/conflicts/{conflict_id}/resolve", response_model=ConflictOut,
              dependencies=[need("deal.write")])
 def resolve(deal_id: int, conflict_id: int, body: ConflictResolve):
     """裁决矛盾：采用哪个值、为什么（必填）。"""
