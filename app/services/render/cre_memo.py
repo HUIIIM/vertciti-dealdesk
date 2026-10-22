@@ -21,6 +21,7 @@ from reportlab.platypus import KeepTogether, PageBreak, Paragraph, SimpleDocTemp
 
 from app.core import brand
 from app.domain.v2.cre import engine
+from app.domain.v2.cre.waterfall import describe as describe_waterfall
 from app.services.render import pdf_uw
 from app.services.render.cre_excel import month_label
 
@@ -495,8 +496,8 @@ def _returns(cre: JSON, r: JSON) -> list[Any]:
     rows.append([_p("有杠杆", 8, INK, True), *[_num(money(fl["levered"][y])) for y in yrs]])
     wf = r.get("waterfall")
     if wf:
-        rows.append([_p("LP", 8), *[_num(money(wf["lp"][y])) for y in yrs]])
-        rows.append([_p("GP", 8), *[_num(money(wf["gp"][y])) for y in yrs]])
+        rows.append([_p("LP", 8), *[_num(money(wf["lp_annual"][y])) for y in yrs]])
+        rows.append([_p("GP", 8), *[_num(money(wf["gp_annual"][y])) for y in yrs]])
     story.append(_table(rows, [CW * 0.1] + [CW * 0.9 / len(yrs)] * len(yrs)))
     if n > MAX_YEARS:
         story.append(_note(f"只列前 {MAX_YEARS} 年；最后一年含出售回款，完整见 Excel 模型。"))
@@ -510,15 +511,13 @@ def _returns(cre: JSON, r: JSON) -> list[Any]:
     blocks: list[Any] = [_table(ret, [CW * 0.16, CW * 0.12, CW * 0.12])]
     if wf:
         w = cre["waterfall"]
-        tiers = [f"LP 出资 {w['lp_equity_pct']:g}%", f"优先回报 {w['pref_pct']:g}%（按出资比例）",
-                 *(f"LP IRR 至 {t['irr_pct']:g}%：LP 分 {t['lp_share_pct']:g}%" for t in w["tiers"]),
-                 f"之上：LP 分 {w['final_lp_share_pct']:g}%"]
         wrows = [_hdr_row(["分配瀑布", "LP", "GP"]),
                  [_p("IRR", 8), _num(pct(wf["lp_irr_pct"]), True), _num(pct(wf["gp_irr_pct"]), True)],
                  [_p("权益倍数", 8), _num(mult(wf["lp_multiple"])), _num(mult(wf["gp_multiple"]))],
-                 [_p("GP promote", 8), _num("—"), _num(money(wf["gp_promote"]))]]
+                 [_p("GP promote", 8), _num("—"), _num(money(wf["gp_promote"]))],
+                 *([[_p("回拨（clawback）", 8), _num("—"), _num(money(-wf["clawback"]))]] if wf["clawback"] else [])]
         blocks.append([_table(wrows, [CW * 0.14, CW * 0.11, CW * 0.11]), Spacer(1, 1.5 * mm),
-                       _note("；".join(tiers) + "。按年度分配，无 catch-up / 回拨。")])
+                       _note(describe_waterfall(w))])
     else:
         blocks.append(_note("未设置分配瀑布。"))
     t = Table([blocks], colWidths=[CW * 0.42, CW * 0.58])
@@ -614,7 +613,7 @@ _METHOD = [
     "一般空置按潜在总收入计提，先扣除已建模的周转空置，不低于 0。管理费按有效总收入计、不回收。",
     "售价 = 第 N+1 年 NOI ÷ 退出资本化率，扣卖方成本（可选稳定化 NOI：加回该年周转空置与免租、按潜在收入重算一般空置）；贷款按退出当月余额偿清。浮动利率 = min(SOFR, 上限) + 利差。",
     "本版不建模：CPI 递增、百分比租金、费用上限 / gross-up、再融资 / 夹层 / 施工贷、开发期、按概率分叉的续租树、"
-    "按月瀑布与 GP catch-up / 回拨。",
+    "欧式（整只基金）瀑布。",
     "续上的租约段是假设，不是签约事实；本备忘录只基于录入的输入，不构成投资建议。",
 ]
 
@@ -626,7 +625,7 @@ _METHOD_MF = [
     "翻新后的户按当月租金计，不计续约滞后（简化）。",
     "空置、优惠按在租租金计；其他收入按在线户数 × (1 − 空置率) 计；坏账按收入合计计。管理费按有效总收入计。",
     "售价 = 第 N+1 年 NOI ÷ 退出资本化率，扣卖方成本（可选稳定化 NOI：加回退出年翻新停用损失）；贷款按退出当月余额偿清。",
-    "本版不建模：按户逐份租约、续约涨幅上限、租金管制、短租、按月瀑布与 GP catch-up / 回拨、再融资 / 夹层。",
+    "本版不建模：按户逐份租约、续约涨幅上限、租金管制、短租、欧式（整只基金）瀑布、再融资 / 夹层。",
     "本备忘录只基于录入的输入，不构成投资建议。",
 ]
 

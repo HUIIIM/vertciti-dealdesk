@@ -17,7 +17,8 @@ interface UnitRow { name?: string; units?: number; avg_sf?: number; in_place_ren
 interface Seg { tenant: string; suite: string; sf: number; start: number; end: number; rent_psf: number; speculative: boolean;
   downtime_before: number; ti: number; lc: number }
 interface Cre { metrics: Record<string, number | null>; annual: Record<string, number[]>; rent_roll: Seg[];
-  waterfall: { lp_irr_pct: number | null; gp_irr_pct: number | null; lp_multiple: number | null; gp_multiple: number | null; gp_promote: number } | null;
+  waterfall: { lp_irr_pct: number | null; gp_irr_pct: number | null; lp_multiple: number | null; gp_multiple: number | null; gp_promote: number;
+    clawback?: number } | null;
   exit: { sale_price: number; selling_costs: number; loan_payoff: number; net_proceeds_levered: number } }
 
 /** 多户公寓（按户型）还是按租约（写字楼 / 零售 / 工业）。 */
@@ -299,7 +300,8 @@ export function InstModel() {
           <li><span className="chip">{T("退出")}</span><span>{T("售价 {0}（下一年 NOI {1} ÷ {2}）· 偿还贷款 {3} · 有杠杆净所得 {4}", [fmt(cre.exit.sale_price, "usd"), fmt(cm.forward_noi, "usd"),
             fmt(cm.exit_cap_pct, "pct"), fmt(cre.exit.loan_payoff, "usd"), fmt(cre.exit.net_proceeds_levered, "usd")])}</span></li>
           {cre.waterfall ? <li><span className="chip">{T("瀑布")}</span><span>{T("LP IRR {0}（{1}）· GP IRR {2}（{3}）· GP promote {4}", [fmt(cre.waterfall.lp_irr_pct, "pct"), fmt(cre.waterfall.lp_multiple, "x"),
-            fmt(cre.waterfall.gp_irr_pct, "pct"), fmt(cre.waterfall.gp_multiple, "x"), fmt(cre.waterfall.gp_promote, "usd")])}</span></li> : null}
+            fmt(cre.waterfall.gp_irr_pct, "pct"), fmt(cre.waterfall.gp_multiple, "x"), fmt(cre.waterfall.gp_promote, "usd")])}
+            {cre.waterfall.clawback ? T("（已回拨 {0}）", [fmt(cre.waterfall.clawback, "usd")]) : null}</span></li> : null}
         </ul> : null}
         <h3 style={{ marginTop: 20, fontSize: 15 }}>{T("逐年现金流（$）")}</h3>
         {cre ? <div className="table-wrap" tabIndex={0} role="region" aria-label={T("逐年现金流（$）")}><table className="t">

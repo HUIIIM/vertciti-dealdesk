@@ -19,6 +19,7 @@ from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
 
 from app.core import brand
+from app.domain.v2.cre.waterfall import describe as describe_waterfall
 
 JSON = dict[str, Any]
 
@@ -406,19 +407,17 @@ def _monthly(ws: Worksheet, cre: JSON, r: JSON) -> None:
 
 def _waterfall(ws: Worksheet, cre: JSON, r: JSON) -> None:
     w, wf = cre["waterfall"], r["waterfall"]
-    _put(ws, 1, 1, "GP / LP 分配瀑布（按 LP IRR 门槛，年度）", Font(name=_F, size=13, bold=True))
-    tiers = " → ".join([f"{w.get('pref_pct', 8):g}% 优先回报内按出资比例",
-                        *(f"{t['irr_pct']:g}% 前 LP {t['lp_share_pct']:g}%" for t in w.get("tiers", [])),
-                        f"之上 LP {w.get('final_lp_share_pct', 70):g}%"])
-    _put(ws, 2, 1, f"LP 出资 {w.get('lp_equity_pct', 90):g}%；{tiers}", NOTE)
+    monthly = w["frequency"] == "monthly"
+    _put(ws, 1, 1, "GP / LP 分配瀑布（按 LP IRR 门槛）", Font(name=_F, size=13, bold=True))
+    _put(ws, 2, 1, describe_waterfall(w) + ("各年 LP / GP 为按月分配的年度合计。" if monthly else ""), NOTE)
     _hdr(ws, 4, ["年", "有杠杆现金流", "LP", "GP", "核对 LP+GP−现金流"])
     lev = r["flows"]["levered"]
     for t in range(len(lev)):
         row = t + 5
         _put(ws, row, 1, f"第{t}年")
         _put(ws, row, 2, f"='{RET}'!{_col(t + 2)}13", BODY, MONEY)
-        _put(ws, row, 3, wf["lp"][t], ENGINE, MONEY)
-        _put(ws, row, 4, wf["gp"][t], ENGINE, MONEY)
+        _put(ws, row, 3, wf["lp_annual"][t], ENGINE, MONEY)
+        _put(ws, row, 4, wf["gp_annual"][t], ENGINE, MONEY)
         _put(ws, row, 5, f"=C{row}+D{row}-B{row}", BODY, MONEY)
     end = len(lev) + 4
     row = end + 2
@@ -427,11 +426,12 @@ def _waterfall(ws: Worksheet, cre: JSON, r: JSON) -> None:
         return None if x is None else x / 100
 
     for label, f, v, fmt in [
-        ("LP IRR", f"=IRR(C5:C{end})", pct(wf["lp_irr_pct"]), PCT),
-        ("GP IRR", f"=IRR(D5:D{end})", pct(wf["gp_irr_pct"]), PCT),
+        ("LP IRR" + ("（Excel 按年度合计；引擎按月年化）" if monthly else ""), f"=IRR(C5:C{end})", pct(wf["lp_irr_pct"]), PCT),
+        ("GP IRR" + ("（同上）" if monthly else ""), f"=IRR(D5:D{end})", pct(wf["gp_irr_pct"]), PCT),
         ("LP 权益倍数", f'=SUMIF(C5:C{end},">0")/-SUMIF(C5:C{end},"<0")', wf["lp_multiple"], X),
         ("GP 权益倍数", f'=SUMIF(D5:D{end},">0")/-SUMIF(D5:D{end},"<0")', wf["gp_multiple"], X),
-        ("GP promote（超出出资比例部分）", "", wf["gp_promote"], MONEY),
+        ("GP promote（超出出资比例部分，已扣回拨）", "", wf["gp_promote"], MONEY),
+        ("回拨（clawback）", "", wf["clawback"], MONEY),
     ]:
         _put(ws, row, 1, label)
         if f:
@@ -455,7 +455,7 @@ _NOTES = [
     "“租金表”页灰字行是假设续上的，不是签约事实。",
     "一般空置先扣除已建模的周转空置，避免重复扣。免租只免基本租金，费用回收照收。",
     "IRR 两种口径：年度现金流 IRR（Excel 可重算）与按月现金流折算的年化 IRR（更精确，引擎值）。",
-    "本版不建模：CPI 递增、百分比租金、费用上限 / gross-up、再融资 / 夹层、开发期、GP catch-up 与回拨。",
+    "本版不建模：CPI 递增、百分比租金、费用上限 / gross-up、再融资 / 夹层、开发期、欧式（整只基金）瀑布。",
     "完整方法论：docs/INSTITUTIONAL-ENGINE.md。",
 ]
 

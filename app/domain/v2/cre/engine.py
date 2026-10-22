@@ -13,6 +13,7 @@ from pydantic import ValidationError
 from app.domain.v2.cre import cashflow, debt, leases, multifamily
 from app.domain.v2.cre.inputs import CreInputs
 from app.domain.v2.cre.returns import equity_multiple, irr, npv
+from app.domain.v2.cre.waterfall import annual as annual_series
 from app.domain.v2.cre.waterfall import distribute
 
 JSON = dict[str, Any]
@@ -74,6 +75,17 @@ def _unit_mix(cre: CreInputs) -> list[JSON]:
              "market_rent": u.market_rent, "loss_to_lease_pct": (u.market_rent - u.in_place_rent) / u.market_rent * 100,
              "renovate_units": u.renovate_units, "reno_cost_per_unit": u.reno_cost_per_unit,
              "reno_premium": u.reno_premium} for u in cre.unit_mix]
+
+
+def _waterfall(cre: CreInputs, lev: list[float], lev_m: list[float]) -> JSON | None:
+    """按年瀑布用年度现金流；按月瀑布用按月现金流，LP / GP 再汇总成年度（lp_annual / gp_annual）与年度现金流对齐。"""
+    w = cre.waterfall
+    if w is None:
+        return None
+    out = distribute(w, lev_m, periods_per_year=12) if w.frequency == "monthly" else distribute(w, lev)
+    out["lp_annual"] = annual_series(out["lp"], out["periods_per_year"])
+    out["gp_annual"] = annual_series(out["gp"], out["periods_per_year"])
+    return out
 
 
 def run(inputs: JSON) -> JSON:
@@ -151,5 +163,5 @@ def run(inputs: JSON) -> JSON:
                        "rent_psf": s.rent_psf, "speculative": s.speculative, "downtime_before": s.downtime_before,
                        "ti": s.ti, "lc": s.lc} for chain in chains for s in chain if s.start < hold_m],
         "unit_mix": _unit_mix(cre) if is_mf else None,
-        "waterfall": distribute(cre.waterfall, lev) if cre.waterfall else None,
+        "waterfall": _waterfall(cre, lev, lev_m),
     }

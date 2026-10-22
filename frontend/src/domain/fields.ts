@@ -110,6 +110,10 @@ export const INST_WATERFALL: FieldSpec[] = [
   { path: "waterfall.lp_equity_pct", label: T("LP 出资比例"), unit: "pct", step: 1 },
   { path: "waterfall.pref_pct", label: T("优先回报"), unit: "pct", step: 0.5, hint: T("LP IRR 门槛") },
   { path: "waterfall.final_lp_share_pct", label: T("最后一档 LP 份额"), unit: "pct", step: 5 },
+  { path: "waterfall.frequency", label: T("分配频率"), unit: "select", options: [["annual", T("按年")], ["monthly", T("按月（门槛按月复利）")]] },
+  { path: "waterfall.catch_up_target_pct", label: T("GP catch-up 目标"), unit: "pct", step: 5, hint: T("GP 补到累计利润的比例；空 = 无 catch-up") },
+  { path: "waterfall.catch_up_rate_pct", label: T("catch-up 期间 GP 份额"), unit: "pct", step: 10 },
+  { path: "waterfall.clawback", label: T("期末回拨（clawback）"), unit: "bool", hint: T("LP 未达优先回报时 GP 退回 promote") },
 ];
 
 // 多户公寓（按户型；租金一律“每户每月”）

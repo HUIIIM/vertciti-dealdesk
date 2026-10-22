@@ -198,4 +198,14 @@ describe("机构级交易页", () => {
       .toEqual({ units: 4, inPlace: 1750, market: 1850 });
     expect(unitAverages([])).toEqual({ units: 0, inPlace: null, market: null });
   });
+  it("瀑布选项：按月、GP catch-up、期末回拨进草稿并触发重算", async () => {
+    seedInstitutionalDeal();
+    at("#/deals/9/model");
+    const freq = await screen.findByRole("combobox", { name: /^分配频率/ }, { timeout: 3000 });
+    fireEvent.change(freq, { target: { value: "monthly" } });
+    const cu = screen.getByRole("textbox", { name: /^GP catch-up 目标/ });
+    fireEvent.focus(cu); fireEvent.change(cu, { target: { value: "20" } }); fireEvent.blur(cu);
+    fireEvent.click(screen.getByRole("checkbox", { name: /期末回拨/ }));
+    await waitFor(() => expect(lastPreview()?.waterfall).toMatchObject({ frequency: "monthly", catch_up_target_pct: 20, clawback: true }));
+  });
 });

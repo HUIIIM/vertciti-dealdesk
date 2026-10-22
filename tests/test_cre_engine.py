@@ -240,3 +240,76 @@ def test_example_locked_numbers():
     assert m["unlevered_irr_pct"] == pytest.approx(11.845, abs=1e-3)
     assert m["levered_irr_pct"] == pytest.approx(16.903, abs=1e-3)
     assert m["dscr_min"] == pytest.approx(1.765, abs=1e-3)
+
+
+# ---------------------------------------------------------------- 瀑布：catch-up / 按月 / 回拨（都可手算）
+def _w(**kw) -> Waterfall:
+    return Waterfall(**{"lp_equity_pct": 90, "pref_pct": 8, "final_lp_share_pct": 80, **kw})
+
+
+def test_catch_up_brings_gp_to_target_share_of_profit():
+    """[-100, 150]：优先回报 108（LP 97.2 / GP 10.8）→ catch-up：利润 LP 7.2、GP 0.8，要补到 GP = 20% × 利润合计，
+    100% 给 GP 时需 x = (0.2 × 8 − 0.8) / (1 − 0.2) = 1.0 → 剩 41 按 80 / 20：LP 130、GP 20，利润 40 / 10 正好 80 / 20。"""
+    r = distribute(_w(catch_up_target_pct=20), [-100, 150])
+    assert r["lp"][1] == pytest.approx(130) and r["gp"][1] == pytest.approx(20)
+    assert r["gp_promote"] == pytest.approx(20 - 15)
+    partial = distribute(_w(catch_up_target_pct=20), [-100, 108.5])        # 钱不够补完：剩下的 0.5 全给 GP
+    assert partial["lp"][1] == pytest.approx(97.2) and partial["gp"][1] == pytest.approx(11.3)
+    half = distribute(_w(catch_up_target_pct=20, catch_up_rate_pct=50), [-100, 150])  # 50 / 50 catch-up：需 x = 0.8 / 0.3
+    assert half["gp"][1] == pytest.approx(10.8 + 0.5 * 0.8 / 0.3 + 0.2 * (42 - 0.8 / 0.3))
+
+
+def test_catch_up_sits_between_pref_and_first_tier():
+    tiered = distribute(_w(catch_up_target_pct=20, tiers=[{"irr_pct": 15, "lp_share_pct": 85}], final_lp_share_pct=70),
+                        [-100, 150])
+    plain = distribute(_w(tiers=[{"irr_pct": 15, "lp_share_pct": 85}], final_lp_share_pct=70), [-100, 150])
+    assert tiered["gp"][1] > plain["gp"][1]
+    assert tiered["lp"][1] + tiered["gp"][1] == pytest.approx(150)
+
+
+def test_monthly_waterfall_uses_monthly_compounded_hurdles():
+    """同样的钱、同样的时点：按月（中间 11 个月为 0）与按年结果一致；门槛按 (1.08)^(1/12) 月复利。"""
+    annual_r = distribute(_w(final_lp_share_pct=70), [-100, 120])
+    monthly_r = distribute(_w(final_lp_share_pct=70), [-100, *[0.0] * 11, 120], periods_per_year=12)
+    assert monthly_r["lp"][-1] == pytest.approx(annual_r["lp"][1]) == pytest.approx(105.6)
+    assert monthly_r["lp_irr_pct"] == pytest.approx(annual_r["lp_irr_pct"], abs=1e-6)
+
+
+def test_clawback_returns_promote_until_lp_reaches_pref():
+    """[-100, 140, -50]：第 1 年 GP 拿 promote 6.4（20.4 − 按出资比例 14），第 2 年追加出资后 LP 远低于 8%：
+    缺口 = −(−90 × 1.08² + 119.6 × 1.08 − 45) = 20.808 > 6.4 → 全部退回。"""
+    r = distribute(_w(final_lp_share_pct=70, clawback=True), [-100, 140, -50])
+    assert r["clawback"] == pytest.approx(6.4) and r["gp_promote"] == pytest.approx(0)
+    assert r["lp"][2] == pytest.approx(-45 + 6.4) and r["gp"][2] == pytest.approx(-5 - 6.4)
+    no = distribute(_w(final_lp_share_pct=70), [-100, 140, -50])
+    assert no["clawback"] == 0 and no["gp_promote"] == pytest.approx(6.4)
+    # 缺口小于 promote：只退缺口，LP 恰好达到 8%
+    part = distribute(_w(final_lp_share_pct=70, clawback=True), [-100, 140, -30])
+    assert part["clawback"] == pytest.approx(2.808)
+    assert part["lp_irr_pct"] == pytest.approx(8.0, abs=1e-6)
+
+
+def test_engine_monthly_waterfall_rolls_up_to_annual_flows():
+    from app.domain.v2.cre.example import suburban_office
+    inp = suburban_office()
+    inp["waterfall"] = {**inp["waterfall"], "frequency": "monthly", "catch_up_target_pct": 20, "clawback": True}
+    r = run(inp)
+    wf = r["waterfall"]
+    assert wf["periods_per_year"] == 12 and len(wf["lp"]) == 7 * 12 + 1
+    for t, cash in enumerate(r["flows"]["levered"]):
+        assert wf["lp_annual"][t] + wf["gp_annual"][t] == pytest.approx(cash)
+    annual_wf = run(suburban_office())["waterfall"]
+    assert annual_wf["lp_annual"] == annual_wf["lp"]
+
+
+def test_catch_up_rate_must_exceed_target():
+    with pytest.raises(ValueError, match="catch-up"):
+        Waterfall(lp_equity_pct=90, pref_pct=8, catch_up_target_pct=20, catch_up_rate_pct=20)
+
+
+def test_irr_picks_root_nearest_ten_percent_when_flows_change_sign_twice():
+    """[-90, 119.6, -24.192] 有两个根（8% 和约 24.9%）：取离 10% 近的 8%；旧算法两端同号会直接返回空。"""
+    from app.domain.v2.cre.returns import irr
+    assert irr([-90, 119.6, -24.192]) == pytest.approx(0.08, abs=1e-9)
+    assert irr([-100, 110]) == pytest.approx(0.10, abs=1e-9)
+    assert irr([100, 50]) is None

@@ -105,12 +105,20 @@ class Waterfall(_In):
     pref_pct: Pct = Field(default=8, gt=0, le=50, description="优先回报（复利、按 LP IRR 计）")
     tiers: list[Tier] = Field(default_factory=list, max_length=5, description="优先回报之上的各档，IRR 递增")
     final_lp_share_pct: Pct = Field(default=70, gt=0, le=100, description="最后一档之上 LP 的份额")
+    frequency: Literal["annual", "monthly"] = Field(default="annual",
+                                                    description="分配频率：按年或按月（门槛按年化 IRR）")
+    catch_up_target_pct: Pct | None = Field(default=None, gt=0, lt=100,
+                                            description="GP catch-up：LP 达到优先回报后 GP 补到累计利润的比例；空 = 无")
+    catch_up_rate_pct: Pct = Field(default=100, gt=0, le=100, description="catch-up 期间 GP 拿的现金比例")
+    clawback: bool = Field(default=False, description="期末 LP 未达优先回报时，GP 退回已拿的 promote")
 
     @model_validator(mode="after")
     def _ascending(self) -> Waterfall:
         hs = [self.pref_pct, *(t.irr_pct for t in self.tiers)]
         if any(b <= a for a, b in itertools.pairwise(hs)):
             raise ValueError("瀑布门槛必须逐档递增（优先回报 < 第一档 < 第二档 …）")
+        if self.catch_up_target_pct is not None and self.catch_up_rate_pct <= self.catch_up_target_pct:
+            raise ValueError("catch-up 期间 GP 的现金比例必须高于目标利润比例，否则永远补不到")
         return self
 
 

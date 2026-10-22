@@ -966,4 +966,12 @@ export const EN: Record<string, string> = {
   "坏账": "Bad debt",
   "房产税与保险": "Taxes & insurance",
   "翻新支出": "Renovation capex",
+  "分配频率": "Distribution frequency",
+  "按月（门槛按月复利）": "Monthly (hurdles compounded monthly)",
+  "GP catch-up 目标": "GP catch-up target",
+  "GP 补到累计利润的比例；空 = 无 catch-up": "GP's target share of cumulative profit; blank = no catch-up",
+  "catch-up 期间 GP 份额": "GP share during catch-up",
+  "期末回拨（clawback）": "End-of-term clawback",
+  "LP 未达优先回报时 GP 退回 promote": "GP returns promote if the LP falls short of the preferred return",
+  "（已回拨 {0}）": " (clawback {0})",
 };

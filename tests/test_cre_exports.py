@@ -221,3 +221,18 @@ def test_multifamily_memo_sections_and_monotone_sensitivity():
     assert g["grid"][i][j] == pytest.approx(r["metrics"]["levered_irr_pct"], abs=1e-9)
     assert all(a > b for a, b in itertools.pairwise(g["grid"][i]))      # 空置越高 IRR 越低
     assert all(a < b for a, b in itertools.pairwise(row[j] for row in g["grid"]))  # 增长越高 IRR 越高
+
+
+def test_monthly_catch_up_clawback_waterfall_in_exports():
+    inp = suburban_office()
+    inp["waterfall"] = {**inp["waterfall"], "frequency": "monthly", "catch_up_target_pct": 20, "clawback": True}
+    cre = engine.parse(inp).model_dump()
+    r = engine.run(cre)
+    wb = load_workbook(io.BytesIO(cre_excel.build_cre_xlsx(cre, r, META)))
+    ws = wb["瀑布"]
+    assert "按月分配" in ws["A2"].value and "catch-up" in ws["A2"].value
+    assert ws["C5"].value == pytest.approx(r["waterfall"]["lp_annual"][0])
+    labels = [ws.cell(row=i, column=1).value for i in range(1, 30)]
+    assert "回拨（clawback）" in labels
+    text = _pdf_text(cre_memo.build_cre_memo(cre, r, META, None))
+    assert "按月分配" in text and "GP catch-up" in text
