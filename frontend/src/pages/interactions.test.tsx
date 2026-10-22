@@ -94,6 +94,45 @@ describe("持有期、日志、租金表、T12、市场", () => {
     await userEvent.click(screen.getByRole("button", { name: "录入" }));
     await waitFor(() => expect(posted("/api/v2/deals/1/actuals")[0]?.body).toMatchObject({ noi: 1800000 }));
   });
+  it("归因：每步都算得出才画瀑布图；有一步未知就不画、如实说明", async () => {
+    const attribution = (steps: { key: string; label: string; contribution_pct_points: number | null }[]) => ({
+      available: true, metric: "irr_pct", underwritten: 12, actual_implied: 9.5, total_pct_points: -2.5, note: "按实际 NOI 重算", reason: null, steps });
+    const base = { actuals: [], basis: { from_buy_decision: true, run_id: "R1", version_id: 2, version_no: 2 },
+      variance: [{ period: "2026", year: 1, occupancy_pct: 91, noi: { actual: 1500000, underwritten: 1600000, variance: -100000, variance_pct: -6.25 } }] };
+    override("GET /api/v2/deals/1/holding", 200, { ...base, attribution: attribution([{ key: "noi", label: "NOI", contribution_pct_points: -2.5 }]) });
+    const { unmount } = at("#/deals/1/holding");
+    expect(await screen.findByRole("img", { name: "IRR归因瀑布图" }, { timeout: 3000 })).toBeInTheDocument();
+    expect(screen.getByText(/（BUY 决策时冻结）/)).toBeInTheDocument();
+    expect(screen.getByText(/第\s*1\s*年/)).toBeInTheDocument();
+    unmount();
+    override("GET /api/v2/deals/1/holding", 200, { ...base, attribution: attribution([{ key: "noi", label: "NOI", contribution_pct_points: null }]) });
+    at("#/deals/1/holding");
+    expect(await screen.findByText(/不画瀑布图/, undefined, { timeout: 3000 })).toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: "IRR归因瀑布图" })).toBeNull();
+  });
+  it("录实际数失败时报错，不假装成功", async () => {
+    override("PUT /api/v2/deals/1/actuals", 422, { detail: "期间格式不对" });
+    at("#/deals/1/holding");
+    await heading("实际 vs 承销");
+    await userEvent.click(screen.getByRole("button", { name: "录入" }));
+    expect(await screen.findByText(/期间格式不对/)).toBeInTheDocument();
+  });
+  it("住宅交易的 T12 只列运营费用", async () => {
+    at("#/deals/2/t12");
+    expect(await heading("运营费用")).toBeInTheDocument();
+  });
+  it("市场：拉到可比成交时出表和散点图，$/SF 按面积算、缺面积不算", async () => {
+    override("POST /api/wb/comps/pull", 200, { ok: true, rows: [
+      { address: "1 Main St", price: 2000000, sf: 4000, sale_date: "2026-03-01", distance_miles: 0.4, source: "TopHap" },
+      { address: "2 Main St", price: 3000000, sf: 5000, sale_date: "2026-05-01", distance_miles: 1.2, source: "TopHap" },
+      { address: "3 Main St", price: 1000000, sf: null, sale_date: "2026-06-01", distance_miles: null, source: "TopHap" }] });
+    at("#/deals/1/market");
+    await heading("可比成交");
+    await userEvent.click(screen.getByRole("button", { name: "拉取可比成交" }));
+    expect(await screen.findByRole("img", { name: "可比成交：$/SF 与距离" })).toBeInTheDocument();
+    const row = screen.getByText("3 Main St").closest("tr")!;
+    expect(within(row).getAllByText("—").length).toBeGreaterThan(0);
+  });
   it("选两版看差异、校验运行编号", async () => {
     override("GET /api/v2/deals/1/diff", 200, (await import("@/test/fixtures.json")).default["GET /api/v2/deals/1/diff"][1]);
     override("POST /api/v2/runs", 200, { run_id: "R1", identical: true, same_engine: true, stored_engine: "a", current_engine: "a", stored_sha256: "x", recomputed_sha256: "x" });
