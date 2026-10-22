@@ -153,9 +153,44 @@ class FieldProvenance(Base):
     evidence_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     market_data: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     note: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    # 复核状态（pending / reviewed / overridden）与假设来源类型（provenance.ASSUMPTION_SOURCES）
+    review_status: Mapped[str] = mapped_column(String(12), default="pending", nullable=False)
+    reviewed_by: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    assumption_source: Mapped[str] = mapped_column(String(20), default="document", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
     created_by: Mapped[str] = mapped_column(String(80), default="system", nullable=False)
     __table_args__ = (Index("ix_field_provenance_deal_field", "deal_id", "field"),)
+
+
+class Conflict(AuditMixin, Base):
+    """跨来源矛盾登记：同一字段两个来源数值不同，记两边的值、差多少、采用哪个、谁裁决。"""
+    __tablename__ = "conflicts"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    deal_id: Mapped[int] = mapped_column(ForeignKey("deals.id", ondelete="CASCADE"), nullable=False)
+    field: Mapped[str] = mapped_column(String(160), nullable=False)
+    value_a: Mapped[Any] = mapped_column(JSON, nullable=True)
+    source_a: Mapped[str] = mapped_column(String(300), nullable=False)
+    value_b: Mapped[Any] = mapped_column(JSON, nullable=True)
+    source_b: Mapped[str] = mapped_column(String(300), nullable=False)
+    diff_pct: Mapped[float | None] = mapped_column(Float, nullable=True)
+    status: Mapped[str] = mapped_column(String(12), default="open", nullable=False)  # open | resolved
+    resolved_value: Mapped[Any] = mapped_column(JSON, nullable=True)
+    resolution_note: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    resolved_by: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class CommitteePack(AuditMixin, Base):
+    """投委会包登记：内容哈希印在包上，任何人拿到 PDF 都能校验是否原样。"""
+    __tablename__ = "committee_packs"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    deal_id: Mapped[int] = mapped_column(ForeignKey("deals.id", ondelete="CASCADE"), nullable=False)
+    version_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    run_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    kind: Mapped[str] = mapped_column(String(10), nullable=False)  # pdf | xlsx
+    sha256: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    size: Mapped[int] = mapped_column(Integer, nullable=False)
 
 
 class Task(AuditMixin, Base):

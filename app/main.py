@@ -9,6 +9,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from app.api import ROUTERS
+from app.api import v2 as api_v2
 from app.api.common import STATIC_DIR
 from app.api.common import _parse_rr_date as _parse_rr_date  # noqa: F401  旧测试/脚本的导入路径
 from app.api.common import score_input as score_input  # noqa: F401
@@ -18,7 +19,8 @@ from app.services import db
 configure_logging()
 app = FastAPI(title="DealDesk", description="vertciti 房地产交易核保台", version="2.0.0")
 app.add_middleware(RequestContextMiddleware)  # 请求编号 · 身份 · 结构化访问日志 · 错误上报
-for _router in ROUTERS:
+api_v2.install_error_handlers(app)
+for _router in [*ROUTERS, *api_v2.routers()]:
     app.include_router(_router)
 
 

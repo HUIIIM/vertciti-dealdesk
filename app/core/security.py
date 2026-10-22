@@ -75,9 +75,9 @@ def can(actor: Actor, action: str) -> bool:
 def require(action: str) -> Actor:
     """在路由内调用：无权限 → 401（未登录）/ 403（角色不够）。返回当前操作人。"""
     a = current_actor()
+    if a.username == ANONYMOUS.username and auth_enabled():
+        raise HTTPException(401, "需要登录：请提供有效的访问令牌")
     if not can(a, action):
-        if a.username == ANONYMOUS.username:
-            raise HTTPException(401, "需要登录：请提供有效的访问令牌")
         raise HTTPException(403, f"权限不足：{action} 需要{ROLE_LABEL[PERMISSIONS[action]]}及以上角色"
                                  f"（当前：{ROLE_LABEL.get(a.role, a.role)}）")
     return a
