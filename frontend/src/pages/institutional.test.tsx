@@ -6,8 +6,9 @@ import { ToastHost } from "@/components/ui";
 import { blankInputs, fieldLabel, trackLabel } from "@/domain/fields";
 import fixtures from "@/test/fixtures.json";
 import inst from "@/test/inst-fixture.json";
+import mfx from "@/test/mf-fixture.json";
 import { calls, override } from "@/test/server";
-import { monthLabel, tenantsToLeases, walt } from "./deal/InstTabs";
+import { monthLabel, tenantsToLeases, unitAverages, walt } from "./deal/InstTabs";
 
 const FX = fixtures as unknown as Record<string, [number, unknown]>;
 
@@ -37,6 +38,19 @@ function seedBlankInstitutionalDeal(): void {
   override("GET /api/v2/deals/9/versions/2", 200, ov.version);
   override("POST /api/v2/model/institutional", 200, { track: "institutional", metrics: {}, detail: {} });
 }
+/** 9 号交易换成多户公寓：版本输入与试算结果来自真实引擎（mf-fixture.json）。 */
+function seedMultifamilyDeal(): void {
+  seedInstitutionalDeal();
+  const ov = JSON.parse(JSON.stringify(FX["GET /api/v2/deals/1"]![1])) as { deal: Record<string, unknown>; version: Record<string, unknown>; metrics: unknown };
+  ov.deal = { ...ov.deal, id: 9, track: "institutional", name: "Garden Apartments" };
+  ov.version = { ...ov.version, deal_id: 9, inputs: mfx.inputs, outputs: mfx.preview };
+  ov.metrics = mfx.preview.metrics;
+  override("GET /api/v2/deals/9", 200, ov);
+  override("GET /api/v2/deals/9/versions/2", 200, ov.version);
+  override("POST /api/v2/model/institutional", 200, mfx.preview);
+}
+const lastPreview = () => calls.filter((c) => c.method === "POST" && c.path === "/api/v2/model/institutional").at(-1)?.body as
+  Record<string, unknown> | undefined;
 const at = (hash: string) => { window.location.hash = hash; return render(<ToastHost><App /></ToastHost>); };
 
 describe("机构级工具函数", () => {
@@ -134,5 +148,54 @@ describe("机构级交易页", () => {
     expect(await screen.findByRole("button", { name: "机构投委会备忘录 PDF" }, { timeout: 3000 })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "承销模型 Excel（带公式）" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "一页纸 Tear Sheet" })).toBeNull();
+  });
+  it("多户公寓：户型表、收入与费用假设、按户型的逐年现金流", async () => {
+    seedMultifamilyDeal();
+    at("#/deals/9/rentroll");
+    expect(await screen.findByRole("heading", { name: "户型表" }, { timeout: 3000 })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "多户公寓（按户型）" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByLabelText("第 1 个户型名称")).toHaveValue("1B1B");
+    expect(screen.queryByRole("heading", { name: "租约（逐份）" })).toBeNull();
+    expect(await screen.findByText(/持有期翻新支出/, undefined, { timeout: 3000 })).toBeInTheDocument();
+    const rent = screen.getByLabelText("第 2 个户型在租月租");
+    fireEvent.focus(rent); fireEvent.change(rent, { target: { value: "1850" } }); fireEvent.blur(rent);
+    await waitFor(() => expect((lastPreview()?.unit_mix as { in_place_rent: number }[] | undefined)?.[1]?.in_place_rent).toBe(1850));
+    fireEvent.click(screen.getByRole("button", { name: "+ 加户型" }));
+    expect(screen.getByLabelText("第 4 个户型名称")).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText("删除第 4 个户型"));
+    fireEvent.click(screen.getByLabelText("第 1 个户型在租月租的数字护照"));
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+    await act(async () => { window.location.hash = "#/deals/9/t12"; window.dispatchEvent(new HashChangeEvent("hashchange")); });
+    expect(await screen.findByRole("heading", { name: "收入假设" }, { timeout: 3000 })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "翻新计划" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "市场租赁假设（MLA）" })).toBeNull();
+    await act(async () => { window.location.hash = "#/deals/9/model"; window.dispatchEvent(new HashChangeEvent("hashchange")); });
+    expect(await screen.findByText("Loss-to-lease", undefined, { timeout: 3000 })).toBeInTheDocument();
+    expect(screen.getByText("翻新支出")).toBeInTheDocument();
+    expect(screen.queryByText("TI")).toBeNull();
+  });
+  it("按租约 ↔ 多户公寓切换：清租约前先确认，切回时补市场租赁假设", async () => {
+    seedInstitutionalDeal();
+    at("#/deals/9/rentroll");
+    await screen.findByLabelText("第 1 份租约租户", undefined, { timeout: 3000 });
+    const confirm = window.confirm;
+    window.confirm = () => false;
+    fireEvent.click(screen.getByRole("button", { name: "多户公寓（按户型）" }));
+    expect(screen.getByLabelText("第 1 份租约租户")).toBeInTheDocument();   // 取消：什么都不改
+    window.confirm = () => true;
+    fireEvent.click(screen.getByRole("button", { name: "多户公寓（按户型）" }));
+    expect(await screen.findByRole("heading", { name: "户型表" })).toBeInTheDocument();
+    await waitFor(() => expect(lastPreview()).toMatchObject({ property_type: "multifamily", leases: [] }));
+    expect((lastPreview()?.unit_mix as unknown[]).length).toBe(1);
+    fireEvent.click(screen.getByRole("button", { name: "按租约（写字楼 / 零售 / 工业）" }));
+    expect(await screen.findByRole("heading", { name: "租约（逐份）" })).toBeInTheDocument();
+    await waitFor(() => expect(lastPreview()?.property_type).toBe("commercial"));
+    window.confirm = confirm;
+  });
+  it("户型加权平均：按户数加权，没有户数时不编数", () => {
+    expect(unitAverages([{ units: 1, in_place_rent: 1000, market_rent: 1100 }, { units: 3, in_place_rent: 2000, market_rent: 2100 }]))
+      .toEqual({ units: 4, inPlace: 1750, market: 1850 });
+    expect(unitAverages([])).toEqual({ units: 0, inPlace: null, market: null });
   });
 });

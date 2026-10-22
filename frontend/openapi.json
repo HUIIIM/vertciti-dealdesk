@@ -2378,6 +2378,21 @@
       "title": "Rent Roll",
       "type": "array"
      },
+     "unit_mix": {
+      "anyOf": [
+       {
+        "items": {
+         "additionalProperties": true,
+         "type": "object"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Unit Mix"
+     },
      "waterfall": {
       "anyOf": [
        {
@@ -5748,8 +5763,24 @@
   },
   "/api/v2/cre/example": {
    "get": {
-    "description": "示例输入：4 租户郊区办公楼（含空置、基年租约、即将到期租约、浮动利率带上限、两档瀑布）；演示数字。",
+    "description": "示例输入（演示数字）。\n\noffice = 郊区办公楼（含空置、基年租约、即将到期租约、浮动利率带上限、两档瀑布）；\nmultifamily = 240 户花园式公寓（loss-to-lease、翻新 120 户、固定利率、一档瀑布）。",
     "operationId": "institutional_example_api_v2_cre_example_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "kind",
+      "required": false,
+      "schema": {
+       "default": "office",
+       "enum": [
+        "office",
+        "multifamily"
+       ],
+       "title": "Kind",
+       "type": "string"
+      }
+     }
+    ],
     "responses": {
      "200": {
       "content": {
@@ -5762,6 +5793,16 @@
        }
       },
       "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
      }
     },
     "summary": "Institutional Example",

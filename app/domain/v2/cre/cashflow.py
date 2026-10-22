@@ -13,9 +13,11 @@ from dataclasses import dataclass, field
 from app.domain.v2.cre.inputs import CreInputs
 from app.domain.v2.cre.leases import Segment, market_rent_psf, year_step
 
-LINES = ("potential_rent", "turnover_vacancy", "free_rent", "base_rent", "recoveries", "general_vacancy",
+LINES = ("potential_rent", "loss_to_lease", "premium", "non_revenue", "turnover_vacancy", "free_rent", "base_rent",
+         "recoveries", "general_vacancy",
          "credit_loss", "egr", "opex_recoverable", "opex_non_recoverable", "mgmt_fee", "opex", "noi",
-         "ti", "lc", "reserves", "cf_before_debt", "occupancy_pct")
+         "ti", "lc", "reserves", "capex", "cf_before_debt", "occupancy_pct")
+# loss_to_lease / premium / non_revenue / capex 只有多户公寓有值（见 multifamily.py）；按租约物业恒为 0
 
 
 @dataclass
@@ -40,7 +42,7 @@ def _recovery(seg: Segment, rec_psf: float, area: float, m: int) -> float:
 
 def _vacant_potential(seg: Segment, cre: CreInputs, rec_psf: float, m: int) -> float:
     """空置期内这块面积按市场条件本可收到的租金与回收（周转空置损失）。"""
-    rent = market_rent_psf(cre.market, m) * seg.sf / 12
+    rent = market_rent_psf(cre.mla(), m) * seg.sf / 12
     rec = rec_psf * seg.sf / 12 if seg.recovery == "nnn" else 0.0
     return rent + rec
 

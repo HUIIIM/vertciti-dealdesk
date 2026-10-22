@@ -4,18 +4,108 @@ import { useApp } from "@/app-context";
 import { FieldInput, NumberInput } from "@/components/FieldInput";
 import { passportStatus } from "@/components/Passport";
 import { Metric, MetricGrid, NumCell } from "@/components/ui";
-import { INST_DEAL, INST_DEBT, INST_MARKET, INST_OPEX, INST_WATERFALL, type FieldSpec } from "@/domain/fields";
+import { INST_DEAL, INST_DEBT, INST_MARKET, INST_MF_OPEX, INST_MF_RENO, INST_MF_REVENUE, INST_OPEX, INST_WATERFALL, MF_DEFAULTS,
+  blankInstitutional, blankUnit, type FieldSpec } from "@/domain/fields";
 import { fmt, type Unit } from "@/lib/format";
 import { getPath, type JsonObj } from "@/lib/paths";
 import { useDeal } from "./Deal";
 
 interface Lease { tenant?: string; suite?: string; sf?: number; start?: string; end?: string; rent_psf_yr?: number; escalation_pct?: number;
   free_rent_months?: number; recovery?: "nnn" | "gross" | "base_year" }
+interface UnitRow { name?: string; units?: number; avg_sf?: number; in_place_rent?: number; market_rent?: number; renovate_units?: number;
+  reno_cost_per_unit?: number; reno_premium?: number }
 interface Seg { tenant: string; suite: string; sf: number; start: number; end: number; rent_psf: number; speculative: boolean;
   downtime_before: number; ti: number; lc: number }
 interface Cre { metrics: Record<string, number | null>; annual: Record<string, number[]>; rent_roll: Seg[];
   waterfall: { lp_irr_pct: number | null; gp_irr_pct: number | null; lp_multiple: number | null; gp_multiple: number | null; gp_promote: number } | null;
   exit: { sale_price: number; selling_costs: number; loan_payoff: number; net_proceeds_levered: number } }
+
+/** 多户公寓（按户型）还是按租约（写字楼 / 零售 / 工业）。 */
+export function useIsMf(): boolean {
+  const { draft } = useDeal();
+  return draft.property_type === "multifamily";
+}
+
+/** 物业类型切换：多户公寓不填逐份租约（有租约时先确认清掉）；按租约物业缺市场租赁假设时补默认值。 */
+function PropertyType() {
+  const { draft, set } = useDeal();
+  const mf = draft.property_type === "multifamily";
+  const leases = (draft.leases as Lease[] | undefined) ?? [];
+  const toMf = () => {
+    if (mf) return;
+    if (leases.length && !window.confirm(T("多户公寓按户型建模，会清掉现有 {0} 份租约。继续？", [leases.length]))) return;
+    set("leases", []);
+    if (!Array.isArray(draft.unit_mix) || !(draft.unit_mix as UnitRow[]).length) set("unit_mix", [{ ...blankUnit(), name: "1B1B" }]);
+    if (!draft.multifamily) set("multifamily", { ...MF_DEFAULTS });
+    set("property_type", "multifamily");
+  };
+  const toCommercial = () => {
+    if (!mf) return;
+    if (!draft.market) set("market", blankInstitutional().market);
+    set("property_type", "commercial");
+  };
+  return (
+    <div className="seg" role="group" aria-label={T("物业类型")} style={{ marginBottom: 12 }}>
+      <button type="button" aria-pressed={!mf} onClick={toCommercial}>{T("按租约（写字楼 / 零售 / 工业）")}</button>
+      <button type="button" aria-pressed={mf} onClick={toMf}>{T("多户公寓（按户型）")}</button>
+    </div>
+  );
+}
+
+/** 按户数加权的平均在租月租与市场月租。 */
+export function unitAverages(units: UnitRow[]): { units: number; inPlace: number | null; market: number | null } {
+  const n = units.reduce((a, u) => a + (u.units ?? 0), 0);
+  if (!n) return { units: 0, inPlace: null, market: null };
+  const w = (k: "in_place_rent" | "market_rent") => units.reduce((a, u) => a + (u.units ?? 0) * (u[k] ?? 0), 0) / n;
+  return { units: n, inPlace: w("in_place_rent"), market: w("market_rent") };
+}
+
+function UnitMix() {
+  const { draft, set, passports, openPassport } = useDeal();
+  const cre = useCre();
+  const units = (draft.unit_mix as UnitRow[] | undefined) ?? [];
+  const upd = (i: number, k: keyof UnitRow, v: unknown) => set(`unit_mix.${i}.${k}`, v);
+  const avg = unitAverages(units);
+  const ltl = avg.market && avg.inPlace != null ? ((avg.market - avg.inPlace) / avg.market) * 100 : null;
+  const reno = units.reduce((a, u) => a + (u.renovate_units ?? 0), 0);
+  const num = (i: number, k: keyof UnitRow, label: string, unit: "int" | "usd") => (
+    <NumberInput value={units[i]![k] as number | undefined} unit={unit} label={T("第 {0} 个户型{1}", [i + 1, label])}
+      onChange={(v) => upd(i, k, k === "units" || k === "renovate_units" ? Math.round(v ?? 0) : v ?? 0)} />);
+  return (
+    <section className="card" aria-label={T("户型表")}>
+      <div className="row" style={{ justifyContent: "space-between" }}><h2 style={{ margin: 0 }}>{T("户型表")}</h2>
+        <button className="btn sm" type="button" onClick={() => set("unit_mix", [...units, blankUnit()])}>{T("+ 加户型")}</button></div>
+      <p className="sub">{T("租金按每户每月。在租租约在租期内均匀到期、调到市场租金；翻新户停用后按市场租金 + 溢价出租。")}</p>
+      <MetricGrid count={4} style={{ marginBottom: 12 }}>
+        <Metric label={T("总户数")} value={avg.units} unit="int" />
+        <Metric label={T("平均在租月租")} value={avg.inPlace} unit="usd" />
+        <Metric label="Loss-to-lease" value={ltl} unit="pct" />
+        <Metric label={T("翻新户数")} value={reno} unit="int" />
+      </MetricGrid>
+      <div className="table-wrap" style={{ maxHeight: "none" }}><table className="t">
+        <thead><tr><th scope="col">{T("户型")}</th><th scope="col" className="num">{T("户数")}</th><th scope="col" className="num">{T("户均面积")}<span className="unit">SF</span></th>
+          <th scope="col" className="num">{T("在租月租")}<span className="unit">$</span></th><th scope="col" className="num">{T("市场月租")}<span className="unit">$</span></th>
+          <th scope="col" className="num">{T("翻新户数")}</th><th scope="col" className="num">{T("每户翻新成本")}<span className="unit">$</span></th>
+          <th scope="col" className="num">{T("翻新溢价")}<span className="unit">{T("$/月")}</span></th><th scope="col"><span className="sr-only">{T("操作")}</span></th></tr></thead>
+        <tbody>{units.map((u, i) => (
+          <tr key={i}>
+            <td className="cell-input"><input className="input" style={{ width: 90 }} value={u.name ?? ""} aria-label={T("第 {0} 个户型名称", [i + 1])} onChange={(e) => upd(i, "name", e.target.value)} /></td>
+            <td className="cell-input">{num(i, "units", T("户数"), "int")}</td>
+            <td className="cell-input">{num(i, "avg_sf", T("户均面积"), "int")}</td>
+            <td className="cell-input"><div className="row" style={{ gap: 4, flexWrap: "nowrap" }}>{num(i, "in_place_rent", T("在租月租"), "usd")}
+              <button type="button" className="btn ghost sm" aria-label={T("第 {0} 个户型在租月租的数字护照", [i + 1])} onClick={() => openPassport(`unit_mix.${i}.in_place_rent`, T("第 {0} 个户型在租月租", [i + 1]))}>
+                <span className={`status ${passportStatus(passports[`unit_mix.${i}.in_place_rent`])}`} style={{ padding: "0 4px" }}><i aria-hidden="true" />{T("源")}</span></button></div></td>
+            <td className="cell-input">{num(i, "market_rent", T("市场月租"), "usd")}</td>
+            <td className="cell-input">{num(i, "renovate_units", T("翻新户数"), "int")}</td>
+            <td className="cell-input">{num(i, "reno_cost_per_unit", T("每户翻新成本"), "usd")}</td>
+            <td className="cell-input">{num(i, "reno_premium", T("翻新溢价"), "usd")}</td>
+            <td><button type="button" className="btn ghost sm" aria-label={T("删除第 {0} 个户型", [i + 1])} disabled={units.length <= 1}
+              onClick={() => set("unit_mix", units.filter((_, j) => j !== i))}>×</button></td>
+          </tr>))}</tbody></table></div>
+      {cre && cre.metrics.capex_total ? <p className="muted" style={{ marginTop: 8 }}>{T("持有期翻新支出 {0}；每户价格 {1}", [fmt(cre.metrics.capex_total, "usd"), fmt(cre.metrics.price_per_unit, "usd")])}</p> : null}
+    </section>
+  );
+}
 
 const RECOVERY: [string, string][] = [["nnn", "NNN"], ["gross", T("毛租约")], ["base_year", T("基年")]];
 
@@ -56,6 +146,11 @@ function Fields({ specs }: { specs: FieldSpec[] }) {
 }
 
 export function InstRentRoll() {
+  const mf = useIsMf();
+  return <><PropertyType />{mf ? <UnitMix /> : <LeaseRentRoll />}</>;
+}
+
+function LeaseRentRoll() {
   const { draft, set, passports, openPassport } = useDeal();
   const cre = useCre();
   const leases = (draft.leases as Lease[] | undefined) ?? [];
@@ -119,6 +214,17 @@ export function InstRentRoll() {
 }
 
 export function InstMarketOpex() {
+  if (useIsMf()) return (
+    <div className="split">
+      <section className="card" aria-label={T("收入假设")}><h2>{T("收入假设")}</h2>
+        <p className="sub">{T("空置率与坏账在“模型”页的“一般空置率 / 信用损失”里填。")}</p><Fields specs={INST_MF_REVENUE} /></section>
+      <div>
+        <section className="card" aria-label={T("运营费用")}><h2>{T("运营费用")}</h2><Fields specs={INST_MF_OPEX} /></section>
+        <section className="card" aria-label={T("翻新计划")}><h2>{T("翻新计划")}</h2>
+          <p className="sub">{T("按户型顺序开工；各户型翻新户数、成本与溢价在“租金表”页的户型表里填。")}</p><Fields specs={INST_MF_RENO} /></section>
+      </div>
+    </div>
+  );
   return (
     <div className="split">
       <section className="card" aria-label={T("市场租赁假设")}><h2>{T("市场租赁假设（MLA）")}</h2>
@@ -137,8 +243,19 @@ const ROWS: [string, string, boolean][] = [
   ["cf_before_debt", T("债前现金流"), true], ["debt_service", T("还本付息"), false], ["cf_after_debt", T("债后现金流"), true],
 ];
 
+const ROWS_MF: [string, string, boolean][] = [
+  ["potential_rent", T("潜在租金 GPR"), false], ["loss_to_lease", "Loss-to-lease", false], ["premium", T("翻新溢价"), false],
+  ["turnover_vacancy", T("翻新停用"), false], ["non_revenue", T("不产生租金的户"), false], ["base_rent", T("在租租金"), true],
+  ["free_rent", T("租金优惠"), false], ["general_vacancy", T("空置"), false], ["credit_loss", T("坏账"), false],
+  ["recoveries", T("其他收入"), false], ["egr", T("有效总收入 EGR"), true], ["opex_recoverable", T("房产税与保险"), false],
+  ["opex_non_recoverable", T("运营费用"), false], ["mgmt_fee", T("管理费"), false], ["noi", "NOI", true],
+  ["capex", T("翻新支出"), false], ["reserves", T("资本储备"), false],
+  ["cf_before_debt", T("债前现金流"), true], ["debt_service", T("还本付息"), false], ["cf_after_debt", T("债后现金流"), true],
+];
+
 export function InstModel() {
   const { draft, set, preview, previewing } = useDeal();
+  const mf = draft.property_type === "multifamily";
   const { catalog } = useApp();
   const cre = useCre();
   const hold = Number(draft.hold_years ?? 0);
@@ -187,7 +304,7 @@ export function InstModel() {
         <h3 style={{ marginTop: 20, fontSize: 15 }}>{T("逐年现金流（$）")}</h3>
         {cre ? <div className="table-wrap" tabIndex={0} role="region" aria-label={T("逐年现金流（$）")}><table className="t">
           <thead><tr><th scope="col" style={{ whiteSpace: "nowrap" }}>{T("科目")}</th>{years.map((y) => <th key={y} scope="col" className="num">{T("第 {0} 年", [y + 1])}</th>)}</tr></thead>
-          <tbody>{ROWS.map(([k, label, total]) => <tr key={k} className={total ? "total" : undefined}><td style={{ whiteSpace: "nowrap" }}>{label}</td>{years.map((y) => <NumCell key={y} v={val(k, y)} unit="usd" />)}</tr>)}
+          <tbody>{(mf ? ROWS_MF : ROWS).map(([k, label, total]) => <tr key={k} className={total ? "total" : undefined}><td style={{ whiteSpace: "nowrap" }}>{label}</td>{years.map((y) => <NumCell key={y} v={val(k, y)} unit="usd" />)}</tr>)}
             <tr><td style={{ whiteSpace: "nowrap" }}>{T("平均出租率")}</td>{years.map((y) => <NumCell key={y} v={cre.annual.occupancy_pct?.[y]} unit="pct" />)}</tr></tbody></table></div>
           : <p className="muted">{T("填好交易、租约与市场假设后，这里出逐年现金流。")}</p>}
       </section>

@@ -125,7 +125,10 @@ export interface paths {
         };
         /**
          * Institutional Example
-         * @description 示例输入：4 租户郊区办公楼（含空置、基年租约、即将到期租约、浮动利率带上限、两档瀑布）；演示数字。
+         * @description 示例输入（演示数字）。
+         *
+         *     office = 郊区办公楼（含空置、基年租约、即将到期租约、浮动利率带上限、两档瀑布）；
+         *     multifamily = 240 户花园式公寓（loss-to-lease、翻新 120 户、固定利率、一档瀑布）。
          */
         get: operations["institutional_example_api_v2_cre_example_get"];
         put?: never;
@@ -1993,6 +1996,10 @@ export interface components {
             rent_roll: {
                 [key: string]: unknown;
             }[];
+            /** Unit Mix */
+            unit_mix?: {
+                [key: string]: unknown;
+            }[] | null;
             /** Waterfall */
             waterfall: {
                 [key: string]: unknown;
@@ -3555,7 +3562,9 @@ export interface operations {
     };
     institutional_example_api_v2_cre_example_get: {
         parameters: {
-            query?: never;
+            query?: {
+                kind?: "office" | "multifamily";
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -3571,6 +3580,15 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

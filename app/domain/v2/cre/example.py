@@ -33,3 +33,35 @@ def suburban_office() -> dict[str, Any]:
                                                                    {"irr_pct": 16, "lp_share_pct": 70}],
                       "final_lp_share_pct": 60},
     }
+
+
+def garden_multifamily() -> dict[str, Any]:
+    """示例：240 户花园式公寓（value-add）：在租租金低于市场约 6%，翻新 120 户、每户 1.2 万美元、溢价 175 美元 / 月。
+
+    数字为演示用，不是真实交易。
+    """
+    return {
+        "property_type": "multifamily",
+        "analysis_start": "2026-01", "hold_years": 5, "area_sf": 216_000,
+        "purchase_price": 48_000_000, "closing_costs_pct": 1.5,
+        "unit_mix": [
+            {"name": "1B1B", "units": 120, "avg_sf": 750, "in_place_rent": 1_480, "market_rent": 1_575,
+             "renovate_units": 60, "reno_cost_per_unit": 12_000, "reno_premium": 175},
+            {"name": "2B2B", "units": 96, "avg_sf": 1_050, "in_place_rent": 1_820, "market_rent": 1_925,
+             "renovate_units": 48, "reno_cost_per_unit": 12_000, "reno_premium": 175},
+            {"name": "3B2B", "units": 24, "avg_sf": 1_300, "in_place_rent": 2_150, "market_rent": 2_250,
+             "renovate_units": 12, "reno_cost_per_unit": 12_000, "reno_premium": 175},
+        ],
+        "multifamily": {"rent_growth_pct": 3, "lease_term_months": 12, "concessions_pct": 1, "non_revenue_units": 2,
+                        "other_income_per_unit": 95, "other_income_growth_pct": 3, "turnover_pct": 50,
+                        "make_ready_per_turn": 900, "opex_per_unit_yr": 4_200, "taxes_yr": 720_000,
+                        "insurance_yr": 180_000, "reserves_per_unit_yr": 300, "reno_start_month": 3,
+                        "reno_units_per_month": 6, "reno_downtime_months": 1},
+        "opex": {"growth_pct": 3, "mgmt_fee_pct_egr": 3},
+        "general_vacancy_pct": 5, "credit_loss_pct": 1,
+        "debt": {"ltv_pct": 65, "rate_type": "fixed", "rate_pct": 6.0, "io_months": 24, "amort_years": 30,
+                 "orig_fee_pct": 1},
+        "exit_cap_pct": 5.5, "selling_costs_pct": 1.5, "discount_rate_pct": 8,
+        "waterfall": {"lp_equity_pct": 90, "pref_pct": 8, "tiers": [{"irr_pct": 13, "lp_share_pct": 80}],
+                      "final_lp_share_pct": 70},
+    }

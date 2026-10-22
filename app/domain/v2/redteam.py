@@ -28,10 +28,17 @@ def _has_value(inputs: JSON, a: Assumption) -> bool:
     return False
 
 
+def _present(inputs: JSON, path: str) -> bool:
+    v = get_path(inputs, path)
+    return v != [] if isinstance(v, list) else v is not None
+
+
 def shock(inputs: JSON, a: Assumption, factor: float) -> JSON:
+    """只扰动这笔交易里存在的路径：不存在的路径不补空对象（否则会凭空造出输入，如多户公寓的 market）。"""
     out = inputs
     for p in a.paths:
-        out = update_path(out, p, partial(scale_numeric, factor=factor))
+        if _present(inputs, p):
+            out = update_path(out, p, partial(scale_numeric, factor=factor))
     return out
 
 

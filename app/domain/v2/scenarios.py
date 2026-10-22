@@ -59,6 +59,10 @@ def _scaler(f: float) -> Callable[[Any], Any]:
 
 def _apply_change(track: str, inputs: JSON, ch: JSON) -> JSON:
     paths = list(find(track, ch["assumption"]).paths) if ch.get("assumption") else [ch["path"]]
+    if ch.get("assumption") and ("add" in ch or "pct" in ch):
+        # 一条假设对应多个路径时，只调整这笔交易里有数的路径；一个都没有才算缺数
+        with_values = [p for p in paths if _has_number(get_path(inputs, p))]
+        paths = with_values or paths[:1]
     out = inputs
     for p in paths:
         if not any(k in ch for k in ("set", "add", "pct")):

@@ -79,6 +79,40 @@ def month_label(start: str, m: int) -> str:
 # B11 贷款额、B12 开办费、B13 退出时贷款余额（后三项为引擎值）
 
 
+def _commercial_info(cre: JSON) -> list[tuple[str, Any, str | None]]:
+    mk, ox = cre["market"], cre["opex"]
+    return [
+        ("市场租金 $/SF/年", mk["rent_psf_yr"], "0.00"), ("市场租金增长", mk["rent_growth_pct"] / 100, PCT),
+        ("续租概率", mk["renewal_prob_pct"] / 100, PCT), ("新租空置月数", mk["downtime_months"], "0.0"),
+        ("新租 / 续租免租月", f"{mk['free_rent_new_months']:g} / {mk['free_rent_renew_months']:g}", None),
+        ("新租 / 续租 TI $/SF", f"{mk['ti_new_psf']:g} / {mk['ti_renew_psf']:g}", None),
+        ("新租 / 续租 LC", f"{mk['lc_new_pct']:g}% / {mk['lc_renew_pct']:g}%", None),
+        ("新租期（年）", mk["lease_term_years"], None), ("新租递增", mk["escalation_pct"] / 100, PCT),
+        ("可回收费用 $/SF/年", ox["recoverable_psf_yr"], "0.00"),
+        ("不可回收费用 $/SF/年", ox["non_recoverable_psf_yr"], "0.00"),
+        ("费用增长", ox["growth_pct"] / 100, PCT), ("管理费（占有效总收入）", ox["mgmt_fee_pct_egr"] / 100, PCT),
+        ("资本储备 $/SF/年", ox["reserves_psf_yr"], "0.00"),
+    ]
+
+
+def _mf_info(cre: JSON) -> list[tuple[str, Any, str | None]]:
+    mf, ox = cre["multifamily"], cre["opex"]
+    return [
+        ("物业类型", "多户公寓（按户型）", None), ("总户数", sum(u["units"] for u in cre["unit_mix"]), "0"),
+        ("市场租金增长", mf["rent_growth_pct"] / 100, PCT), ("租期（月，在租租约均匀到期）", mf["lease_term_months"], "0"),
+        ("租金优惠（占在租租金）", mf["concessions_pct"] / 100, PCT), ("不产生租金的户数", mf["non_revenue_units"], "0"),
+        ("其他收入（每户每月）", mf["other_income_per_unit"], MONEY),
+        ("其他收入增长", mf["other_income_growth_pct"] / 100, PCT),
+        ("年换租率 / 每次翻房成本", f"{mf['turnover_pct']:g}% / ${mf['make_ready_per_turn']:,.0f}", None),
+        ("运营费用（每户每年）", mf["opex_per_unit_yr"], MONEY), ("房产税（全年）", mf["taxes_yr"], MONEY),
+        ("保险（全年）", mf["insurance_yr"], MONEY), ("费用增长", ox["growth_pct"] / 100, PCT),
+        ("管理费（占有效总收入）", ox["mgmt_fee_pct_egr"] / 100, PCT),
+        ("资本储备（每户每年）", mf["reserves_per_unit_yr"], MONEY),
+        ("翻新：开工月 / 每月户数 / 停用月", f"第 {mf['reno_start_month']} 月 / {mf['reno_units_per_month']} 户 / "
+                                     f"{mf['reno_downtime_months']} 个月", None),
+    ]
+
+
 def _assumptions(ws: Worksheet, cre: JSON, r: JSON, meta: JSON) -> None:
     ws.column_dimensions["A"].width = 30
     ws.column_dimensions["B"].width = 18
@@ -124,31 +158,28 @@ def _assumptions(ws: Worksheet, cre: JSON, r: JSON, meta: JSON) -> None:
         row += 1
     row += 1
     _section(ws, row, "物业与市场假设（引擎输入，供核对）", 3)
-    mk, ox = cre["market"], cre.get("opex") or {}
-    info: list[tuple[str, Any, str | None]] = [
+    common: list[tuple[str, Any, str | None]] = [
         ("分析起点（交割月）", cre["analysis_start"], None), ("持有年限", cre["hold_years"], None),
         ("退出 NOI 口径", "稳定化（加回周转空置与免租）" if cre["exit_noi_basis"] == "stabilized" else "第 N+1 年 NOI 原值", None),
-        ("可租面积 SF", cre["area_sf"], MONEY), ("一般空置率", cre.get("general_vacancy_pct", 5) / 100, PCT),
-        ("信用损失率", cre.get("credit_loss_pct", 1) / 100, PCT),
-        ("市场租金 $/SF/年", mk["rent_psf_yr"], "0.00"), ("市场租金增长", mk.get("rent_growth_pct", 3) / 100, PCT),
-        ("续租概率", mk.get("renewal_prob_pct", 70) / 100, PCT), ("新租空置月数", mk.get("downtime_months", 6), "0.0"),
-        ("新租 / 续租免租月", f"{mk.get('free_rent_new_months', 3):g} / {mk.get('free_rent_renew_months', 1):g}", None),
-        ("新租 / 续租 TI $/SF", f"{mk.get('ti_new_psf', 30):g} / {mk.get('ti_renew_psf', 10):g}", None),
-        ("新租 / 续租 LC", f"{mk.get('lc_new_pct', 6):g}% / {mk.get('lc_renew_pct', 3):g}%", None),
-        ("新租期（年）", mk.get("lease_term_years", 5), None), ("新租递增", mk.get("escalation_pct", 3) / 100, PCT),
-        ("可回收费用 $/SF/年", ox.get("recoverable_psf_yr", 0), "0.00"),
-        ("不可回收费用 $/SF/年", ox.get("non_recoverable_psf_yr", 0), "0.00"),
-        ("费用增长", ox.get("growth_pct", 3) / 100, PCT), ("管理费（占有效总收入）", ox.get("mgmt_fee_pct_egr", 3) / 100, PCT),
-        ("资本储备 $/SF/年", ox.get("reserves_psf_yr", 0.25), "0.00"),
+        ("可租面积 SF", cre["area_sf"], MONEY), ("一般空置率", cre["general_vacancy_pct"] / 100, PCT),
+        ("信用损失率", cre["credit_loss_pct"] / 100, PCT),
     ]
+    info = common + (_mf_info(cre) if cre["property_type"] == "multifamily" else _commercial_info(cre))
     for label, v, info_fmt in info:
         row += 1
         _put(ws, row, 1, label)
         _put(ws, row, 2, v, ENGINE, info_fmt)
 
 
-# 现金流页行号（公式互相引用）
-_CF_ROWS = [
+# 现金流页的行：(科目键, 标签, 取值)。取值 "v" = 引擎值；元组 = 这些科目相加的 Excel 公式；"after" / "dscr" 为专用公式。
+Formula = str | tuple[str, ...]
+_DEBT_ROWS: list[tuple[str, str, Formula]] = [
+    ("debt_service", "还本付息", "v"),
+    ("cf_after_debt", "债后现金流（有杠杆）", "after"),
+    ("dscr", "DSCR", "dscr"),
+    ("occupancy_pct", "平均出租率", "v"),
+]
+_COMMERCIAL_ROWS: list[tuple[str, str, Formula]] = [
     ("potential_rent", "潜在租金（含空置面积按市场应收）", "v"),
     ("turnover_vacancy", "周转空置", "v"),
     ("base_rent", "基本租金", "v"),
@@ -156,55 +187,97 @@ _CF_ROWS = [
     ("recoveries", "费用回收", "v"),
     ("general_vacancy", "一般空置（已扣周转空置）", "v"),
     ("credit_loss", "信用损失", "v"),
-    ("egr", "有效总收入 EGR", "=SUM({c}5:{c}9)"),
+    ("egr", "有效总收入 EGR", ("base_rent", "free_rent", "recoveries", "general_vacancy", "credit_loss")),
     ("opex_recoverable", "可回收费用", "v"),
     ("opex_non_recoverable", "不可回收费用", "v"),
     ("mgmt_fee", "管理费", "v"),
-    ("opex", "运营费用合计", "=SUM({c}11:{c}13)"),
-    ("noi", "净营业收入 NOI", "={c}10+{c}14"),
+    ("opex", "运营费用合计", ("opex_recoverable", "opex_non_recoverable", "mgmt_fee")),
+    ("noi", "净营业收入 NOI", ("egr", "opex")),
     ("ti", "租户改造 TI", "v"),
     ("lc", "租赁佣金 LC", "v"),
     ("reserves", "资本储备", "v"),
-    ("cf_before_debt", "债前现金流（无杠杆）", "={c}15+{c}16+{c}17+{c}18"),
-    ("debt_service", "还本付息", "v"),
-    ("cf_after_debt", "债后现金流（有杠杆）", "={c}19-{c}20"),
-    ("dscr", "DSCR", '=IF({c}20=0,"",{c}15/{c}20)'),
-    ("occupancy_pct", "平均出租率", "v"),
+    ("cf_before_debt", "债前现金流（无杠杆）", ("noi", "ti", "lc", "reserves")),
+    *_DEBT_ROWS,
 ]
-ROW = {key: i for i, (key, _, _) in enumerate(_CF_ROWS, start=3)}
+_MULTIFAMILY_ROWS: list[tuple[str, str, Formula]] = [
+    ("potential_rent", "潜在租金 GPR（全部户按市场租金）", "v"),
+    ("loss_to_lease", "Loss-to-lease（在租低于市场）", "v"),
+    ("premium", "翻新溢价", "v"),
+    ("turnover_vacancy", "翻新停用", "v"),
+    ("non_revenue", "不产生租金的户", "v"),
+    ("base_rent", "在租租金", ("potential_rent", "loss_to_lease", "premium", "turnover_vacancy", "non_revenue")),
+    ("free_rent", "租金优惠", "v"),
+    ("general_vacancy", "空置", "v"),
+    ("credit_loss", "坏账", "v"),
+    ("recoveries", "其他收入（停车、RUBS、杂费）", "v"),
+    ("egr", "有效总收入 EGR", ("base_rent", "free_rent", "general_vacancy", "credit_loss", "recoveries")),
+    ("opex_recoverable", "房产税与保险", "v"),
+    ("opex_non_recoverable", "运营费用（人工、维修、公用事业、翻房等）", "v"),
+    ("mgmt_fee", "管理费", "v"),
+    ("opex", "运营费用合计", ("opex_recoverable", "opex_non_recoverable", "mgmt_fee")),
+    ("noi", "净营业收入 NOI", ("egr", "opex")),
+    ("capex", "翻新资本支出", "v"),
+    ("reserves", "资本储备", "v"),
+    ("cf_before_debt", "债前现金流（无杠杆）", ("noi", "capex", "reserves")),
+    *_DEBT_ROWS,
+]
+
+
+def cf_rows(property_type: str) -> list[tuple[str, str, Formula]]:
+    return _MULTIFAMILY_ROWS if property_type == "multifamily" else _COMMERCIAL_ROWS
+
+
+def row_index(property_type: str) -> dict[str, int]:
+    """现金流页每个科目所在行（第 1、2 行是表头）。"""
+    return {key: i for i, (key, _, _) in enumerate(cf_rows(property_type), start=3)}
+
+
+ROW = row_index("commercial")
+
+
+def _formula(kind: Formula, row: dict[str, int], c: str) -> str:
+    if kind == "after":
+        return f"={c}{row['cf_before_debt']}-{c}{row['debt_service']}"
+    if kind == "dscr":
+        return f'=IF({c}{row["debt_service"]}=0,"",{c}{row["noi"]}/{c}{row["debt_service"]})'
+    rows = [row[k] for k in kind]
+    if len(rows) > 2 and rows == list(range(rows[0], rows[0] + len(rows))):
+        return f"=SUM({c}{rows[0]}:{c}{rows[-1]})"
+    return "=" + "+".join(f"{c}{x}" for x in rows)
 
 
 def _cashflow(ws: Worksheet, cre: JSON, r: JSON) -> None:
     n = cre["hold_years"]
     ann = r["annual"]
+    row = row_index(cre["property_type"])
     _hdr(ws, 1, ["科目（美元）", *[f"第{y}年" for y in range(1, n + 1)], f"第{n + 1}年（退出用）"])
     _put(ws, 2, 1, "灰字 = 引擎测算（按月汇总）；黑字 = Excel 公式", NOTE)
     for i in range(1, n + 2):
         _put(ws, 2, i + 1, month_label(cre["analysis_start"], (i - 1) * 12), NOTE)
         ws.cell(row=2, column=i + 1).alignment = Alignment(horizontal="center")
-    ws.column_dimensions["A"].width = 34
+    ws.column_dimensions["A"].width = 40
     bold_rows = {"egr", "noi", "cf_before_debt", "cf_after_debt"}
-    for key, label, kind in _CF_ROWS:
-        row = ROW[key]
-        _put(ws, row, 1, label, BOLD if key in bold_rows else BODY)
+    for key, label, kind in cf_rows(cre["property_type"]):
+        r_i = row[key]
+        _put(ws, r_i, 1, label, BOLD if key in bold_rows else BODY)
         for y in range(n + 1):
             col = y + 2
-            c = _col(col)
             if kind == "v":
                 v = ann[key][y]
                 fmt = PCT if key == "occupancy_pct" else MONEY
-                _put(ws, row, col, v / 100 if key == "occupancy_pct" else v, ENGINE, fmt)
+                _put(ws, r_i, col, v / 100 if key == "occupancy_pct" else v, ENGINE, fmt)
             else:
-                _put(ws, row, col, kind.format(c=c), BOLD if key in bold_rows else BODY,
+                _put(ws, r_i, col, _formula(kind, row, _col(col)), BOLD if key in bold_rows else BODY,
                      X if key == "dscr" else MONEY)
         if key in ("debt_service", "cf_after_debt", "dscr"):  # 第 N+1 年只用于退出 NOI，不计债务
-            ws.cell(row=row, column=n + 2).value = None
+            ws.cell(row=r_i, column=n + 2).value = None
     for col in range(2, n + 3):
         ws.column_dimensions[_col(col)].width = 14
     ws.freeze_panes = "B3"
 
 
 def _returns(ws: Worksheet, cre: JSON, r: JSON) -> None:
+    ROW = row_index(cre["property_type"])  # noqa: N806 — 与模块级 ROW 同义，按物业类型取
     n = cre["hold_years"]
     m, ex = r["metrics"], r["exit"]
     fwd_col, hold_col = _col(n + 2), _col(n + 1)  # 现金流页：B = 第 1 年 → 第 N 年在第 n+1 列，第 N+1 年在第 n+2 列
@@ -293,6 +366,27 @@ def _rent_roll(ws: Worksheet, cre: JSON, r: JSON) -> None:
     ws.freeze_panes = "A2"
 
 
+def _unit_mix(ws: Worksheet, r: JSON) -> None:
+    _hdr(ws, 1, ["户型", "户数", "户均面积 SF", "在租月租", "市场月租", "Loss-to-lease", "翻新户数", "每户翻新成本",
+                 "翻新溢价 / 月"])
+    rows = r["unit_mix"]
+    for i, u in enumerate(rows, start=2):
+        vals = [u["name"], u["units"], u["avg_sf"], u["in_place_rent"], u["market_rent"], u["loss_to_lease_pct"] / 100,
+                u["renovate_units"], u["reno_cost_per_unit"], u["reno_premium"]]
+        for c, (v, fmt) in enumerate(zip(vals, (None, "0", MONEY, MONEY, MONEY, PCT, "0", MONEY, MONEY), strict=True), 1):
+            _put(ws, i, c, v, BODY, fmt)
+    total = len(rows) + 2
+    _put(ws, total, 1, "合计 / 按户数加权", BOLD)
+    _put(ws, total, 2, f"=SUM(B2:B{total - 1})", BOLD, "0")
+    for col in ("C", "D", "E"):
+        _put(ws, total, "CDE".index(col) + 3, f"=SUMPRODUCT($B2:$B{total - 1},{col}2:{col}{total - 1})/B{total}", BOLD, MONEY)
+    _put(ws, total, 6, f"=(E{total}-D{total})/E{total}", BOLD, PCT)
+    _put(ws, total, 7, f"=SUM(G2:G{total - 1})", BOLD, "0")
+    for letter, w in zip("ABCDEFGHI", (14, 8, 12, 11, 11, 13, 10, 13, 13), strict=True):
+        ws.column_dimensions[letter].width = w
+    ws.freeze_panes = "A2"
+
+
 def _monthly(ws: Worksheet, cre: JSON, r: JSON) -> None:
     mo = r["monthly"]
     _hdr(ws, 1, ["月份", "NOI", "债前现金流", "还本付息", "债后现金流", "执行利率", "出租率"])
@@ -374,7 +468,10 @@ def build_cre_xlsx(cre: JSON, r: JSON, meta: JSON) -> bytes:
     _assumptions(ws, cre, r, meta)
     _cashflow(wb.create_sheet(CF), cre, r)
     _returns(wb.create_sheet(RET), cre, r)
-    _rent_roll(wb.create_sheet(RR), cre, r)
+    if cre["property_type"] == "multifamily":
+        _unit_mix(wb.create_sheet("户型表"), r)
+    else:
+        _rent_roll(wb.create_sheet(RR), cre, r)
     _monthly(wb.create_sheet(MO), cre, r)
     if cre.get("waterfall") and r.get("waterfall"):
         _waterfall(wb.create_sheet(WF), cre, r)

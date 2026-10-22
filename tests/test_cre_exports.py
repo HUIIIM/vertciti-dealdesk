@@ -169,3 +169,55 @@ def test_stabilized_exit_basis_flows_into_both_exports():
     assert ret["B5"].value == "=B3/B4"
     text = _pdf_text(cre_memo.build_cre_memo(cre, r, META, None))
     assert "稳定化" in text
+
+
+def _mf_case():
+    from app.domain.v2.cre.example import garden_multifamily
+    cre = engine.parse(garden_multifamily()).model_dump()
+    return cre, engine.run(cre)
+
+
+def test_multifamily_workbook_bridges_rent_with_formulas():
+    cre, r = _mf_case()
+    wb = load_workbook(io.BytesIO(cre_excel.build_cre_xlsx(cre, r, META)))
+    assert "户型表" in wb.sheetnames and "租金表" not in wb.sheetnames
+    row = cre_excel.row_index("multifamily")
+    cf = wb["现金流"]
+    assert cf[f"B{row['base_rent']}"].value == f"=SUM(B{row['potential_rent']}:B{row['non_revenue']})"
+    assert cf[f"B{row['cf_before_debt']}"].value == f"=SUM(B{row['noi']}:B{row['reserves']})"  # NOI、翻新支出、储备相邻
+    assert wb["收益"]["B3"].value == f"='现金流'!{cre_excel._col(cre['hold_years'] + 2)}{row['noi']}"
+
+
+@pytest.mark.skipif(shutil.which("soffice") is None, reason="没装 LibreOffice，无法重算公式")
+def test_multifamily_libreoffice_recalc_matches_engine(tmp_path):
+    cre, r = _mf_case()
+    wb = _recalc(cre_excel.build_cre_xlsx(cre, r, META), tmp_path)
+    ret = wb["收益"]
+    for row in [*range(3, 10), *range(16, 31)]:
+        label, formula_v, engine_v = (ret.cell(row=row, column=c).value for c in (1, 2, 3))
+        if isinstance(formula_v, (int, float)) and isinstance(engine_v, (int, float)):
+            assert formula_v == pytest.approx(engine_v, rel=1e-6, abs=1e-6), label
+    idx = cre_excel.row_index("multifamily")
+    cf = wb["现金流"]
+    for y in range(cre["hold_years"] + 1):
+        col = cre_excel._col(y + 2)
+        assert cf[f"{col}{idx['base_rent']}"].value == pytest.approx(r["annual"]["base_rent"][y], rel=1e-9)
+        assert cf[f"{col}{idx['noi']}"].value == pytest.approx(r["annual"]["noi"][y], rel=1e-9)
+    mix = wb["户型表"]
+    total = len(cre["unit_mix"]) + 2
+    assert mix[f"B{total}"].value == 240 and mix[f"G{total}"].value == 120
+
+
+def test_multifamily_memo_sections_and_monotone_sensitivity():
+    cre, r = _mf_case()
+    text = _pdf_text(cre_memo.build_cre_memo(cre, r, META, None))
+    for heading in ("户型表与翻新计划", "Loss-to-lease", "翻新停用", "市场租金增长 × 空置率", "每户价格", "按户型逐月测算"):
+        assert heading in text, heading
+    assert "WALT" not in text and "续租概率" not in text
+    s = cre_memo.sensitivity(cre)
+    g = s["growth_vac"]
+    i = g["rows"].index(cre["multifamily"]["rent_growth_pct"])
+    j = g["cols"].index(cre["general_vacancy_pct"])
+    assert g["grid"][i][j] == pytest.approx(r["metrics"]["levered_irr_pct"], abs=1e-9)
+    assert all(a > b for a, b in itertools.pairwise(g["grid"][i]))      # 空置越高 IRR 越低
+    assert all(a < b for a, b in itertools.pairwise(row[j] for row in g["grid"]))  # 增长越高 IRR 越高

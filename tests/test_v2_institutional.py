@@ -75,3 +75,27 @@ def test_workbench_preview_route_returns_standard_shape(c):
     r = c.post("/api/v2/model/institutional", json=suburban_office()).json()
     assert r["track"] == "institutional" and r["metrics"]["irr_pct"] == pytest.approx(16.903, abs=1e-3)
     assert r["detail"]["cre"]["rent_roll"]
+
+
+def test_multifamily_deal_through_the_whole_toolchain(c):
+    """多户公寓同一套工具链：红队只扰动这笔交易里有的假设（不凭空造出 market），情景、最高出价、投委会包、导出都能用。"""
+    from app.domain.v2.cre.example import garden_multifamily
+    d = c.post("/api/v2/deals", json={"name": "Garden Apartments", "track": "institutional",
+                                      "kill_criteria": []}).json()
+    v = c.post(f"/api/v2/deals/{d['id']}/versions", json={"inputs": garden_multifamily(), "label": "OM"})
+    assert v.status_code == 201, v.text
+    did = d["id"]
+    assert v.json()["outputs"]["metrics"]["irr_pct"] == pytest.approx(15.43, abs=1e-2)
+    rt = c.get(f"/api/v2/deals/{did}/redteam").json()
+    keys = {r["key"] for r in rt["all"]}
+    assert {"rent_level", "reno_premium", "exit_cap", "opex"} <= keys
+    assert "downtime" not in keys and "renewal" not in keys        # 按租约物业的假设：这笔交易没有，跳过
+    sc = c.post(f"/api/v2/deals/{did}/scenarios", json={}).json()
+    assert all(r["primary"] is not None for r in sc["scenarios"])
+    pess = next(r for r in sc["scenarios"] if r["name"] == "悲观")
+    assert pess["primary"] < sc["scenarios"][0]["primary"]
+    assert c.post(f"/api/v2/deals/{did}/max-bid", json={}).status_code == 200
+    assert c.get(f"/api/v2/deals/{did}/committee/pack.pdf").content.startswith(b"%PDF-")
+    for kind, magic in (("memo", b"%PDF-"), ("model", b"PK")):
+        r = c.get(f"/api/v2/deals/{did}/export/{kind}")
+        assert r.status_code == 200 and r.content.startswith(magic), (kind, r.text[:300])

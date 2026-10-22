@@ -10,7 +10,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from app.domain.v2.cre import cashflow, debt, leases
+from app.domain.v2.cre import cashflow, debt, leases, multifamily
 from app.domain.v2.cre.inputs import CreInputs
 from app.domain.v2.cre.returns import equity_multiple, irr, npv
 from app.domain.v2.cre.waterfall import distribute
@@ -49,6 +49,8 @@ def _stabilized_noi(cre: CreInputs, annual: dict[str, list[float]], y: int) -> f
     按潜在收入（在租合同租金 + 回收、空置面积按市场应收）收足，不计周转空置与免租，
     再按一般空置率、信用损失率、管理费率重算；费用（税、保险、CAM）照实际计。
     """
+    if cre.property_type == "multifamily":
+        return _stabilized_noi_mf(cre, annual, y)
     pot = annual["potential_rent"][y]
     gv = cre.general_vacancy_pct / 100 * pot
     egr = (pot - gv) * (1 - cre.credit_loss_pct / 100)
@@ -56,12 +58,31 @@ def _stabilized_noi(cre: CreInputs, annual: dict[str, list[float]], y: int) -> f
     return egr + annual["opex_recoverable"][y] + annual["opex_non_recoverable"][y] - mgmt
 
 
+def _stabilized_noi_mf(cre: CreInputs, annual: dict[str, list[float]], y: int) -> float:
+    """多户公寓：加回翻新停用损失（停用户按市场租金收），优惠、空置、坏账、管理费按同一费率重算；其他收入不变。"""
+    base = annual["base_rent"][y] - annual["turnover_vacancy"][y]
+    mf = cre.mfa()
+    vac, conc, bad = cre.general_vacancy_pct / 100, mf.concessions_pct / 100, cre.credit_loss_pct / 100
+    other = annual["recoveries"][y]
+    egr = (base * (1 - conc - vac) + other) * (1 - bad)
+    mgmt = cre.opex.mgmt_fee_pct_egr / 100 * egr
+    return egr + annual["opex_recoverable"][y] + annual["opex_non_recoverable"][y] - mgmt
+
+
+def _unit_mix(cre: CreInputs) -> list[JSON]:
+    return [{"name": u.name, "units": u.units, "avg_sf": u.avg_sf, "in_place_rent": u.in_place_rent,
+             "market_rent": u.market_rent, "loss_to_lease_pct": (u.market_rent - u.in_place_rent) / u.market_rent * 100,
+             "renovate_units": u.renovate_units, "reno_cost_per_unit": u.reno_cost_per_unit,
+             "reno_premium": u.reno_premium} for u in cre.unit_mix]
+
+
 def run(inputs: JSON) -> JSON:
     cre = parse(inputs)
     hold_m = cre.hold_years * 12
     months = hold_m + 12  # 多算一年：退出要用下一年 NOI
-    chains = leases.expand(cre, months)
-    cf = cashflow.project(cre, chains, months)
+    is_mf = cre.property_type == "multifamily"
+    chains = [] if is_mf else leases.expand(cre, months)
+    cf = multifamily.project(cre, months) if is_mf else cashflow.project(cre, chains, months)
     ds = debt.schedule(cre.debt, cre.purchase_price, months)
     lines = cf.lines
     debt_service = [i + p for i, p in zip(ds.interest, ds.principal, strict=True)]
@@ -112,6 +133,9 @@ def run(inputs: JSON) -> JSON:
         "cash_on_cash_year1_pct": _pct(_div(annual["cf_after_debt"][0], equity)),
         "avg_occupancy_pct": sum(annual["occupancy_pct"][:cre.hold_years]) / cre.hold_years,
         "leasing_costs_total": abs(sum(annual["ti"][:cre.hold_years]) + sum(annual["lc"][:cre.hold_years])),
+        "capex_total": abs(sum(annual["capex"][:cre.hold_years])),
+        "units": float(sum(u.units for u in cre.unit_mix)) if is_mf else None,
+        "price_per_unit": cre.purchase_price / sum(u.units for u in cre.unit_mix) if is_mf else None,
     }
     return {
         "engine": ENGINE,
@@ -126,5 +150,6 @@ def run(inputs: JSON) -> JSON:
         "rent_roll": [{"tenant": s.tenant, "suite": s.suite, "sf": s.sf, "start": s.start, "end": s.end,
                        "rent_psf": s.rent_psf, "speculative": s.speculative, "downtime_before": s.downtime_before,
                        "ti": s.ti, "lc": s.lc} for chain in chains for s in chain if s.start < hold_m],
+        "unit_mix": _unit_mix(cre) if is_mf else None,
         "waterfall": distribute(cre.waterfall, lev) if cre.waterfall else None,
     }

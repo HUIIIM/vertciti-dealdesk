@@ -69,7 +69,7 @@ def market_rent_psf(mk: Market, m: int) -> float:
 
 def _rollover(prev_end: int, sf: float, tenant: str, suite: str, recovery: Recovery, cre: CreInputs, *,
               renewal_prob: float) -> Segment:
-    mk = cre.market
+    mk = cre.mla()
     p = renewal_prob
     downtime = _round_month((1 - p) * mk.downtime_months)
     free = _round_month(p * mk.free_rent_renew_months + (1 - p) * mk.free_rent_new_months)
@@ -106,7 +106,7 @@ def _existing(lease: Lease, cre: CreInputs) -> Segment:
 
 def expand(cre: CreInputs, horizon: int) -> list[list[Segment]]:
     """每块面积一条租期段链（签约段 + 到期续上的假设段；空置面积是一条招租链），覆盖到 horizon（不含）为止。"""
-    p = cre.market.renewal_prob_pct / 100
+    p = cre.mla().renewal_prob_pct / 100
     chains: list[list[Segment]] = []
     for lease in cre.leases:
         first = _existing(lease, cre)

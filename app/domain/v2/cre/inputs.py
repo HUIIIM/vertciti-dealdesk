@@ -114,14 +114,60 @@ class Waterfall(_In):
         return self
 
 
+class UnitType(_In):
+    """多户公寓的一个户型（如 1B1B）。租金一律按“每户每月”计。"""
+
+    name: str = Field(min_length=1, max_length=60)
+    units: int = Field(gt=0, le=10_000)
+    avg_sf: float = Field(default=0, ge=0, description="户均面积 SF（只用于展示 $/SF）")
+    in_place_rent: float = Field(ge=0, description="在租租约的平均月租（交割时）")
+    market_rent: float = Field(gt=0, description="分析起点的市场月租")
+    renovate_units: int = Field(default=0, ge=0, description="计划翻新的户数")
+    reno_cost_per_unit: float = Field(default=0, ge=0, description="每户翻新成本")
+    reno_premium: float = Field(default=0, ge=0, description="翻新后相对市场月租的溢价（分析起点口径，随市场租金增长）")
+
+    @model_validator(mode="after")
+    def _reno(self) -> UnitType:
+        if self.renovate_units > self.units:
+            raise ValueError(f"{self.name}：翻新户数 {self.renovate_units} 超过户数 {self.units}")
+        return self
+
+
+class Multifamily(_In):
+    """多户公寓假设：在租租约按租期均匀到期、逐批调到市场租金（loss-to-lease 逐步消化）。
+
+    空置率与坏账沿用 general_vacancy_pct / credit_loss_pct；费用增长与管理费沿用 opex.growth_pct / mgmt_fee_pct_egr。
+    """
+
+    rent_growth_pct: Pct = Field(default=3, ge=-20, le=20, description="市场租金年增长（按分析年阶梯）")
+    lease_term_months: int = Field(default=12, ge=1, le=24, description="租期：在租租约在这么多个月里均匀到期")
+    concessions_pct: Pct = Field(default=1, ge=0, le=20, description="租金优惠，占在租租金")
+    non_revenue_units: int = Field(default=0, ge=0, description="不产生租金的户数（样板间、员工房）")
+    other_income_per_unit: float = Field(default=0, ge=0, description="每户每月其他收入（停车、RUBS、杂费）")
+    other_income_growth_pct: Pct = Field(default=3, ge=-20, le=20)
+    turnover_pct: Pct = Field(default=50, ge=0, le=150, description="年换租率（用于翻房成本）")
+    make_ready_per_turn: float = Field(default=0, ge=0, description="每次换租的翻房成本")
+    opex_per_unit_yr: float = Field(default=0, ge=0, description="每户每年运营费用（人工、维修、公用事业、行政、营销）")
+    taxes_yr: float = Field(default=0, ge=0, description="房产税（全年）")
+    insurance_yr: float = Field(default=0, ge=0, description="保险（全年）")
+    reserves_per_unit_yr: float = Field(default=250, ge=0, description="资本储备（每户每年，NOI 之下）")
+    reno_start_month: int = Field(default=0, ge=0, le=360, description="翻新计划从交割后第几个月开始")
+    reno_units_per_month: int = Field(default=4, ge=1, le=500, description="每月开工翻新的户数")
+    reno_downtime_months: int = Field(default=1, ge=0, le=12, description="每户翻新停用月数")
+
+
 class CreInputs(_In):
     analysis_start: str = Field(description="分析起点（收购交割）月 YYYY-MM")
     hold_years: int = Field(ge=1, le=30)
     area_sf: float = Field(gt=0, description="可租面积（NRA）")
     purchase_price: float = Field(gt=0)
     closing_costs_pct: Pct = Field(default=1.5, ge=0, le=10)
+    property_type: Literal["commercial", "multifamily"] = Field(
+        default="commercial", description="commercial = 按租约（写字楼 / 零售 / 工业）；multifamily = 按户型")
     leases: list[Lease] = Field(default_factory=list, max_length=2000)
-    market: Market
+    market: Market | None = Field(default=None, description="按租约物业的市场租赁假设（commercial 必填）")
+    unit_mix: list[UnitType] = Field(default_factory=list, max_length=100)
+    multifamily: Multifamily | None = None
     opex: Opex = Field(default_factory=Opex)
     general_vacancy_pct: Pct = Field(default=5, ge=0, le=50, description="一般空置：会扣除已建模的周转空置后再计")
     credit_loss_pct: Pct = Field(default=1, ge=0, le=20)
@@ -137,8 +183,33 @@ class CreInputs(_In):
 
     _v_start = field_validator("analysis_start")(classmethod(lambda _c, v: _month(v)))
 
+    def mla(self) -> Market:
+        """按租约物业的市场租赁假设（校验器保证 commercial 必有）。"""
+        if self.market is None:
+            raise ValueError("按租约物业需要市场租赁假设（market）")
+        return self.market
+
+    def mfa(self) -> Multifamily:
+        """多户公寓假设（校验器保证 multifamily 必有，缺省时补默认值）。"""
+        if self.multifamily is None:
+            raise ValueError("多户公寓需要户型假设（multifamily）")
+        return self.multifamily
+
     @model_validator(mode="after")
     def _space(self) -> CreInputs:
+        if self.property_type == "multifamily":
+            if not self.unit_mix:
+                raise ValueError("多户公寓需要户型表（unit_mix）")
+            if self.leases:
+                raise ValueError("多户公寓按户型建模，不填逐份租约")
+            if self.multifamily is None:
+                self.multifamily = Multifamily()
+            total = sum(u.units for u in self.unit_mix)
+            if self.multifamily.non_revenue_units >= total:
+                raise ValueError(f"不产生租金的户数 {self.multifamily.non_revenue_units} 不少于总户数 {total}")
+            return self
+        if self.market is None:
+            raise ValueError("按租约物业需要市场租赁假设（market）")
         leased = sum(lease.sf for lease in self.leases)
         if leased > self.area_sf * 1.0001:
             raise ValueError(f"租约面积合计 {leased:,.0f} SF 超过可租面积 {self.area_sf:,.0f} SF")

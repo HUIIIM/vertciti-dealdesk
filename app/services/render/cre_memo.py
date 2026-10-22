@@ -127,7 +127,37 @@ def expiry_schedule(cre: JSON) -> list[tuple[int, float]]:
     return list(enumerate(out, start=1))
 
 
+def _is_mf(cre: JSON) -> bool:
+    return bool(cre.get("property_type") == "multifamily")
+
+
+def _facts_mf(cre: JSON, r: JSON) -> list[str]:
+    m, a, mix = r["metrics"], r["annual"], cre["unit_mix"]
+    units = sum(u["units"] for u in mix)
+    in_place = sum(u["units"] * u["in_place_rent"] for u in mix) / units
+    market = sum(u["units"] * u["market_rent"] for u in mix) / units
+    reno = sum(u["renovate_units"] for u in mix)
+    out = [f"{units} 户，每户价格 {money(cre['purchase_price'] / units)}；平均在租月租 {money(in_place)}、"
+           f"市场月租 {money(market)}，在租低于市场 {(market - in_place) / market * 100:.1f}%（loss-to-lease）。",
+           f"持有期平均出租率 {pct(m['avg_occupancy_pct'], 1)}（含空置率、翻新停用与不产生租金的户）。"]
+    if reno:
+        mf = cre["multifamily"]
+        months = -(-reno // mf["reno_units_per_month"])
+        out.append(f"翻新 {reno} 户（{reno / units * 100:.0f}%），持有期翻新支出 {money(m['capex_total'])}；"
+                   f"从第 {mf['reno_start_month']} 月起每月 {mf['reno_units_per_month']} 户，约 {months} 个月完成，"
+                   f"翻新后溢价合计第 {cre['hold_years']} 年 {money(a['premium'][cre['hold_years'] - 1])}。")
+    noi = a["noi"]
+    out.append(f"NOI 首年 {money(noi[0])}，退出年（第 {cre['hold_years'] + 1} 年）{money(noi[cre['hold_years']])}。")
+    drag = exit_year_drag(cre, r)
+    if drag:
+        basis = "稳定化 NOI（已加回）" if cre["exit_noi_basis"] == "stabilized" else "该年 NOI（未加回）"
+        out.append(f"退出年仍有翻新停用损失 {money(drag)}；售价按{basis}计。")
+    return out
+
+
 def _facts(cre: JSON, r: JSON) -> list[str]:
+    if _is_mf(cre):
+        return _facts_mf(cre, r)
     area, m = cre["area_sf"], r["metrics"]
     leased = sum(lease["sf"] for lease in cre["leases"] if _months_from_start(cre["analysis_start"], lease["end"]) >= 0)
     roll = sum(sf for _, sf in expiry_schedule(cre))
@@ -157,6 +187,8 @@ def _facts(cre: JSON, r: JSON) -> list[str]:
 def exit_year_drag(cre: JSON, r: JSON) -> float:
     """退出年（第 N+1 年）周转空置与免租的合计损失（正数）；没有周转时为 0。一般空置已扣过周转空置，这里不再加回。"""
     a, n = r["annual"], cre["hold_years"]
+    if _is_mf(cre):  # 多户公寓的优惠是常态，不算周转损失；只看翻新停用
+        return -float(a["turnover_vacancy"][n])
     return -float(a["turnover_vacancy"][n] + a["free_rent"][n])
 
 
@@ -171,9 +203,38 @@ def _rerun(cre: JSON, edit: Callable[[JSON], None]) -> float | None:
     return v
 
 
+def _sensitivity_mf(cre: JSON, caps: list[float], rents: list[float]) -> dict[str, JSON]:
+    g0, v0 = cre["multifamily"]["rent_growth_pct"], cre["general_vacancy_pct"]
+    growth = sorted({g0 + d for d in (-2.0, -1.0, 0.0, 1.0, 2.0)})
+    vacs = sorted({max(0.0, v0 + d) for d in (-2.0, 0.0, 2.0, 4.0)})
+    base = [u["market_rent"] for u in cre["unit_mix"]]
+
+    def cap_rent(cap: float, dr: float) -> Callable[[JSON], None]:
+        def f(c: JSON) -> None:
+            c["exit_cap_pct"] = cap
+            for u, b in zip(c["unit_mix"], base, strict=True):
+                u["market_rent"] = b * (1 + dr / 100)
+        return f
+
+    def growth_vac(g: float, v: float) -> Callable[[JSON], None]:
+        def f(c: JSON) -> None:
+            c["multifamily"]["rent_growth_pct"] = g
+            c["general_vacancy_pct"] = v
+        return f
+
+    return {
+        "cap_rent": {"rows": caps, "cols": rents,
+                     "grid": [[_rerun(cre, cap_rent(cap, dr)) for dr in rents] for cap in caps]},
+        "growth_vac": {"rows": growth, "cols": vacs,
+                       "grid": [[_rerun(cre, growth_vac(g, v)) for v in vacs] for g in growth]},
+    }
+
+
 def sensitivity(cre: JSON) -> dict[str, JSON]:
     caps = [cre["exit_cap_pct"] + d for d in (-0.5, -0.25, 0.0, 0.25, 0.5)]
     rents = [-10.0, -5.0, 0.0, 5.0, 10.0]
+    if _is_mf(cre):
+        return _sensitivity_mf(cre, caps, rents)
     p0, d0 = cre["market"]["renewal_prob_pct"], cre["market"]["downtime_months"]
     renew = sorted({min(100.0, max(0.0, p0 + d)) for d in (-20.0, -10.0, 0.0, 10.0, 20.0)})
     downs = sorted({min(36.0, max(0.0, d0 + d)) for d in (-6.0, -3.0, 0.0, 3.0, 6.0)})
@@ -229,7 +290,8 @@ def _cover(cre: JSON, r: JSON, meta: JSON, kill: JSON | None) -> list[Any]:
                  8.5, MUTED)]
     story += _h1("一、交易概要")
     tiles = [
-        ("收购价", money(cre["purchase_price"])), ("单价 $/SF", f"${cre['purchase_price'] / cre['area_sf']:,.0f}"),
+        ("收购价", money(cre["purchase_price"])), (("每户价格", money(m["price_per_unit"])) if _is_mf(cre) else
+                                               ("单价 $/SF", f"${cre['purchase_price'] / cre['area_sf']:,.0f}")),
         ("进入资本化率", pct(m["going_in_cap_pct"])), ("成本收益率", pct(m["yield_on_cost_pct"])),
         ("无杠杆 IRR", pct(m["unlevered_irr_pct"])), ("有杠杆 IRR", pct(m["levered_irr_pct"])),
         ("有杠杆倍数", mult(m["levered_multiple"])), ("股权投入", money(m["equity"])),
@@ -267,7 +329,37 @@ def _cover(cre: JSON, r: JSON, meta: JSON, kill: JSON | None) -> list[Any]:
     return story
 
 
+def _unit_mix(cre: JSON) -> list[Any]:
+    story = _h1("二、户型表与翻新计划")
+    rows: list[list[Any]] = [_hdr_row(["户型", "户数", "户均面积 SF", "在租月租", "市场月租", "Loss-to-lease",
+                                       "市场 $/SF/月", "翻新户数", "每户成本", "溢价 / 月"])]
+    mix = cre["unit_mix"]
+    for u in mix:
+        psf = u["market_rent"] / u["avg_sf"] if u["avg_sf"] else None
+        rows.append([_p(u["name"], 8, INK, True), _num(str(u["units"])), _num(f"{u['avg_sf']:,.0f}" if u["avg_sf"] else "—"),
+                     _num(money(u["in_place_rent"])), _num(money(u["market_rent"])),
+                     _num(f"{(u['market_rent'] - u['in_place_rent']) / u['market_rent'] * 100:.1f}%"),
+                     _num("—" if psf is None else f"${psf:,.2f}"), _num(str(u["renovate_units"])),
+                     _num(money(u["reno_cost_per_unit"])), _num(money(u["reno_premium"]))])
+    n = sum(u["units"] for u in mix)
+    ip = sum(u["units"] * u["in_place_rent"] for u in mix) / n
+    mk = sum(u["units"] * u["market_rent"] for u in mix) / n
+    rows.append([_p("合计 / 加权", 8, INK, True), _num(str(n), True), _num("—"), _num(money(ip), True), _num(money(mk), True),
+                 _num(f"{(mk - ip) / mk * 100:.1f}%", True), _num("—"), _num(str(sum(u["renovate_units"] for u in mix)), True),
+                 _num("—"), _num("—")])
+    story.append(_table(rows, [CW * x for x in (0.13, 0.07, 0.1, 0.1, 0.1, 0.1, 0.1, 0.08, 0.11, 0.11)],
+                        bold_rows=(len(rows) - 1,)))
+    mf = cre["multifamily"]
+    story += [Spacer(1, 1.5 * mm), _note(
+        f"在租租约按 {mf['lease_term_months']} 个月租期均匀到期，到期即调到当月市场租金（loss-to-lease 逐步消化）。"
+        f"翻新从交割后第 {mf['reno_start_month']} 月开始，每月 {mf['reno_units_per_month']} 户，每户停用 "
+        f"{mf['reno_downtime_months']} 个月，复租按市场租金 + 溢价（溢价随市场租金增长）。不产生租金的户 {mf['non_revenue_units']} 户。")]
+    return story
+
+
 def _rent_roll(cre: JSON) -> list[Any]:
+    if _is_mf(cre):
+        return _unit_mix(cre)
     area = cre["area_sf"]
     story = _h1("二、租金表（已签约）与到期分布")
     head = _hdr_row(["租户", "单元", "面积 SF", "占比", "起租", "到期", "租金 $/SF/年", "年递增", "剩余免租月", "回收方式"])
@@ -312,6 +404,16 @@ _CF_LINES = [
 ]
 
 
+_CF_LINES_MF = [
+    ("potential_rent", "潜在租金 GPR", False), ("loss_to_lease", "Loss-to-lease", False), ("premium", "翻新溢价", False),
+    ("turnover_vacancy", "翻新停用", False), ("non_revenue", "不产生租金的户", False), ("base_rent", "在租租金", True),
+    ("free_rent", "租金优惠", False), ("general_vacancy", "空置", False), ("credit_loss", "坏账", False),
+    ("recoveries", "其他收入", False), ("egr", "有效总收入", True), ("opex", "运营费用", False), ("noi", "NOI", True),
+    ("capex", "翻新支出", False), ("reserves", "资本储备", False), ("cf_before_debt", "债前现金流", True),
+    ("debt_service", "还本付息", False), ("cf_after_debt", "债后现金流", True),
+]
+
+
 def _cash_flow(cre: JSON, r: JSON) -> list[Any]:
     n = min(cre["hold_years"], MAX_YEARS)
     a = r["annual"]
@@ -320,7 +422,7 @@ def _cash_flow(cre: JSON, r: JSON) -> list[Any]:
     rows: list[list[Any]] = [_hdr_row(["科目", *years])]
     rows.append([_p("年度起始", 7.5, MUTED), *[_num(month_label(cre["analysis_start"], y * 12)) for y in range(n)]])
     bold: list[int] = []
-    for key, label, is_bold in _CF_LINES:
+    for key, label, is_bold in (_CF_LINES_MF if _is_mf(cre) else _CF_LINES):
         sign = -1 if key == "debt_service" else 1
         rows.append([_p(label, 8, INK, is_bold), *[_num(money(sign * a[key][y]), is_bold) for y in range(n)]])
         if is_bold:
@@ -331,7 +433,8 @@ def _cash_flow(cre: JSON, r: JSON) -> list[Any]:
     story.append(_table(rows, [CW * 0.14] + [CW * 0.86 / n] * n, bold_rows=tuple(bold)))
     tail = "" if cre["hold_years"] <= MAX_YEARS else f"持有 {cre['hold_years']} 年，表中只列前 {MAX_YEARS} 年，完整见 Excel 模型。"
     story += [Spacer(1, 1.5 * mm),
-              _note("物业层逐租约、按月测算后按年汇总；括号为负数。一般空置已扣除建模的周转空置。" + tail)]
+              _note(("按户型逐月测算后按年汇总；括号为负数。在租租金 = GPR − loss-to-lease + 翻新溢价 − 翻新停用 − 不产生租金的户。"
+                     if _is_mf(cre) else "物业层逐租约、按月测算后按年汇总；括号为负数。一般空置已扣除建模的周转空置。") + tail)]
     return story
 
 
@@ -369,7 +472,8 @@ def _capital(cre: JSON, r: JSON) -> list[Any]:
             _num(money(m["forward_noi"]))],
            [_p("退出资本化率", 8), _num(pct(cre["exit_cap_pct"]))],
            [_p("售价", 8, INK, True), _num(money(ex["sale_price"]), True)],
-           [_p("单价 $/SF", 8), _num(f"${ex['sale_price'] / cre['area_sf']:,.0f}")],
+           ([_p("每户售价", 8), _num(money(ex["sale_price"] / m["units"]))] if _is_mf(cre) else
+            [_p("单价 $/SF", 8), _num(f"${ex['sale_price'] / cre['area_sf']:,.0f}")]),
            [_p(f"卖方成本（{cre['selling_costs_pct']:g}%）", 8), _num(money(-ex["selling_costs"]))],
            [_p("偿还贷款", 8), _num(money(-ex["loan_payoff"]))],
            [_p("股权净回款", 8, INK, True), _num(money(ex["net_proceeds_levered"]), True)]]
@@ -425,6 +529,8 @@ def _returns(cre: JSON, r: JSON) -> list[Any]:
 
 def _sensitivity(cre: JSON, sens: JSON) -> list[Any]:
     story = _h1("六、敏感性：有杠杆 IRR（每格重跑整套引擎）")
+    if _is_mf(cre):
+        return story + _sensitivity_mf_section(cre, sens)
     mk = cre["market"]
     a = _grid("退出资本化率 × 市场租金水平", lambda c: f"退出 {c:.2f}%", lambda d: f"租金 {d:+.0f}%",
               sens["cap_rent"], (cre["exit_cap_pct"], 0.0), "退出 cap ＼ 市场租金")
@@ -439,7 +545,44 @@ def _sensitivity(cre: JSON, sens: JSON) -> list[Any]:
     return story
 
 
+def _sensitivity_mf_section(cre: JSON, sens: JSON) -> list[Any]:
+    a = _grid("退出资本化率 × 市场租金水平", lambda c: f"退出 {c:.2f}%", lambda d: f"租金 {d:+.0f}%",
+              sens["cap_rent"], (cre["exit_cap_pct"], 0.0), "退出 cap ＼ 市场租金")
+    b = _grid("市场租金增长 × 空置率", lambda g: f"增长 {g:g}%", lambda v: f"空置 {v:g}%",
+              sens["growth_vac"], (cre["multifamily"]["rent_growth_pct"], cre["general_vacancy_pct"]), "增长 ＼ 空置")
+    t = Table([[a, b]], colWidths=[CW / 2, CW / 2])
+    t.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("LEFTPADDING", (0, 0), (-1, -1), 0)]))
+    return [t, Spacer(1, 1.5 * mm), _note("黄底 = 基准假设。市场租金按分析起点水平整体上下浮动（各户型同比例），"
+                                         "在租租约到期后才调到新市场租金。“—”= 该组合下 IRR 无解。")]
+
+
+def _assumptions_mf(cre: JSON) -> list[Any]:
+    mf, ox = cre["multifamily"], cre["opex"]
+    story = _h1("七、主要假设")
+    rev = [("市场租金增长", f"{mf['rent_growth_pct']:g}% / 年"), ("租期", f"{mf['lease_term_months']} 个月"),
+           ("空置 / 坏账", f"{cre['general_vacancy_pct']:g}% / {cre['credit_loss_pct']:g}%"),
+           ("租金优惠", f"{mf['concessions_pct']:g}%"), ("不产生租金的户", f"{mf['non_revenue_units']} 户"),
+           ("其他收入", f"{money(mf['other_income_per_unit'])} /户/月，年增 {mf['other_income_growth_pct']:g}%"),
+           ("翻新节奏", f"第 {mf['reno_start_month']} 月起每月 {mf['reno_units_per_month']} 户，停用 {mf['reno_downtime_months']} 个月")]
+    op = [("运营费用", f"{money(mf['opex_per_unit_yr'])} /户/年"), ("房产税 / 保险", f"{money(mf['taxes_yr'])} / {money(mf['insurance_yr'])}"),
+          ("换租 / 翻房", f"{mf['turnover_pct']:g}% / {money(mf['make_ready_per_turn'])} 每次"),
+          ("费用年增", f"{ox['growth_pct']:g}%"), ("管理费", f"{ox['mgmt_fee_pct_egr']:g}% × 有效总收入"),
+          ("资本储备", f"{money(mf['reserves_per_unit_yr'])} /户/年"),
+          ("交割成本 / 卖方成本", f"{cre['closing_costs_pct']:g}% / {cre['selling_costs_pct']:g}%"),
+          ("退出 NOI 口径", "稳定化" if cre["exit_noi_basis"] == "stabilized" else "第 N+1 年原值")]
+
+    def block(title: str, items: list[tuple[str, str]]) -> Table:
+        return _table([_hdr_row([title, ""])] + [[_p(k, 8), _num(v)] for k, v in items], [CW * 0.2, CW * 0.26])
+
+    t = Table([[block("收入假设", rev), block("费用与其他", op)]], colWidths=[CW / 2, CW / 2])
+    t.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("LEFTPADDING", (0, 0), (-1, -1), 0)]))
+    story.append(t)
+    return story
+
+
 def _assumptions(cre: JSON) -> list[Any]:
+    if _is_mf(cre):
+        return _assumptions_mf(cre)
     mk, ox = cre["market"], cre["opex"]
     story = _h1("七、主要假设")
     mla = [("市场租金", f"${mk['rent_psf_yr']:,.2f} /SF/年，年增 {mk['rent_growth_pct']:g}%"),
@@ -471,8 +614,20 @@ _METHOD = [
     "一般空置按潜在总收入计提，先扣除已建模的周转空置，不低于 0。管理费按有效总收入计、不回收。",
     "售价 = 第 N+1 年 NOI ÷ 退出资本化率，扣卖方成本（可选稳定化 NOI：加回该年周转空置与免租、按潜在收入重算一般空置）；贷款按退出当月余额偿清。浮动利率 = min(SOFR, 上限) + 利差。",
     "本版不建模：CPI 递增、百分比租金、费用上限 / gross-up、再融资 / 夹层 / 施工贷、开发期、按概率分叉的续租树、"
-    "按月瀑布与 GP catch-up / 回拨、multifamily。",
+    "按月瀑布与 GP catch-up / 回拨。",
     "续上的租约段是假设，不是签约事实；本备忘录只基于录入的输入，不构成投资建议。",
+]
+
+
+_METHOD_MF = [
+    "按户型逐月测算：潜在租金 GPR 按全部户的市场租金计；在租租约按租期均匀到期、到期即调到当月市场租金，"
+    "两者之差为 loss-to-lease。市场租金按分析年阶梯增长，所以续约租金比市场滞后。",
+    "翻新：按户型顺序、每月固定户数开工；停用期不收租（计翻新停用），复租按市场租金 + 溢价；翻新成本在开工当月计入 NOI 之下的资本支出。"
+    "翻新后的户按当月租金计，不计续约滞后（简化）。",
+    "空置、优惠按在租租金计；其他收入按在线户数 × (1 − 空置率) 计；坏账按收入合计计。管理费按有效总收入计。",
+    "售价 = 第 N+1 年 NOI ÷ 退出资本化率，扣卖方成本（可选稳定化 NOI：加回退出年翻新停用损失）；贷款按退出当月余额偿清。",
+    "本版不建模：按户逐份租约、续约涨幅上限、租金管制、短租、按月瀑布与 GP catch-up / 回拨、再融资 / 夹层。",
+    "本备忘录只基于录入的输入，不构成投资建议。",
 ]
 
 
@@ -497,7 +652,7 @@ def build_cre_memo(cre: JSON, r: JSON, meta: JSON, kill: JSON | None = None) -> 
     story.append(PageBreak())
     story += _assumptions(cre)
     story += _h1("八、方法与局限")
-    story += [_p(f"{i}. {t}", 8.5) for i, t in enumerate(_METHOD, start=1)]
+    story += [_p(f"{i}. {t}", 8.5) for i, t in enumerate(_METHOD_MF if _is_mf(cre) else _METHOD, start=1)]
     footer = f"{meta.get('name') or ''} · 机构级投委会备忘录 · 第 {meta.get('version_no', '—')} 版 · 机密"
 
     def deco(canvas: Any, d: Any) -> None:
