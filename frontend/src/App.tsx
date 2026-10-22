@@ -1,5 +1,5 @@
 // 根组件：加载身份与目录 → 外壳 → 路由；全局快捷键（⌘K / ? / N / G+字母）。
-import { useCallback, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useMemo, useState } from "react";
 import { api, ApiError, call, rawJson } from "@/api/client";
 import type { Catalog, Me } from "@/api/types";
 import { useApi } from "@/api/useApi";
@@ -12,12 +12,14 @@ import { useHotkeys } from "@/lib/hotkeys";
 import { effectivePermissions, PHONE_QUERY, useMediaQuery } from "@/lib/media";
 import { useAppearance } from "@/lib/prefs";
 import { navigate, useRoute } from "@/lib/router";
-import { Compare } from "@/pages/Compare";
-import { DealPage } from "@/pages/deal/Deal";
 import { Login } from "@/pages/Login";
 import { NewDeal } from "@/pages/NewDeal";
 import { Pipeline } from "@/pages/Pipeline";
-import { Settings } from "@/pages/Settings";
+
+// 按页面拆包：首屏（流水线）只带必需代码，其余页面进入时再取
+const DealPage = lazy(() => import("@/pages/deal/Deal").then((m) => ({ default: m.DealPage })));
+const Compare = lazy(() => import("@/pages/Compare").then((m) => ({ default: m.Compare })));
+const Settings = lazy(() => import("@/pages/Settings").then((m) => ({ default: m.Settings })));
 
 export function App() {
   const route = useRoute();
@@ -65,9 +67,11 @@ export function App() {
     <Ctx.Provider value={{ me, catalog, can, refreshDeals, dealsVersion }}>
       <AppShell route={route} onCmdk={() => setCmdk(true)} density={density} setDensity={setDensity} theme={theme} setTheme={setTheme}>
         {phone ? <p className="phone-note" role="note">手机端为只读视图：看数字、进度与记录；编辑、审批、投票请用电脑。</p> : null}
+        <Suspense fallback={<Skeleton rows={6} h={28} />}>
         {route.name === "pipeline" ? <Pipeline /> : route.name === "deal" ? <DealPage key={route.id} id={route.id} tab={route.tab} />
           : route.name === "compare" ? <Compare ids={route.ids} /> : route.name === "settings" ? <Settings section={route.section} />
           : <ErrorBox error={new Error(`页面不存在：${route.path}`)} />}
+        </Suspense>
       </AppShell>
       {cmdk ? <CommandPalette onClose={() => setCmdk(false)} commands={commands} /> : null}
       {help ? <ShortcutHelp onClose={() => setHelp(false)} /> : null}

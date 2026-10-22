@@ -249,6 +249,11 @@ table.t a.rowlink:hover { text-decoration: underline; }
   animation: sk 1.2s linear infinite; min-height: 16px; }
 @keyframes sk { from { background-position: 200% 0; } to { background-position: -200% 0; } }
 
+/* 首屏外壳（index.html，JS 未到时） */
+.boot-sk { height: 120px; margin-bottom: var(--s4); background: linear-gradient(90deg, var(--surface-2) 0%, var(--hover) 50%, var(--surface-2) 100%);
+  background-size: 200% 100%; animation: sk 1.2s linear infinite; }
+.boot-sk-h { height: 56px; width: 40%; } .boot-sk-s { height: 320px; }
+
 /* ---------------------------------------------------------------- 动效（官网同名同节奏：rise / fadeOnly / megaIn / pulse / 条形生长） */
 @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 @keyframes fadeOnly { from { opacity: 0; } to { opacity: 1; } }

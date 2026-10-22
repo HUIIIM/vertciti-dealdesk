@@ -1,6 +1,6 @@
 // 交易页：顶部结论卡（F 型阅读起点）+ 核对进度 + 关卡；下方 10 个标签页。
 // 草稿：在模型类标签页改假设 → 右侧实时重算（防抖 300ms，不保存）；⌘S 保存为新承销版本（必填“本版改了什么”）。
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, lazy, Suspense, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { api, call, type OverviewOut, type PassportOut, type VersionOut } from "@/api/client";
 import type { KillEval, MaxBid, Metrics } from "@/api/types";
 import { useApi } from "@/api/useApi";
@@ -13,16 +13,18 @@ import { useHotkeys } from "@/lib/hotkeys";
 import { useTween } from "@/lib/motion";
 import { getPath, setPath, type JsonObj } from "@/lib/paths";
 import { DEAL_TABS, navigate, type DealTab } from "@/lib/router";
-import { CommitteeTab } from "./CommitteeTab";
-import { FilesTab } from "./FilesTab";
-import { HoldingTab } from "./HoldingTab";
-import { LogTab } from "./LogTab";
-import { MarketTab } from "./MarketTab";
-import { ModelTab } from "./ModelTab";
-import { OverviewTab } from "./OverviewTab";
-import { RentRollTab } from "./RentRollTab";
-import { RiskTab } from "./RiskTab";
-import { T12Tab } from "./T12Tab";
+
+// 标签页按需加载（各自一个包），概览随交易页一起预取
+const CommitteeTab = lazy(() => import("./CommitteeTab").then((m) => ({ default: m.CommitteeTab })));
+const FilesTab = lazy(() => import("./FilesTab").then((m) => ({ default: m.FilesTab })));
+const HoldingTab = lazy(() => import("./HoldingTab").then((m) => ({ default: m.HoldingTab })));
+const LogTab = lazy(() => import("./LogTab").then((m) => ({ default: m.LogTab })));
+const MarketTab = lazy(() => import("./MarketTab").then((m) => ({ default: m.MarketTab })));
+const ModelTab = lazy(() => import("./ModelTab").then((m) => ({ default: m.ModelTab })));
+const OverviewTab = lazy(() => import("./OverviewTab").then((m) => ({ default: m.OverviewTab })));
+const RentRollTab = lazy(() => import("./RentRollTab").then((m) => ({ default: m.RentRollTab })));
+const RiskTab = lazy(() => import("./RiskTab").then((m) => ({ default: m.RiskTab })));
+const T12Tab = lazy(() => import("./T12Tab").then((m) => ({ default: m.T12Tab })));
 
 export interface Preview { metrics: Metrics; detail: Record<string, unknown>; error?: string }
 export interface DealCtxValue {
@@ -176,9 +178,11 @@ export function DealPage({ id, tab }: { id: number; tab: DealTab }) {
           title={`快捷键 ${(i + 1) % 10}`}>{l}</a>)}
       </nav>
       <div role="tabpanel" aria-label={DEAL_TABS.find(([k]) => k === tab)?.[1]}>
+        <Suspense fallback={<Skeleton rows={5} h={28} />}>
         {tab === "overview" ? <OverviewTab /> : tab === "rentroll" ? <RentRollTab /> : tab === "t12" ? <T12Tab /> : tab === "model" ? <ModelTab />
           : tab === "risk" ? <RiskTab /> : tab === "market" ? <MarketTab /> : tab === "files" ? <FilesTab /> : tab === "committee" ? <CommitteeTab />
           : tab === "holding" ? <HoldingTab /> : <LogTab />}
+        </Suspense>
       </div>
       {dirty ? (
         <div className="draftbar" role="region" aria-label="未保存的草稿">
