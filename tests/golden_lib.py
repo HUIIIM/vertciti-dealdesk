@@ -35,6 +35,8 @@ _TS_PATTERNS = [
     re.compile(r"\d{4}-\d{2}-\d{2}"),
     re.compile(r"\d{4}年\d{1,2}月\d{1,2}日"),
     re.compile(r"\b\d{1,2}:\d{2}(:\d{2})?\b"),
+    # 文件名里的紧凑日期 20261021（导出文件名带当天日期）
+    re.compile(r"(?<!\d)20\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])(?!\d)"),
 ]
 # 以 epoch 秒/毫秒存的时间字段（键名判断）
 _TIME_KEYS = {"created_at", "updated_at", "generated_at", "fetched_at", "at", "ts", "timestamp",
@@ -110,7 +112,7 @@ def response_digest(resp) -> dict:
         d["bytes_sha256"] = hashlib.sha256(resp.content).hexdigest()
     disp = resp.headers.get("content-disposition")
     if disp:
-        d["disposition"] = disp
+        d["disposition"] = norm_text(disp)
     return d
 
 
