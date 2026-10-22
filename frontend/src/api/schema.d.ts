@@ -893,6 +893,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v2/model/institutional": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Institutional
+         * @description 机构级承销（office / retail / industrial），不保存的试算。
+         *
+         *     逐租约按月现金流、到期续租（MLA 加权）、TI / LC、费用回收、一般空置抵减周转空置、
+         *     固定 / 浮动债务（含利率上限）、按下一年 NOI 退出、有杠杆 / 无杠杆收益与 GP / LP 瀑布。
+         */
+        post: operations["institutional_api_v2_model_institutional_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/model/institutional/example": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Institutional Example
+         * @description 示例输入：4 租户郊区办公楼（含空置、基年租约、即将到期租约、浮动利率带上限、两档瀑布）；演示数字。
+         */
+        get: operations["institutional_example_api_v2_model_institutional_example_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v2/model/{track}": {
         parameters: {
             query?: never;
@@ -1916,6 +1959,44 @@ export interface components {
             basis: components["schemas"]["HoldingBasisOut"];
             /** Variance */
             variance: components["schemas"]["VarianceRowOut"][];
+        } & {
+            [key: string]: unknown;
+        };
+        /**
+         * InstitutionalOut
+         * @description 逐租约按月引擎的结果：metrics 主指标；annual / monthly 为逐期现金流科目；rent_roll 含到期续上的假设段。
+         */
+        InstitutionalOut: {
+            /** Annual */
+            annual: {
+                [key: string]: number[];
+            };
+            /** Engine */
+            engine: string;
+            /** Exit */
+            exit: {
+                [key: string]: number;
+            };
+            /** Flows */
+            flows: {
+                [key: string]: number[];
+            };
+            /** Metrics */
+            metrics: {
+                [key: string]: number | null;
+            };
+            /** Monthly */
+            monthly: {
+                [key: string]: number[];
+            };
+            /** Rent Roll */
+            rent_roll: {
+                [key: string]: unknown;
+            }[];
+            /** Waterfall */
+            waterfall: {
+                [key: string]: unknown;
+            } | null;
         } & {
             [key: string]: unknown;
         };
@@ -5018,6 +5099,63 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MeOut"];
+                };
+            };
+        };
+    };
+    institutional_api_v2_model_institutional_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstitutionalOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    institutional_example_api_v2_model_institutional_example_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
         };

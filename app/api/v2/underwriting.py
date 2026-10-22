@@ -9,6 +9,7 @@ from app.api.v2.deps import LocalizedRoute, need
 from app.api.v2.schemas import (
     CatalogOut,
     DevilsMemoOut,
+    InstitutionalOut,
     MaxBidIn,
     MaxBidOut,
     ModelOut,
@@ -24,11 +25,32 @@ from app.api.v2.schemas import (
 from app.core.i18n import label
 from app.domain.v2 import kill_criteria, scenarios
 from app.domain.v2.assumptions import BY_TRACK
+from app.domain.v2.cre import engine as cre_engine
+from app.domain.v2.cre.example import suburban_office
 from app.domain.v2.model import METRICS, PRIMARY_METRIC, ModelInputError, run_model
 from app.services.v2 import analysis
 from app.services.v2.errors import InvalidInputError
 
 router = APIRouter(prefix="/api/v2", tags=["v2 · underwriting"], route_class=LocalizedRoute)
+
+
+@router.post("/model/institutional", response_model=InstitutionalOut, dependencies=[need("deal.read")])
+def institutional(inputs: dict[str, Any]) -> dict[str, Any]:
+    """机构级承销（office / retail / industrial），不保存的试算。
+
+    逐租约按月现金流、到期续租（MLA 加权）、TI / LC、费用回收、一般空置抵减周转空置、
+    固定 / 浮动债务（含利率上限）、按下一年 NOI 退出、有杠杆 / 无杠杆收益与 GP / LP 瀑布。
+    """
+    try:
+        return cre_engine.run(inputs)
+    except cre_engine.CreInputError as e:
+        raise InvalidInputError(str(e)) from e
+
+
+@router.get("/model/institutional/example", dependencies=[need("deal.read")])
+def institutional_example() -> dict[str, Any]:
+    """示例输入：4 租户郊区办公楼（含空置、基年租约、即将到期租约、浮动利率带上限、两档瀑布）；演示数字。"""
+    return suburban_office()
 
 
 @router.post("/model/{track}", response_model=ModelOut, dependencies=[need("deal.read")])

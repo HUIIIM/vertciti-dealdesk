@@ -862,3 +862,17 @@ class LegacyImportOut(Out):
     deal: DealOut
     version: VersionOut | None
     warning: str
+
+
+# ---------------------------------------------------------------- 机构级承销引擎
+class InstitutionalOut(Out):
+    """逐租约按月引擎的结果：metrics 主指标；annual / monthly 为逐期现金流科目；rent_roll 含到期续上的假设段。"""
+
+    engine: str
+    metrics: dict[str, float | None]
+    annual: dict[str, list[float]]
+    monthly: dict[str, list[float]]
+    flows: dict[str, list[float]]
+    exit: dict[str, float]
+    rent_roll: list[dict[str, Any]]
+    waterfall: dict[str, Any] | None

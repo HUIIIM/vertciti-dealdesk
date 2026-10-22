@@ -2307,6 +2307,99 @@
     "title": "HoldingOut",
     "type": "object"
    },
+   "InstitutionalOut": {
+    "additionalProperties": true,
+    "description": "逐租约按月引擎的结果：metrics 主指标；annual / monthly 为逐期现金流科目；rent_roll 含到期续上的假设段。",
+    "properties": {
+     "annual": {
+      "additionalProperties": {
+       "items": {
+        "type": "number"
+       },
+       "type": "array"
+      },
+      "title": "Annual",
+      "type": "object"
+     },
+     "engine": {
+      "title": "Engine",
+      "type": "string"
+     },
+     "exit": {
+      "additionalProperties": {
+       "type": "number"
+      },
+      "title": "Exit",
+      "type": "object"
+     },
+     "flows": {
+      "additionalProperties": {
+       "items": {
+        "type": "number"
+       },
+       "type": "array"
+      },
+      "title": "Flows",
+      "type": "object"
+     },
+     "metrics": {
+      "additionalProperties": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "title": "Metrics",
+      "type": "object"
+     },
+     "monthly": {
+      "additionalProperties": {
+       "items": {
+        "type": "number"
+       },
+       "type": "array"
+      },
+      "title": "Monthly",
+      "type": "object"
+     },
+     "rent_roll": {
+      "items": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "title": "Rent Roll",
+      "type": "array"
+     },
+     "waterfall": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Waterfall"
+     }
+    },
+    "required": [
+     "engine",
+     "metrics",
+     "annual",
+     "monthly",
+     "flows",
+     "exit",
+     "rent_roll",
+     "waterfall"
+    ],
+    "title": "InstitutionalOut",
+    "type": "object"
+   },
    "KillCriterion": {
     "additionalProperties": false,
     "properties": {
@@ -8032,6 +8125,74 @@
     "summary": "Me",
     "tags": [
      "v2 · admin"
+    ]
+   }
+  },
+  "/api/v2/model/institutional": {
+   "post": {
+    "description": "机构级承销（office / retail / industrial），不保存的试算。\n\n逐租约按月现金流、到期续租（MLA 加权）、TI / LC、费用回收、一般空置抵减周转空置、\n固定 / 浮动债务（含利率上限）、按下一年 NOI 退出、有杠杆 / 无杠杆收益与 GP / LP 瀑布。",
+    "operationId": "institutional_api_v2_model_institutional_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "additionalProperties": true,
+        "title": "Inputs",
+        "type": "object"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/InstitutionalOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Institutional",
+    "tags": [
+     "v2 · underwriting"
+    ]
+   }
+  },
+  "/api/v2/model/institutional/example": {
+   "get": {
+    "description": "示例输入：4 租户郊区办公楼（含空置、基年租约、即将到期租约、浮动利率带上限、两档瀑布）；演示数字。",
+    "operationId": "institutional_example_api_v2_model_institutional_example_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Institutional Example Api V2 Model Institutional Example Get",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Institutional Example",
+    "tags": [
+     "v2 · underwriting"
     ]
    }
   },
