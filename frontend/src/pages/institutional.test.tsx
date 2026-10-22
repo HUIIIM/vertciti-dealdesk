@@ -78,9 +78,11 @@ describe("机构级交易页", () => {
     fireEvent.click(screen.getByLabelText("删除第 3 档"));
     expect(screen.queryByLabelText("第 3 档门槛")).toBeNull();
   });
-  it("导出卡如实说明下一版提供", async () => {
+  it("导出卡给出机构投委会备忘录与带公式的 Excel", async () => {
     seedInstitutionalDeal();
     at("#/deals/9");
-    expect(await screen.findByText(/机构级交易的导出.*下一版提供/, undefined, { timeout: 3000 })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "机构投委会备忘录 PDF" }, { timeout: 3000 })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "承销模型 Excel（带公式）" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "一页纸 Tear Sheet" })).toBeNull();
   });
 });

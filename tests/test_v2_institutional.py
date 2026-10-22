@@ -1,5 +1,5 @@
 """机构级赛道接入 v2 全链路：建交易 → 保存版本（逐租约引擎）→ 最高出价 / 红队 / 情景 / 先核哪个 / 反方备忘录 /
-投委会包 / 持有期 都能用；导出明确说下一版提供（不假装能导出）。"""
+投委会包 / 持有期 / 导出（带公式 Excel、机构投委会备忘录）都能用。"""
 from __future__ import annotations
 
 import pytest
@@ -56,13 +56,18 @@ def test_price_check_moves_irr_and_loan_scales_with_ltv(c):
     assert lo["metrics"]["irr_pct"] > hi["metrics"]["irr_pct"]
 
 
-def test_bad_institutional_inputs_are_422_and_exports_say_not_yet(c):
+def test_bad_institutional_inputs_are_422_and_exports_work(c):
     did = c.post("/api/v2/deals", json={"name": "x", "track": "institutional", "kill_criteria": []}).json()["id"]
     r = c.post(f"/api/v2/deals/{did}/versions", json={"inputs": {**suburban_office(), "exit_cap_pct": 0}})
     assert r.status_code == 422 and "exit_cap_pct" in r.json()["detail"]
     did = _deal(c)
-    e = c.get(f"/api/v2/deals/{did}/export/memo")
-    assert e.status_code == 422 and "下一版" in e.json()["detail"]
+    memo = c.get(f"/api/v2/deals/{did}/export/memo")
+    assert memo.status_code == 200 and memo.content[:5] == b"%PDF-"
+    assert "_memo_v1_" in memo.headers["content-disposition"]
+    xl = c.get(f"/api/v2/deals/{did}/export/model")
+    assert xl.status_code == 200 and xl.content[:2] == b"PK"
+    e = c.get(f"/api/v2/deals/{did}/export/tearsheet")  # 一页纸是商业 v1 版式，机构级用备忘录封面
+    assert e.status_code == 422
 
 
 def test_workbench_preview_route_returns_standard_shape(c):

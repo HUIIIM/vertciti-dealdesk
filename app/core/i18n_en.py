@@ -70,8 +70,6 @@ EN: dict[str, str] = {
     "第 {0} 条淘汰条件：阈值必须是数字": "Kill criterion #{0}: threshold must be a number",
     "未知赛道：{0!r}（只支持 residential / commercial / institutional）":
         "Unknown track: {0!r} (residential / commercial / institutional only)",
-    "机构级交易的导出（带公式的 Excel、机构格式投委会备忘录）在下一版提供":
-        "Exports for institutional deals (formula-linked Excel, institutional IC memo) arrive in the next release",
     "机构级承销输入校验失败：{0}": "Institutional underwriting inputs are invalid: {0}",
     "一般空置率": "General vacancy", "债务收益率": "Debt yield", "市场租金增长": "Market rent growth",
     "平均出租率": "Average occupancy", "新租 TI": "New-lease TI", "新租空置月数": "New-lease downtime (months)",

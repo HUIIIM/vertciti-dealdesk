@@ -1,5 +1,7 @@
 """导出（老版功能搬进 v2）：投资备忘录 PDF、核保明细 Excel、一页纸 Tear Sheet、经典核保报告。
 
+机构级交易导出带公式的承销模型 Excel 与机构格式投委会备忘录（app/services/render/cre_*）。
+
 都按交易的**当前承销版本**现算（与工作台同一引擎、同一输入），不另开一套数；缺数照旧渲染“—”。
 商业导出前先过 v1 的数据质量门：输入自相矛盾就拦下（422），不导出一份错的报告。
 渲染器沿用 v1（app/services/render），版式与老版导出逐字一致。
@@ -9,12 +11,15 @@ from __future__ import annotations
 import re
 from datetime import datetime, timezone
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from app.core.i18n import T
 from app.domain import uw_commercial, validators
+from app.domain.v2 import kill_criteria
+from app.domain.v2.cre import engine as cre_engine
 from app.domain.v2.model import ModelInputError, run_model
 from app.services.persistence.engine import session_scope
-from app.services.render import excel_uw, pdf_report, pdf_uw, tearsheet
+from app.services.render import cre_excel, cre_memo, excel_uw, pdf_report, pdf_uw, tearsheet
 from app.services.v2.deals import _event, current_version, deal_or_404
 from app.services.v2.errors import InvalidInputError
 
@@ -24,8 +29,8 @@ XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 # 导出种类 → (允许的赛道, 文件后缀, 媒体类型)
 KINDS: dict[str, tuple[tuple[str, ...], str, str]] = {
-    "memo": (("residential", "commercial"), "pdf", PDF),
-    "model": (("residential", "commercial"), "xlsx", XLSX),
+    "memo": (("residential", "commercial", "institutional"), "pdf", PDF),
+    "model": (("residential", "commercial", "institutional"), "xlsx", XLSX),
     "tearsheet": (("commercial",), "pdf", PDF),
     "report": (("commercial",), "pdf", PDF),
 }
@@ -78,6 +83,23 @@ def _residential(kind: str, name: str, address: str, inputs: JSON) -> bytes:
                                  "valuation_display": None})
 
 
+def _institutional(kind: str, name: str, address: str, inputs: JSON, version_no: int,
+                   criteria: list[JSON] | None) -> bytes:
+    """机构级：带公式的承销模型 Excel / 机构格式投委会备忘录，与工作台同一次引擎测算。"""
+    try:
+        m = run_model("institutional", inputs)
+    except ModelInputError as e:
+        raise InvalidInputError(str(e)) from e
+    cre = cre_engine.parse({k: v for k, v in inputs.items() if k not in _STRIP}).model_dump()
+    r = m["detail"]["cre"]
+    meta = {"name": name, "address": address, "version_no": version_no,
+            "date": datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d")}
+    if kind == "model":
+        return cre_excel.build_cre_xlsx(cre, r, meta)
+    kill = kill_criteria.evaluate(criteria or kill_criteria.DEFAULT_INSTITUTIONAL, m["metrics"])
+    return cre_memo.build_cre_memo(cre, r, meta, kill)
+
+
 def export(deal_id: int, kind: str) -> tuple[str, str, bytes]:
     """→ (文件名, 媒体类型, 内容)。没有承销版本、赛道不支持、质量门不过 → InvalidInputError。"""
     if kind not in KINDS:
@@ -88,13 +110,15 @@ def export(deal_id: int, kind: str) -> tuple[str, str, bytes]:
         v = current_version(s, d)
         if v is None:
             raise InvalidInputError(T("还没有承销版本：先在模型页保存一版再导出"))
-        if d.track == "institutional":
-            raise InvalidInputError(T("机构级交易的导出（带公式的 Excel、机构格式投委会备忘录）在下一版提供"))
         if d.track not in tracks:
             raise InvalidInputError(T("这种导出只适用于商业交易"))
         name, address, track, inputs, version_no = d.name, d.address, d.track, dict(v.inputs or {}), v.version_no
-    build = _commercial if track == "commercial" else _residential
-    data = build(kind, name, address, inputs)
+        criteria = list(d.kill_criteria or [])
+    if track == "institutional":
+        data = _institutional(kind, name, address, inputs, version_no, criteria)
+    else:
+        build = _commercial if track == "commercial" else _residential
+        data = build(kind, name, address, inputs)
     with session_scope() as s:
         _event(s, deal_id, "exported", {"kind": kind, "version_no": version_no})
     stamp = datetime.now(timezone.utc).strftime("%Y%m%d")
