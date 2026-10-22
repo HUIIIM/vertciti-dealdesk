@@ -299,14 +299,14 @@ def parse_pdf_text(text: str, filename: str, pages: list[str] | None = None,
     if price:
         fields.append(F("asking_price", price, f"${price:,.0f}",
                         page=pm.page_of(_money_offset(text, price))))
-    sf_m = re.search(r"([\d,]+)\s*(?:sq\.?\s*ft|sqft|square feet|SF|平方英尺)", text, re.I)
+    sf_m = re.search(r"(?<![\d,])([\d,]+)\s*(?:sq\.?\s*ft|sqft|square feet|SF|平方英尺)", text, re.I)
     if sf_m and rp._num(sf_m.group(1)):
         v = rp._num(sf_m.group(1))
         fields.append(F("building_sf", v, f"{v:,.0f} SF", page=pm.page_of(sf_m.start())))
-    beds_m = re.search(r"(\d+)\s*(?:bd|bed|bedroom|卧)", text, re.I)
+    beds_m = re.search(r"(?<!\d)(\d+)\s*(?:bd|bed|bedroom|卧)", text, re.I)
     if beds_m:
         fields.append(F("beds", int(beds_m.group(1)), page=pm.page_of(beds_m.start())))
-    baths_m = re.search(r"([\d.]+)\s*(?:ba|bath|bathroom|卫)", text, re.I)
+    baths_m = re.search(r"(?<![\d.])([\d.]+)\s*(?:ba|bath|bathroom|卫)", text, re.I)
     if baths_m:
         try:
             fields.append(F("baths", float(baths_m.group(1)), page=pm.page_of(baths_m.start())))
@@ -374,7 +374,7 @@ def parse_commercial_pdf_text(text: str, filename: str, pages: list[str] | None 
         fields.append(F("analysis.purchase_price", price, f"${price:,.0f}",
                         page=pm.page_of(_money_offset(text, price))))
     # ---- 面积 ----
-    sf_m = re.search(r"([\d,]+)[ \t]*(?:sq\.?[ \t]*ft|sqft|square[ \t]*feet|\bSF\b)(?![A-Za-z])", text, re.I)
+    sf_m = re.search(r"(?<![\d,])([\d,]+)[ \t]*(?:sq\.?[ \t]*ft|sqft|square[ \t]*feet|\bSF\b)(?![A-Za-z])", text, re.I)
     if sf_m and rp._num(sf_m.group(1)):
         v = rp._num(sf_m.group(1))
         if 500 < v < 10000000:
@@ -434,7 +434,7 @@ def parse_commercial_pdf_text(text: str, filename: str, pages: list[str] | None 
     # ---- 租户（租约表行：Suite + 租户名 + SF + 租金）----
     tenants = []
     for m in re.finditer(
-        r"(?:Suite|Unit)\s*([A-Za-z0-9\-]+)\s+([A-Za-z0-9\s&.,'\-]{2,40}?)\s+([\d,]+)\s*(?:SF|sq\.?\s*ft)?\s+\$\s*([\d,]+)",
+        r"(?:Suite|Unit)\s*([A-Za-z0-9\-]{1,20})\s+([A-Za-z0-9\s&.,'\-]{2,40}?)\s+([\d,]+)\s*(?:SF|sq\.?\s*ft)?\s+\$\s*([\d,]+)",
         text):
         try:
             tenants.append({

@@ -31,7 +31,8 @@ def monthly_payment(principal: float, annual_rate_pct: float, years: float) -> f
         return 0.0
     if factor == 1:  # 利率小到 (1+r)^n 在浮点下等于 1：按零利率摊还，而不是月供 0（性质测试发现）
         return principal / n
-    return principal * r * factor / (factor - 1)
+    # r 极小时 factor - 1 有相消误差，可能算出低于零利率的月供；数学上月供不会低于 本金/期数
+    return max(principal * r * factor / (factor - 1), principal / n)
 
 
 def remaining_balance(principal: float, annual_rate_pct: float, years: float,

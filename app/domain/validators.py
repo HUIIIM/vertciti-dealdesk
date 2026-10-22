@@ -313,7 +313,7 @@ def _sf_on_lines(text: str) -> list[tuple[float, str]]:
             continue
         if not _re.search(r"(?:sq\.?\s*ft|sqft|square\s*feet|\bSF\b)(?![A-Za-z])", ln, _re.I):
             continue
-        for m in _re.finditer(r"([\d,]+)\s*(?:sq\.?\s*ft|sqft|square\s*feet|\bSF\b)(?![A-Za-z])", ln, _re.I):
+        for m in _re.finditer(r"(?<![\d,])([\d,]+)\s*(?:sq\.?\s*ft|sqft|square\s*feet|\bSF\b)(?![A-Za-z])", ln, _re.I):
             v = _f(m.group(1).replace(",", ""))
             if v and 500 < v < 100_000_000:
                 out.append((v, ln.strip()[:140]))
