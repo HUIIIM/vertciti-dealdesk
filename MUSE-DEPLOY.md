@@ -48,15 +48,9 @@ bash tools/pre_deploy_diff_gate.sh          # 必须 exit 0
 ## 6. 老版已下线（HUIIIM 已定）
 - 仓库已删除 v1 页面文件（`static/index.html`、`d.*`、`workbench.*`、`uw-commercial.*` 等），FastAPI 对旧地址回 307 → `/app/`。
 - `tools/deploy.sh` 步骤 3 会删掉 `vercel-deploy/` 根目录里的旧副本——**手动同步时也必须删**，否则 Vercel 先发静态文件，用户看到的还是老版。
-- `vercel-deploy/vercel.json` 加跳转（放在 rewrites 之前生效）：
-```json
-"redirects": [
-  {"source": "/", "destination": "/app/", "permanent": false},
-  {"source": "/index.html", "destination": "/app/", "permanent": false},
-  {"source": "/d", "destination": "/app/", "permanent": false},
-  {"source": "/(d|workbench|uw-commercial|res-legacy)\\.html", "destination": "/app/", "permanent": false}
-]
-```
+- `vercel-deploy/vercel.json`：把 **`docs/deploy/vercel-v2.json`** 里的 `redirects` / `rewrites` / `headers` 合并进去（原有 `/api/*` → serverless 的规则保留不动）。
+  这份片段由 `tests/test_vercel_v2_routing.py` 守着：CSP 与代码逐字一致、旧地址全覆盖、引用的构建文件真实存在。
+  `/app/` 在 Vercel 上走 CDN 静态、不经 FastAPI，所以**严格 CSP 只能靠这份 headers 下发**，漏了就没有 CSP。
 - 删掉 `vercel.json` 里给旧页面内联脚本配的 CSP hash 和 `/d → /d.html` 之类的旧 rewrite。
 
 ## 7. 部署后验收（curl 200 不算）
