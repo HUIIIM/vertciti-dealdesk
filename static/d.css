@@ -303,3 +303,73 @@ input.gate-yellow{box-shadow:0 0 0 2px var(--amber) !important;border-color:var(
 .caliber{display:inline-block;font-size:10px;padding:1px 6px;border-radius:3px;border:1px solid var(--line);color:var(--ink3);margin-left:6px;vertical-align:middle}
 .caliber.c-real{border-color:var(--teal);color:var(--teal)}
 .caliber.c-est{border-color:var(--amber);color:var(--amber)}
+
+/* ============================================================================
+ * vertciti DNA v4 — 浅色「机构级」皮肤（对标 BlackRock 设计系统，调色板同源：
+ * 黑 / 白 / 橙 #FF4713 / 黄 #FFCE00）。本块置于文件末尾，统一覆盖早先的深色令牌，
+ * 不改动各组件的结构规则。原则：黑为主、留白、颜色克制（橙=指针/主操作，黄=注意，
+ * 其余状态用 DNA ok/warn/bad），直角、系统字体、左对齐、8px 间距栅格。
+ * Source: https://www.blackrock.com/design (foundation/color, typography, layout)
+ * ========================================================================== */
+:root{
+  --bg0:#FFFFFF; --bg1:#F3F3F3; --surface:#FFFFFF; --surface2:#F7F7F7; --surface3:#EFEFEF;
+  --line:#DEDEDE; --line-soft:#EAEAEA;
+  --ink:#000000; --ink2:#3F3F3F; --ink3:#6B6B6B; --muted:#6B6B6B;
+  /* 官网 DNA：不用青/绿做强调——former-teal 一律收敛到墨黑/中性，绿只留给 ok 状态 */
+  --teal:#000000; --teal-dim:#F3F3F3;
+  --green:#1D8348; --amber:#8A6A00; --red:#C62828; --blue:#5F6B78;
+  --orange:#FF4713; --yellow:#FFCE00;
+  --radius:0;
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI","Helvetica Neue",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC","Noto Sans CJK SC",sans-serif;
+}
+body{font-family:var(--font);background:var(--bg0);color:var(--ink)}
+/* 左对齐（BlackRock：所有标题/正文左对齐）、直角 */
+h1,h2,h3,h4{text-align:left}
+.card,.mode,.typetag,.znum,.gate-chip,.gate-f,.caliber,.tag,#askBar,#askBarInput,.biginput,
+.conf-bar,.conf-fill,.hbar-track,.hbar-fill,.veto-badge,.paste-toast,.typenudge,#toast,.btn,
+.kpi,.zone,.z1,.formula,.empty,.amber,.gate-panel,.field input,.field select,.frow2 select,.frow2 input{border-radius:0}
+.src i{border-radius:0}  /* 来源点改为 DNA 方块 */
+
+/* 主操作 = 黑底白字（DNA primary）；指针/选中/强调 = 橙 */
+.btn{background:var(--surface);border:1px solid var(--line);color:var(--ink)}
+.btn.primary{background:#000;border-color:#000;color:#fff;font-weight:800}
+.btn.primary:hover:not(:disabled){background:#fff;color:#000}
+.btn.ghost{background:transparent}
+a{color:inherit;text-decoration-color:var(--orange);text-decoration-thickness:2px;text-underline-offset:3px}
+a:hover{text-decoration-color:currentColor}
+.conf-fill{background:var(--ink)}
+.hbar-fill{background:var(--blue)}
+.hbar-row.me .hbar-fill{background:var(--orange)}   /* 「你这套」= 橙指针 */
+.wf-row.total .wv,.frow.hero .fv{color:var(--teal)}
+.znum{color:var(--orange);border-color:var(--orange)}
+#askBar{border-color:var(--orange)}
+.gloss{border-bottom-color:var(--teal)}
+.gloss:hover,.gloss:focus{color:var(--teal)}
+
+/* 顶栏 / sticky：浅色不透明背景（杜绝文字穿透） */
+.z0{background:#FFFFFF}
+@media (max-width:720px){ #stickyV{background:#FFFFFF} }
+
+/* 状态色（在白底上保证 AA）：verdict / KPI */
+.v-buy,.k-ok,.step.done .st{color:var(--green)}
+.v-hold,.k-warn{color:var(--amber)}
+.v-pass,.v-veto,.k-bad,.veto,.anchor-warn,.sens-matrix td.sm-neg,.cell-bad,.gate-list .sev-fail,td.cell-bad{color:var(--red)}
+.gate-list .sev-warn,.gate-f.low,.tag.exp,.caliber.c-est,.amber b{color:var(--amber)}
+.gate-f.flagged{border-color:var(--red);color:var(--red)}
+
+/* 黄色徽标/注意块：黄底黑字（DNA：黄=注意，配黑字过 AA） */
+.pf,sup.pf{background:var(--yellow);color:#000}
+.gate-chip.warn{background:var(--yellow);color:#000}
+.gate-chip.blocked{background:var(--red);color:#fff}
+.gate-chip.pass{background:var(--green);color:#fff}
+.veto-badge{background:#FBEAEA;color:var(--red);border-color:var(--red)}
+.tag.exp,.caliber.c-est,.gate-f.low{border-color:var(--amber)}
+.gate-panel{border-color:var(--amber);background:rgba(255,206,0,.10)}
+.gate-panel.pass{border-color:var(--green);background:rgba(29,131,72,.07)}
+.amber{border-color:var(--amber);background:rgba(255,206,0,.10)}
+tr.hl-yellow td{background:rgba(255,206,0,.12)}
+.dup-tag{background:rgba(198,40,40,.08);color:var(--red);border-color:rgba(198,40,40,.35)}
+input.gate-yellow{box-shadow:0 0 0 2px var(--yellow)!important;border-color:var(--amber)!important}
+input[type=range]{accent-color:var(--orange)}
+#toast{border-color:var(--ink)}
+.paste-toast{background:var(--teal-dim);border-color:var(--teal);color:var(--ink)}

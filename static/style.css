@@ -457,3 +457,39 @@ details.fold .fb { padding: 4px 16px 15px; }
   .pstep.run .n, .spinner, .sk::after { animation: none; }
   * { transition: none !important; }
 }
+
+/* ============================================================================
+ * vertciti DNA v4 — 浅色「机构级」皮肤（对标 BlackRock，调色板同源）。置于文件末尾，
+ * 覆盖早先深色令牌；原则同 d.css：黑为主、留白、颜色克制、直角、系统字体、左对齐。
+ * Source: https://www.blackrock.com/design
+ * ========================================================================== */
+:root{
+  --bg0:#FFFFFF; --bg1:#F3F3F3; --surface:#FFFFFF; --surface2:#F7F7F7; --surface3:#EFEFEF;
+  --line:#DEDEDE; --line-soft:#EAEAEA; --faint:#9A9A9A;
+  --ink:#000000; --ink2:#3F3F3F; --muted:#6B6B6B;
+  /* 官网 DNA：不用青/绿做强调——former-teal 收敛到墨黑/中性，绿只留给 ok 状态 */
+  --teal:#000000; --teal-deep:#000000; --teal-ink:#FFFFFF;
+  --teal-dim:#F3F3F3; --teal-line:#DEDEDE;
+  --green:#1D8348; --green-dim:rgba(29,131,72,.08); --green-line:rgba(29,131,72,.30);
+  --blue:#5F6B78;   --blue-dim:rgba(95,107,120,.08); --blue-line:rgba(95,107,120,.28);
+  --amber:#8A6A00;  --amber-dim:rgba(255,206,0,.12);  --amber-line:rgba(138,106,0,.35);
+  --red:#C62828;    --red-dim:rgba(198,40,40,.08);    --red-line:rgba(198,40,40,.32);
+  --orange:#FF4713; --yellow:#FFCE00;
+  --radius:0;
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI","Helvetica Neue",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC","Noto Sans CJK SC",sans-serif;
+}
+body{font-family:var(--font);background:var(--bg0);color:var(--ink)}  /* 去掉青色径向光晕渐变 */
+h1,h2,h3,h4{text-align:left}
+/* 直角：覆盖一切圆角 */
+[class]{border-radius:0}
+.src i,.dot,.status-dot{border-radius:0}   /* 圆点→方块 */
+/* 主操作=黑底白字；指针/强调=橙 */
+.btn.primary,button.primary,.primary,.seg button.on{background:#000;border-color:#000;color:#fff}
+.btn.primary:hover,button.primary:hover{background:#fff;color:#000;border-color:#000}
+.btn:hover{border-color:#000;background:var(--surface2)}
+a{color:inherit;text-decoration-color:var(--orange);text-decoration-thickness:2px;text-underline-offset:3px}
+a:hover{text-decoration-color:currentColor}
+/* 去掉绿色光晕/青色强调：状态点无发光，insight good 收敛为墨色 */
+.tophap .dot,.tophap.ok .dot,.dot{box-shadow:none}
+.insight.good .ic,.pstep.run .n,.pstep.run .t{color:var(--ink)}
+.insight.good{border-left-color:var(--ink)}
