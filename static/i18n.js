@@ -155,6 +155,12 @@
     '空置 ＼ 利率': 'Vacancy ＼ Rate',
     '格子 = 月现金流；中心格为当前基准假设。改价/改假设后点"重新计算"刷新。':
       'Cells = monthly cash flow; the center cell is the current base case. Change the price/assumptions and click "Recalculate" to refresh.',
+    '格子 = IRR；橙框为当前基准假设。改价/改假设后点"重新计算"刷新。':
+      'Cells = IRR; the orange-framed cell is the current base case. Change the price/assumptions and click "Recalculate" to refresh.',
+    '格子 = 月现金流；橙框为当前基准假设。改价/改假设后点"重新计算"刷新。':
+      'Cells = monthly cash flow; the orange-framed cell is the current base case. Change the price/assumptions and click "Recalculate" to refresh.',
+    '负值（越深越差）': 'Negative (darker = worse)', '正值（越深越好）': 'Positive (darker = better)',
+    '当前假设': 'Current assumption', '无数据': 'No data',
     /* ---- 数据质量门 / 导出 ---- */
     '⛔ 数据质量门拦截': '⛔ Data-quality gate: blocked',
     '⚠️ 数据质量门告警': '⚠️ Data-quality gate: warning',
