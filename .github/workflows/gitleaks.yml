@@ -10,6 +10,7 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+  pull-requests: read   # PR 扫描要列出 PR 的提交
 jobs:
   scan:
     name: gitleaks
@@ -19,5 +20,6 @@ jobs:
         with:
           fetch-depth: 0
       - uses: gitleaks/gitleaks-action@v3
-        with:
-          config-path: .gitleaks.toml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}   # 扫描 PR 必需
+          GITLEAKS_CONFIG: .gitleaks.toml              # 该 action 不认 config-path 输入，配置走环境变量
