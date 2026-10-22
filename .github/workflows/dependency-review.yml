@@ -1,0 +1,16 @@
+# Blocks PRs that add dependencies with known high/critical CVEs or copyleft licenses. vertciti standard SEC-4.
+name: Dependency Review
+on: [pull_request]
+permissions:
+  contents: read
+jobs:
+  review:
+    if: ${{ !github.event.repository.private }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/dependency-review-action@v5
+        with:
+          fail-on-severity: high
+          deny-licenses: "GPL-2.0, GPL-3.0, AGPL-3.0, SSPL-1.0"
