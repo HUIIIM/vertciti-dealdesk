@@ -709,7 +709,8 @@ class HealthOut(Out):
 class TemplateOut(Out):
     id: int | None
     kind: str
-    name: str
+    name: str  # 标识（保存 / 覆盖按它匹配），不随语言变
+    label: str = ""  # 显示名：内置模板按语言翻译，自定义模板同 name
     payload: dict[str, Any]
     builtin: bool = False
 

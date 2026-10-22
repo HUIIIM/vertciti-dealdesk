@@ -18,6 +18,7 @@ from reportlab.lib.units import mm
 from reportlab.platypus import PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from app.core import brand
+from app.core.i18n import T
 from app.services.render import pdf_report
 
 JSON = dict[str, Any]
@@ -83,17 +84,17 @@ def _tornado(rt: JSON, width: float = 174 * mm) -> Drawing:
     h = 22 + 20 * max(len(top), 1)
     d = Drawing(width, h)
     if not top:
-        d.add(String(0, h / 2, "红队面板：数据不足，暂无图", fontName=pdf_report.FONT, fontSize=9, fillColor=STONE))
+        d.add(String(0, h / 2, T("红队面板：数据不足，暂无图"), fontName=pdf_report.FONT, fontSize=9, fillColor=STONE))
         return d
     label_w, mid = 70 * mm, 70 * mm + (width - 70 * mm) / 2
     span = max(max(abs(r["minus"]["delta_pct_points"]), abs(r["plus"]["delta_pct_points"])) for r in top) or 1
     scale = ((width - label_w) / 2 - 6) / span
     d.add(Line(mid, 4, mid, h - 14, strokeColor=INK, strokeWidth=0.8))
-    d.add(String(mid, h - 10, f"基准 {rt['metric_label']} {fmt(rt.get('base'), 'pct')}", fontName=pdf_report.FONT,
+    d.add(String(mid, h - 10, T("基准 {0} {1}", rt["metric_label"], fmt(rt.get("base"), "pct")), fontName=pdf_report.FONT,
                  fontSize=7.5, fillColor=STONE, textAnchor="middle"))
     for i, r in enumerate(top):
         y = h - 32 - i * 20
-        d.add(String(0, y + 3, f"{r['label']}（±{rt['shock_pct']:g}%）", fontName=pdf_report.FONT, fontSize=8,
+        d.add(String(0, y + 3, T("{0}（±{1:g}%）", r["label"], rt["shock_pct"]), fontName=pdf_report.FONT, fontSize=8,
                      fillColor=INK))
         for side in ("minus", "plus"):
             dv = r[side]["delta_pct_points"]
@@ -101,7 +102,7 @@ def _tornado(rt: JSON, width: float = 174 * mm) -> Drawing:
             x = mid if dv >= 0 else mid - w
             d.add(Rect(x, y, w, 11, fillColor=RED if dv < 0 else GREEN, strokeColor=None))
         if r.get("material"):
-            d.add(String(width, y + 3, "关键", fontName=pdf_report.FONT, fontSize=7.5, fillColor=ORANGE,
+            d.add(String(width, y + 3, T("关键"), fontName=pdf_report.FONT, fontSize=7.5, fillColor=ORANGE,
                          textAnchor="end"))
     return d
 
@@ -113,14 +114,13 @@ def _footer(pack: JSON):  # noqa: ANN202 — reportlab 回调
         canvas.rect(0, A4[1] - 10 * mm, A4[0], 10 * mm, stroke=0, fill=1)
         canvas.setFillColor(HexColor(brand.PAPER))
         canvas.setFont(pdf_report.FONT, 9)
-        canvas.drawString(18 * mm, A4[1] - 6.6 * mm, "vertciti · DealDesk 投委会包")
+        canvas.drawString(18 * mm, A4[1] - 6.6 * mm, T("vertciti · DealDesk 投委会包"))
         canvas.setFillColor(ORANGE)
         canvas.rect(18 * mm, A4[1] - 10 * mm, 30 * mm, 1.2 * mm, stroke=0, fill=1)
         canvas.setFillColor(STONE)
         canvas.setFont(pdf_report.FONT, 7)
-        canvas.drawString(18 * mm, 9 * mm, f"运行编号 {pack['run_id']} · 引擎 {pack['engine_version']} · "
-                                           f"数据摘要 {pack['data_sha256'][:16]}")
-        canvas.drawRightString(A4[0] - 18 * mm, 9 * mm, f"第 {doc.page} 页")
+        canvas.drawString(18 * mm, 9 * mm, T("运行编号 {0} · 引擎 {1} · 数据摘要 {2}", pack["run_id"], pack["engine_version"], pack["data_sha256"][:16]))
+        canvas.drawRightString(A4[0] - 18 * mm, 9 * mm, T("第 {0} 页", doc.page))
         canvas.restoreState()
     return draw
 
@@ -132,90 +132,84 @@ def build_pdf(pack: JSON) -> bytes:
                             bottomMargin=16 * mm, title=f"投委会包 · {pack['deal']['name']}", author="vertciti DealDesk")
     deal, m, cat = pack["deal"], pack["metrics"], pack["metric_catalog"]
     story: list[Any] = [
-        Paragraph(_esc(f"投委会包 · {deal['stage_label']} · 第 {pack['version']['version_no']} 版"), st["eyebrow"]),
+        Paragraph(_esc(T("投委会包 · {0} · 第 {1} 版", deal["stage_label"], pack["version"]["version_no"])), st["eyebrow"]),
         Paragraph(_esc(deal["name"]), st["h1"]),
-        Paragraph(_esc(f"{deal.get('address') or '—'} · {'商业' if deal['track'] == 'commercial' else '住宅'} · "
-                       f"生成 {pack['generated_at']}"), st["small"]),
+        Paragraph(_esc(T("{0} · {1} · 生成 {2}", deal.get("address") or "—", T("商业") if deal["track"] == "commercial" else T("住宅"), pack["generated_at"])), st["small"]),
         Spacer(1, 6)]
     # 结论卡
     kill = pack["kill"]
-    kill_txt = ("已触发：" + "；".join(r["text"] for r in kill["triggered"])) if kill["triggered"] else (
-        ("未知：" + "；".join(r["text"] for r in kill["unknown"])) if kill["unknown"] else "未触发")
+    kill_txt = (T("已触发：") + T("；").join(r["text"] for r in kill["triggered"])) if kill["triggered"] else (
+        (T("未知：") + T("；").join(r["text"] for r in kill["unknown"])) if kill["unknown"] else T("未触发"))
     mb = pack.get("max_bid") or {}
     card = [[Paragraph(f"<b>{_esc(cat[k]['label'])}</b>", st["small"]) for k in pack["card_keys"]],
             [Paragraph(f"<font color='{brand.RED if _neg(m.get(k)) else brand.INK}' size=13>"
                        f"{_esc(fmt(m.get(k), cat[k]['unit']))}</font>", st["cell"]) for k in pack["card_keys"]]]
     story += [_table(card, [174 * mm / len(pack["card_keys"])] * len(pack["card_keys"]), header=False), Spacer(1, 4),
-              Paragraph(_esc(f"最高出价：{fmt(mb.get('max_bid'), 'usd')}"
-                             + (f"（卡在：{mb['binding']['label']}）" if mb.get("binding") else "")
-                             + f" · 要价 {fmt(mb.get('asking'), 'usd')}"), st["body"]),
-              Paragraph(f"淘汰条件：<font color='{brand.RED if kill['triggered'] else brand.INK}'>{_esc(kill_txt)}</font>",
+              Paragraph(_esc(T("最高出价：{0}", fmt(mb.get("max_bid"), "usd"))
+                             + (T("（卡在：{0}）", mb["binding"]["label"]) if mb.get("binding") else "")
+                             + T(" · 要价 {0}", fmt(mb.get("asking"), "usd"))), st["body"]),
+              Paragraph(T("淘汰条件：<font color='{0}'>{1}</font>", brand.RED if kill["triggered"] else brand.INK, _esc(kill_txt)),
                         st["body"]),
-              Paragraph(_esc(f"核对进度：关键数字已复核 {pack['verification']['key_reviewed']}/"
-                             f"{pack['verification']['key_total']} · 未裁决矛盾 {pack['verification']['open_conflicts']} · "
-                             f"过期证据 {pack['verification']['stale_evidence']}"), st["body"])]
+              Paragraph(_esc(T("核对进度：关键数字已复核 {0}/{1} · 未裁决矛盾 {2} · 过期证据 {3}", pack["verification"]["key_reviewed"], pack["verification"]["key_total"], pack["verification"]["open_conflicts"], pack["verification"]["stale_evidence"])), st["body"])]
     # 自上一版起改了什么
-    story.append(_section(st, "自上一版起改了什么"))
+    story.append(_section(st, T("自上一版起改了什么")))
     diff = pack.get("diff")
     if not diff:
-        story.append(Paragraph("这是第一版承销，无可对比的上一版。", st["body"]))
+        story.append(Paragraph(T("这是第一版承销，无可对比的上一版。"), st["body"]))
     else:
-        story.append(Paragraph(_esc(f"对比第 {diff['a']['version_no']} 版（{diff['a']['label']}）：改动 "
-                                    f"{diff['changed_inputs']} 项假设，{diff['changed_metrics']} 项结果随之变化。"),
+        story.append(Paragraph(_esc(T("对比第 {0} 版（{1}）：改动 {2} 项假设，{3} 项结果随之变化。", diff["a"]["version_no"], diff["a"]["label"], diff["changed_inputs"], diff["changed_metrics"])),
                                st["small"]))
-        rows: list[list[Any]] = [["假设路径", "上一版", "本版"]]
+        rows: list[list[Any]] = [[T("假设路径"), T("上一版"), T("本版")]]
         for r in diff["inputs"][:25]:
             rows.append([Paragraph(_esc(r["path"]), st["cell"]), Paragraph(_esc(r["before"]), st["num"]),
                          Paragraph(_esc(r["after"]), st["num"])])
         story.append(_table(rows, [94 * mm, 40 * mm, 40 * mm]))
     # 关键图表
-    story += [_section(st, "红队面板：最可能出错的 5 个假设"), _tornado(pack["redteam"]),
+    story += [_section(st, T("红队面板：最可能出错的 5 个假设")), _tornado(pack["redteam"]),
               Paragraph(_esc(pack["redteam"].get("note", "")), st["small"])]
     sc = pack.get("scenarios")
     if sc:
-        rows = [["情景", "概率", sc["metric_label"], "亏损"]]
+        rows = [[T("情景"), T("概率"), sc["metric_label"], T("亏损")]]
         for r in sc["scenarios"]:
             rows.append([r["name"], f"{r['probability']:g}%", fmt(r["primary"], "pct"),
-                         "—" if r["loss"] is None else ("是" if r["loss"] else "否")])
-        rows.append(["期望值", "100%", fmt(sc["expected"], "pct"),
-                     "—" if sc["loss_probability_pct"] is None else f"亏损概率 {sc['loss_probability_pct']:g}%"])
-        story += [_section(st, "概率加权结果"), _table(rows, [50 * mm, 30 * mm, 50 * mm, 44 * mm])]
+                         "—" if r["loss"] is None else (T("是") if r["loss"] else T("否"))])
+        rows.append([T("期望值"), "100%", fmt(sc["expected"], "pct"),
+                     "—" if sc["loss_probability_pct"] is None else T("亏损概率 {0:g}%", sc["loss_probability_pct"])])
+        story += [_section(st, T("概率加权结果")), _table(rows, [50 * mm, 30 * mm, 50 * mm, 44 * mm])]
     # 反方意见：上会前先看“最可能怎么失败”
     dv = pack.get("devils") or {}
-    story += [PageBreak(), _section(st, "反方意见（系统按固定规则生成，不经 AI）")]
+    story += [PageBreak(), _section(st, T("反方意见（系统按固定规则生成，不经 AI）"))]
     if dv.get("points"):
-        story += [Paragraph(_esc(f"{'■ 高' if p['severity'] == 'high' else '□ 中'} · {p['title']}：{p['text']}"), st["body"])
+        story += [Paragraph(_esc(T("{0} · {1}：{2}", T("■ 高") if p["severity"] == "high" else T("□ 中"), p["title"], p["text"])), st["body"])
                   for p in dv["points"]]
     else:
-        story += [Paragraph(_esc("未发现可由数据支持的反方论点（数据不足的论点不写）"), st["body"])]
+        story += [Paragraph(_esc(T("未发现可由数据支持的反方论点（数据不足的论点不写）")), st["body"])]
     # 风险清单
-    story += [_section(st, "风险清单")]
-    risks = pack["risks"] or ["未发现需要上会讨论的风险项"]
+    story += [_section(st, T("风险清单"))]
+    risks = pack["risks"] or [T("未发现需要上会讨论的风险项")]
     story += [Paragraph(_esc(f"· {r}"), st["body"]) for r in risks]
     # 关键指标全表
-    rows = [["指标", "数值"]] + [[cat[k]["label"], Paragraph(
+    rows = [[T("指标"), T("数值")]] + [[cat[k]["label"], Paragraph(
         f"<font color='{brand.RED if _neg(v) else brand.INK}'>{_esc(fmt(v, cat[k]['unit']))}</font>", st["num"])]
         for k, v in m.items() if k in cat]
-    story += [_section(st, "全部标准指标"), _table(rows, [110 * mm, 64 * mm])]
+    story += [_section(st, T("全部标准指标")), _table(rows, [110 * mm, 64 * mm])]
     # 投票记录
     cm = pack["committee"]
-    story += [_section(st, "投票记录"),
-              Paragraph(_esc(f"结果：{ {'approved': '通过', 'rejected': '不通过', 'pending': '待定'}[cm['result']] }"
-                             f"（{cm['why']}）· 赞成 {cm['approve']} · 反对 {cm['reject']} · 弃权 {cm['abstain']}"),
+    story += [_section(st, T("投票记录")),
+              Paragraph(_esc(T("结果：{0}（{1}）· 赞成 {2} · 反对 {3} · 弃权 {4}", {"approved": T("通过"), "rejected": T("不通过"), "pending": T("待定")}[cm["result"]], cm["why"], cm["approve"], cm["reject"], cm["abstain"])),
                         st["body"])]
-    vrows: list[list[Any]] = [["投票人", "角色", "投票", "意见", "时间"]]
+    vrows: list[list[Any]] = [[T("投票人"), T("角色"), T("投票"), T("意见"), T("时间")]]
     for v in pack["votes"]:
-        vrows.append([v["voter"], v.get("role_label", ""), {"approve": "赞成", "reject": "反对", "abstain": "弃权"}[v["vote"]],
+        vrows.append([v["voter"], v.get("role_label", ""), {"approve": T("赞成"), "reject": T("反对"), "abstain": T("弃权")}[v["vote"]],
                       Paragraph(_esc(v.get("comment") or ""), st["cell"]), v["created_at"][:16].replace("T", " ")])
     story.append(_table(vrows, [28 * mm, 18 * mm, 16 * mm, 80 * mm, 32 * mm]))
     if pack.get("decisions"):
-        story.append(_section(st, "决策日志"))
+        story.append(_section(st, T("决策日志")))
         for dcs in pack["decisions"]:
-            story.append(Paragraph(_esc(f"{dcs['created_at'][:10]} {dcs['verdict']} · {dcs['created_by']}：{dcs['rationale']}"),
+            story.append(Paragraph(_esc(T("{0} {1} · {2}：{3}", dcs["created_at"][:10], dcs["verdict"], dcs["created_by"], dcs["rationale"])),
                                    st["body"]))
     story += [Spacer(1, 10), Paragraph(_esc(
-        "校验：本包内容摘要与运行编号已登记；把 PDF 上传到 /api/v2/committee/verify 即可核验是否原样。"
-        "筛选辅助工具，不构成投资建议。"), st["small"])]
+        T("校验：本包内容摘要与运行编号已登记；把 PDF 上传到 /api/v2/committee/verify 即可核验是否原样。筛选辅助工具，不构成投资建议。")), st["small"])]
     doc.build(story, onFirstPage=_footer(pack), onLaterPages=_footer(pack))
     return buf.getvalue()
 
@@ -246,26 +240,26 @@ def build_xlsx(pack: JSON) -> bytes:
                         c.font = red
 
     cat, m = pack["metric_catalog"], pack["metrics"]
-    sheet("摘要", ["项目", "值"], [["交易", pack["deal"]["name"]], ["地址", pack["deal"].get("address") or ""],
-                               ["阶段", pack["deal"]["stage_label"]], ["版本", pack["version"]["version_no"]],
-                               ["运行编号", pack["run_id"]], ["引擎版本", pack["engine_version"]],
-                               ["数据摘要 SHA-256", pack["data_sha256"]], ["生成时间", pack["generated_at"]],
-                               ["最高出价", (pack.get("max_bid") or {}).get("max_bid")]], first=True)
-    sheet("指标", ["指标", "单位", "数值"], [[cat[k]["label"], cat[k]["unit"], v] for k, v in m.items() if k in cat])
-    sheet("红队面板", ["假设", "-10% 后", "+10% 后", "波动(bp)", "关键"],
-          [[r["label"], r["minus"]["value"], r["plus"]["value"], r["swing_bps"], "是" if r["material"] else ""]
+    sheet(T("摘要"), [T("项目"), T("值")], [[T("交易"), pack["deal"]["name"]], [T("地址"), pack["deal"].get("address") or ""],
+                               [T("阶段"), pack["deal"]["stage_label"]], [T("版本"), pack["version"]["version_no"]],
+                               [T("运行编号"), pack["run_id"]], [T("引擎版本"), pack["engine_version"]],
+                               [T("数据摘要 SHA-256"), pack["data_sha256"]], [T("生成时间"), pack["generated_at"]],
+                               [T("最高出价"), (pack.get("max_bid") or {}).get("max_bid")]], first=True)
+    sheet(T("指标"), [T("指标"), T("单位"), T("数值")], [[cat[k]["label"], cat[k]["unit"], v] for k, v in m.items() if k in cat])
+    sheet(T("红队面板"), [T("假设"), T("-10% 后"), T("+10% 后"), T("波动(bp)"), T("关键")],
+          [[r["label"], r["minus"]["value"], r["plus"]["value"], r["swing_bps"], T("是") if r["material"] else ""]
            for r in pack["redteam"].get("all", [])])
     if pack.get("scenarios"):
-        sheet("情景", ["情景", "概率%", pack["scenarios"]["metric_label"], "亏损"],
+        sheet(T("情景"), [T("情景"), T("概率%"), pack["scenarios"]["metric_label"], T("亏损")],
               [[r["name"], r["probability"], r["primary"], r["loss"]] for r in pack["scenarios"]["scenarios"]])
-    sheet("版本差异", ["路径", "类型", "上一版", "本版"],
+    sheet(T("版本差异"), [T("路径"), T("类型"), T("上一版"), T("本版")],
           [[r["path"], r["kind"], str(r["before"]), str(r["after"])] for r in (pack.get("diff") or {}).get("inputs", [])])
-    sheet("反方意见", ["级别", "论点", "说明"],
-          [["高" if p["severity"] == "high" else "中", p["title"], p["text"]] for p in (pack.get("devils") or {}).get("points", [])])
-    sheet("风险清单", ["风险"], [[r] for r in pack["risks"]])
-    sheet("投票", ["投票人", "投票", "意见", "时间"],
+    sheet(T("反方意见"), [T("级别"), T("论点"), T("说明")],
+          [[T("高") if p["severity"] == "high" else T("中"), p["title"], p["text"]] for p in (pack.get("devils") or {}).get("points", [])])
+    sheet(T("风险清单"), [T("风险")], [[r] for r in pack["risks"]])
+    sheet(T("投票"), [T("投票人"), T("投票"), T("意见"), T("时间")],
           [[v["voter"], v["vote"], v.get("comment") or "", v["created_at"]] for v in pack["votes"]])
-    sheet("数字护照", ["字段", "值", "来源", "页", "方式", "可信度", "复核", "新鲜度"],
+    sheet(T("数字护照"), [T("字段"), T("值"), T("来源"), T("页"), T("方式"), T("可信度"), T("复核"), T("新鲜度")],
           [[p["field"], str(p["value"]), p["source"], p["page"], p["method_label"], p["confidence_label"],
             p["review_label"], p["freshness"]["label"]] for p in pack["passports"]])
     out = io.BytesIO()

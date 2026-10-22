@@ -5,7 +5,7 @@ from typing import Any
 
 from fastapi import APIRouter
 
-from app.api.v2.deps import need
+from app.api.v2.deps import LocalizedRoute, need
 from app.api.v2.schemas import (
     CatalogOut,
     DevilsMemoOut,
@@ -27,7 +27,7 @@ from app.domain.v2.model import METRICS, PRIMARY_METRIC, ModelInputError, run_mo
 from app.services.v2 import analysis
 from app.services.v2.errors import InvalidInputError
 
-router = APIRouter(prefix="/api/v2", tags=["v2 · underwriting"])
+router = APIRouter(prefix="/api/v2", tags=["v2 · underwriting"], route_class=LocalizedRoute)
 
 
 @router.post("/model/{track}", response_model=ModelOut, dependencies=[need("deal.read")])

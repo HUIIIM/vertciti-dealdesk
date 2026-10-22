@@ -286,3 +286,12 @@ def test_devils_memo_is_deterministic_and_never_invents():
     # 数据不足：不写论点，不拿 0 凑
     empty = devils_advocate.build("commercial", {}, {}, {})
     assert empty["points"] == [] and empty["headline"] is None
+
+
+def test_passed_deal_can_only_restart_to_sourcing():
+    ctx = _ctx()
+    back = lifecycle.evaluate("passed", "sourcing", ctx)
+    assert back["allowed"] and back["direction"] == "back"  # 重启 = 回退：服务层要求写原因
+    for t in ("screening", "committee", "holding", "passed"):
+        r = lifecycle.evaluate("passed", t, ctx)
+        assert not r["allowed"] and "发现" in r["reason"]

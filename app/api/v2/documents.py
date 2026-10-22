@@ -8,7 +8,7 @@ from fastapi import APIRouter, File, Form, Request, UploadFile
 from fastapi.responses import Response
 
 from app.api.common import _check_upload_size
-from app.api.v2.deps import need
+from app.api.v2.deps import LocalizedRoute, need
 from app.api.v2.schemas import (
     ConflictOut,
     ConflictResolve,
@@ -19,9 +19,10 @@ from app.api.v2.schemas import (
     PassportOut,
     ReviewIn,
 )
+from app.core.i18n import T
 from app.services.v2 import evidence, workflow
 
-router = APIRouter(prefix="/api/v2", tags=["v2 · documents"])
+router = APIRouter(prefix="/api/v2", tags=["v2 · documents"], route_class=LocalizedRoute)
 
 
 @router.get("/deals/{deal_id}/documents", response_model=list[DocOut], dependencies=[need("deal.read")])
@@ -34,7 +35,7 @@ def list_documents(deal_id: int) -> list[dict[str, Any]]:
 async def upload_document(deal_id: int, request: Request, file: UploadFile = File(...),
                           category: str = Form("other")) -> dict[str, Any]:
     """上传 OM / 租金表 / T12 / 尽调文件（≤ 20MB，存 SHA-256 便于核对原件）。"""
-    _check_upload_size(request, workflow.MAX_DOC_BYTES, "文件")
+    _check_upload_size(request, workflow.MAX_DOC_BYTES, T("文件"))
     data = await file.read(workflow.MAX_DOC_BYTES + 1)
     return workflow.upload_document(deal_id, file.filename or "file", file.content_type or "", data, category)
 

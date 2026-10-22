@@ -8,6 +8,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.context import current_actor
+from app.core.i18n import T
 from app.domain.v2 import kill_criteria, reproducible
 from app.domain.v2.lifecycle import ORDER, STAGE_LABEL
 from app.domain.v2.model import PRICE_PATH, TRACKS, ModelInputError, run_model
@@ -29,7 +30,7 @@ def _event(s: Session, deal_id: int, kind: str, payload: JSON | None = None) -> 
 def deal_or_404(s: Session, deal_id: int) -> Deal:
     d = s.get(Deal, deal_id)
     if d is None or d.archived:
-        raise NotFoundError(f"交易 {deal_id} 不存在")
+        raise NotFoundError(T("交易 {0} 不存在", deal_id))
     return d
 
 
@@ -42,9 +43,9 @@ def _deal_dict(d: Deal) -> JSON:
 def create_deal(name: str, track: str, *, address: str = "", asking_price: float | None = None,
                 kill: list[JSON] | None = None, tags: list[str] | None = None) -> JSON:
     if track not in TRACKS:
-        raise InvalidInputError("赛道只能是 residential 或 commercial")
+        raise InvalidInputError(T("赛道只能是 residential 或 commercial"))
     if not name.strip():
-        raise InvalidInputError("交易名称不能为空")
+        raise InvalidInputError(T("交易名称不能为空"))
     try:
         crit = kill_criteria.validate(kill or [])
     except ValueError as e:
@@ -63,7 +64,7 @@ def update_deal(deal_id: int, changes: JSON) -> JSON:
     allowed = {"name", "address", "asking_price", "tags", "kill_criteria"}
     bad = set(changes) - allowed
     if bad:
-        raise InvalidInputError(f"不能修改的字段：{', '.join(sorted(bad))}")
+        raise InvalidInputError(T("不能修改的字段：{0}", ", ".join(sorted(bad))))
     with session_scope() as s:
         d = deal_or_404(s, deal_id)
         before = _deal_dict(d)
@@ -112,7 +113,7 @@ def save_version(deal_id: int, inputs: JSON, label: str = "") -> JSON:
             raise InvalidInputError(str(e)) from e
         run = _store_run(s, RUN_KIND + ":" + d.track, inputs, outputs)
         n = (s.scalar(select(func.max(DealVersion.version_no)).where(DealVersion.deal_id == d.id)) or 0) + 1
-        v = DealVersion(deal_id=d.id, version_no=n, label=label or f"第 {n} 版", inputs=inputs, outputs=outputs,
+        v = DealVersion(deal_id=d.id, version_no=n, label=label or T("第 {0} 版", n), inputs=inputs, outputs=outputs,
                         run_id=run.run_id, created_by=current_actor().username)
         s.add(v)
         s.flush()
@@ -144,7 +145,7 @@ def get_version(deal_id: int, version_id: int, *, with_detail: bool = True) -> J
     with session_scope() as s:
         v = s.get(DealVersion, version_id)
         if v is None or v.deal_id != deal_id:
-            raise NotFoundError(f"版本 {version_id} 不存在")
+            raise NotFoundError(T("版本 {0} 不存在", version_id))
         return version_dict(v, with_detail=with_detail)
 
 
@@ -156,7 +157,7 @@ def get_run(rid: str) -> JSON:
     with session_scope() as s:
         r = s.get(Run, rid)
         if r is None:
-            raise NotFoundError(f"运行编号 {rid} 不存在")
+            raise NotFoundError(T("运行编号 {0} 不存在", rid))
         return row(r)
 
 

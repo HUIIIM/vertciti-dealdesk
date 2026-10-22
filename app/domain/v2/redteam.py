@@ -8,6 +8,7 @@ from __future__ import annotations
 from functools import partial
 from typing import Any
 
+from app.core.i18n import T
 from app.domain.v2.assumptions import BY_TRACK, Assumption
 from app.domain.v2.model import METRICS, PRIMARY_METRIC, ModelInputError, primary_value, run_model
 from app.domain.v2.paths import get_path, scale_numeric, update_path
@@ -49,12 +50,14 @@ def run(track: str, inputs: JSON, shock_pct: float = SHOCK * 100) -> JSON:
     skipped: list[JSON] = []
     for a in BY_TRACK[track]:
         if not _has_value(inputs, a):
-            skipped.append({"key": a.key, "label": a.label, "reason": "当前输入为空或 0，无法扰动"})
+            skipped.append({"key": a.key, "label": a.label, "reason": T("当前输入为空或 0，无法扰动")})
             continue
         low = _safe_primary(track, shock(inputs, a, 1 - factor))
         high = _safe_primary(track, shock(inputs, a, 1 + factor))
         if base is None or low is None or high is None:
-            skipped.append({"key": a.key, "label": a.label, "reason": f"{METRICS[metric].label}无法计算（数据不足）"})
+            skipped.append({"key": a.key, "label": a.label, "reason": T(
+                "{0}无法计算（数据不足）",
+                METRICS[metric].label)})
             continue
         d_low, d_high = low - base, high - base
         swing_bps = max(abs(d_low), abs(d_high)) * 100.0
@@ -70,6 +73,6 @@ def run(track: str, inputs: JSON, shock_pct: float = SHOCK * 100) -> JSON:
         "material_bps": MATERIAL_BPS, "top": rows[:TOP_N], "all": rows, "skipped": skipped,
         "key_assumptions": [r["key"] for r in rows if r["material"]],
         "key_fields": sorted({p for r in rows if r["material"] for p in r["paths"]}),
-        "note": (f"每个假设单独上下浮动 {shock_pct:g}%，其余不变；主指标为{METRICS[metric].label}。"
-                 f"波动 ≥ {MATERIAL_BPS:g} 个基点的假设定为关键数字。"),
+        "note": T("每个假设单独上下浮动 {0:g}%，其余不变；主指标为{1}。"
+                  "波动 ≥ {2:g} 个基点的假设定为关键数字。", shock_pct, METRICS[metric].label, MATERIAL_BPS),
     }

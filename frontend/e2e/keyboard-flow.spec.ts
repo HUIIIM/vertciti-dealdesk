@@ -181,3 +181,26 @@ test("别人做不到的：先核哪个 + 反方备忘录（不经 AI），真�
   await expect(memo).toContainText("已触发淘汰条件");
   await expect(memo).toContainText("不经 AI");
 });
+
+test("中英切换：点 EN 后整页英文（用户数据除外），刷新不丢；再点“中文”切回", async ({ page, request }) => {
+  const tpl = await (await request.get("/api/uw/template")).json();
+  const d = await (await request.post("/api/v2/deals", { data: { name: "Lang Check", track: "commercial", address: "9 Lang St",
+    kill_criteria: [{ metric: "irr_pct", op: "<", threshold: 12 }] } })).json();
+  await request.post(`/api/v2/deals/${d.id}/versions`, { data: { inputs: tpl.example_39_main, label: "v1" } });
+  await page.goto(`/app/#/deals/${d.id}`);
+  await page.getByRole("button", { name: "Switch to English" }).click();
+  await page.waitForLoadState("load");
+  const CJK = /[　-〿一-鿿＀-￯]/;
+  for (const tab of ["", "/model", "/risk", "/files", "/committee", "/log"]) {
+    await page.goto(`/app/#/deals/${d.id}${tab}`);
+    await page.waitForLoadState("networkidle");
+    await page.waitForTimeout(400);
+    const text = await page.locator("main").innerText();
+    const hits = text.split("\n").filter((l) => CJK.test(l));
+    expect(hits, `tab ${tab || "overview"}`).toEqual([]);
+  }
+  await expect(page.locator("html")).toHaveAttribute("lang", "en");
+  await page.getByRole("button", { name: "切换到中文" }).click();
+  await page.waitForLoadState("load");
+  await expect(page.getByRole("tab", { name: "概览" }).or(page.getByText("概览").first())).toBeVisible();
+});

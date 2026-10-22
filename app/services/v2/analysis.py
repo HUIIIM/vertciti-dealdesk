@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.context import current_actor
+from app.core.i18n import T
 from app.domain.v2 import (
     devils_advocate,
     diffing,
@@ -44,7 +45,7 @@ JSON = dict[str, Any]
 def _require_version(s: Session, d: Deal) -> DealVersion:
     v = current_version(s, d)
     if v is None:
-        raise ConflictError("这笔交易还没有承销版本：先在模型页保存一版")
+        raise ConflictError(T("这笔交易还没有承销版本：先在模型页保存一版"))
     return v
 
 
@@ -142,7 +143,7 @@ def diff_versions(deal_id: int, a: int, b: int) -> JSON:
     with session_scope() as s:
         va, vb = s.get(DealVersion, a), s.get(DealVersion, b)
         if va is None or vb is None or va.deal_id != deal_id or vb.deal_id != deal_id:
-            raise NotFoundError("版本不存在")
+            raise NotFoundError(T("版本不存在"))
         out = diffing.compare_versions(version_dict(va, with_detail=True), version_dict(vb, with_detail=True))
         return {"a": {"id": va.id, "version_no": va.version_no, "label": va.label, "run_id": va.run_id},
                 "b": {"id": vb.id, "version_no": vb.version_no, "label": vb.label, "run_id": vb.run_id}, **out}
@@ -218,7 +219,7 @@ def gate_check(deal_id: int, target: str) -> JSON:
 
 def compare_deals(ids: list[int]) -> JSON:
     if not 2 <= len(ids) <= 4:
-        raise InvalidInputError("比较页支持 2–4 笔交易")
+        raise InvalidInputError(T("比较页支持 2–4 笔交易"))
     with session_scope() as s:
         out: list[JSON] = []
         for i in ids:

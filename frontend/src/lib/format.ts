@@ -1,3 +1,4 @@
+import { T } from "@/i18n";
 // 数字口径（蓝图 §6）：等宽数字、千分位、单位放表头不放单元格；负数括号 + 红色双重标示（色盲友好）；
 // 未知一律 “—”，绝不编数字（AGENTS.md）。百分比为“百分比数”（6.5 表示 6.5%）。
 export type Unit = "usd" | "usd_month" | "pct" | "x" | "int" | "pts" | "text";
@@ -48,7 +49,7 @@ export function fmt(v: unknown, unit: Unit): string {
 }
 
 export function unitSuffix(unit: Unit): string {
-  return { usd: "$", usd_month: "$/月", pct: "%", x: "×", int: "", pts: "分", text: "" }[unit];
+  return { usd: "$", usd_month: T("$/月"), pct: "%", x: "×", int: "", pts: T("分"), text: "" }[unit];
 }
 
 export function isNeg(v: unknown): boolean {

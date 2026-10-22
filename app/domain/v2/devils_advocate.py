@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.core.i18n import T
 from app.domain.v2.model import METRICS
 
 JSON = dict[str, Any]
@@ -32,11 +33,13 @@ def _kill_points(kill: JSON) -> list[JSON]:
         unit = METRICS[k["metric"]].unit
         f = (lambda x: f"{x:.2f}×") if unit == "x" else (lambda x: f"{x:.2f}%")
         if k["state"] == "triggered" and v is not None:
-            out.append(_pt(f"kill:{k['metric']}", "high", "已触发淘汰条件",
-                           f"{k['text']}：当前 {f(v)}，越线 {f(abs(v - th))}。", "overview"))
+            out.append(_pt(f"kill:{k['metric']}", "high", T("已触发淘汰条件"),
+                           T("{0}：当前 {1}，越线 {2}。", k["text"], f(v), f(abs(v - th))), "overview"))
         elif k["state"] == "ok" and v is not None and th != 0 and abs(v - th) / abs(th) <= NEAR_MISS:
-            out.append(_pt(f"near:{k['metric']}", "medium", "离淘汰线很近",
-                           f"{k['text']}：当前 {f(v)}，只比底线多 {f(abs(v - th))}，一个假设稍差就会触发。", "risk"))
+            out.append(_pt(f"near:{k['metric']}", "medium", T("离淘汰线很近"),
+                           T(
+                               "{0}：当前 {1}，只比底线多 {2}，一个假设稍差就会触发。",
+                               k["text"], f(v), f(abs(v - th))), "risk"))
     return out
 
 
@@ -45,12 +48,13 @@ def _price_point(mb: JSON | None) -> list[JSON]:
         return []
     ask, best, bind = _num(mb.get("asking")), _num(mb.get("max_bid")), mb.get("binding") or {}
     if best is None and bind:
-        why = f"「{bind.get('label', '')}」{bind.get('reason', '')}。"
-        return [_pt("price:none", "high", "任何价格都不满足", why, "risk")]
+        why = T("「{0}」{1}。", bind.get("label", ""), bind.get("reason", ""))
+        return [_pt("price:none", "high", T("任何价格都不满足"), why, "risk")]
     if ask and best is not None and best < ask:
-        return [_pt("price:gap", "high", "要价高过可出价",
-                    f"要价 ${ask:,.0f} 比所有约束允许的最高价 ${best:,.0f} 高 {(ask / best - 1) * 100:.1f}%；"
-                    f"卡住价格的是「{bind.get('label', '')}」。按要价成交等于放弃这条底线。", "risk")]
+        text = T("要价 ${0:,.0f} 比所有约束允许的最高价 ${1:,.0f} 高 {2:.1f}%；"
+                 "卡住价格的是「{3}」。按要价成交等于放弃这条底线。",
+                 ask, best, (ask / best - 1) * 100, bind.get("label", ""))
+        return [_pt("price:gap", "high", T("要价高过可出价"), text, "risk")]
     return []
 
 
@@ -60,9 +64,10 @@ def _swing_point(rt: JSON | None) -> list[JSON]:
         return []
     r = top[0]
     lo, hi = sorted([r["minus"]["value"], r["plus"]["value"]])
-    return [_pt("swing:top", "high" if r["material"] else "medium", "结论押在一个假设上",
-                f"「{r['label']}」只要错 {rt['shock_pct']:g}%，{rt['metric_label']}就落在 {lo:.2f}%–{hi:.2f}% 之间"
-                f"（摆动 {r['swing_bps']:.0f} bp）。这个数从哪来、谁核过，决定了这笔交易。", "risk")]
+    return [_pt("swing:top", "high" if r["material"] else "medium", T("结论押在一个假设上"),
+                T("「{0}」只要错 {1:g}%，{2}就落在 {3:.2f}%–{4:.2f}% 之间（摆动 {5"
+                  ":.0f} bp）。这个数从哪来、谁核过，决定了这笔交易。",
+                  r["label"], rt["shock_pct"], rt["metric_label"], lo, hi, r["swing_bps"]), "risk")]
 
 
 def _downside_point(sc: JSON | None) -> list[JSON]:
@@ -74,10 +79,10 @@ def _downside_point(sc: JSON | None) -> list[JSON]:
     worst = min(rows, key=lambda r: r["primary"])
     lp = _num(sc.get("loss_probability_pct"))
     if worst["primary"] < 0 or worst.get("loss"):
-        tail = f"，按当前情景概率算，亏损概率 {lp:.0f}%" if lp is not None else ""
-        return [_pt("downside", "high", "悲观情景是亏的",
-                    f"「{worst['name']}」（概率 {worst['probability']:.0f}%）"
-                    f"{sc['metric_label']} {worst['primary']:.2f}%{tail}。", "risk")]
+        tail = T("，按当前情景概率算，亏损概率 {0:.0f}%", lp) if lp is not None else ""
+        return [_pt("downside", "high", T("悲观情景是亏的"),
+                    T("「{0}」（概率 {1:.0f}%）{2} {3:.2f}%{4}。",
+                      worst["name"], worst["probability"], sc["metric_label"], worst["primary"], tail), "risk")]
     return []
 
 
@@ -85,12 +90,16 @@ def _verify_points(kn: JSON | None, queue: JSON | None, stale: int) -> list[JSON
     out = []
     if kn and kn.get("total") and kn["done"] < kn["total"]:
         first = ((queue or {}).get("items") or [None])[0]
-        hint = (f"；最该先核：「{first['label']}」（{first['swing_bps']:.0f} bp）"
+        hint = (T("；最该先核：「{0}」（{1:.0f} bp）", first["label"], first["swing_bps"])
                 if first and first.get("swing_bps") else "")
-        out.append(_pt("verify:gap", "high" if kn["done"] == 0 else "medium", "关键数字没核完",
-                       f"{kn['total']} 个关键数字只复核了 {kn['done']} 个{hint}。没核过的数不该拿去上会。", "files"))
+        out.append(_pt("verify:gap", "high" if kn["done"] == 0 else "medium", T("关键数字没核完"),
+                       T(
+                           "{0} 个关键数字只复核了 {1} 个{2}。没核过的数不该拿去上会。",
+                           kn["total"], kn["done"], hint), "files"))
     if stale:
-        out.append(_pt("verify:stale", "medium", "证据过期", f"{stale} 条证据超过 30 天，市场数据可能已变。", "files"))
+        out.append(_pt("verify:stale", "medium", T("证据过期"), T(
+            "{0} 条证据超过 30 天，市场数据可能已变。",
+            stale), "files"))
     return out
 
 
@@ -98,19 +107,22 @@ def _structure_points(track: str, inputs: JSON, metrics: JSON) -> list[JSON]:
     out = []
     be = _num(metrics.get("breakeven_occupancy_pct"))
     if track == "commercial" and be is not None and be >= BREAKEVEN_MED:
-        out.append(_pt("breakeven", "high" if be >= BREAKEVEN_HIGH else "medium", "容错空间小",
-                       f"出租率跌破 {be:.1f}% 就入不敷出——空置只要超过 {100 - be:.1f}% 就开始亏现金。", "model"))
+        out.append(_pt("breakeven", "high" if be >= BREAKEVEN_HIGH else "medium", T("容错空间小"),
+                       T(
+                           "出租率跌破 {0:.1f}% 就入不敷出——空置只要超过 {1:.1f}% 就开始亏现金。",
+                           be, 100 - be), "model"))
     a = inputs.get("analysis") or {}
     exit_cap, entry = _num(a.get("exit_cap_rate")), _num(metrics.get("cap_rate_pct"))
     if exit_cap is not None and entry is not None and exit_cap < entry:
-        out.append(_pt("cap:compress", "medium", "回报靠估值上升",
-                       f"退出 Cap Rate {exit_cap:.2f}% 低于买入 {entry:.2f}%："
-                       "一部分回报来自假设将来有人出更高的价。", "model"))
+        out.append(_pt("cap:compress", "medium", T("回报靠估值上升"),
+                       T(
+                           "退出 Cap Rate {0:.2f}% 低于买入 {1:.2f}%：一部分回报来自假设将来有人出更高的价。",
+                           exit_cap, entry), "model"))
     dscr = _num(metrics.get("dscr"))
     if dscr is not None and 1.0 <= dscr < DSCR_THIN:
-        out.append(_pt("dscr:thin", "medium", "偿债余量薄",
-                       f"DSCR {dscr:.2f}×，只比贷款常见门槛 1.25× 高 {max(dscr - 1.25, 0):.2f}，"
-                       "NOI 小幅下滑就可能触发贷款条款。", "model"))
+        out.append(_pt("dscr:thin", "medium", T("偿债余量薄"),
+                       T("DSCR {0:.2f}×，只比贷款常见门槛 1.25× 高 {1:.2f}，"
+                         "NOI 小幅下滑就可能触发贷款条款。", dscr, max(dscr - 1.25, 0)), "model"))
     return out
 
 
@@ -119,11 +131,11 @@ def _headline(points: list[JSON]) -> str | None:
     if not points:
         return None
     high = [p for p in points if p["severity"] == "high"]
-    head = f"{len(high)} 条高危、{len(points) - len(high)} 条中危"
+    head = T("{0} 条高危、{1} 条中危", len(high), len(points) - len(high))
     if not high:
-        return f"{head}：没有致命问题，但下面几处会削弱结论。"
-    must = "、".join(dict.fromkeys(p["title"] for p in high[:2]))
-    return f"{head}；要上会，至少先解决：{must}。"
+        return T("{0}：没有致命问题，但下面几处会削弱结论。", head)
+    must = T("、").join(dict.fromkeys(p["title"] for p in high[:2]))
+    return T("{0}；要上会，至少先解决：{1}。", head, must)
 
 
 def build(track: str, inputs: JSON, metrics: JSON, facts: JSON) -> JSON:
@@ -139,6 +151,6 @@ def build(track: str, inputs: JSON, metrics: JSON, facts: JSON) -> JSON:
     return {
         "headline": _headline(points),
         "points": points, "high": sum(1 for p in points if p["severity"] == "high"),
-        "note": "本备忘录不经 AI：每条都由固定规则从系统已算出的结果拼成，数字可点开来源核对；数据不足的论点不写。",
+        "note": T("本备忘录不经 AI：每条都由固定规则从系统已算出的结果拼成，数字可点开来源核对；数据不足的论点不写。"),
     }
 

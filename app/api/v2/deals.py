@@ -5,7 +5,7 @@ from typing import Any
 
 from fastapi import APIRouter, Query
 
-from app.api.v2.deps import need
+from app.api.v2.deps import LocalizedRoute, need
 from app.api.v2.schemas import (
     CompareOut,
     DealCreate,
@@ -27,7 +27,7 @@ from app.api.v2.schemas import (
 )
 from app.services.v2 import analysis, deals, workflow
 
-router = APIRouter(prefix="/api/v2", tags=["v2 · deals"])
+router = APIRouter(prefix="/api/v2", tags=["v2 · deals"], route_class=LocalizedRoute)
 
 
 @router.get("/deals", response_model=list[DealListItem], dependencies=[need("deal.read")])

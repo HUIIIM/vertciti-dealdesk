@@ -23,6 +23,7 @@ ignore = [
 "app/core/security.py" = ["T201"]                       # 运维命令行入口打印一次性令牌
 "app/services/persistence/migrate.py" = ["T201"]        # 迁移命令行输出
 "app/core/brand.py" = ["E501"]                          # 报告 CSS 字面量：折行会改变 v1 报告字节（金标准锁定）
+"app/core/i18n_en.py" = ["E501"]                        # 词典数据：中文键本身很长，折行反而难对照
 
 [lint.flake8-type-checking]
 # FastAPI / Pydantic / SQLAlchemy 在运行时读取注解：这些类型的导入必须留在运行时

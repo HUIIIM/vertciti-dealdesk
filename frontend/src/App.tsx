@@ -1,4 +1,5 @@
 // 根组件：加载身份与目录 → 外壳 → 路由；全局快捷键（⌘K / ? / N / G+字母）。
+import { T } from "@/i18n";
 import { lazy, Suspense, useCallback, useMemo, useState } from "react";
 import { api, ApiError, call, rawJson } from "@/api/client";
 import type { Catalog, Me } from "@/api/types";
@@ -38,23 +39,23 @@ export function App() {
   const [dealsVersion, setDealsVersion] = useState(0);
   const refreshDeals = useCallback(() => setDealsVersion((v) => v + 1), []);
   const commands = useMemo<Command[]>(() => [
-    { id: "new", group: "命令", label: "新建交易", hint: "N", run: () => setCreating(true) },
-    { id: "pipeline", group: "跳转", label: "流水线", hint: "G P", run: () => navigate({ name: "pipeline" }) },
-    { id: "compare", group: "跳转", label: "比较页", hint: "G C", run: () => navigate({ name: "compare", ids: [] }) },
-    { id: "settings", group: "跳转", label: "设置 · 模板", hint: "G S", run: () => navigate({ name: "settings", section: "templates" }) },
-    { id: "sources", group: "跳转", label: "设置 · 数据源状态", run: () => navigate({ name: "settings", section: "sources" }) },
-    { id: "dense", group: "外观", label: density === "compact" ? "切换到舒适密度" : "切换到紧凑密度", run: () => setDensity(density === "compact" ? "comfortable" : "compact") },
-    { id: "theme", group: "外观", label: theme === "dark" ? "切换到浅色" : "切换到深色（长时间建模）", run: () => setTheme(theme === "dark" ? "light" : "dark") },
-    { id: "help", group: "帮助", label: "显示全部快捷键", hint: "?", run: () => setHelp(true) },
-    { id: "v1", group: "跳转", label: "v1 单页决策（旧版入口）", run: () => { window.location.href = "/"; } },
+    { id: "new", group: T("命令"), label: T("新建交易"), hint: "N", run: () => setCreating(true) },
+    { id: "pipeline", group: T("跳转"), label: T("流水线"), hint: "G P", run: () => navigate({ name: "pipeline" }) },
+    { id: "compare", group: T("跳转"), label: T("比较页"), hint: "G C", run: () => navigate({ name: "compare", ids: [] }) },
+    { id: "settings", group: T("跳转"), label: T("设置 · 模板"), hint: "G S", run: () => navigate({ name: "settings", section: "templates" }) },
+    { id: "sources", group: T("跳转"), label: T("设置 · 数据源状态"), run: () => navigate({ name: "settings", section: "sources" }) },
+    { id: "dense", group: T("外观"), label: density === "compact" ? T("切换到舒适密度") : T("切换到紧凑密度"), run: () => setDensity(density === "compact" ? "comfortable" : "compact") },
+    { id: "theme", group: T("外观"), label: theme === "dark" ? T("切换到浅色") : T("切换到深色（长时间建模）"), run: () => setTheme(theme === "dark" ? "light" : "dark") },
+    { id: "help", group: T("帮助"), label: T("显示全部快捷键"), hint: "?", run: () => setHelp(true) },
+    { id: "v1", group: T("跳转"), label: T("v1 单页决策（旧版入口）"), run: () => { window.location.href = "/"; } },
   ], [density, theme, setDensity, setTheme]);
   const overlay = cmdk || help || creating;
   useHotkeys([
-    { combo: "mod+k", label: "命令栏", group: "全局", allowInInput: true, run: () => setCmdk((v) => !v) },
-    { combo: "?", label: "快捷键", group: "全局", run: () => setHelp(true) },
-    { combo: "g p", label: "流水线", group: "全局", run: () => navigate({ name: "pipeline" }) },
-    { combo: "g c", label: "比较", group: "全局", run: () => navigate({ name: "compare", ids: [] }) },
-    { combo: "g s", label: "设置", group: "全局", run: () => navigate({ name: "settings", section: "templates" }) },
+    { combo: "mod+k", label: T("命令栏"), group: T("全局"), allowInInput: true, run: () => setCmdk((v) => !v) },
+    { combo: "?", label: T("快捷键"), group: T("全局"), run: () => setHelp(true) },
+    { combo: "g p", label: T("流水线"), group: T("全局"), run: () => navigate({ name: "pipeline" }) },
+    { combo: "g c", label: T("比较"), group: T("全局"), run: () => navigate({ name: "compare", ids: [] }) },
+    { combo: "g s", label: T("设置"), group: T("全局"), run: () => navigate({ name: "settings", section: "templates" }) },
   ], !overlay);
 
   if (boot.error && !(boot.error instanceof ApiError && boot.error.status === 401)) return <main className="page"><ErrorBox error={boot.error} onRetry={boot.reload} /></main>;
@@ -66,11 +67,11 @@ export function App() {
   return (
     <Ctx.Provider value={{ me, catalog, can, refreshDeals, dealsVersion }}>
       <AppShell route={route} onCmdk={() => setCmdk(true)} density={density} setDensity={setDensity} theme={theme} setTheme={setTheme}>
-        {phone ? <p className="phone-note" role="note">手机端为只读视图：看数字、进度与记录；编辑、审批、投票请用电脑。</p> : null}
+        {phone ? <p className="phone-note" role="note">{T("手机端为只读视图：看数字、进度与记录；编辑、审批、投票请用电脑。")}</p> : null}
         <Suspense fallback={<Skeleton rows={6} h={28} />}>
         {route.name === "pipeline" ? <Pipeline /> : route.name === "deal" ? <DealPage key={route.id} id={route.id} tab={route.tab} />
           : route.name === "compare" ? <Compare ids={route.ids} /> : route.name === "settings" ? <Settings section={route.section} />
-          : <ErrorBox error={new Error(`页面不存在：${route.path}`)} />}
+          : <ErrorBox error={new Error(T("页面不存在：{0}", [route.path]))} />}
         </Suspense>
       </AppShell>
       {cmdk ? <CommandPalette onClose={() => setCmdk(false)} commands={commands} /> : null}

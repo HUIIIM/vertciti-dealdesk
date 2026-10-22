@@ -10,6 +10,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
+from app.core.i18n import T
 from app.domain.v2.assumptions import find
 from app.domain.v2.model import METRICS, PRIMARY_METRIC, run_model
 from app.domain.v2.paths import set_path, update_path
@@ -20,17 +21,17 @@ JSON = dict[str, Any]
 def default_scenarios(track: str) -> list[JSON]:
     if track == "commercial":
         return [
-            {"name": "基准", "probability": 50, "changes": []},
-            {"name": "乐观", "probability": 25, "changes": [{"assumption": "rent_level", "pct": 5},
+            {"name": T("基准"), "probability": 50, "changes": []},
+            {"name": T("乐观"), "probability": 25, "changes": [{"assumption": "rent_level", "pct": 5},
                                                           {"assumption": "exit_cap", "add": -0.25}]},
-            {"name": "悲观", "probability": 25, "changes": [{"assumption": "rent_level", "pct": -10},
+            {"name": T("悲观"), "probability": 25, "changes": [{"assumption": "rent_level", "pct": -10},
                                                           {"assumption": "vacancy", "add": 5},
                                                           {"assumption": "exit_cap", "add": 0.75}]},
         ]
     return [
-        {"name": "基准", "probability": 50, "changes": []},
-        {"name": "乐观", "probability": 25, "changes": [{"assumption": "rent_level", "pct": 5}]},
-        {"name": "悲观", "probability": 25, "changes": [{"assumption": "rent_level", "pct": -10},
+        {"name": T("基准"), "probability": 50, "changes": []},
+        {"name": T("乐观"), "probability": 25, "changes": [{"assumption": "rent_level", "pct": 5}]},
+        {"name": T("悲观"), "probability": 25, "changes": [{"assumption": "rent_level", "pct": -10},
                                                       {"assumption": "vacancy", "add": 5}]},
     ]
 
@@ -59,7 +60,7 @@ def _apply_change(track: str, inputs: JSON, ch: JSON) -> JSON:
         elif "pct" in ch:
             out = update_path(out, p, _scaler(1 + float(ch["pct"]) / 100))
         else:
-            raise ValueError("情景变动须含 pct / add / set 之一")
+            raise ValueError(T("情景变动须含 pct / add / set 之一"))
     return out
 
 
@@ -75,7 +76,7 @@ def run(track: str, inputs: JSON, scenarios: list[JSON] | None = None) -> JSON:
     sc = scenarios or default_scenarios(track)
     total_p = sum(float(s.get("probability", 0)) for s in sc)
     if abs(total_p - 100.0) > 1e-6:
-        raise ValueError(f"情景概率合计须为 100（当前 {total_p:g}）")
+        raise ValueError(T("情景概率合计须为 100（当前 {0:g}）", total_p))
     metric = PRIMARY_METRIC[track]  # type: ignore[index]
     rows: list[JSON] = []
     for s in sc:
@@ -92,4 +93,4 @@ def run(track: str, inputs: JSON, scenarios: list[JSON] | None = None) -> JSON:
     loss_p = sum(r["probability"] for r in loss_known if r["loss"]) if len(loss_known) == len(rows) else None
     return {"metric": metric, "metric_label": METRICS[metric].label, "scenarios": rows,
             "expected": expected, "loss_probability_pct": loss_p,
-            "note": "期望值 = Σ 概率 × 情景值；任一情景算不出则期望值显示为未知，不拿部分情景凑数。"}
+            "note": T("期望值 = Σ 概率 × 情景值；任一情景算不出则期望值显示为未知，不拿部分情景凑数。")}

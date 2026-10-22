@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.core.i18n import T
 from app.domain.v2.model import primary_value, run_model
 from app.domain.v2.paths import get_path, set_path
 
@@ -73,10 +74,10 @@ def _calibrate_noi(track: str, inputs: JSON, target: float) -> JSON:
 
 def attribution(track: str, inputs: JSON, actuals: list[JSON]) -> JSON:
     if track != "commercial":
-        return {"available": False, "reason": "事后归因目前支持商业赛道（IRR）；住宅请看偏差表"}
+        return {"available": False, "reason": T("事后归因目前支持商业赛道（IRR）；住宅请看偏差表")}
     acts = sorted([a for a in actuals if a.get("noi") is not None], key=lambda r: r["period"])
     if not acts:
-        return {"available": False, "reason": "还没有录入实际 NOI"}
+        return {"available": False, "reason": T("还没有录入实际 NOI")}
     base = primary_value(track, run_model(track, inputs))
     cur, prev, rows = inputs, base, []
 
@@ -91,15 +92,15 @@ def attribution(track: str, inputs: JSON, actuals: list[JSON]) -> JSON:
     occ = [a["occupancy_pct"] for a in acts if a.get("occupancy_pct") is not None]
     if occ:
         vac = 100 - sum(occ) / len(occ)
-        step("vacancy", "出租率（实际平均）", get_path(cur, "proforma.vacancy_pct"), vac,
+        step("vacancy", T("出租率（实际平均）"), get_path(cur, "proforma.vacancy_pct"), vac,
              set_path(cur, "proforma.vacancy_pct", vac))
     uw_noi = _pro_noi(run_model(track, inputs))
-    step("noi_level", "其他经营差异（第 1 年 NOI 校准到实际）", uw_noi, acts[0]["noi"],
+    step("noi_level", T("其他经营差异（第 1 年 NOI 校准到实际）"), uw_noi, acts[0]["noi"],
          _calibrate_noi(track, cur, float(acts[0]["noi"])))
     if len(acts) >= 2 and acts[0]["noi"] > 0:
         cagr = ((acts[-1]["noi"] / acts[0]["noi"]) ** (1 / (len(acts) - 1)) - 1) * 100
-        step("noi_growth", "NOI 年增长（实际年复合）", get_path(cur, "analysis.noi_growth"), cagr,
+        step("noi_growth", T("NOI 年增长（实际年复合）"), get_path(cur, "analysis.noi_growth"), cagr,
              set_path(cur, "analysis.noi_growth", cagr))
     return {"available": True, "metric": "irr_pct", "underwritten": base, "actual_implied": prev,
             "total_pct_points": None if prev is None or base is None else prev - base, "steps": rows,
-            "note": "顺序替换法：出租率 → 其他经营差异 → NOI 增长；退出 cap 未发生前沿用承销值。"}
+            "note": T("顺序替换法：出租率 → 其他经营差异 → NOI 增长；退出 cap 未发生前沿用承销值。")}

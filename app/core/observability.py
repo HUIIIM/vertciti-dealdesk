@@ -29,6 +29,7 @@ from starlette.responses import JSONResponse, Response
 from app.core import security
 from app.core.context import current_actor, current_request_id, reset_actor, set_actor, set_request_id
 from app.core.hardening import AUTH_THROTTLE, headers_for
+from app.core.i18n import lang_from_header, reset_lang, set_lang
 
 log = logging.getLogger("dealdesk")
 access_log = logging.getLogger("dealdesk.access")
@@ -88,6 +89,7 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
             AUTH_THROTTLE.fail(client)
             log.warning("invalid token", extra={"extra_fields": {"client": client}})
         act_tok = set_actor(actor)
+        lang_tok = set_lang(lang_from_header(request.headers.get("x-dd-lang")))
         t0 = time.perf_counter()
         path, method = request.url.path, request.method
         try:
@@ -115,6 +117,7 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
             access_log.info("request", extra={"extra_fields": {
                 "method": method, "path": path, "status": resp.status_code,
                 "ms": round((time.perf_counter() - t0) * 1000, 1)}})
+        reset_lang(lang_tok)
         reset_actor(act_tok)
         set_request_id("")  # 不跨请求泄漏
         del rid_tok

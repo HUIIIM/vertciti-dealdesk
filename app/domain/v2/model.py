@@ -13,6 +13,7 @@ from typing import Any, Literal
 
 from pydantic import ValidationError
 
+from app.core.i18n import T
 from app.domain import scoring_residential, uw_commercial
 from app.domain.models import ResidentialInput
 
@@ -75,7 +76,7 @@ def _residential(inputs: JSON) -> tuple[JSON, JSON]:
         validated = ResidentialInput.model_validate(clean).model_dump()
     except ValidationError as e:
         parts = [f"[{'.'.join(str(x) for x in err.get('loc', ()))}] {err.get('msg', '')}" for err in e.errors()]
-        raise ModelInputError("住宅输入校验失败：" + "；".join(parts)) from e
+        raise ModelInputError(T("住宅输入校验失败：") + T("；").join(parts)) from e
     s = scoring_residential.score(validated)
     m = s.get("metrics", {})
     price = _num(validated.get("price"))
@@ -103,7 +104,7 @@ def _commercial(inputs: JSON) -> tuple[JSON, JSON]:
     try:
         r = uw_commercial.compute_all(clean)
     except Exception as e:
-        raise ModelInputError(f"商业核保计算失败：{str(e)[:200]}") from e
+        raise ModelInputError(T("商业核保计算失败：{0}", str(e)[:200])) from e
     a = r.get("analysis", {}) or {}
     proj = a.get("projected", {}) or {}
     ex = a.get("exit", {}) or {}
@@ -133,7 +134,7 @@ def run_model(track: str, inputs: JSON) -> JSON:
     elif track == "commercial":
         metrics, detail = _commercial(inputs)
     else:
-        raise ModelInputError(f"未知赛道：{track!r}（只支持 residential / commercial）")
+        raise ModelInputError(T("未知赛道：{0!r}（只支持 residential / commercial）", track))
     return {"track": track, "metrics": metrics, "detail": detail}
 
 

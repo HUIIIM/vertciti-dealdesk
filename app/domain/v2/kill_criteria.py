@@ -9,6 +9,7 @@ import operator
 from collections.abc import Callable
 from typing import Any
 
+from app.core.i18n import T
 from app.domain.v2.model import METRICS
 
 OPS: dict[str, Callable[[float, float], bool]] = {
@@ -33,12 +34,12 @@ def validate(criteria: list[dict[str, Any]]) -> list[dict[str, Any]]:
     for i, c in enumerate(criteria or []):
         m, op, th = c.get("metric"), c.get("op"), c.get("threshold")
         if m not in METRICS:
-            raise ValueError(f"第 {i + 1} 条淘汰条件：未知指标 {m!r}")
+            raise ValueError(T("第 {0} 条淘汰条件：未知指标 {1!r}", i + 1, m))
         if op not in OPS:
-            raise ValueError(f"第 {i + 1} 条淘汰条件：比较符只能是 < <= > >=")
+            raise ValueError(T("第 {0} 条淘汰条件：比较符只能是 < <= > >=", i + 1))
         if isinstance(th, bool) or not isinstance(th, (int, float)):
             # 输入校验错误（用户填错），统一 ValueError → 422，而非编程错误的 TypeError
-            raise ValueError(f"第 {i + 1} 条淘汰条件：阈值必须是数字")  # noqa: TRY004
+            raise ValueError(T("第 {0} 条淘汰条件：阈值必须是数字", i + 1))  # noqa: TRY004
         out.append({"metric": m, "op": op, "threshold": float(th)})
     return out
 
@@ -47,7 +48,7 @@ def describe(c: dict[str, Any]) -> str:
     met = METRICS[c["metric"]]
     unit = "%" if met.unit == "pct" else ("×" if met.unit == "x" else "")
     th = f"${c['threshold']:,.0f}" if met.unit == "usd" else f"{c['threshold']:g}{unit}"
-    return f"{met.label}{OP_TEXT[c['op']]} {th} 即放弃"
+    return T("{0}{1} {2} 即放弃", met.label, OP_TEXT[c["op"]], th)
 
 
 def evaluate(criteria: list[dict[str, Any]], metrics: dict[str, Any]) -> dict[str, Any]:

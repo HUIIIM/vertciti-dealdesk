@@ -1,5 +1,6 @@
 // 交易页：顶部结论卡（F 型阅读起点）+ 核对进度 + 关卡；下方 10 个标签页。
 // 草稿：在模型类标签页改假设 → 右侧实时重算（防抖 300ms，不保存）；⌘S 保存为新承销版本（必填“本版改了什么”）。
+import { T } from "@/i18n";
 import { createContext, lazy, Suspense, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { api, call, type OverviewOut, type PassportOut, type VersionOut } from "@/api/client";
 import type { KillEval, MaxBid, Metrics, PriceCheck, VerifyQueue } from "@/api/types";
@@ -35,7 +36,7 @@ export interface DealCtxValue {
 const DealCtx = createContext<DealCtxValue | null>(null);
 export function useDeal(): DealCtxValue {
   const v = useContext(DealCtx);
-  if (!v) throw new Error("useDeal 必须在交易页内使用");
+  if (!v) throw new Error(T("useDeal 必须在交易页内使用"));
   return v;
 }
 
@@ -96,17 +97,17 @@ export function DealPage({ id, tab }: { id: number; tab: DealTab }) {
     setSaving(true);
     try {
       const v = await call(api.POST("/api/v2/deals/{deal_id}/versions", { params: { path: { deal_id: id } }, body: { inputs: draft as never, label } }));
-      toast.ok(`已保存第 ${v.version_no} 版 · 运行编号 ${v.run_id}`);
+      toast.ok(T("已保存第 {0} 版 · 运行编号 {1}", [v.version_no, v.run_id]));
       setLabel(""); setSaving(false); setEdit(null);
       await ov.reload();
     } catch (e) { toast.err(e); setSaving(false); }
   };
   const [askSave, setAskSave] = useState(false);
-  const save = () => { if (!can("deal.write")) { toast.err("只读角色不能保存"); return; } if (dirty || !vid) setAskSave(true); else toast.info("没有未保存的改动"); };
+  const save = () => { if (!can("deal.write")) { toast.err(T("只读角色不能保存")); return; } if (dirty || !vid) setAskSave(true); else toast.info(T("没有未保存的改动")); };
   useHotkeys([
-    { combo: "mod+s", label: "保存", group: "交易", allowInInput: true, run: save },
-    { combo: "e", label: "编辑模型", group: "交易", run: () => navigate({ name: "deal", id, tab: "model" }) },
-    ...DEAL_TABS.map(([k], i) => ({ combo: String((i + 1) % 10), label: k, group: "标签", run: () => navigate({ name: "deal", id, tab: k }) })),
+    { combo: "mod+s", label: T("保存"), group: T("交易"), allowInInput: true, run: save },
+    { combo: "e", label: T("编辑模型"), group: T("交易"), run: () => navigate({ name: "deal", id, tab: "model" }) },
+    ...DEAL_TABS.map(([k], i) => ({ combo: String((i + 1) % 10), label: k, group: T("标签"), run: () => navigate({ name: "deal", id, tab: k }) })),
   ], !askSave && !passport);
   useEffect(() => {
     if (!dirty) return;
@@ -131,52 +132,52 @@ export function DealPage({ id, tab }: { id: number; tab: DealTab }) {
   return (
     <DealCtx.Provider value={ctx}>
       <div className="deal-head">
-        <section className={`verdict-card ${kill.triggered.length ? "risk" : kill.clear ? "ok" : ""}`} aria-label="结论卡">
-          <p className="eyebrow">{d.track === "commercial" ? "商业" : "住宅"} · {d.stage_label}{o.version ? ` · 第 ${(o.version as { version_no: number }).version_no} 版` : " · 尚未承销"}</p>
+        <section className={`verdict-card ${kill.triggered.length ? "risk" : kill.clear ? "ok" : ""}`} aria-label={T("结论卡")}>
+          <p className="eyebrow">{d.track === "commercial" ? T("商业") : T("住宅")} · {d.stage_label}{o.version ? T(" · 第 {0} 版", [(o.version as { version_no: number }).version_no]) : T(" · 尚未承销")}</p>
           <h1>{d.name}</h1>
-          <div className="muted" style={{ fontSize: 14 }}>{d.address || "地址未填"}</div>
+          <div className="muted" style={{ fontSize: 14 }}>{d.address || T("地址未填")}</div>
           <div className="maxbid">
-            <span className="muted" style={{ fontWeight: 800, fontSize: 13 }}>结论</span>
-            <Status s={killStatus(kill)}>{kill.triggered.length ? `触发淘汰 ${kill.triggered.length} 条` : kill.unknown.length ? "淘汰条件无法判定" : kill.clear ? "淘汰条件未触发" : "未承销"}</Status>
-            {o.last_verdict ? <span className="chip">最近决策 {o.last_verdict}</span> : null}
+            <span className="muted" style={{ fontWeight: 800, fontSize: 13 }}>{T("结论")}</span>
+            <Status s={killStatus(kill)}>{kill.triggered.length ? T("触发淘汰 {0} 条", [kill.triggered.length]) : kill.unknown.length ? T("淘汰条件无法判定") : kill.clear ? T("淘汰条件未触发") : T("未承销")}</Status>
+            {o.last_verdict ? <span className="chip">{T("最近决策")}{" "}{o.last_verdict}</span> : null}
             <MaxBidInline mb={mb} hasVersion={Boolean(o.version)} dirty={dirty} />
           </div>
           <MetricGrid count={metricKeys.length} style={{ marginTop: 8 }}>
             {metricKeys.map((k) => { const meta = catalog.metrics[k]!;
               return <Metric key={k} label={meta.label} value={m[k] ?? null} unit={meta.unit as Unit} testId={`metric-${k}`}
-                note={dirty ? "草稿重算" : undefined} onOpen={() => setPassport({ path: `metric:${k}`, label: meta.label })} />; })}
+                note={dirty ? T("草稿重算") : undefined} onOpen={() => setPassport({ path: `metric:${k}`, label: meta.label })} />; })}
           </MetricGrid>
           {kill.items.length ? (
-            <ul className="checks" style={{ marginTop: 12 }} aria-label="淘汰条件">
+            <ul className="checks" style={{ marginTop: 12 }} aria-label={T("淘汰条件")}>
               {kill.items.map((k, i) => <li key={i}><Status s={k.state === "triggered" ? "risk" : k.state === "unknown" ? "building" : "verified"}>
-                {k.state === "triggered" ? "触发" : k.state === "unknown" ? "未知" : "未触发"}</Status><span>{k.text}<span className="muted"> · 当前 {fmt(k.value, (catalog.metrics[k.metric]?.unit ?? "x") as Unit)}</span></span></li>)}
-            </ul>) : <div className="banner warn" style={{ marginTop: 12 }}>还没写淘汰条件：进入承销前必须先写“什么情况下放弃”。</div>}
+                {k.state === "triggered" ? T("触发") : k.state === "unknown" ? T("未知") : T("未触发")}</Status><span>{k.text}<span className="muted"> {" "}{T("· 当前")}{" "}{fmt(k.value, (catalog.metrics[k.metric]?.unit ?? "x") as Unit)}</span></span></li>)}
+            </ul>) : <div className="banner warn" style={{ marginTop: 12 }}>{T("还没写淘汰条件：进入承销前必须先写“什么情况下放弃”。")}</div>}
           {mb.data && o.version ? <PriceLadder mb={mb.data} dealId={id} track={track} /> : null}
-          <ol className="stepper" aria-label="阶段" style={{ marginTop: "auto", paddingTop: 16 }}>
+          <ol className="stepper" aria-label={T("阶段")} style={{ marginTop: "auto", paddingTop: 16 }}>
             {STAGES.map(([s, l], i) => <li key={s} className={i < stageIdx ? "done" : i === stageIdx ? "current" : ""} aria-current={i === stageIdx ? "step" : undefined}>{l}</li>)}
           </ol>
         </section>
-        <section className="card" aria-label="核对进度">
-          <h2>核对进度</h2>
-          <p className="sub">关键数字由红队面板的敏感性客观定义（±10% 让主回报移动 ≥ 100bp）</p>
-          <div className="row" style={{ justifyContent: "space-between" }}><span>关键数字已复核</span><strong className="num">{ver_.key_reviewed} / {ver_.key_total}</strong></div>
-          <div className="progress" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label="关键数字复核进度"><span style={{ width: `${pct}%` }} /></div>
+        <section className="card" aria-label={T("核对进度")}>
+          <h2>{T("核对进度")}</h2>
+          <p className="sub">{T("关键数字由红队面板的敏感性客观定义（±10% 让主回报移动 ≥ 100bp）")}</p>
+          <div className="row" style={{ justifyContent: "space-between" }}><span>{T("关键数字已复核")}</span><strong className="num">{ver_.key_reviewed} / {ver_.key_total}</strong></div>
+          <div className="progress" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label={T("关键数字复核进度")}><span style={{ width: `${pct}%` }} /></div>
           <ul className="checks" style={{ marginTop: 8 }}>
-            <li><Status s={ver_.open_conflicts ? "risk" : "verified"}>{ver_.open_conflicts ? `${ver_.open_conflicts} 条` : "无"}</Status><span>未裁决的跨来源矛盾</span></li>
-            <li><Status s={ver_.stale_evidence ? "risk" : ver_.review_due ? "building" : "verified"}>{ver_.stale_evidence ? `${ver_.stale_evidence} 条停用` : ver_.review_due ? `${ver_.review_due} 条待复核` : "新鲜"}</Status><span>证据新鲜度（14 天待复核 / 30 天停用）</span></li>
-            <li><Status s={ver_.redteam_read ? "verified" : "planned"}>{ver_.redteam_read ? "已读" : "未读"}</Status><span>红队面板（当前版本）</span></li>
+            <li><Status s={ver_.open_conflicts ? "risk" : "verified"}>{ver_.open_conflicts ? T("{0} 条", [ver_.open_conflicts]) : T("无")}</Status><span>{T("未裁决的跨来源矛盾")}</span></li>
+            <li><Status s={ver_.stale_evidence ? "risk" : ver_.review_due ? "building" : "verified"}>{ver_.stale_evidence ? T("{0} 条停用", [ver_.stale_evidence]) : ver_.review_due ? T("{0} 条待复核", [ver_.review_due]) : T("新鲜")}</Status><span>{T("证据新鲜度（14 天待复核 / 30 天停用）")}</span></li>
+            <li><Status s={ver_.redteam_read ? "verified" : "planned"}>{ver_.redteam_read ? T("已读") : T("未读")}</Status><span>{T("红队面板（当前版本）")}</span></li>
           </ul>
           {o.version ? <VerifyFirst id={id} version={(o.version as { id: number }).id} stamp={JSON.stringify(ver_)} /> : null}
           {o.next_gate ? (<>
-            <h3 style={{ marginTop: 16, fontSize: 15 }}>进入「{STAGES.find(([s]) => s === o.next_stage)?.[1]}」的关卡</h3>
+            <h3 style={{ marginTop: 16, fontSize: 15 }}>{T("进入「")}{STAGES.find(([s]) => s === o.next_stage)?.[1]}{T("」的关卡")}</h3>
             <ul className="checks">{(o.next_gate.checks ?? []).map((c) => <li key={c.key}><Status s={c.status}>{c.status_label}</Status><span>{c.label}{c.detail ? <div className="d">{c.detail}</div> : null}</span></li>)}</ul>
           </>) : null}
-          {can("deal.advance") ? <div style={{ marginTop: 12 }}><a className="btn sm" href={`#/deals/${id}`}>去推进阶段 →</a></div> : null}
+          {can("deal.advance") ? <div style={{ marginTop: 12 }}><a className="btn sm" href={`#/deals/${id}`}>{T("去推进阶段 →")}</a></div> : null}
         </section>
       </div>
-      <nav className="tabs" role="tablist" aria-label="交易标签页">
+      <nav className="tabs" role="tablist" aria-label={T("交易标签页")}>
         {DEAL_TABS.map(([k, l], i) => <a key={k} role="tab" aria-selected={tab === k} href={k === "overview" ? `#/deals/${id}` : `#/deals/${id}/${k}`}
-          title={`快捷键 ${(i + 1) % 10}`}>{l}</a>)}
+          title={T("快捷键 {0}", [(i + 1) % 10])}>{l}</a>)}
       </nav>
       <div role="tabpanel" aria-label={DEAL_TABS.find(([k]) => k === tab)?.[1]}>
         <Suspense fallback={<Skeleton rows={5} h={28} />}>
@@ -186,20 +187,20 @@ export function DealPage({ id, tab }: { id: number; tab: DealTab }) {
         </Suspense>
       </div>
       {dirty ? (
-        <div className="draftbar" role="region" aria-label="未保存的草稿">
-          <span>{previewing ? <span className="live-dot" aria-hidden="true" /> : null}草稿有改动 · 结果为实时重算{previewing ? "（计算中…）" : ""}{preview?.error ? ` · ${preview.error}` : ""}</span>
+        <div className="draftbar" role="region" aria-label={T("未保存的草稿")}>
+          <span>{previewing ? <span className="live-dot" aria-hidden="true" /> : null}{T("草稿有改动 · 结果为实时重算")}{previewing ? T("（计算中…）") : ""}{preview?.error ? ` · ${preview.error}` : ""}</span>
           <span style={{ flex: 1 }} />
-          <button className="btn sm" type="button" onClick={() => setEdit(null)}>放弃改动</button>
-          {can("deal.write") ? <button className="btn sm primary" type="button" onClick={save}>保存为新版本 <Kbd k="⌘ S" /></button> : null}
+          <button className="btn sm" type="button" onClick={() => setEdit(null)}>{T("放弃改动")}</button>
+          {can("deal.write") ? <button className="btn sm primary" type="button" onClick={save}>{T("保存为新版本")}{" "}<Kbd k="⌘ S" /></button> : null}
         </div>) : !vid && can("deal.write") ? (
-        <div className="draftbar"><span>还没有承销版本：在“租金表 / T12 / 模型”填好假设后保存第一版</span><span style={{ flex: 1 }} />
-          <button className="btn sm primary" type="button" onClick={save}>保存第一版 <Kbd k="⌘ S" /></button></div>) : null}
+        <div className="draftbar"><span>{T("还没有承销版本：在“租金表 / T12 / 模型”填好假设后保存第一版")}</span><span style={{ flex: 1 }} />
+          <button className="btn sm primary" type="button" onClick={save}>{T("保存第一版")}{" "}<Kbd k="⌘ S" /></button></div>) : null}
       {askSave ? (
-        <Dialog title="保存承销版本" onClose={() => setAskSave(false)} footer={<>
-          <button className="btn ghost" type="button" onClick={() => setAskSave(false)}>取消</button>
-          <button className="btn primary" type="button" disabled={saving} onClick={async () => { await doSave(); setAskSave(false); }}>{saving ? "保存中…" : "保存"}</button></>}>
-          <label className="field">本版改了什么、为什么<span className="hint">写进投委会包“自上一版起改了什么”</span>
-            <input className="input" value={label} onChange={(e) => setLabel(e.target.value)} placeholder="如：退出 cap 按可比上调 50bp" maxLength={200}
+        <Dialog title={T("保存承销版本")} onClose={() => setAskSave(false)} footer={<>
+          <button className="btn ghost" type="button" onClick={() => setAskSave(false)}>{T("取消")}</button>
+          <button className="btn primary" type="button" disabled={saving} onClick={async () => { await doSave(); setAskSave(false); }}>{saving ? T("保存中…") : T("保存")}</button></>}>
+          <label className="field">{T("本版改了什么、为什么")}<span className="hint">{T("写进投委会包“自上一版起改了什么”")}</span>
+            <input className="input" value={label} onChange={(e) => setLabel(e.target.value)} placeholder={T("如：退出 cap 按可比上调 50bp")} maxLength={200}
               onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void doSave().then(() => setAskSave(false)); } }} /></label>
         </Dialog>) : null}
       {passport ? (passport.path.startsWith("metric:") ? (
@@ -221,13 +222,13 @@ function useMaxBid(id: number, hasVersion: boolean, kill: KillEval | undefined) 
 
 function MaxBidInline({ mb, hasVersion, dirty }: { mb: ReturnType<typeof useMaxBid>; hasVersion: boolean; dirty: boolean }) {
   if (!hasVersion) return null;
-  if (mb.loading && !mb.data) return <span className="muted">最高出价计算中…</span>;
-  if (!mb.data) return <span className="muted">最高出价：需下限型淘汰条件</span>;
+  if (mb.loading && !mb.data) return <span className="muted">{T("最高出价计算中…")}</span>;
+  if (!mb.data) return <span className="muted">{T("最高出价：需下限型淘汰条件")}</span>;
   return (
     <span style={{ display: "inline-flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }} data-testid="max-bid">
-      <span className="muted" style={{ fontWeight: 800, fontSize: 13 }}>最高出价</span>
+      <span className="muted" style={{ fontWeight: 800, fontSize: 13 }}>{T("最高出价")}</span>
       <TweenUsd value={mb.data.max_bid} />
-      <span className="muted" style={{ fontSize: 13 }}>{mb.data.binding ? `卡在：${mb.data.binding.label}` : ""}{dirty ? " · 按已保存版本" : ""}</span>
+      <span className="muted" style={{ fontSize: 13 }}>{mb.data.binding ? T("卡在：{0}", [mb.data.binding.label]) : ""}{dirty ? T(" · 按已保存版本") : ""}</span>
     </span>
   );
 }
@@ -260,8 +261,8 @@ export function PriceLadder({ mb, dealId, track }: { mb: MaxBid; dealId: number;
   const step = Math.max(1000, Math.round(mb.asking / 400 / 1000) * 1000);
   const shown = check && trial !== null && check.price === trial ? check : null;
   return (
-    <section className="ladder" aria-label="出价空间">
-      <div className="ladder-head"><strong>出价空间</strong><span className="muted">方块 = 该约束允许的最高价 · 竖线 = 要价 {fmtShort(mb.asking)} · 橙色 = 卡住价格的约束</span></div>
+    <section className="ladder" aria-label={T("出价空间")}>
+      <div className="ladder-head"><strong>{T("出价空间")}</strong><span className="muted">{T("方块 = 该约束允许的最高价 · 竖线 = 要价")}{" "}{fmtShort(mb.asking)} {" "}{T("· 橙色 = 卡住价格的约束")}</span></div>
       {mb.constraints.map((c, i) => {
         const bind = mb.binding?.label === c.label;
         return (
@@ -273,7 +274,7 @@ export function PriceLadder({ mb, dealId, track }: { mb: MaxBid; dealId: number;
                 <i className={`gap ${c.price >= mb.asking ? "up" : "down"}`} style={{ left: `${Math.min(ask, pos(c.price))}%`,
                   width: `${Math.abs(pos(c.price) - ask)}%`, animationDelay: `${150 + i * 90}ms` }} />
                 <s className={`mk${bind ? " bind" : ""}`} style={{ left: `${pos(c.price)}%`, animationDelay: `${150 + i * 90}ms` }} />
-              </>) : <em className="lx">无法满足</em>}
+              </>) : <em className="lx">{T("无法满足")}</em>}
               <b className="ask" style={{ left: `${ask}%` }} aria-hidden="true" />
               {trial !== null ? <b className="trial" style={{ left: `${pos(trial)}%` }} aria-hidden="true" /> : null}
             </span>
@@ -281,7 +282,7 @@ export function PriceLadder({ mb, dealId, track }: { mb: MaxBid; dealId: number;
           </div>);
       })}
       <div className="lrow try">
-        <label className="ll" htmlFor={`trial-${dealId}`}>试算出价</label>
+        <label className="ll" htmlFor={`trial-${dealId}`}>{T("试算出价")}</label>
         <input id={`trial-${dealId}`} type="range" min={Math.round(lo)} max={Math.round(hi)} step={step} value={trial ?? mb.asking}
           aria-valuetext={fmt(trial ?? mb.asking, "usd")} onChange={(e) => setTrial(Number(e.target.value))} />
         <span className="lv num">{fmtShort(trial ?? mb.asking)}</span>
@@ -290,17 +291,17 @@ export function PriceLadder({ mb, dealId, track }: { mb: MaxBid; dealId: number;
         <div className="trial-out" aria-live="polite">
           <span className="row" style={{ gap: 4 }}>
             <strong className="num">{fmt(trial, "usd")}</strong>
-            <span className="muted">{shown?.out?.vs_asking_pct != null ? `相对要价 ${shown.out.vs_asking_pct >= 0 ? "+" : ""}${shown.out.vs_asking_pct.toFixed(1)}%` : ""}</span>
-            {!shown ? <span className="muted"><span className="live-dot" aria-hidden="true" />计算中</span> : null}
+            <span className="muted">{shown?.out?.vs_asking_pct != null ? T("相对要价 {0}{1}%", [shown.out.vs_asking_pct >= 0 ? "+" : "", shown.out.vs_asking_pct.toFixed(1)]) : ""}</span>
+            {!shown ? <span className="muted"><span className="live-dot" aria-hidden="true" />{T("计算中")}</span> : null}
           </span>
           {shown?.err ? <span className="neg">{shown.err}</span> : null}
           {shown?.out ? (<>
             <span className="row" style={{ gap: 12 }}>{CARD_METRICS[track].map((k) => { const meta = catalog.metrics[k]!;
               return <span key={k}><span className="muted">{meta.label}</span> <strong className="num">{fmt(shown.out!.metrics[k] ?? null, meta.unit as Unit)}</strong></span>; })}</span>
             <span className="row" style={{ gap: 6 }}>{shown.out.kill.items.map((k, i) => <Status key={i} s={k.state === "triggered" ? "risk" : k.state === "unknown" ? "building" : "verified"}>
-              {k.state === "triggered" ? "触发" : k.state === "unknown" ? "未知" : "通过"} · {passText(k, catalog)}</Status>)}</span>
+              {k.state === "triggered" ? T("触发") : k.state === "unknown" ? T("未知") : T("通过")} · {passText(k, catalog)}</Status>)}</span>
           </>) : null}
-          <button className="btn sm ghost" type="button" onClick={() => { setTrial(null); setCheck(null); }}>回到要价</button>
+          <button className="btn sm ghost" type="button" onClick={() => { setTrial(null); setCheck(null); }}>{T("回到要价")}</button>
         </div>) : null}
     </section>
   );
@@ -311,13 +312,13 @@ function MetricExplain({ metric, label, onClose }: { metric: string; label: stri
   const rt = useApi(() => (ov.version ? call(api.GET("/api/v2/deals/{deal_id}/redteam", { params: { path: { deal_id: ov.deal.id } } })) : Promise.resolve(null)), [ov.deal.id, ov.version]);
   const keys = ((rt.data as { key_fields?: string[] } | null)?.key_fields ?? []);
   return (
-    <Dialog title={`计算说明 · ${label}`} onClose={onClose}>
-      <p style={{ marginTop: 0 }}>这是系统计算值（抽取方式：系统计算），由 v1 核保引擎按当前版本输入算出，口径由金标准测试锁定。</p>
-      <p className="mono muted">指标 {metric} · 运行编号 {version?.run_id ?? "—（尚未保存版本）"}</p>
-      <p>同一运行编号半年后重算结果分毫不差：“日志”标签页可一键校验。</p>
+    <Dialog title={T("计算说明 · {0}", [label])} onClose={onClose}>
+      <p style={{ marginTop: 0 }}>{T("这是系统计算值（抽取方式：系统计算），由 v1 核保引擎按当前版本输入算出，口径由金标准测试锁定。")}</p>
+      <p className="mono muted">{T("指标")}{" "}{metric} {" "}{T("· 运行编号")}{" "}{version?.run_id ?? T("—（尚未保存版本）")}</p>
+      <p>{T("同一运行编号半年后重算结果分毫不差：“日志”标签页可一键校验。")}</p>
       {keys.length ? (<>
-        <h3 style={{ fontSize: 15 }}>驱动它的关键输入（敏感性 ≥ 100bp）</h3>
-        <ul className="checks">{keys.map((k) => <li key={k}><span className={`status ${passportStatus(passports[k])}`}><i aria-hidden="true" />{passports[k]?.review_label ?? "无来源"}</span>
+        <h3 style={{ fontSize: 15 }}>{T("驱动它的关键输入（敏感性 ≥ 100bp）")}</h3>
+        <ul className="checks">{keys.map((k) => <li key={k}><span className={`status ${passportStatus(passports[k])}`}><i aria-hidden="true" />{passports[k]?.review_label ?? T("无来源")}</span>
           <button type="button" className="btn ghost sm" title={k} onClick={() => { onClose(); openPassport(k, fieldLabel(k)); }}>{fieldLabel(k)}</button></li>)}</ul></>) : null}
     </Dialog>
   );
@@ -347,15 +348,15 @@ function VerifyFirst({ id, version, stamp }: { id: number; version: number; stam
   const top = q.data.items.slice(0, 3);
   const max = Math.max(1, ...top.map((x) => x.swing_bps ?? 0));
   return (
-    <section className="vfirst" aria-label="先核哪个">
-      <div className="ladder-head"><strong>先核哪个</strong>
-        <span className="muted">按对{q.data.metric_label}的摆动排序{q.data.top_share_pct != null && q.data.items.length > 1 ? ` · 第一处占全部不确定性的 ${Math.round(q.data.top_share_pct)}%` : ""}</span></div>
+    <section className="vfirst" aria-label={T("先核哪个")}>
+      <div className="ladder-head"><strong>{T("先核哪个")}</strong>
+        <span className="muted">{T("按对")}{q.data.metric_label}{T("的摆动排序")}{q.data.top_share_pct != null && q.data.items.length > 1 ? T(" · 第一处占全部不确定性的 {0}%", [Math.round(q.data.top_share_pct)]) : ""}</span></div>
       <ol>
         {top.map((x, i) => (
           <li key={`${x.kind}-${x.field}`}>
             <span className="rank num">{i + 1}</span>
             <span className="what"><strong title={x.field}>{x.label}</strong>
-              <span className="muted"> · {x.kind === "conflict" ? "矛盾" : "未达标"}：{x.detail}</span></span>
+              <span className="muted"> · {x.kind === "conflict" ? T("矛盾") : T("未达标")}{T("：")}{x.detail}</span></span>
             <span className="bar"><i style={{ width: `${((x.swing_bps ?? 0) / max) * 100}%`, animationDelay: `${120 + i * 90}ms` }} /></span>
             <span className="bps num">{x.swing_bps == null ? "—" : `${Math.round(x.swing_bps)} bp`}</span>
             <a className="btn sm" href={`#/deals/${id}/files`}>{x.action}</a>

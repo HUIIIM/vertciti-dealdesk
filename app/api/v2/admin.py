@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import APIRouter, Query
 from sqlalchemy import text
 
-from app.api.v2.deps import need
+from app.api.v2.deps import LocalizedRoute, need
 from app.api.v2.schemas import (
     AuditOut,
     DataSourceOut,
@@ -24,12 +24,13 @@ from app.api.v2.schemas import (
 )
 from app.core import security
 from app.core.context import current_actor
+from app.core.i18n import label
 from app.core.observability import RECENT_ERRORS
 from app.domain.v2 import reproducible
 from app.services.persistence.engine import database_url, ensure_migrated
 from app.services.v2 import settings
 
-router = APIRouter(prefix="/api/v2", tags=["v2 · admin"])
+router = APIRouter(prefix="/api/v2", tags=["v2 · admin"], route_class=LocalizedRoute)
 _STARTED = time.time()
 
 
@@ -54,7 +55,9 @@ def health() -> dict[str, Any]:
 def me() -> dict[str, Any]:
     a = current_actor()
     return {"username": a.username, "role": a.role, "role_label": security.ROLE_LABEL.get(a.role, a.role),
-            "display_name": a.display_name, "auth": security.auth_enabled(),
+            # 内置身份（本机用户 / 匿名）的显示名按语言输出；真实用户的显示名是用户数据，原样返回
+            "display_name": label(a.display_name) if a.username in ("local", "anonymous") else a.display_name,
+            "auth": security.auth_enabled(),
             "permissions": sorted(k for k in security.PERMISSIONS if security.can(a, k))}
 
 

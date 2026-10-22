@@ -1,4 +1,5 @@
 // 表单字段：数字按千分位显示、失焦解析；旁边“源”按钮打开该字段的数字护照（来源 / 页码 / 复核 / 历史）。
+import { T } from "@/i18n";
 import { useId, useState } from "react";
 import type { FieldSpec } from "@/domain/fields";
 import { fmtCell, parseNum, type Unit } from "@/lib/format";
@@ -22,15 +23,15 @@ export function FieldInput({ spec, value, onChange, onPassport, passportState }:
   passportState?: "verified" | "building" | "planned" | "risk";
 }) {
   const id = useId();
-  const unitTxt = spec.unit === "pct" ? "%" : spec.unit === "usd" ? "$" : spec.unit === "usd_month" ? "$/月" : spec.unit === "x" ? "×" : "";
+  const unitTxt = spec.unit === "pct" ? "%" : spec.unit === "usd" ? "$" : spec.unit === "usd_month" ? T("$/月") : spec.unit === "x" ? "×" : "";
   return (
     <div className="field">
-      <label htmlFor={id} className="flabel" title={`${spec.label}${unitTxt ? `（${unitTxt}）` : ""}`}>
-        <span className="t">{spec.label}{unitTxt ? <span className="hint">（{unitTxt}）</span> : null}</span>
+      <label htmlFor={id} className="flabel" title={`${spec.label}${unitTxt ? T("（{0}）", [unitTxt]) : ""}`}>
+        <span className="t">{spec.label}{unitTxt ? <span className="hint">{T("（")}{unitTxt}{T("）")}</span> : null}</span>
         {onPassport ? (
           <button type="button" className="btn ghost sm src-btn"
-            onClick={() => onPassport(spec.path)} aria-label={`${spec.label} 的数字护照`} title="来源 · 复核 · 修改历史">
-            <span className={`status ${passportState ?? "planned"}`} style={{ padding: "0 4px" }}><i aria-hidden="true" />源</span>
+            onClick={() => onPassport(spec.path)} aria-label={T("{0} 的数字护照", [spec.label])} title={T("来源 · 复核 · 修改历史")}>
+            <span className={`status ${passportState ?? "planned"}`} style={{ padding: "0 4px" }}><i aria-hidden="true" />{T("源")}</span>
           </button>) : null}
       </label>
       {spec.unit === "select" ? (

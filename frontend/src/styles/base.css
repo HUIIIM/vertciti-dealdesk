@@ -26,6 +26,10 @@ kbd { font-family: var(--mono); font-size: 11px; border: 1px solid var(--border)
 .brandbar .logo { font-weight: 900; font-size: 16px; letter-spacing: -.02em; color: #fff; }
 .brandbar .logo i { display: inline-block; width: 5px; height: 5px; background: var(--orange); margin: 0 0 3px 2px; }
 .brandbar .sp { flex: 1; }
+/* 语言切换：放在品牌条（手机也可见）；按钮写目标语言（EN / 中文），读屏用目标语言念 */
+.brandbar .langsw { all: unset; cursor: pointer; color: #bdbdbd; font-weight: 800; min-height: 44px; min-width: 44px; display: inline-flex;
+  align-items: center; justify-content: center; border-bottom: 3px solid transparent; font-size: 13px; }
+.brandbar .langsw:hover { color: #fff; } .brandbar .langsw:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; }
 .appbar { position: sticky; top: 0; z-index: 30; background: var(--surface); border-bottom: 1px solid var(--border);
   min-height: 56px; display: flex; align-items: center; gap: var(--s4); padding: 0 var(--s5); }
 .appbar .prod { font-weight: 800; white-space: nowrap; }

@@ -8,6 +8,7 @@ from sqlalchemy import select
 
 from app.core import security
 from app.core.context import current_actor
+from app.core.i18n import T, label
 from app.domain.v2 import kill_criteria
 from app.services.persistence import audit
 from app.services.persistence.engine import session_scope
@@ -30,15 +31,15 @@ def list_templates(kind: str | None = None) -> list[JSON]:
             q = q.where(Template.kind == kind)
         saved = [row(t) for t in s.scalars(q.order_by(Template.kind, Template.name)).all()]
     names = {(t["kind"], t["name"]) for t in saved}
-    builtin = [{"id": None, "kind": k, "name": n, "payload": p, "builtin": True}
+    builtin = [{"id": None, "kind": k, "name": n, "label": label(n), "payload": p, "builtin": True}
                for (k, n), p in BUILTIN.items() if (not kind or k == kind) and (k, n) not in names]
-    return builtin + saved
+    return builtin + [{**t, "label": t["name"]} for t in saved]
 
 
 def save_template(kind: str, name: str, payload: JSON) -> JSON:
     security.require("settings.write")
     if kind not in KINDS:
-        raise InvalidInputError(f"模板类型只能是：{', '.join(KINDS)}")
+        raise InvalidInputError(T("模板类型只能是：{0}", ", ".join(KINDS)))
     if kind == "kill_criteria":
         try:
             payload = {**payload, "criteria": kill_criteria.validate(payload.get("criteria", []))}
@@ -65,7 +66,7 @@ def list_views() -> list[JSON]:
 def save_view(name: str, config: JSON) -> JSON:
     security.require("deal.write")
     if not name.strip():
-        raise InvalidInputError("视图名称不能为空")
+        raise InvalidInputError(T("视图名称不能为空"))
     with session_scope() as s:
         v = s.scalar(select(SavedView).where(SavedView.name == name.strip()))
         if v is None:
@@ -82,7 +83,7 @@ def delete_view(view_id: int) -> None:
     with session_scope() as s:
         v = s.get(SavedView, view_id)
         if v is None:
-            raise NotFoundError("视图不存在")
+            raise NotFoundError(T("视图不存在"))
         s.delete(v)
 
 
@@ -97,15 +98,15 @@ def create_user(username: str, role: str, display_name: str = "") -> JSON:
     try:
         security.Role(role)
     except ValueError as e:
-        raise InvalidInputError("角色只能是 chairman / analyst / viewer") from e
+        raise InvalidInputError(T("角色只能是 chairman / analyst / viewer")) from e
     token = security.add_user(username, role, display_name)
     with session_scope() as s:
         u = s.scalar(select(User).where(User.username == username))
         if u is None:  # add_user 刚写入；读不到说明库状态异常
-            raise NotFoundError(f"用户 {username} 创建后读取失败")
+            raise NotFoundError(T("用户 {0} 创建后读取失败", username))
         audit.record(s, "user", u.id, "create", None, {"username": username, "role": role})
         return {**row(u, exclude=("token_sha256",)), "token": token,
-                "note": "访问令牌只显示这一次，请立即妥善保存"}
+                "note": T("访问令牌只显示这一次，请立即妥善保存")}
 
 
 def audit_log(entity: str | None = None, entity_id: str | None = None, limit: int = 200) -> list[JSON]:
@@ -122,14 +123,15 @@ def audit_log(entity: str | None = None, entity_id: str | None = None, limit: in
 def data_sources() -> list[JSON]:
     """数据源状态（只读、不发网络请求；TopHap 连通性看 /api/tophap/status）。"""
     return [
-        {"key": "tophap", "label": "TopHap 公共记录（MCP）", "configured": os.environ.get("TOPHAP_ENABLED") == "1",
-         "detail": "OAuth token 1 小时有效；状态与重授权见 /api/tophap/status"},
-        {"key": "rentcast", "label": "RentCast 租金", "configured": bool(os.environ.get("RENTCAST_API_KEY")),
-         "detail": "未设 RENTCAST_API_KEY 时跳过"},
-        {"key": "census", "label": "Census 人口与就业", "configured": True, "detail": "公开接口，免 key"},
-        {"key": "web", "label": "公开网页（遵守 robots.txt）", "configured": True, "detail": "失败诚实降级为手动录入"},
-        {"key": "database", "label": "数据库", "configured": True,
-         "detail": "Postgres（DATABASE_URL）" if os.environ.get("DATABASE_URL") else "SQLite（本机开发）"},
+        {"key": "tophap", "label": T("TopHap 公共记录（MCP）"), "configured": os.environ.get("TOPHAP_ENABLED") == "1",
+         "detail": T("OAuth token 1 小时有效；状态与重授权见 /api/tophap/status")},
+        {"key": "rentcast", "label": T("RentCast 租金"), "configured": bool(os.environ.get("RENTCAST_API_KEY")),
+         "detail": T("未设 RENTCAST_API_KEY 时跳过")},
+        {"key": "census", "label": T("Census 人口与就业"), "configured": True, "detail": T("公开接口，免 key")},
+        {"key": "web", "label": T("公开网页（遵守 robots.txt）"), "configured": True, "detail": T(
+            "失败诚实降级为手动录入")},
+        {"key": "database", "label": T("数据库"), "configured": True,
+         "detail": T("Postgres（DATABASE_URL）") if os.environ.get("DATABASE_URL") else T("SQLite（本机开发）")},
     ]
 
 

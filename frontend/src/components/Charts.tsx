@@ -1,4 +1,5 @@
 // 原生 SVG 图表（零依赖，深浅色自适应）：龙卷风图（红队）、归因瀑布图（持有期复盘）。
+import { T } from "@/i18n";
 import type { RedTeamRow } from "@/api/types";
 import { fmt } from "@/lib/format";
 
@@ -8,8 +9,8 @@ export function Tornado({ rows, base, label, shock }: { rows: RedTeamRow[]; base
   const RIGHT = 96, mid = labelW + (W - labelW - RIGHT) / 2, scale = (W - labelW - RIGHT) / 2 / span;
   return (
     <svg className="chart" viewBox={`0 0 ${W} ${H}`} width="100%" role="img"
-      aria-label={`红队面板龙卷风图：每个假设上下浮动 ${shock}% 对${label}的影响`}>
-      <text x={mid} y={16} textAnchor="middle">基准 {label} {fmt(base, "pct")}</text>
+      aria-label={T("红队面板龙卷风图：每个假设上下浮动 {0}% 对{1}的影响", [shock, label])}>
+      <text x={mid} y={16} textAnchor="middle">{T("基准")}{" "}{label} {fmt(base, "pct")}</text>
       <line className="axis" x1={mid} x2={mid} y1={22} y2={H - 14} />
       {rows.map((r, i) => {
         const y = top + i * rowH;
@@ -18,13 +19,13 @@ export function Tornado({ rows, base, label, shock }: { rows: RedTeamRow[]; base
           // 从中轴向外生长（官网“条形生长”同一节奏），逐行错开
           return <rect key={k} x={d >= 0 ? mid : mid - w} y={y + 6} width={Math.max(w, 1)} height={rowH - 14}
             className={`${d < 0 ? "negbar grow-l" : "pos grow-r"}`} style={{ animationDelay: `${i * 70}ms` }}>
-            <title>{`${r.label} ${k === "m" ? "-" : "+"}${shock}%：${label} ${d >= 0 ? "+" : ""}${d.toFixed(2)} 个百分点`}</title></rect>;
+            <title>{T("{0} {1}{2}%：{3} {4}{5} 个百分点", [r.label, k === "m" ? "-" : "+", shock, label, d >= 0 ? "+" : "", d.toFixed(2)])}</title></rect>;
         };
         return (
           <g key={r.key}>
             <text x={0} y={y + rowH / 2 + 4}>{r.label}</text>
             {bar(r.minus.delta_pct_points, "m")}{bar(r.plus.delta_pct_points, "p")}
-            <text x={W} y={y + rowH / 2 + 4} textAnchor="end" className={r.material ? "key" : undefined}>{Math.round(r.swing_bps)} bp{r.material ? " · 关键" : ""}</text>
+            <text x={W} y={y + rowH / 2 + 4} textAnchor="end" className={r.material ? "key" : undefined}>{Math.round(r.swing_bps)} bp{r.material ? T(" · 关键") : ""}</text>
           </g>);
       })}
     </svg>
@@ -37,10 +38,10 @@ export function Waterfall({ start, steps, end, label }: { start: number; steps: 
   const pts = [...cum, end];
   const lo = Math.min(0, ...pts), hi = Math.max(0, ...pts), y = (v: number) => H - pad - ((v - lo) / (hi - lo || 1)) * (H - pad * 2);
   return (
-    <svg className="chart" viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label={`${label}归因瀑布图`}>
+    <svg className="chart" viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label={T("{0}归因瀑布图", [label])}>
       <line className="grid" x1={pad} x2={W - pad} y1={y(0)} y2={y(0)} />
       <rect className="base grow-up" x={pad + (gap - bw) / 2} y={Math.min(y(start), y(0))} width={bw} height={Math.abs(y(start) - y(0))} />
-      <text x={pad + gap / 2} y={H - 10} textAnchor="middle">承销</text>
+      <text x={pad + gap / 2} y={H - 10} textAnchor="middle">{T("承销")}</text>
       <text x={pad + gap / 2} y={Math.min(y(start), y(0)) - 6} textAnchor="middle">{fmt(start, "pct")}</text>
       {steps.map((s, i) => {
         const a = cum[i]!, b = cum[i + 1]!, x = pad + gap * (i + 1) + (gap - bw) / 2;
@@ -52,7 +53,7 @@ export function Waterfall({ start, steps, end, label }: { start: number; steps: 
           <text x={x + bw / 2} y={H - 10} textAnchor="middle">{s.label.length > 8 ? s.label.slice(0, 8) + "…" : s.label}</text></g>);
       })}
       <rect className="base grow-up" style={{ animationDelay: `${(n - 1) * 140}ms` }} x={pad + gap * (n - 1) + (gap - bw) / 2} y={Math.min(y(end), y(0))} width={bw} height={Math.abs(y(end) - y(0))} />
-      <text x={pad + gap * (n - 1) + gap / 2} y={H - 10} textAnchor="middle">实际推算</text>
+      <text x={pad + gap * (n - 1) + gap / 2} y={H - 10} textAnchor="middle">{T("实际推算")}</text>
       <text x={pad + gap * (n - 1) + gap / 2} y={Math.min(y(end), y(0)) - 6} textAnchor="middle">{fmt(end, "pct")}</text>
     </svg>
   );

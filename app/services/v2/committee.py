@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.core import security
 from app.core.context import current_actor
+from app.core.i18n import T
 from app.domain.v2 import (
     devils_advocate,
     diffing,
@@ -44,13 +45,13 @@ def _roles(s: Session) -> dict[str, str]:
 
 def vote(deal_id: int, choice: str, comment: str = "") -> JSON:
     if choice not in ("approve", "reject", "abstain"):
-        raise InvalidInputError("投票只能是 approve / reject / abstain")
+        raise InvalidInputError(T("投票只能是 approve / reject / abstain"))
     security.require("committee.vote")
     actor = current_actor()
     with session_scope() as s:
         d = deal_or_404(s, deal_id)
         if d.stage != "committee":
-            raise InvalidInputError("只有处于“投委会”阶段的交易才能投票")
+            raise InvalidInputError(T("只有处于“投委会”阶段的交易才能投票"))
         v = _require_version(s, d)
         existing = s.scalar(select(CommitteeVote).where(CommitteeVote.deal_id == d.id,
                                                         CommitteeVote.version_id == v.id,
@@ -79,7 +80,7 @@ def status_in(s: Session, deal_id: int) -> JSON:
     vs = [{**row(x), "role": roles.get(x.voter, ""), "role_label": security.ROLE_LABEL.get(roles.get(x.voter, ""), "")}
           for x in votes]
     return {"version_id": v.id, "votes": vs, "tally": tally([{"voter": x.voter, "vote": x.vote} for x in votes], roles),
-            "rules": "董事长一票否决；董事长赞成且赞成票不少于反对票即通过。"}
+            "rules": T("董事长一票否决；董事长赞成且赞成票不少于反对票即通过。")}
 
 
 def status(deal_id: int) -> JSON:
@@ -100,7 +101,7 @@ def pack_data(s: Session, deal_id: int) -> JSON:
     try:
         rt = redteam.run(d.track, v.inputs)
     except ModelInputError:
-        rt = {"top": [], "all": [], "metric_label": "", "note": "数据不足", "shock_pct": 10, "base": None}
+        rt = {"top": [], "all": [], "metric_label": "", "note": T("数据不足"), "shock_pct": 10, "base": None}
     try:
         sc = scenarios.run(d.track, v.inputs)
     except (ModelInputError, ValueError):
@@ -111,20 +112,22 @@ def pack_data(s: Session, deal_id: int) -> JSON:
     except ValueError:
         mb = None
     risks: list[str] = []
-    risks += [f"淘汰条件触发：{r['text']}（当前 {r['value']}）" for r in ctx["kill"]["triggered"]]
-    risks += [f"淘汰条件无法判定（指标未算出）：{r['text']}" for r in ctx["kill"]["unknown"]]
-    risks += [f"关键数字未达标：{it['field']} — {it['reason']}" for it in ctx["key_numbers"]["items"] if not it["ok"]]
+    risks += [T("淘汰条件触发：{0}（当前 {1}）", r["text"], r["value"]) for r in ctx["kill"]["triggered"]]
+    risks += [T("淘汰条件无法判定（指标未算出）：{0}", r["text"]) for r in ctx["kill"]["unknown"]]
+    risks += [T(
+        "关键数字未达标：{0} — {1}",
+        it["field"], it["reason"]) for it in ctx["key_numbers"]["items"] if not it["ok"]]
     if ctx["open_conflicts"]:
-        risks.append(f"跨来源矛盾未裁决 {ctx['open_conflicts']} 条")
+        risks.append(T("跨来源矛盾未裁决 {0} 条", ctx["open_conflicts"]))
     if ctx["stale_evidence"]:
-        risks.append(f"过期证据（>30 天）{ctx['stale_evidence']} 条，需重拉")
+        risks.append(T("过期证据（>30 天）{0} 条，需重拉", ctx["stale_evidence"]))
     for r in rt.get("top", []):
         if r.get("material"):
-            risks.append(f"敏感假设：{r['label']} ±{rt['shock_pct']:g}% → "
-                         f"{rt['metric_label']}波动 {r['swing_bps']:.0f} bp")
+            risks.append(T("敏感假设：{0} ±{1:g}% → {2}波动 {3:.0f} bp",
+                           r["label"], rt["shock_pct"], rt["metric_label"], r["swing_bps"]))
     unknown = [k for k, val in ctx["metrics"].items() if val is None and k in CARD_KEYS[d.track]]
     if unknown:
-        risks.append("以下结论卡指标未能计算（未知保持未知）：" + "、".join(unknown))
+        risks.append(T("以下结论卡指标未能计算（未知保持未知）：") + T("、").join(unknown))
     # 反方意见（不经 AI）：与交易页同一套规则；附“先核哪个”提示
     cons = [{"id": c.id, "field": c.field, "value_a": c.value_a, "source_a": c.source_a, "value_b": c.value_b,
              "source_b": c.source_b} for c in s.scalars(select(ConflictRow).where(
@@ -156,7 +159,7 @@ def pack_data(s: Session, deal_id: int) -> JSON:
 
 def generate_pack(deal_id: int, kind: str) -> tuple[bytes, JSON]:
     if kind not in ("pdf", "xlsx"):
-        raise InvalidInputError("格式只能是 pdf / xlsx")
+        raise InvalidInputError(T("格式只能是 pdf / xlsx"))
     security.require("committee.package")
     with session_scope() as s:
         data = pack_data(s, deal_id)
@@ -177,10 +180,10 @@ def verify(blob: bytes) -> JSON:
         rec = s.scalar(select(CommitteePack).where(CommitteePack.sha256 == sha))
         if rec is None:
             return {"genuine": False, "sha256": sha,
-                    "message": "未登记：这份文件不是本系统生成的原件，或生成后被改动过"}
+                    "message": T("未登记：这份文件不是本系统生成的原件，或生成后被改动过")}
         return {"genuine": True, "sha256": sha, "deal_id": rec.deal_id, "version_id": rec.version_id,
                 "run_id": rec.run_id, "kind": rec.kind, "generated_by": rec.created_by,
-                "generated_at": rec.created_at.isoformat(), "message": "原件：与登记哈希一致"}
+                "generated_at": rec.created_at.isoformat(), "message": T("原件：与登记哈希一致")}
 
 
 def packs(deal_id: int) -> list[JSON]:

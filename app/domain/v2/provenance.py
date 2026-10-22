@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.core.i18n import T
+
 CONFIDENCE = ("low", "medium", "high")
 CONFIDENCE_LABEL = {"low": "低", "medium": "中", "high": "高"}
 METHODS = {"manual": "人工录入", "ocr": "OCR 识别", "api": "接口拉取", "pdf": "PDF 抽取", "calc": "系统计算",
@@ -41,15 +43,16 @@ def key_number_status(key_fields: list[str], passports: dict[str, dict[str, Any]
     for f in key_fields:
         p = passports.get(f)
         if p is None:
-            rows.append({"field": f, "ok": False, "reason": "没有来源记录（数字护照为空）"})
+            rows.append({"field": f, "ok": False, "code": "no_source", "reason": T("没有来源记录（数字护照为空）")})
             continue
         if not confidence_at_least(p.get("confidence", "low"), floor):
             got = CONFIDENCE_LABEL.get(p.get("confidence", "low"))
-            rows.append({"field": f, "ok": False, "reason": f"可信度{got}，低于{CONFIDENCE_LABEL[floor]}"})
+            rows.append({"field": f, "ok": False, "code": "low_confidence",
+                         "reason": T("可信度{0}，低于{1}", got, CONFIDENCE_LABEL[floor])})
             continue
         if p.get("review_status", "pending") == "pending":
-            rows.append({"field": f, "ok": False, "reason": "尚未复核"})
+            rows.append({"field": f, "ok": False, "code": "unreviewed", "reason": T("尚未复核")})
             continue
-        rows.append({"field": f, "ok": True, "reason": ""})
+        rows.append({"field": f, "ok": True, "code": "ok", "reason": ""})
     done = sum(1 for r in rows if r["ok"])
     return {"items": rows, "done": done, "total": len(rows), "ok": done == len(rows)}

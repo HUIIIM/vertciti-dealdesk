@@ -1,11 +1,12 @@
 // DNA 基础组件。状态词全系统统一：已验证 / 建设中 / 计划中 / 风险（颜色 + 图标 + 文字三重表意）。
+import { T } from "@/i18n";
 import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { ApiError } from "@/api/client";
 import { fmt, fmtCell, fmtShort, isNeg, isNum, type Unit } from "@/lib/format";
 import { useTween } from "@/lib/motion";
 
 export type StatusKey = "verified" | "building" | "planned" | "risk";
-export const STATUS_LABEL: Record<StatusKey, string> = { verified: "已验证", building: "建设中", planned: "计划中", risk: "风险" };
+export const STATUS_LABEL: Record<StatusKey, string> = { verified: T("已验证"), building: T("建设中"), planned: T("计划中"), risk: T("风险") };
 
 export function Status({ s, children }: { s: StatusKey; children?: ReactNode }) {
   return <span className={`status ${s}`}><i aria-hidden="true" />{children ?? STATUS_LABEL[s]}</span>;
@@ -27,7 +28,7 @@ export function Metric({ label, value, unit, note, onOpen, testId }: {
     <div className="metric" data-testid={testId}>
       <div className="k">{label}</div>
       <div className={`v${isNeg(value) ? " neg" : ""}`} title={full}>
-        {onOpen ? <button type="button" onClick={onOpen} aria-label={`${label} ${full}，查看来源与计算`}>{text}</button> : text}
+        {onOpen ? <button type="button" onClick={onOpen} aria-label={T("{0} {1}，查看来源与计算", [label, full])}>{text}</button> : text}
       </div>
       {note ? <div className="note">{note}</div> : null}
     </div>
@@ -63,7 +64,7 @@ export function NumCell({ v, unit }: { v: unknown; unit: Unit }) {
 
 export function Skeleton({ rows = 3, h = 18 }: { rows?: number; h?: number }) {
   return (
-    <div aria-busy="true" aria-label="加载中" style={{ display: "grid", gap: 8 }}>
+    <div aria-busy="true" aria-label={T("加载中")} style={{ display: "grid", gap: 8 }}>
       {Array.from({ length: rows }, (_, i) => <div key={i} className="skeleton" style={{ height: h, width: `${90 - i * 12}%` }} />)}
     </div>
   );
@@ -77,9 +78,9 @@ export function ErrorBox({ error, onRetry }: { error: Error; onRetry?: () => voi
   const rid = error instanceof ApiError ? error.requestId : null;
   return (
     <div className="banner risk" role="alert">
-      <strong>出错了：</strong>{error.message}
-      {rid ? <span className="muted mono"> · 请求编号 {rid}</span> : null}
-      {onRetry ? <> <button className="btn sm" type="button" onClick={onRetry}>重试</button></> : null}
+      <strong>{T("出错了：")}</strong>{error.message}
+      {rid ? <span className="muted mono"> {" "}{T("· 请求编号")}{" "}{rid}</span> : null}
+      {onRetry ? <> <button className="btn sm" type="button" onClick={onRetry}>{T("重试")}</button></> : null}
     </div>
   );
 }
@@ -112,7 +113,7 @@ export function Dialog({ title, onClose, children, footer, wide }: {
   return (
     <div className="overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="dialog" role="dialog" aria-modal="true" aria-labelledby={titleId} ref={ref} style={wide ? { width: "min(960px,100%)" } : undefined}>
-        <header><h2 id={titleId}>{title}</h2><button className="btn ghost sm" type="button" onClick={onClose} aria-label="关闭">Esc</button></header>
+        <header><h2 id={titleId}>{title}</h2><button className="btn ghost sm" type="button" onClick={onClose} aria-label={T("关闭")}>Esc</button></header>
         <div className="body">{children}</div>
         {footer ? <footer>{footer}</footer> : null}
       </div>
@@ -148,7 +149,7 @@ export function useToast() {
     info: (t: string) => push(t, "info"),
     err: (e: unknown) => {
       const msg = e instanceof Error ? e.message : String(e);
-      const rid = e instanceof ApiError && e.requestId ? `（请求编号 ${e.requestId.slice(0, 8)}）` : "";
+      const rid = e instanceof ApiError && e.requestId ? T("（请求编号 {0}）", [e.requestId.slice(0, 8)]) : "";
       push(msg + rid, "err");
     },
   }), [push]);

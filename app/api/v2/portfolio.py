@@ -5,11 +5,11 @@ from typing import Any
 
 from fastapi import APIRouter
 
-from app.api.v2.deps import need
+from app.api.v2.deps import LocalizedRoute, need
 from app.api.v2.schemas import ActualIn, ActualOut, HoldingOut, PortfolioOut
 from app.services.v2 import deals, holding
 
-router = APIRouter(prefix="/api/v2", tags=["v2 · portfolio"])
+router = APIRouter(prefix="/api/v2", tags=["v2 · portfolio"], route_class=LocalizedRoute)
 
 
 @router.put("/deals/{deal_id}/actuals", response_model=ActualOut, dependencies=[need("holding.write")])

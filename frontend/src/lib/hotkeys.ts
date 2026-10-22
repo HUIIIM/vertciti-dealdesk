@@ -1,22 +1,23 @@
 // 全局快捷键（蓝图 §6）：⌘K 命令栏、J/K 上下、Enter 打开、E 编辑、⌘S 保存、? 显示全部、G 然后字母跳转、Esc 关浮层。
 // 焦点在输入框时只响应带修饰键的组合（⌘S / ⌘K），单字母不抢输入。
+import { T } from "@/i18n";
 import { useEffect, useLayoutEffect, useRef } from "react";
 
 export interface Hotkey { combo: string; label: string; group: string; run: (e: KeyboardEvent) => void; allowInInput?: boolean }
 
 export const GLOBAL_HELP: { combo: string; label: string }[] = [
-  { combo: "⌘ K", label: "打开命令栏：搜交易、跳页面、执行命令" },
-  { combo: "J / K", label: "列表中下移 / 上移" },
-  { combo: "Enter", label: "打开选中的交易" },
-  { combo: "E", label: "编辑当前交易的模型" },
-  { combo: "⌘ S", label: "保存承销版本" },
-  { combo: "N", label: "新建交易" },
-  { combo: "G P", label: "跳到流水线" },
-  { combo: "G C", label: "跳到比较页" },
-  { combo: "G S", label: "跳到设置" },
-  { combo: "1 – 9 / 0", label: "交易页切换标签" },
-  { combo: "?", label: "显示全部快捷键" },
-  { combo: "Esc", label: "关闭浮层" },
+  { combo: "⌘ K", label: T("打开命令栏：搜交易、跳页面、执行命令") },
+  { combo: "J / K", label: T("列表中下移 / 上移") },
+  { combo: "Enter", label: T("打开选中的交易") },
+  { combo: "E", label: T("编辑当前交易的模型") },
+  { combo: "⌘ S", label: T("保存承销版本") },
+  { combo: "N", label: T("新建交易") },
+  { combo: "G P", label: T("跳到流水线") },
+  { combo: "G C", label: T("跳到比较页") },
+  { combo: "G S", label: T("跳到设置") },
+  { combo: "1 – 9 / 0", label: T("交易页切换标签") },
+  { combo: "?", label: T("显示全部快捷键") },
+  { combo: "Esc", label: T("关闭浮层") },
 ];
 
 function isTyping(t: EventTarget | null): boolean {

@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.core.i18n import T
+
 
 def tally(votes: list[dict[str, Any]], roles: dict[str, str]) -> dict[str, Any]:
     counts = {"approve": 0, "reject": 0, "abstain": 0}
@@ -17,11 +19,11 @@ def tally(votes: list[dict[str, Any]], roles: dict[str, str]) -> dict[str, Any]:
         if roles.get(v["voter"]) == "chairman":
             chairman_vote = v["vote"]
     if chairman_vote == "reject":
-        result, why = "rejected", "董事长否决"
+        result, why = "rejected", T("董事长否决")
     elif counts["reject"] > counts["approve"]:
-        result, why = "rejected", "反对票多于赞成票"
+        result, why = "rejected", T("反对票多于赞成票")
     elif chairman_vote == "approve":
-        result, why = "approved", "董事长赞成且赞成票不少于反对票"
+        result, why = "approved", T("董事长赞成且赞成票不少于反对票")
     else:
-        result, why = "pending", "待董事长表决"
+        result, why = "pending", T("待董事长表决")
     return {**counts, "chairman_vote": chairman_vote, "result": result, "why": why, "votes": len(votes)}

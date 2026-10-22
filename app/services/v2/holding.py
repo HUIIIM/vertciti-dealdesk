@@ -6,6 +6,7 @@ from typing import Any
 from sqlalchemy import select
 
 from app.core.context import current_actor
+from app.core.i18n import T
 from app.domain.v2 import holding as hd
 from app.services.persistence import audit
 from app.services.persistence.engine import session_scope
@@ -21,13 +22,13 @@ FIELDS = ("noi", "occupancy_pct", "capex", "debt_service", "cash_flow")
 
 def upsert_actual(deal_id: int, period: str, values: JSON) -> JSON:
     if not (len(period) in (4, 7) and period[:4].isdigit()):
-        raise InvalidInputError("期间格式为 YYYY 或 YYYY-MM")
+        raise InvalidInputError(T("期间格式为 YYYY 或 YYYY-MM"))
     bad = set(values) - set(FIELDS)
     if bad:
-        raise InvalidInputError(f"未知字段：{', '.join(sorted(bad))}")
+        raise InvalidInputError(T("未知字段：{0}", ", ".join(sorted(bad))))
     occ = values.get("occupancy_pct")
     if occ is not None and not 0 <= occ <= 100:
-        raise InvalidInputError("出租率用百分比数（0–100）")
+        raise InvalidInputError(T("出租率用百分比数（0–100）"))
     with session_scope() as s:
         deal_or_404(s, deal_id)
         rec = s.scalar(select(HoldingActual).where(HoldingActual.deal_id == deal_id, HoldingActual.period == period))

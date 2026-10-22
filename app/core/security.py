@@ -22,6 +22,7 @@ from fastapi import HTTPException
 from sqlalchemy import select
 
 from app.core.context import Actor, current_actor
+from app.core.i18n import T
 from app.services.persistence.engine import session_scope
 from app.services.persistence.schema import User
 
@@ -80,10 +81,10 @@ def require(action: str) -> Actor:
     """在路由内调用：无权限 → 401（未登录）/ 403（角色不够）。返回当前操作人。"""
     a = current_actor()
     if a.username == ANONYMOUS.username and auth_enabled():
-        raise HTTPException(401, "需要登录：请提供有效的访问令牌")
+        raise HTTPException(401, T("需要登录：请提供有效的访问令牌"))
     if not can(a, action):
-        raise HTTPException(403, f"权限不足：{action} 需要{ROLE_LABEL[PERMISSIONS[action]]}及以上角色"
-                                 f"（当前：{ROLE_LABEL.get(a.role, a.role)}）")
+        raise HTTPException(403, T("权限不足：{0} 需要{1}及以上角色（当前：{2}）",
+                                   action, ROLE_LABEL[PERMISSIONS[action]], ROLE_LABEL.get(a.role, a.role)))
     return a
 
 

@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.context import current_actor
+from app.core.i18n import T
 from app.domain.v2 import freshness, provenance
 from app.services.persistence import audit
 from app.services.persistence.engine import session_scope
@@ -27,7 +28,7 @@ def _parse_dt(v: Any) -> datetime | None:
     try:
         dt = datetime.fromisoformat(str(v).replace("Z", "+00:00"))
     except ValueError as e:
-        raise InvalidInputError(f"时间格式不对（应为 ISO 8601）：{v!r}") from e
+        raise InvalidInputError(T("时间格式不对（应为 ISO 8601）：{0!r}", v)) from e
     return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
 
 
@@ -63,13 +64,13 @@ def add_evidence(deal_id: int, ev: Evidence) -> JSON:
     page, document_id, evidence_at, market_data = ev.page, ev.document_id, ev.evidence_at, ev.market_data
     assumption_source, note = ev.assumption_source, ev.note
     if method not in provenance.METHODS:
-        raise InvalidInputError(f"抽取方式只能是：{', '.join(provenance.METHODS)}")
+        raise InvalidInputError(T("抽取方式只能是：{0}", ", ".join(provenance.METHODS)))
     if confidence not in provenance.CONFIDENCE:
-        raise InvalidInputError("可信度只能是 high / medium / low")
+        raise InvalidInputError(T("可信度只能是 high / medium / low"))
     if assumption_source not in provenance.ASSUMPTION_SOURCES:
-        raise InvalidInputError(f"假设来源只能是：{', '.join(provenance.ASSUMPTION_SOURCES)}")
+        raise InvalidInputError(T("假设来源只能是：{0}", ", ".join(provenance.ASSUMPTION_SOURCES)))
     if not field.strip() or not source.strip():
-        raise InvalidInputError("字段与来源不能为空")
+        raise InvalidInputError(T("字段与来源不能为空"))
     with session_scope() as s:
         deal_or_404(s, deal_id)
         prior = s.scalars(select(FieldProvenance).where(FieldProvenance.deal_id == deal_id,
@@ -103,13 +104,13 @@ def review(deal_id: int, field: str, note: str = "") -> JSON:
         p = s.scalars(select(FieldProvenance).where(FieldProvenance.deal_id == deal_id, FieldProvenance.field == field)
                       .order_by(FieldProvenance.id.desc()).limit(1)).first()
         if p is None:
-            raise NotFoundError(f"字段 {field} 没有来源记录")
+            raise NotFoundError(T("字段 {0} 没有来源记录", field))
         before = p.review_status
         if p.review_status != "overridden":
             p.review_status = "reviewed"
         p.reviewed_by, p.reviewed_at = current_actor().username, datetime.now(timezone.utc)
         if note:
-            p.note = (p.note + "\n" if p.note else "") + f"复核：{note}"
+            p.note = (p.note + "\n" if p.note else "") + T("复核：{0}", note)
         audit.record(s, "field_provenance", p.id, "update", {"review_status": before},
                      {"review_status": p.review_status, "reviewed_by": p.reviewed_by})
         return _passport_dict(p)
@@ -123,7 +124,7 @@ def passport(deal_id: int, field: str) -> JSON:
                                                        FieldProvenance.field == field)
                          .order_by(FieldProvenance.id.desc())).all()
         if not hist:
-            raise NotFoundError(f"字段 {field} 没有来源记录（未知保持未知）")
+            raise NotFoundError(T("字段 {0} 没有来源记录（未知保持未知）", field))
         cons = s.scalars(select(ConflictRow).where(ConflictRow.deal_id == deal_id, ConflictRow.field == field)
                          .order_by(ConflictRow.id.desc())).all()
         now = datetime.now(timezone.utc)
@@ -159,11 +160,11 @@ def list_conflicts(deal_id: int, status: str | None = None) -> list[JSON]:
 
 def resolve_conflict(deal_id: int, conflict_id: int, value: Any, note: str) -> JSON:
     if not note.strip():
-        raise InvalidInputError("裁决须写理由（为什么采用这个值）")
+        raise InvalidInputError(T("裁决须写理由（为什么采用这个值）"))
     with session_scope() as s:
         c = s.get(ConflictRow, conflict_id)
         if c is None or c.deal_id != deal_id:
-            raise NotFoundError(f"矛盾 {conflict_id} 不存在")
+            raise NotFoundError(T("矛盾 {0} 不存在", conflict_id))
         before = row(c)
         c.status, c.resolved_value, c.resolution_note = "resolved", value, note.strip()
         c.resolved_by, c.resolved_at = current_actor().username, datetime.now(timezone.utc)

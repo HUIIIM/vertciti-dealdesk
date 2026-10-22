@@ -1,4 +1,5 @@
 // 类型安全客户端：路径、参数、请求体由后端 OpenAPI 生成的 schema.d.ts 约束（npm run gen:api）。
+import { lang, T } from "@/i18n";
 import createClient, { type Middleware } from "openapi-fetch";
 import type { components, paths } from "./schema";
 
@@ -32,11 +33,11 @@ export class ApiError extends Error {
 
 // 框架层（Starlette / Pydantic）的英文报错一律转成中文可操作的话：用户永远不该看到英文原因短语
 const FRAMEWORK_TEXT: Record<string, string> = {
-  "Not Found": "接口不存在：前后端版本可能不一致，请刷新页面",
-  "Method Not Allowed": "接口不存在：前后端版本可能不一致，请刷新页面",
-  "Internal Server Error": "服务器内部错误",
-  "Unauthorized": "请先登录",
-  "Forbidden": "当前角色没有这个权限",
+  "Not Found": T("接口不存在：前后端版本可能不一致，请刷新页面"),
+  "Method Not Allowed": T("接口不存在：前后端版本可能不一致，请刷新页面"),
+  "Internal Server Error": T("服务器内部错误"),
+  "Unauthorized": T("请先登录"),
+  "Forbidden": T("当前角色没有这个权限"),
 };
 
 interface PydErr { loc?: unknown[]; msg?: string; type?: string; ctx?: Record<string, unknown> }
@@ -45,20 +46,20 @@ interface PydErr { loc?: unknown[]; msg?: string; type?: string; ctx?: Record<st
 export function pydText(e: PydErr): string {
   const c = e.ctx ?? {};
   switch (e.type) {
-    case "missing": return "必填";
-    case "greater_than": return `必须大于 ${String(c.gt)}`;
-    case "greater_than_equal": return `不能小于 ${String(c.ge)}`;
-    case "less_than": return `必须小于 ${String(c.lt)}`;
-    case "less_than_equal": return `不能大于 ${String(c.le)}`;
-    case "string_too_long": return `最多 ${String(c.max_length)} 个字`;
-    case "string_too_short": return `至少 ${String(c.min_length)} 个字`;
-    case "too_long": return `最多 ${String(c.max_length)} 项`;
-    case "too_short": return `至少 ${String(c.min_length)} 项`;
-    case "literal_error": case "enum": return `取值只能是 ${String(c.expected ?? "").replace(/'/g, "")}`;
-    case "float_parsing": case "int_parsing": case "float_type": case "int_type": return "必须是数字";
-    case "bool_parsing": case "bool_type": return "必须是 是 / 否";
-    case "extra_forbidden": return "不认识的字段";
-    default: return e.msg ?? "输入无效";
+    case "missing": return T("必填");
+    case "greater_than": return T("必须大于 {0}", [String(c.gt)]);
+    case "greater_than_equal": return T("不能小于 {0}", [String(c.ge)]);
+    case "less_than": return T("必须小于 {0}", [String(c.lt)]);
+    case "less_than_equal": return T("不能大于 {0}", [String(c.le)]);
+    case "string_too_long": return T("最多 {0} 个字", [String(c.max_length)]);
+    case "string_too_short": return T("至少 {0} 个字", [String(c.min_length)]);
+    case "too_long": return T("最多 {0} 项", [String(c.max_length)]);
+    case "too_short": return T("至少 {0} 项", [String(c.min_length)]);
+    case "literal_error": case "enum": return T("取值只能是 {0}", [String(c.expected ?? "").replace(/'/g, "")]);
+    case "float_parsing": case "int_parsing": case "float_type": case "int_type": return T("必须是数字");
+    case "bool_parsing": case "bool_type": return T("必须是 是 / 否");
+    case "extra_forbidden": return T("不认识的字段");
+    default: return e.msg ?? T("输入无效");
   }
 }
 
@@ -69,16 +70,17 @@ export function detailText(detail: unknown): string {
     return detail.map((d) => {
       const item = d as PydErr;
       const loc = Array.isArray(item.loc) ? item.loc.filter((x) => x !== "body").join(".") : "";
-      return loc ? `${loc}：${pydText(item)}` : pydText(item);
-    }).join("；");
+      return loc ? T("{0}：{1}", [loc, pydText(item)]) : pydText(item);
+    }).join(T("；"));
   }
-  return "请求失败";
+  return T("请求失败");
 }
 
 const auth: Middleware = {
   onRequest({ request }) {
     const t = getToken();
     if (t) request.headers.set("Authorization", `Bearer ${t}`);
+    if (lang() === "en") request.headers.set("X-DD-Lang", "en");  // 后端只认这个头，不认浏览器的 Accept-Language
     return request;
   },
 };
@@ -102,6 +104,7 @@ export async function raw(path: string, init: RequestInit = {}): Promise<Respons
   const headers = new Headers(init.headers);
   const t = getToken();
   if (t) headers.set("Authorization", `Bearer ${t}`);
+  if (lang() === "en") headers.set("X-DD-Lang", "en");
   const r = await fetch(path, { ...init, headers });
   if (!r.ok) {
     let body: { detail?: unknown; request_id?: string; gate?: unknown } = {};

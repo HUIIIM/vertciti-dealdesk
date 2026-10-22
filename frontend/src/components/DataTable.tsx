@@ -1,4 +1,5 @@
 // 数据表：表头与首列冻结、点表头排序、列宽可拖动并记住（本机偏好）、悬停整行高亮、键盘选中行。
+import { T } from "@/i18n";
 import { useRef, useState, type ReactNode } from "react";
 import { load, save } from "@/lib/prefs";
 import { unitSuffix, type Unit } from "@/lib/format";
@@ -50,10 +51,10 @@ export function DataTable<T>({ id, columns, rows, rowKey, selected, onRowClick, 
               <th key={c.key} scope="col" className={`${c.numeric || c.unit ? "num" : ""} ${c.sortValue ? "sortable" : ""}`} aria-sort={c.sortValue ? s : undefined}
                 style={{ position: "sticky" }}>
                 {c.sortValue ? <button type="button" onClick={() => toggle(c.key)} style={{ all: "unset", cursor: "pointer" }}>
-                  {c.header}{c.unit && unitSuffix(c.unit) ? <span className="unit">（{unitSuffix(c.unit)}）</span> : null}
+                  {c.header}{c.unit && unitSuffix(c.unit) ? <span className="unit">{T("（")}{unitSuffix(c.unit)}{T("）")}</span> : null}
                   {s === "ascending" ? " ↑" : s === "descending" ? " ↓" : ""}</button>
-                  : <>{c.header}{c.unit && unitSuffix(c.unit) ? <span className="unit">（{unitSuffix(c.unit)}）</span> : null}</>}
-                <span className="resize desktop-only" role="separator" aria-orientation="vertical" aria-label={`调整“${c.header}”列宽`} onPointerDown={(e) => startResize(e, c.key)} />
+                  : <>{c.header}{c.unit && unitSuffix(c.unit) ? <span className="unit">{T("（")}{unitSuffix(c.unit)}{T("）")}</span> : null}</>}
+                <span className="resize desktop-only" role="separator" aria-orientation="vertical" aria-label={T("调整“{0}”列宽", [c.header])} onPointerDown={(e) => startResize(e, c.key)} />
               </th>);
           })}</tr>
         </thead>

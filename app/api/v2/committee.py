@@ -8,7 +8,7 @@ from fastapi import APIRouter, File, Request, UploadFile
 from fastapi.responses import Response
 
 from app.api.common import _check_upload_size
-from app.api.v2.deps import need
+from app.api.v2.deps import LocalizedRoute, need
 from app.api.v2.schemas import (
     ApprovalDecide,
     ApprovalIn,
@@ -23,9 +23,10 @@ from app.api.v2.schemas import (
     VerifyOut,
     VoteIn,
 )
+from app.core.i18n import T
 from app.services.v2 import committee, workflow
 
-router = APIRouter(prefix="/api/v2", tags=["v2 · committee"])
+router = APIRouter(prefix="/api/v2", tags=["v2 · committee"], route_class=LocalizedRoute)
 _MIME = {"pdf": "application/pdf", "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}
 
 
@@ -60,7 +61,7 @@ def packs(deal_id: int) -> list[dict[str, Any]]:
 @router.post("/committee/verify", response_model=VerifyOut, dependencies=[need("deal.read")])
 async def verify(request: Request, file: UploadFile = File(...)) -> dict[str, Any]:
     """上传一份投委会包 PDF / Excel：与登记哈希比对，判断是否原件未改动。"""
-    _check_upload_size(request, 30 * 1024 * 1024, "文件")
+    _check_upload_size(request, 30 * 1024 * 1024, T("文件"))
     return committee.verify(await file.read())
 
 

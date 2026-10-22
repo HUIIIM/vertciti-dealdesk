@@ -1,4 +1,5 @@
 // hash 路由（#/deals/12/model）：静态托管无需服务端重写规则。
+import { T } from "@/i18n";
 import { useEffect, useState } from "react";
 
 export type Route =
@@ -9,8 +10,8 @@ export type Route =
   | { name: "notfound"; path: string };
 
 export const DEAL_TABS = [
-  ["overview", "概览"], ["rentroll", "租金表"], ["t12", "T12"], ["model", "模型"], ["risk", "敏感性与红队"],
-  ["market", "市场与可比"], ["files", "文件与证据"], ["committee", "投委会"], ["holding", "持有期"], ["log", "日志"],
+  ["overview", T("概览")], ["rentroll", T("租金表")], ["t12", "T12"], ["model", T("模型")], ["risk", T("敏感性与红队")],
+  ["market", T("市场与可比")], ["files", T("文件与证据")], ["committee", T("投委会")], ["holding", T("持有期")], ["log", T("日志")],
 ] as const;
 export type DealTab = (typeof DEAL_TABS)[number][0];
 const TAB_KEYS = new Set<string>(DEAL_TABS.map(([k]) => k));

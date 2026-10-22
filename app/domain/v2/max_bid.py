@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.core.i18n import T
 from app.domain.v2 import kill_criteria
 from app.domain.v2.model import METRICS, PRICE_PATH, ModelInputError, run_model
 from app.domain.v2.paths import get_path, set_path
@@ -46,7 +47,7 @@ def solve_one(track: str, inputs: JSON, *, metric: str, op: str, target: float, 
     """
     ok_hi = _ok(track, inputs, hi, metric, op, target)
     if ok_hi:
-        return {"price": hi, "status": "above_range", "reason": f"到 ${hi:,.0f}（搜索上限）仍满足"}
+        return {"price": hi, "status": "above_range", "reason": T("到 ${0:,.0f}（搜索上限）仍满足", hi)}
     grid = [asking * f for f in (1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0.05) if asking * f < hi]
     upper, lo, saw_unknown = hi, None, ok_hi is None
     for g in grid:
@@ -58,8 +59,8 @@ def solve_one(track: str, inputs: JSON, *, metric: str, op: str, target: float, 
         upper = g
     if lo is None:
         if saw_unknown:
-            return {"price": None, "status": "unknown", "reason": f"{METRICS[metric].label}在搜索区间内无法计算"}
-        return {"price": None, "status": "infeasible", "reason": "降到要价的 5% 仍达不到目标"}
+            return {"price": None, "status": "unknown", "reason": T("{0}在搜索区间内无法计算", METRICS[metric].label)}
+        return {"price": None, "status": "infeasible", "reason": T("降到要价的 5% 仍达不到目标")}
     hi_b = upper
     while hi_b - lo > STEP:
         mid = (lo + hi_b) / 2
@@ -75,12 +76,12 @@ def run(track: str, inputs: JSON, targets: list[JSON], *, kill: list[JSON] | Non
     """targets: [{"metric": "irr_pct", "min": 12}, {"metric": "dscr", "min": 1.25}]。"""
     asking = get_path(inputs, PRICE_PATH[track])  # type: ignore[index]
     if not isinstance(asking, (int, float)) or asking <= 0:
-        raise ValueError("先填要价（收购价）才能反推最高出价")
+        raise ValueError(T("先填要价（收购价）才能反推最高出价"))
     hi = float(asking) * search_multiple
     cons: list[JSON] = []
     for t in targets:
         if t.get("metric") not in METRICS or not isinstance(t.get("min"), (int, float)):
-            raise ValueError(f"目标格式应为 {{metric, min}}：{t!r}")
+            raise ValueError(T("目标格式应为 {{metric, min}}：{0!r}", t))
         r = solve_one(track, inputs, metric=t["metric"], op=">=", target=float(t["min"]), hi=hi, asking=float(asking))
         cons.append({"source": "target", "metric": t["metric"], "label": f"{METRICS[t['metric']].label} ≥ {t['min']:g}",
                      **r})
@@ -100,7 +101,7 @@ def run(track: str, inputs: JSON, targets: list[JSON], *, kill: list[JSON] | Non
         best = binding["price"]
     return {"asking": float(asking), "max_bid": best, "binding": binding, "constraints": cons,
             "headroom_pct": None if best is None else (best / float(asking) - 1) * 100,
-            "note": "可出价 = 各约束允许最高价中的最低者；任一约束无法满足或无法计算则不给数。"}
+            "note": T("可出价 = 各约束允许最高价中的最低者；任一约束无法满足或无法计算则不给数。")}
 
 
 def price_check(track: str, inputs: JSON, price: float, *, kill: list[JSON] | None = None) -> JSON:
@@ -109,7 +110,7 @@ def price_check(track: str, inputs: JSON, price: float, *, kill: list[JSON] | No
     与 run() 同一套改价规则，前端拖动“出价空间”时调用；不保存任何东西。
     """
     if price <= 0:
-        raise ValueError("试算价格必须大于 0")
+        raise ValueError(T("试算价格必须大于 0"))
     asking = get_path(inputs, PRICE_PATH[track])  # type: ignore[index]
     try:
         metrics = run_model(track, with_price(track, inputs, price))["metrics"]

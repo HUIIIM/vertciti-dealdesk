@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.core.i18n import T
 from app.domain.v2.assumptions import BY_TRACK
 from app.domain.v2.model import METRICS, PRIMARY_METRIC, ModelInputError, primary_value, run_model
 from app.domain.v2.paths import set_path
@@ -48,7 +49,7 @@ def rank(track: str, inputs: JSON, redteam: JSON, key_status: JSON, conflicts: l
             "kind": "conflict", "field": c["field"], "label": label, "conflict_id": c["id"],
             "swing_bps": None if a is None or b is None else abs(a - b) * 100.0,
             "detail": f"{c['source_a']} {c['value_a']} vs {c['source_b']} {c['value_b']}",
-            "primary_a": a, "primary_b": b, "action": "裁决矛盾",
+            "primary_a": a, "primary_b": b, "action": T("裁决矛盾"),
         })
         seen.add(key)
     swing_by_path = {p: r["swing_bps"] for r in redteam.get("all", []) for p in r["paths"]}
@@ -59,13 +60,14 @@ def rank(track: str, inputs: JSON, redteam: JSON, key_status: JSON, conflicts: l
             continue
         row = pending.setdefault(key, {"kind": "unverified", "field": k["field"], "label": label, "conflict_id": None,
                                        "swing_bps": swing_by_path.get(k["field"]), "primary_a": None, "primary_b": None,
-                                       "reasons": set(), "n": 0})
+                                       "reasons": set(), "n": 0, "no_source": False})
         row["reasons"].add(k["reason"])
+        row["no_source"] = row["no_source"] or k.get("code") == "no_source"
         row["n"] += 1
     for row in pending.values():
         reasons, n = sorted(row.pop("reasons")), row.pop("n")
-        row["detail"] = (f"{n} 个字段：" if n > 1 else "") + "；".join(reasons)
-        row["action"] = "补来源" if any("没有来源" in r for r in reasons) else "复核"
+        row["detail"] = (T("{0} 个字段：", n) if n > 1 else "") + T("；").join(reasons)
+        row["action"] = T("补来源") if row.pop("no_source") else T("复核")
         items.append(row)
     # 未知摆动（算不出）排最后，但不丢：未知保持未知
     items.sort(key=lambda x: -1.0 if x["swing_bps"] is None else x["swing_bps"], reverse=True)
@@ -73,5 +75,5 @@ def rank(track: str, inputs: JSON, redteam: JSON, key_status: JSON, conflicts: l
     return {
         "metric": metric, "metric_label": METRICS[metric].label, "items": items,
         "top_share_pct": (known[0] / sum(known) * 100.0) if known and sum(known) > 0 else None,
-        "note": "按“这处待核能让主回报指标摆动多少基点”排序：矛盾按两个来源值实测，未复核关键数字按 ±10% 摆动。",
+        "note": T("按“这处待核能让主回报指标摆动多少基点”排序：矛盾按两个来源值实测，未复核关键数字按 ±10% 摆动。"),
     }
