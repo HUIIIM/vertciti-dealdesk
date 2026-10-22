@@ -6,6 +6,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core import security
 from app.core.context import current_actor
 from app.core.i18n import T
 from app.domain.v2 import (
@@ -167,7 +168,7 @@ def _context(s: Session, d: Deal) -> JSON:
     kn = provenance.key_number_status(key_fields, ev["passports"])
     votes = s.scalars(select(CommitteeVote).where(CommitteeVote.deal_id == d.id,
                                                   CommitteeVote.version_id == (v.id if v else None))).all()
-    roles = {u.username: u.role for u in s.scalars(select(User)).all()} | {"local": "chairman"}
+    roles = {u.username: u.role for u in s.scalars(select(User)).all()} | security.builtin_roles()
     last = s.scalars(select(Decision).where(Decision.deal_id == d.id).order_by(Decision.id.desc()).limit(1)).first()
     tasks = s.scalars(select(Task).where(Task.deal_id == d.id, Task.status != "done")).all()
     open_tasks: dict[str, int] = {}

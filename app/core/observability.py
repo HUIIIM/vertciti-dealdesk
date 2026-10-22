@@ -28,7 +28,7 @@ from starlette.responses import JSONResponse, Response
 
 from app.core import security
 from app.core.context import current_actor, current_request_id, reset_actor, set_actor, set_request_id
-from app.core.hardening import AUTH_THROTTLE, headers_for
+from app.core.hardening import AUTH_THROTTLE, client_ip, headers_for
 from app.core.i18n import lang_from_header, reset_lang, set_lang
 
 log = logging.getLogger("dealdesk")
@@ -82,7 +82,7 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
         # 只认 Authorization 头（不读 cookie）：浏览器不会自动携带，天然免疫 CSRF
         auth = request.headers.get("authorization", "")
         token = auth[7:].strip() if auth.lower().startswith("bearer ") else None
-        client = request.client.host if request.client else "-"
+        client = client_ip(request.client.host if request.client else None, request.headers.get("x-forwarded-for"))
         wait = AUTH_THROTTLE.blocked(client) if token and security.auth_enabled() else 0.0
         actor = security.ANONYMOUS if wait else security.resolve_token(token)
         if token and not wait and actor is security.ANONYMOUS:

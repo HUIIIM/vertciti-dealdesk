@@ -40,7 +40,7 @@ CARD_KEYS = {"commercial": ["irr_pct", "cap_rate_pct", "dscr", "coc_pct", "equit
 
 
 def _roles(s: Session) -> dict[str, str]:
-    return {u.username: u.role for u in s.scalars(select(User)).all()} | {"local": "chairman"}
+    return {u.username: u.role for u in s.scalars(select(User)).all()} | security.builtin_roles()
 
 
 def vote(deal_id: int, choice: str, comment: str = "") -> JSON:

@@ -57,11 +57,26 @@ PERMISSIONS: dict[str, str] = {
 }
 
 LOCAL = Actor("local", "chairman", "本机用户")
+# 内置身份的用户名保留：不能被真实用户占用，否则会继承内置身份的特权（计票按董事长、免分权检查）
+RESERVED_USERNAMES = frozenset({"local", "anonymous", "system"})
 ANONYMOUS = Actor("anonymous", "viewer", "匿名")
 
 
 def auth_enabled() -> bool:
     return os.environ.get("DEALDESK_AUTH", "off").strip().lower() in ("on", "1", "true", "yes")
+
+
+def builtin_roles() -> dict[str, str]:
+    """计票用的内置身份：只有认证关闭（单机模式）时本机用户才存在并视为董事长。"""
+    return {} if auth_enabled() else {LOCAL.username: LOCAL.role}
+
+
+def is_builtin_local(actor: Actor) -> bool:
+    """单机模式下的唯一使用者（本机用户，或脚本 / 后台任务的内部身份 system），分权检查不适用。
+
+    认证开启时永远为假：多人环境里任何名字都不享有这项豁免（保留名也不能被真实用户注册）。
+    """
+    return not auth_enabled() and actor.username in (LOCAL.username, "system")
 
 
 def protect_v1() -> bool:
@@ -104,6 +119,8 @@ def resolve_token(token: str | None) -> Actor:
 def add_user(username: str, role: str, display_name: str = "") -> str:
     """创建用户并返回一次性明文 token。"""
     Role(role)  # 校验
+    if username.strip().lower() in RESERVED_USERNAMES:
+        raise ValueError(T("用户名 {0} 是系统保留名，请换一个", username))
     token = "dd_" + secrets.token_urlsafe(32)
     with session_scope() as s:
         s.add(User(username=username, role=role, display_name=display_name or username,

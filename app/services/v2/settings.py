@@ -13,7 +13,7 @@ from app.domain.v2 import kill_criteria
 from app.services.persistence import audit
 from app.services.persistence.engine import session_scope
 from app.services.persistence.schema import AuditLog, SavedView, Template, User
-from app.services.v2.errors import InvalidInputError, NotFoundError
+from app.services.v2.errors import ConflictError, InvalidInputError, NotFoundError
 from app.services.v2.serialize import row
 
 JSON = dict[str, Any]
@@ -99,7 +99,13 @@ def create_user(username: str, role: str, display_name: str = "") -> JSON:
         security.Role(role)
     except ValueError as e:
         raise InvalidInputError(T("角色只能是 chairman / analyst / viewer")) from e
-    token = security.add_user(username, role, display_name)
+    with session_scope() as s:
+        if s.scalar(select(User.id).where(User.username == username)) is not None:
+            raise ConflictError(T("用户名 {0} 已存在", username))
+    try:
+        token = security.add_user(username, role, display_name)
+    except ValueError as e:  # 保留名
+        raise InvalidInputError(str(e)) from e
     with session_scope() as s:
         u = s.scalar(select(User).where(User.username == username))
         if u is None:  # add_user 刚写入；读不到说明库状态异常

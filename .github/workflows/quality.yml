@@ -61,7 +61,8 @@ jobs:
       - name: Persistence + v2 on Postgres
         run: >
           pytest -p tests.pg_plugin tests/test_persistence.py tests/test_v2_domain.py tests/test_v2_api.py
-          tests/test_v2_security.py tests/test_v2_services.py tests/test_db_backup.py tests/test_ownership.py
+          tests/test_v2_security.py tests/test_v2_services.py tests/test_v2_i18n.py tests/test_v2_hardening_review.py
+          tests/test_db_backup.py tests/test_ownership.py
           tests/test_routers_smoke.py
 
   frontend:

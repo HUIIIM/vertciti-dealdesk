@@ -1,7 +1,7 @@
 """v2 API 契约（Pydantic）：请求严格校验（extra=forbid），响应给出主干字段类型，供生成 TypeScript 客户端。"""
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -11,6 +11,9 @@ Stage = Literal["sourcing", "screening", "underwriting", "committee", "diligence
 
 class In(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
+
+Tag = Annotated[str, Field(min_length=1, max_length=40)]
 
 
 class Out(BaseModel):
@@ -29,17 +32,17 @@ class DealCreate(In):
     track: Track
     address: str = Field(default="", max_length=300)
     asking_price: float | None = Field(default=None, ge=0)
-    kill_criteria: list[KillCriterion] = Field(default_factory=list,
+    kill_criteria: list[KillCriterion] = Field(default_factory=list, max_length=20,
                                                description="淘汰条件：先写“什么情况下放弃”，再开始承销")
-    tags: list[str] = Field(default_factory=list)
+    tags: list[Tag] = Field(default_factory=list, max_length=20)
 
 
 class DealPatch(In):
     name: str | None = Field(default=None, min_length=1, max_length=200)
     address: str | None = Field(default=None, max_length=300)
     asking_price: float | None = Field(default=None, ge=0)
-    kill_criteria: list[KillCriterion] | None = None
-    tags: list[str] | None = None
+    kill_criteria: list[KillCriterion] | None = Field(default=None, max_length=20)
+    tags: list[Tag] | None = Field(default=None, max_length=20)
 
 
 class VersionCreate(In):
@@ -67,8 +70,8 @@ class EvidenceIn(In):
 
 
 class ReviewIn(In):
-    field: str
-    note: str = ""
+    field: str = Field(min_length=1, max_length=160)
+    note: str = Field(default="", max_length=2000)
 
 
 class ConflictResolve(In):
@@ -85,13 +88,13 @@ class ScenarioChange(In):
 
 
 class Scenario(In):
-    name: str
+    name: str = Field(min_length=1, max_length=80)
     probability: float = Field(ge=0, le=100)
-    changes: list[ScenarioChange] = Field(default_factory=list)
+    changes: list[ScenarioChange] = Field(default_factory=list, max_length=30)
 
 
 class ScenariosIn(In):
-    scenarios: list[Scenario] | None = None
+    scenarios: list[Scenario] | None = Field(default=None, max_length=10)  # 每个情景跑一次模型：限量防耗尽
 
 
 class Target(In):
@@ -100,7 +103,7 @@ class Target(In):
 
 
 class MaxBidIn(In):
-    targets: list[Target] = Field(default_factory=list)
+    targets: list[Target] = Field(default_factory=list, max_length=10)
     include_kill_criteria: bool = True
 
 
@@ -127,12 +130,12 @@ class ApprovalIn(In):
     kind: Literal["payment", "general", "stage_override"]
     title: str = Field(min_length=1, max_length=300)
     amount: float | None = Field(default=None, gt=0)
-    note: str = ""
+    note: str = Field(default="", max_length=2000)
 
 
 class ApprovalDecide(In):
     approve: bool
-    note: str = ""
+    note: str = Field(default="", max_length=2000)
 
 
 class VoteIn(In):
@@ -163,7 +166,7 @@ class ViewIn(In):
 class UserIn(In):
     username: str = Field(min_length=2, max_length=80, pattern=r"^[A-Za-z0-9._-]+$")
     role: Literal["chairman", "analyst", "viewer"]
-    display_name: str = ""
+    display_name: str = Field(default="", max_length=120)
 
 
 # ---------------------------------------------------------------- 响应

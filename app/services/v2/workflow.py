@@ -112,7 +112,7 @@ def decide_approval(deal_id: int, approval_id: int, *, approve: bool, note: str 
         if a.status != "pending":
             raise ConflictError(T("该审批已{0}，不能重复决定", T("批准") if a.status == "approved" else T("驳回")))
         security.require("payment.approve" if a.kind == "payment" else "approval.decide")
-        if a.created_by == actor.username and actor.username not in ("local", "system"):
+        if a.created_by == actor.username and not security.is_builtin_local(actor):
             raise ConflictError(T("不能审批自己发起的申请（分权）"))
         before = row(a)
         a.status = "approved" if approve else "rejected"

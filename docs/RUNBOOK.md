@@ -22,6 +22,8 @@
 | `DEALDESK_AUTH` | off | `on`：v2 接口需 `Authorization: Bearer <token>`；off 时所有请求视为本机董事长 |
 | `DEALDESK_AUTH_PROTECT_V1` | 空 | `1`：v1 项目增删改也要求“分析”及以上 |
 | `DEALDESK_AUTH_FAIL_LIMIT` / `_WINDOW` | 20 / 300 秒 | 同一 IP 错令牌达上限即 429 |
+| `DEALDESK_MAX_BODY_MB` | 32 | 请求体硬上限；分块上传也边收边计数，超限 413 |
+| `DEALDESK_TRUST_PROXY` | 空 | `1`：在可信反向代理（Vercel 等）后，限流按 X-Forwarded-For 第一跳计 IP；**生产必须设**，否则所有人共用代理 IP、一人输错令牌全员被锁 |
 | `DEALDESK_ERROR_WEBHOOK` | 空 | 未捕获异常 POST 到该地址（Slack / 飞书等） |
 | `DEALDESK_LOG_LEVEL` | INFO | JSON 结构化日志级别 |
 | `TOPHAP_*`、`RENTCAST_API_KEY` | — | 数据源；token 只放 `.env`（600），**绝不写进日志 / 代码** |

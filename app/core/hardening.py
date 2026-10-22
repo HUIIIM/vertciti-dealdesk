@@ -1,4 +1,4 @@
-"""HTTP 加固：安全响应头 + 令牌暴力尝试限流。
+"""HTTP 加固：安全响应头、令牌暴力尝试限流、请求体硬上限。
 
 - 安全头对所有响应生效；v2 前端（/app/）额外下发严格 CSP（构建产物无内联脚本，script-src 只允许同源）。
   v1 静态页带内联脚本，其 CSP 由 vercel.json 里的 hash 管（见 AGENTS.md），这里不覆盖。
@@ -6,10 +6,21 @@
 """
 from __future__ import annotations
 
+import json
 import os
 import threading
 import time
 from collections import defaultdict, deque
+from collections.abc import Awaitable, Callable, MutableMapping
+from typing import Any
+
+from app.core.i18n import T
+
+Scope = MutableMapping[str, Any]
+Message = MutableMapping[str, Any]
+Receive = Callable[[], Awaitable[Message]]
+Send = Callable[[Message], Awaitable[None]]
+ASGIApp = Callable[[Scope, Receive, Send], Awaitable[None]]
 
 SECURITY_HEADERS: dict[str, str] = {
     "X-Content-Type-Options": "nosniff",
@@ -76,7 +87,78 @@ class AuthThrottle:
             self._fails.clear()
 
 
+def client_ip(scope_client: str | None, forwarded_for: str | None) -> str:
+    """限流用的来源 IP。
+
+    部署在可信反向代理后（Vercel 等）时设 DEALDESK_TRUST_PROXY=1，取 X-Forwarded-For 第一跳；
+    否则所有用户都显示为代理的 IP，一个人输错令牌就会把所有人一起锁住。缺省不信任该头（可被伪造）。
+    """
+    if os.environ.get("DEALDESK_TRUST_PROXY") == "1" and forwarded_for:
+        first = forwarded_for.split(",")[0].strip()
+        if first:
+            return first
+    return scope_client or "-"
+
+
 AUTH_THROTTLE = AuthThrottle(
     limit=int(os.environ.get("DEALDESK_AUTH_FAIL_LIMIT", "20")),
     window=float(os.environ.get("DEALDESK_AUTH_FAIL_WINDOW", "300")),
 )
+
+
+MAX_BODY_BYTES = int(float(os.environ.get("DEALDESK_MAX_BODY_MB", "32")) * 1024 * 1024)
+
+
+class _TooLargeError(Exception):
+    pass
+
+
+class BodySizeLimit:
+    """请求体硬上限（纯 ASGI）。
+
+    Content-Length 超限直接 413；没有 Content-Length 的分块上传边收边计数、超限立即中断——
+    不让框架先把整个上传落到 /tmp（本机 /tmp 只有 512M）或读进内存。
+    """
+
+    def __init__(self, app: ASGIApp, limit: int = MAX_BODY_BYTES) -> None:
+        self.app, self.limit = app, limit
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        cl = dict(scope.get("headers") or []).get(b"content-length")
+        if cl is not None and cl.isdigit() and int(cl) > self.limit:
+            await self._reject(send)
+            return
+        seen = 0
+        started = False
+
+        async def limited_receive() -> Message:
+            nonlocal seen
+            msg = await receive()
+            if msg["type"] == "http.request":
+                seen += len(msg.get("body", b""))
+                if seen > self.limit:
+                    raise _TooLargeError
+            return msg
+
+        async def tracking_send(msg: Message) -> None:
+            nonlocal started
+            if msg["type"] == "http.response.start":
+                started = True
+            await send(msg)
+
+        try:
+            await self.app(scope, limited_receive, tracking_send)
+        except _TooLargeError:
+            if not started:
+                await self._reject(send)
+
+    async def _reject(self, send: Send) -> None:
+        body = json.dumps({"detail": T("请求太大：超过 {0} MB 上限", self.limit // 1024 // 1024)},
+                          ensure_ascii=False).encode("utf-8")
+        await send({"type": "http.response.start", "status": 413,
+                    "headers": [(b"content-type", b"application/json; charset=utf-8"),
+                                (b"content-length", str(len(body)).encode())]})
+        await send({"type": "http.response.body", "body": body})

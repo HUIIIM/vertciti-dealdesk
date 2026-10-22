@@ -274,6 +274,10 @@ EN: dict[str, str] = {
     "数据库": "Database",
     "Postgres（DATABASE_URL）": "Postgres (DATABASE_URL)",
     "SQLite（本机开发）": "SQLite (local development)",
+    "用户名 {0} 是系统保留名，请换一个": "Username {0} is reserved by the system; pick another",
+    "用户名 {0} 已存在": "Username {0} already exists",
+    "数据冲突：这条记录刚被别人改过或已存在，请刷新后重试": "Conflict: this record was just changed by someone else or already exists; refresh and retry",
+    "请求太大：超过 {0} MB 上限": "Request too large: over the {0} MB limit",
     "需要登录：请提供有效的访问令牌": "Sign-in required: provide a valid access token",
     "权限不足：{0} 需要{1}及以上角色（当前：{2}）": "Not allowed: {0} needs {1} or above (you are: {2})",
 }

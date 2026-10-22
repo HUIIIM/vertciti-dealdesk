@@ -151,6 +151,7 @@
      },
      "note": {
       "default": "",
+      "maxLength": 2000,
       "title": "Note",
       "type": "string"
      }
@@ -187,6 +188,7 @@
      },
      "note": {
       "default": "",
+      "maxLength": 2000,
       "title": "Note",
       "type": "string"
      },
@@ -992,6 +994,7 @@
       "items": {
        "$ref": "#/components/schemas/KillCriterion"
       },
+      "maxItems": 20,
       "title": "Kill Criteria",
       "type": "array"
      },
@@ -1003,8 +1006,11 @@
      },
      "tags": {
       "items": {
+       "maxLength": 40,
+       "minLength": 1,
        "type": "string"
       },
+      "maxItems": 20,
       "title": "Tags",
       "type": "array"
      },
@@ -1289,6 +1295,7 @@
         "items": {
          "$ref": "#/components/schemas/KillCriterion"
         },
+        "maxItems": 20,
         "type": "array"
        },
        {
@@ -1314,8 +1321,11 @@
       "anyOf": [
        {
         "items": {
+         "maxLength": 40,
+         "minLength": 1,
          "type": "string"
         },
+        "maxItems": 20,
         "type": "array"
        },
        {
@@ -2209,6 +2219,7 @@
       "items": {
        "$ref": "#/components/schemas/Target"
       },
+      "maxItems": 10,
       "title": "Targets",
       "type": "array"
      }
@@ -3053,11 +3064,14 @@
     "additionalProperties": false,
     "properties": {
      "field": {
+      "maxLength": 160,
+      "minLength": 1,
       "title": "Field",
       "type": "string"
      },
      "note": {
       "default": "",
+      "maxLength": 2000,
       "title": "Note",
       "type": "string"
      }
@@ -3165,10 +3179,13 @@
       "items": {
        "$ref": "#/components/schemas/ScenarioChange"
       },
+      "maxItems": 30,
       "title": "Changes",
       "type": "array"
      },
      "name": {
+      "maxLength": 80,
+      "minLength": 1,
       "title": "Name",
       "type": "string"
      },
@@ -3316,6 +3333,7 @@
         "items": {
          "$ref": "#/components/schemas/Scenario"
         },
+        "maxItems": 10,
         "type": "array"
        },
        {
@@ -3745,6 +3763,11 @@
       "title": "Kind",
       "type": "string"
      },
+     "label": {
+      "default": "",
+      "title": "Label",
+      "type": "string"
+     },
      "name": {
       "title": "Name",
       "type": "string"
@@ -3814,6 +3837,7 @@
     "properties": {
      "display_name": {
       "default": "",
+      "maxLength": 120,
       "title": "Display Name",
       "type": "string"
      },

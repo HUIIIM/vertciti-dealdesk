@@ -2394,6 +2394,11 @@ export interface components {
             id: number | null;
             /** Kind */
             kind: string;
+            /**
+             * Label
+             * @default
+             */
+            label: string;
             /** Name */
             name: string;
             /** Payload */
