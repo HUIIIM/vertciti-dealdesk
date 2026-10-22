@@ -148,9 +148,9 @@ EN = {
 <div class="wrap">
 <div class="status-grid">
 <article class="status-card">
-<div class="status-top"><h2 class="status-name">Project status</h2><span class="status-stage"><span aria-hidden="true">🟢</span> In operation</span></div>
+<div class="status-top"><h2 class="status-name">Project status</h2><span class="status-stage"><span aria-hidden="true">🟢</span> Live &amp; ongoing</span></div>
 <p class="status-line"><span class="status-k">Latest milestone</span>The v2 deal workbench is built and in code review: layered backend with database migrations, React front end, Chinese/English interface, roles and audit <span class="status-date">{ASOF}</span></p>
-<p class="status-line"><span class="status-k">Next</span>v2 workbench goes to production (date to be set)</p>
+<p class="status-line"><span class="status-k">Next step</span>v2 workbench goes to production (date TBD)</p>
 <p class="status-qualifier">The live app still shows the v1 interface; until v2 ships, some of the features above are available only when self-hosted. No return or performance claims.</p>
 <p class="status-asof" data-asof="{ASOF}">Data as of {ASOF}</p>
 </article>
