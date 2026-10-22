@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="description" content="DealDesk · vertciti 房地产投资分析系统：从发现到持有，每个数字可追溯、每个决定有记录。" />
+    <title>DealDesk · 交易工作台</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23000'/%3E%3Crect x='10' y='10' width='4' height='4' fill='%23FF4713'/%3E%3C/svg%3E" />
+  </head>
+  <body>
+    <!-- 首屏外壳：与 AppShell 同结构同 class，CSS 一到就能画出品牌条与骨架，不等 JS；React 挂载时整体替换（无布局跳动）。
+         严格 CSP 不允许内联 style，所以骨架尺寸全走 class。 -->
+    <div id="root"><div class="boot" aria-busy="true" aria-label="加载中">
+      <div class="brandbar"><a class="logo" href="https://vertciti.com">vertciti<i></i></a><a href="#/" aria-current="page">DealDesk</a></div>
+      <header class="appbar"><span class="prod">交易工作台</span></header>
+      <main class="page"><div class="boot-sk boot-sk-h"></div><div class="boot-sk"></div><div class="boot-sk boot-sk-s"></div></main>
+    </div></div>
+    <noscript>DealDesk 需要启用 JavaScript。</noscript>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

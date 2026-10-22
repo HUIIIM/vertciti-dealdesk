@@ -65,12 +65,16 @@ def test_moved_endpoint_still_merges():
 
 
 def test_freeze_line_handlers_not_in_main():
-    """冻结线守卫：迁走的 handler 定义不许回流 main.py。"""
+    """冻结线守卫（v2 分层后加严）：main.py 只做装配——零路由定义、≤100 行；
+    intake 域经 app.api.ROUTERS 装配。"""
+    import re
+
+    from app.api import ROUTERS
     main_src = Path(__file__).resolve().parent.parent.joinpath(
         "app", "main.py").read_text()
-    assert "def wb_intake_pdf_ocr_pages" not in main_src
-    assert "def uw_commercial_intake_pdf_ocr_pages" not in main_src
-    assert "include_router(intake_router.router)" in main_src
+    assert not re.search(r"^@app\.(get|post|put|delete|patch)\(", main_src, re.M)
+    assert len(main_src.splitlines()) <= 100
+    assert intake_router_mod.router in ROUTERS
     router_src = Path(intake_router_mod.__file__).read_text()
     assert "def wb_intake_pdf_ocr_pages" in router_src
     assert "def uw_commercial_intake_pdf_ocr_pages" in router_src

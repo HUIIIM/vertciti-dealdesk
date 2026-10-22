@@ -113,8 +113,8 @@ def test_xlsx_sensitivity_cells_are_live_formulas():
     assert str(ws["B12"].value).startswith("=$B$2")
     assert str(ws["A13"].value).startswith("=$B$3")
     # 基准格高亮（IRR 网格 D15、EM 网格 D22；B=首偏移列，D=±0 基准列）
-    assert ws["D15"].fill.fgColor.rgb == "00D9EAD3"
-    assert ws["D22"].fill.fgColor.rgb == "00D9EAD3"
+    assert ws["D15"].fill.fgColor.rgb == "00E8F3EC"  # 基准格：vertciti 验证绿浅底（app/brand.GREEN_TINT）
+    assert ws["D22"].fill.fgColor.rgb == "00E8F3EC"  # 基准格：vertciti 验证绿浅底（app/brand.GREEN_TINT）
 
 
 def test_xlsx_sensitivity_formula_semantics_match_backend():
