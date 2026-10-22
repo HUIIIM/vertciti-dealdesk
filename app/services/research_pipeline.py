@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import html as _html
 import ipaddress
 import logging
@@ -215,9 +216,8 @@ def _robots_rules(host: str) -> list[tuple[str, str]]:
     rules: list[tuple[str, str]] = []
     cacheable = False
     try:
-        with httpx.stream("GET", f"https://{host}/robots.txt",
-                          headers={"User-Agent": UA},
-                          timeout=10, follow_redirects=True) as r:
+        with _public_stream(f"https://{host}/robots.txt",
+                            headers={"User-Agent": UA}, timeout=10) as r:
             if r.status_code == 200:
                 body, too_large = _collect_capped(r, MAX_ROBOTS_BYTES)
                 if too_large:
@@ -298,6 +298,34 @@ def _is_public_url(url: str) -> tuple[bool, str]:
         return False, f"URL 安全检查失败：{e}"
 
 
+MAX_REDIRECTS = 5
+REDIRECT_CODES = (301, 302, 303, 307, 308)
+
+
+class UnsafeRedirectError(Exception):
+    """跳转目标不是公网地址（或跳转过多）。"""
+
+
+@contextlib.contextmanager
+def _public_stream(url: str, **kw):
+    """同 httpx.stream("GET")，但不让 httpx 自动跟跳转：每一跳都重新过 _is_public_url。
+
+    否则公网页面一个 302 就能把服务端引到内网 / 云元数据地址（SSRF）。
+    """
+    for _hop in range(MAX_REDIRECTS + 1):
+        with httpx.stream("GET", url, follow_redirects=False, **kw) as r:
+            location = r.headers.get("location") if r.status_code in REDIRECT_CODES else None
+            if not location:
+                yield r
+                return
+            nxt = urllib.parse.urljoin(url, location)
+        ok, reason = _is_public_url(nxt)
+        if not ok:
+            raise UnsafeRedirectError(reason)
+        url = nxt
+    raise UnsafeRedirectError("跳转次数过多")
+
+
 def fetch_page(url: str, log: list) -> dict:
     """抓取单个公开页面。返回 {ok, text, final_url, status, note}."""
     ok, reason = _is_public_url(url)
@@ -309,9 +337,9 @@ def fetch_page(url: str, log: list) -> dict:
         _log(log, f"抓取 {url[:80]}", "skipped", rnote)
         return {"ok": False, "note": rnote}
     try:
-        with httpx.stream("GET", url, headers={"User-Agent": UA,
-                                               "Accept-Language": "en-US,en;q=0.9"},
-                          timeout=FETCH_TIMEOUT, follow_redirects=True) as r:
+        with _public_stream(url, headers={"User-Agent": UA,
+                                          "Accept-Language": "en-US,en;q=0.9"},
+                            timeout=FETCH_TIMEOUT) as r:
             if r.status_code in (403, 429, 503):
                 note = f"HTTP {r.status_code}：站点反爬拦截，已停手（降级走手动录入）"
                 _log(log, f"抓取 {url[:80]}", "blocked", note)
@@ -328,6 +356,9 @@ def fetch_page(url: str, log: list) -> dict:
                 _log(log, f"抓取 {url[:80]}", "failed", note)
                 return {"ok": False, "note": note, "too_large": True}
             html_text = (body or b"").decode(encoding, errors="replace")
+    except UnsafeRedirectError as e:
+        _log(log, f"抓取 {url[:80]}", "skipped", f"跳转被拦：{e}")
+        return {"ok": False, "note": f"跳转被拦：{e}"}
     except Exception as e:  # noqa: BLE001
         _log(log, f"抓取 {url[:80]}", "failed", f"网络异常：{str(e)[:120]}")
         return {"ok": False, "note": f"网络异常：{str(e)[:120]}"}
@@ -521,10 +552,15 @@ def ddg_search(query: str, log: list, max_results: int = 8) -> list[dict]:
 
 # ---------------- 地址解析 ----------------
 
+MAX_ADDRESS_CHARS = 200
+
+
 def parse_address(text: str) -> dict:
     """从用户输入解析 street/city/state/zip（尽力而为）。"""
     t = text.strip()
-    m = re.match(r"^(.*?),\s*([A-Za-z .'\-]+?),\s*([A-Z]{2})(?:\s+(\d{5}(?:-\d{4})?))?$", t)
+    # 正常地址远短于 200 字符；超长输入不进这条正则（多段懒惰匹配在病态输入上是多项式级回溯）
+    m = (re.match(r"^(.*?),\s*([A-Za-z .'\-]+?),\s*([A-Z]{2})(?:\s+(\d{5}(?:-\d{4})?))?$", t)
+         if len(t) <= MAX_ADDRESS_CHARS else None)
     if m:
         return {"street": m.group(1).strip(), "city": m.group(2).strip(),
                 "state": m.group(3), "zip": m.group(4) or "",

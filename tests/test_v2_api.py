@@ -221,3 +221,15 @@ def test_health_catalog_and_templates(client):
     v = c.put("/api/v2/settings/views", json={"name": "只看商业", "config": {"track": "commercial"}}).json()
     assert c.delete(f"/api/v2/settings/views/{v['id']}").status_code == 204
     assert len(c.get("/api/v2/settings/data-sources").json()) == 5
+
+
+def test_health_does_not_leak_db_error_text(client, monkeypatch):
+    """health 不需要登录：数据库报错原文（可能含主机 / 用户名）不能原样回给调用方。"""
+    from app.api.v2 import admin
+
+    def boom():
+        raise RuntimeError("could not connect to postgresql://dealdesk:s3cret@db.internal:5432/prod")
+    monkeypatch.setattr(admin, "ensure_migrated", boom)
+    h = client.get("/api/v2/health").json()
+    assert h["ok"] is False and h["db"]["error"] == "RuntimeError"
+    assert "s3cret" not in str(h) and "db.internal" not in str(h)

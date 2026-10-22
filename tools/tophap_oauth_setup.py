@@ -285,8 +285,11 @@ def phase1(state_file: str) -> None:
         "redirect_uri": redirect_uri(),
         "created_at": int(time.time()),
     }
-    Path(state_file).write_text(json.dumps(payload))
-    os.chmod(state_file, 0o600)
+    # 含 client_secret：文件一创建就是 600，不留“先 644 写入、再 chmod”的空窗
+    fd = os.open(state_file, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as f:
+        f.write(json.dumps(payload))
+    os.chmod(state_file, 0o600)  # 文件早已存在时 os.open 不改权限
     print(auth_url, flush=True)
 
 

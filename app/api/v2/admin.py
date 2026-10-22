@@ -1,6 +1,7 @@
 """管理：健康检查、就绪探针、最近错误、用户、审计查询、设置模板、保存的视图、数据源状态。"""
 from __future__ import annotations
 
+import logging
 import time
 from typing import Any
 
@@ -32,6 +33,7 @@ from app.services.v2 import settings
 
 router = APIRouter(prefix="/api/v2", tags=["v2 · admin"], route_class=LocalizedRoute)
 _STARTED = time.time()
+logger = logging.getLogger(__name__)
 
 
 @router.get("/health", response_model=HealthOut)
@@ -42,8 +44,10 @@ def health() -> dict[str, Any]:
         eng = ensure_migrated()
         with eng.connect() as c:
             rev = c.execute(text("select version_num from alembic_version")).scalar()
-    except Exception as e:  # noqa: BLE001 — 健康检查要报告而不是抛
-        db_ok, err = False, f"{type(e).__name__}: {str(e)[:200]}"
+    except Exception as e:  # 健康检查要报告而不是抛（已记日志）
+        # 对外只给异常类型：原文可能带数据库主机 / 用户名（health 不需要登录）；详情进服务端日志
+        logger.exception("health: 数据库不可用")
+        db_ok, err = False, type(e).__name__
     url = database_url()
     return {"ok": db_ok, "service": "dealdesk", "version": reproducible.APP_VERSION,
             "engine_version": reproducible.engine_version(), "db": {"ok": db_ok, "revision": rev,
