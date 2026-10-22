@@ -157,3 +157,15 @@ def test_walt_expiry_and_exit_year_drag(case):
 def test_missing_values_render_as_dash():
     assert cre_memo.pct(None) == "—" and cre_memo.money(None) == "—" and cre_memo.mult(None) == "—"
     assert cre_memo.money(-1234.4) == "($1,234)"
+
+
+def test_stabilized_exit_basis_flows_into_both_exports():
+    cre = engine.parse({**suburban_office(), "exit_noi_basis": "stabilized"}).model_dump()
+    r = engine.run(cre)
+    wb = load_workbook(io.BytesIO(cre_excel.build_cre_xlsx(cre, r, META)))
+    ret = wb["收益"]
+    assert ret["A3"].value.startswith("退出年稳定化 NOI")
+    assert ret["B3"].value == f"={r['metrics']['forward_noi_stabilized']}"   # 稳定化 NOI 是引擎值，售价公式照旧引用它
+    assert ret["B5"].value == "=B3/B4"
+    text = _pdf_text(cre_memo.build_cre_memo(cre, r, META, None))
+    assert "稳定化" in text

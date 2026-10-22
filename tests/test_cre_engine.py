@@ -135,6 +135,33 @@ def test_exit_uses_forward_noi_and_selling_costs():
     assert r["exit"]["selling_costs"] == pytest.approx(fwd / 0.08 * 0.02)
 
 
+def test_stabilized_exit_noi_adds_back_exit_year_turnover():
+    """租约在第 5 年末到期、第 6 年（退出年）换租：空置 6 月、免租 3 月。
+    原值 NOI = 40 × 1 万 SF × 3/12 + 回收 10 × 1 万 × 6/12 − 费用 10 × 1 万 = 5 万（再扣一般空置净额）；
+    稳定化 = 潜在收入 (40 + 10) × 1 万 = 50 万，扣 5% 一般空置 → 47.5 万，减费用 10 万 = 37.5 万。"""
+    d = base(general_vacancy_pct=5,
+             market={"rent_psf_yr": 40, "rent_growth_pct": 0, "renewal_prob_pct": 0, "downtime_months": 6,
+                     "free_rent_new_months": 3, "ti_new_psf": 0, "lc_new_pct": 0, "escalation_pct": 0},
+             leases=[{"tenant": "A", "sf": AREA, "start": "2021-01", "end": "2030-12", "rent_psf_yr": 40}])
+    raw = run(d)
+    stab = run({**d, "exit_noi_basis": "stabilized"})
+    m = stab["metrics"]
+    assert m["forward_noi_stabilized"] == pytest.approx(375_000)
+    assert m["forward_noi"] == pytest.approx(375_000)
+    assert stab["exit"]["sale_price"] == pytest.approx(375_000 / 0.08)
+    assert raw["metrics"]["forward_noi"] == pytest.approx(raw["annual"]["noi"][5])
+    assert raw["metrics"]["forward_noi"] < 100_000 < m["forward_noi"]
+    assert m["levered_irr_pct"] > raw["metrics"]["levered_irr_pct"]
+    # 持有期现金流不受退出口径影响
+    assert stab["annual"]["noi"][:5] == raw["annual"]["noi"][:5]
+
+
+def test_stabilized_equals_forward_without_exit_year_turnover():
+    r = run({**base(general_vacancy_pct=5, credit_loss_pct=1,
+                    opex={**QUIET, "mgmt_fee_pct_egr": 3}), "exit_noi_basis": "stabilized"})
+    assert r["metrics"]["forward_noi_stabilized"] == pytest.approx(r["metrics"]["forward_noi_unadjusted"])
+
+
 def test_waterfall_hand_case_and_conservation():
     w = Waterfall(lp_equity_pct=90, pref_pct=8, tiers=[], final_lp_share_pct=70)
     out = distribute(w, [-100, 120])

@@ -127,6 +127,10 @@ class CreInputs(_In):
     credit_loss_pct: Pct = Field(default=1, ge=0, le=20)
     debt: Debt | None = None
     exit_cap_pct: Pct = Field(gt=0, le=25)
+    exit_noi_basis: Literal["forward", "stabilized"] = Field(
+        default="forward",
+        description="退出 NOI 口径：forward = 第 N+1 年 NOI 原值；"
+                    "stabilized = 加回该年周转空置与免租、按满租潜在收入重算一般空置后的 NOI")
     selling_costs_pct: Pct = Field(default=2, ge=0, le=10)
     discount_rate_pct: Pct = Field(default=8, ge=0, le=50)
     waterfall: Waterfall | None = None

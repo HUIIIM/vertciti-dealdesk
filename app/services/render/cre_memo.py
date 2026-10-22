@@ -144,7 +144,11 @@ def _facts(cre: JSON, r: JSON) -> list[str]:
     noi = r["annual"]["noi"]
     out.append(f"NOI 首年 {money(noi[0])}，退出年（第 {cre['hold_years'] + 1} 年）{money(noi[cre['hold_years']])}。")
     drag = exit_year_drag(cre, r)
-    if drag:
+    if drag and cre["exit_noi_basis"] == "stabilized":
+        out.append(f"退出年有租约周转（周转空置 + 免租 {money(drag)}）；售价按稳定化 NOI "
+                   f"{money(r['metrics']['forward_noi_stabilized'])} 计（未调整为 {money(r['metrics']['forward_noi_unadjusted'])}），"
+                   "未扣买方承担的续租成本。")
+    elif drag:
         out.append(f"注意：退出年有租约周转（周转空置 + 免租 {money(drag)}），按该年 NOI 定价会压低售价约 "
                    f"{money(drag / (cre['exit_cap_pct'] / 100))}；买方通常会就此议价，敏感性也会因此不单调。")
     return out
@@ -361,7 +365,8 @@ def _capital(cre: JSON, r: JSON) -> list[Any]:
         terms = [("贷款", "无（全股权）")]
     dt = [_hdr_row(["贷款条款", ""])] + [[_p(k, 8), _num(v)] for k, v in terms]
     ext = [_hdr_row(["退出", ""]),
-           [_p(f"退出年 NOI（第 {cre['hold_years'] + 1} 年）", 8), _num(money(m["forward_noi"]))],
+           [_p(f"退出年 NOI（第 {cre['hold_years'] + 1} 年{'，稳定化' if cre['exit_noi_basis'] == 'stabilized' else ''}）", 8),
+            _num(money(m["forward_noi"]))],
            [_p("退出资本化率", 8), _num(pct(cre["exit_cap_pct"]))],
            [_p("售价", 8, INK, True), _num(money(ex["sale_price"]), True)],
            [_p("单价 $/SF", 8), _num(f"${ex['sale_price'] / cre['area_sf']:,.0f}")],
@@ -447,7 +452,8 @@ def _assumptions(cre: JSON) -> list[Any]:
           ("不可回收费用", f"${ox['non_recoverable_psf_yr']:,.2f} /SF/年"), ("费用年增", f"{ox['growth_pct']:g}%"),
           ("管理费", f"{ox['mgmt_fee_pct_egr']:g}% × 有效总收入"), ("资本储备", f"${ox['reserves_psf_yr']:,.2f} /SF/年"),
           ("一般空置 / 信用损失", f"{cre['general_vacancy_pct']:g}% / {cre['credit_loss_pct']:g}%"),
-          ("交割成本 / 卖方成本", f"{cre['closing_costs_pct']:g}% / {cre['selling_costs_pct']:g}%")]
+          ("交割成本 / 卖方成本", f"{cre['closing_costs_pct']:g}% / {cre['selling_costs_pct']:g}%"),
+          ("退出 NOI 口径", "稳定化" if cre["exit_noi_basis"] == "stabilized" else "第 N+1 年原值")]
 
     def block(title: str, items: list[tuple[str, str]]) -> Table:
         return _table([_hdr_row([title, ""])] + [[_p(k, 8), _num(v)] for k, v in items], [CW * 0.2, CW * 0.26])
@@ -463,7 +469,7 @@ _METHOD = [
     "空置月与免租月加权后取整，TI / LC 按金额加权。",
     "费用回收：NNN 按面积占比分摊可回收费用；毛租不回收；基年租约只回收超过基年的部分。免租只免基本租金。",
     "一般空置按潜在总收入计提，先扣除已建模的周转空置，不低于 0。管理费按有效总收入计、不回收。",
-    "售价 = 第 N+1 年 NOI ÷ 退出资本化率，扣卖方成本；贷款按退出当月余额偿清。浮动利率 = min(SOFR, 上限) + 利差。",
+    "售价 = 第 N+1 年 NOI ÷ 退出资本化率，扣卖方成本（可选稳定化 NOI：加回该年周转空置与免租、按潜在收入重算一般空置）；贷款按退出当月余额偿清。浮动利率 = min(SOFR, 上限) + 利差。",
     "本版不建模：CPI 递增、百分比租金、费用上限 / gross-up、再融资 / 夹层 / 施工贷、开发期、按概率分叉的续租树、"
     "按月瀑布与 GP catch-up / 回拨、multifamily。",
     "续上的租约段是假设，不是签约事实；本备忘录只基于录入的输入，不构成投资建议。",

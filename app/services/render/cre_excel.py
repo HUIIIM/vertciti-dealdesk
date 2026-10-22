@@ -127,6 +127,7 @@ def _assumptions(ws: Worksheet, cre: JSON, r: JSON, meta: JSON) -> None:
     mk, ox = cre["market"], cre.get("opex") or {}
     info: list[tuple[str, Any, str | None]] = [
         ("分析起点（交割月）", cre["analysis_start"], None), ("持有年限", cre["hold_years"], None),
+        ("退出 NOI 口径", "稳定化（加回周转空置与免租）" if cre["exit_noi_basis"] == "stabilized" else "第 N+1 年 NOI 原值", None),
         ("可租面积 SF", cre["area_sf"], MONEY), ("一般空置率", cre.get("general_vacancy_pct", 5) / 100, PCT),
         ("信用损失率", cre.get("credit_loss_pct", 1) / 100, PCT),
         ("市场租金 $/SF/年", mk["rent_psf_yr"], "0.00"), ("市场租金增长", mk.get("rent_growth_pct", 3) / 100, PCT),
@@ -214,7 +215,9 @@ def _returns(ws: Worksheet, cre: JSON, r: JSON) -> None:
     _put(ws, 1, 1, "退出与收益", Font(name=_F, size=13, bold=True))
     _hdr(ws, 2, ["退出", "Excel 公式", "引擎结果"])
     exit_rows: list[tuple[str, str, Any, str]] = [
-        ("退出年 NOI（第 N+1 年）", f"={_ref(CF, fwd_col + str(ROW['noi']))}", m["forward_noi"], MONEY),
+        (("退出年 NOI（第 N+1 年）", f"={_ref(CF, fwd_col + str(ROW['noi']))}", m["forward_noi"], MONEY)
+         if cre["exit_noi_basis"] == "forward" else
+         ("退出年稳定化 NOI（引擎：加回周转空置与免租）", f"={m['forward_noi']}", m["forward_noi"], MONEY)),
         ("退出资本化率", f"={_ref(A, '$B$6')}", cre["exit_cap_pct"] / 100, PCT),
         ("售价", "=B3/B4", ex["sale_price"], MONEY),
         ("卖方成本", f"=B5*{_ref(A, '$B$7')}", ex["selling_costs"], MONEY),

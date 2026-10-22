@@ -70,6 +70,8 @@ export const INST_DEAL: FieldSpec[] = [
   { path: "general_vacancy_pct", label: T("一般空置率"), unit: "pct", step: 0.5, hint: T("会先扣除已建模的周转空置") },
   { path: "credit_loss_pct", label: T("信用损失"), unit: "pct", step: 0.25 },
   { path: "exit_cap_pct", label: T("退出 Cap Rate"), unit: "pct", step: 0.05, hint: T("按下一年 NOI") },
+  { path: "exit_noi_basis", label: T("退出 NOI 口径"), unit: "select", options: [["forward", T("下一年 NOI 原值")], ["stabilized", T("稳定化（加回周转空置与免租）")]],
+    hint: T("退出年有租约周转时，原值会压低售价") },
   { path: "selling_costs_pct", label: T("卖方成本"), unit: "pct", step: 0.25 },
   { path: "discount_rate_pct", label: T("折现率"), unit: "pct", step: 0.25, hint: "NPV" },
 ];

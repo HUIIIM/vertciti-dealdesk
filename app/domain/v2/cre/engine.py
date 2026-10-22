@@ -43,6 +43,19 @@ def _div(a: float, b: float) -> float | None:
     return a / b if b else None
 
 
+def _stabilized_noi(cre: CreInputs, annual: dict[str, list[float]], y: int) -> float:
+    """第 y 年的稳定化 NOI：这栋楼在该年满租运转时的 NOI。
+
+    按潜在收入（在租合同租金 + 回收、空置面积按市场应收）收足，不计周转空置与免租，
+    再按一般空置率、信用损失率、管理费率重算；费用（税、保险、CAM）照实际计。
+    """
+    pot = annual["potential_rent"][y]
+    gv = cre.general_vacancy_pct / 100 * pot
+    egr = (pot - gv) * (1 - cre.credit_loss_pct / 100)
+    mgmt = cre.opex.mgmt_fee_pct_egr / 100 * egr
+    return egr + annual["opex_recoverable"][y] + annual["opex_non_recoverable"][y] - mgmt
+
+
 def run(inputs: JSON) -> JSON:
     cre = parse(inputs)
     hold_m = cre.hold_years * 12
@@ -58,7 +71,9 @@ def run(inputs: JSON) -> JSON:
     annual["debt_service"] = _years(debt_service, cre.hold_years + 1)
     annual["cf_after_debt"] = [a - b for a, b in zip(annual["cf_before_debt"], annual["debt_service"], strict=True)]
 
-    fwd_noi = annual["noi"][cre.hold_years]
+    fwd_noi_raw = annual["noi"][cre.hold_years]
+    stab_noi = _stabilized_noi(cre, annual, cre.hold_years)
+    fwd_noi = stab_noi if cre.exit_noi_basis == "stabilized" else fwd_noi_raw
     sale = fwd_noi / (cre.exit_cap_pct / 100)
     selling = sale * cre.selling_costs_pct / 100
     payoff = ds.payoff(hold_m - 1)
@@ -85,6 +100,7 @@ def run(inputs: JSON) -> JSON:
         "going_in_cap_pct": _pct(_div(noi1, cre.purchase_price)),
         "yield_on_cost_pct": _pct(_div(noi1, acquisition)),
         "exit_value": sale, "exit_cap_pct": cre.exit_cap_pct, "forward_noi": fwd_noi,
+        "forward_noi_unadjusted": fwd_noi_raw, "forward_noi_stabilized": stab_noi,
         "unlevered_irr_pct": _pct(irr(unlev)), "unlevered_irr_monthly_pct": _pct(annualized(irr(unlev_m))),
         "levered_irr_pct": _pct(irr(lev)), "levered_irr_monthly_pct": _pct(annualized(irr(lev_m))),
         "unlevered_multiple": equity_multiple(unlev), "levered_multiple": equity_multiple(lev),
