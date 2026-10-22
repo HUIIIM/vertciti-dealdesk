@@ -10,12 +10,15 @@ import os
 import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
+from pathlib import Path
+from typing import Any
 
 from sqlalchemy import Engine, create_engine, event
-from sqlalchemy.pool import NullPool
 from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.pool import NullPool
 
 from app.paths import REPO_ROOT
+from app.services.persistence.migrate import upgrade_head
 
 _LOCK = threading.Lock()
 _ENGINES: dict[str, Engine] = {}
@@ -30,11 +33,11 @@ def database_url() -> str:
         elif url.startswith("postgresql://"):
             url = "postgresql+psycopg://" + url[len("postgresql://"):]
         return url
-    path = os.path.abspath(os.environ.get("DEALDESK_DB", str(REPO_ROOT / "dealdesk.db")))
+    path = Path(os.environ.get("DEALDESK_DB", str(REPO_ROOT / "dealdesk.db"))).resolve()
     return f"sqlite:///{path}"
 
 
-def _sqlite_pragmas(dbapi_conn, _record) -> None:  # noqa: ANN001 — DBAPI 回调签名
+def _sqlite_pragmas(dbapi_conn: Any, _record: Any) -> None:  # DBAPI 连接无公共类型
     cur = dbapi_conn.cursor()
     cur.execute("PRAGMA foreign_keys=ON")
     cur.close()
@@ -60,7 +63,7 @@ def _identity(url: str) -> object:
     if url.startswith("sqlite:///"):
         path = url[len("sqlite:///"):]
         try:
-            st = os.stat(path)
+            st = Path(path).stat()
         except FileNotFoundError:
             return None
         return (st.st_dev, st.st_ino)
@@ -76,7 +79,6 @@ def ensure_migrated(url: str | None = None) -> Engine:
         with _LOCK:
             ident = _identity(url)
             if ident is None or _MIGRATED.get(url) != ident:
-                from app.services.persistence.migrate import upgrade_head
                 upgrade_head(eng)
                 _MIGRATED[url] = _identity(url)
     return eng

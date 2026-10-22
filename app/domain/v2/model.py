@@ -102,7 +102,7 @@ def _commercial(inputs: JSON) -> tuple[JSON, JSON]:
     clean = {k: v for k, v in (inputs or {}).items() if k not in _STRIP}
     try:
         r = uw_commercial.compute_all(clean)
-    except Exception as e:  # noqa: BLE001 — v1 引擎对坏输入抛各类异常，统一成输入错误
+    except Exception as e:
         raise ModelInputError(f"商业核保计算失败：{str(e)[:200]}") from e
     a = r.get("analysis", {}) or {}
     proj = a.get("projected", {}) or {}

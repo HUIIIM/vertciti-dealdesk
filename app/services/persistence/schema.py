@@ -11,7 +11,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, ClassVar
 
 from sqlalchemy import (
     JSON,
@@ -44,7 +44,7 @@ def utcnow() -> datetime:
 
 class Base(DeclarativeBase):
     metadata = MetaData(naming_convention=NAMING)
-    type_annotation_map = {dict[str, Any]: JSON, list[Any]: JSON}
+    type_annotation_map: ClassVar[dict[Any, Any]] = {dict[str, Any]: JSON, list[Any]: JSON}
 
 
 class AuditMixin:
@@ -116,6 +116,7 @@ class Deal(AuditMixin, Base):
 
 class DealVersion(AuditMixin, Base):
     """承销版本：每次保存假设生成一版，带可复现运行编号。"""
+
     __tablename__ = "deal_versions"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     deal_id: Mapped[int] = mapped_column(ForeignKey("deals.id", ondelete="CASCADE"), nullable=False)
@@ -129,6 +130,7 @@ class DealVersion(AuditMixin, Base):
 
 class Run(AuditMixin, Base):
     """可复现运行：run_id = 引擎版本 + 规范化输入的哈希；同编号重算结果分毫不差。"""
+
     __tablename__ = "runs"
     run_id: Mapped[str] = mapped_column(String(80), primary_key=True)
     engine_version: Mapped[str] = mapped_column(String(40), nullable=False)
@@ -140,6 +142,7 @@ class Run(AuditMixin, Base):
 
 class FieldProvenance(Base):
     """数字护照：每个字段每次变更一行（最新一行 = 当前值），可回看谁在何时改过。"""
+
     __tablename__ = "field_provenance"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     deal_id: Mapped[int] = mapped_column(ForeignKey("deals.id", ondelete="CASCADE"), nullable=False)
@@ -165,6 +168,7 @@ class FieldProvenance(Base):
 
 class Conflict(AuditMixin, Base):
     """跨来源矛盾登记：同一字段两个来源数值不同，记两边的值、差多少、采用哪个、谁裁决。"""
+
     __tablename__ = "conflicts"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     deal_id: Mapped[int] = mapped_column(ForeignKey("deals.id", ondelete="CASCADE"), nullable=False)
@@ -183,6 +187,7 @@ class Conflict(AuditMixin, Base):
 
 class CommitteePack(AuditMixin, Base):
     """投委会包登记：内容哈希印在包上，任何人拿到 PDF 都能校验是否原样。"""
+
     __tablename__ = "committee_packs"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     deal_id: Mapped[int] = mapped_column(ForeignKey("deals.id", ondelete="CASCADE"), nullable=False)
@@ -242,6 +247,7 @@ class CommitteeVote(AuditMixin, Base):
 
 class Decision(AuditMixin, Base):
     """决策日志：BUY / HOLD / PASS + 理由 + 当时的数字快照（可复盘）。"""
+
     __tablename__ = "decisions"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     deal_id: Mapped[int] = mapped_column(ForeignKey("deals.id", ondelete="CASCADE"), nullable=False)
@@ -254,6 +260,7 @@ class Decision(AuditMixin, Base):
 
 class HoldingActual(AuditMixin, Base):
     """持有期实际数（按期），与承销对比偏差。"""
+
     __tablename__ = "holding_actuals"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     deal_id: Mapped[int] = mapped_column(ForeignKey("deals.id", ondelete="CASCADE"), nullable=False)
@@ -268,6 +275,7 @@ class HoldingActual(AuditMixin, Base):
 
 class DealEvent(Base):
     """交易时间线（阶段推进、红队面板已读、投委会包生成等），也是“日志”标签页的数据源。"""
+
     __tablename__ = "deal_events"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     deal_id: Mapped[int] = mapped_column(ForeignKey("deals.id", ondelete="CASCADE"), nullable=False)
@@ -279,6 +287,7 @@ class DealEvent(Base):
 
 class Template(AuditMixin, Base):
     """设置：假设模板 / 市场默认值 / 淘汰条件模板。"""
+
     __tablename__ = "templates"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     kind: Mapped[str] = mapped_column(String(30), nullable=False)  # assumptions | market | kill_criteria
@@ -289,6 +298,7 @@ class Template(AuditMixin, Base):
 
 class SavedView(AuditMixin, Base):
     """流水线保存的视图（筛选、排序、列）。"""
+
     __tablename__ = "saved_views"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(120), nullable=False)

@@ -30,7 +30,8 @@ def upgrade_head(engine: Engine) -> None:
 
 
 def main(argv: list[str]) -> None:
-    from app.services.persistence.engine import get_engine
+    # 延迟导入：engine 在顶层导入本模块（ensure_migrated → upgrade_head），反向放顶层会循环
+    from app.services.persistence.engine import get_engine  # noqa: PLC0415
     eng = get_engine()
     cfg = alembic_config(eng)
     cmd = argv[0] if argv else "upgrade"

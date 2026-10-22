@@ -1,7 +1,7 @@
 """请求上下文：当前操作人与请求编号（中间件写入，持久化层读取写 created_by / audit_log）。"""
 from __future__ import annotations
 
-from contextvars import ContextVar
+from contextvars import ContextVar, Token
 from dataclasses import dataclass
 
 
@@ -21,11 +21,11 @@ def current_actor() -> Actor:
     return _actor.get()
 
 
-def set_actor(a: Actor):  # noqa: ANN201 — 返回 contextvars.Token
+def set_actor(a: Actor) -> Token[Actor]:
     return _actor.set(a)
 
 
-def reset_actor(token) -> None:  # noqa: ANN001
+def reset_actor(token: Token[Actor]) -> None:
     _actor.reset(token)
 
 
@@ -33,5 +33,5 @@ def current_request_id() -> str:
     return _request_id.get()
 
 
-def set_request_id(rid: str):  # noqa: ANN201
+def set_request_id(rid: str) -> Token[str]:
     return _request_id.set(rid)

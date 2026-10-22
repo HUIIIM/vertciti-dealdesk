@@ -15,7 +15,7 @@ from app.services.persistence.engine import session_scope
 from app.services.persistence.schema import Approval, Decision, Document, Task
 from app.services.v2.analysis import _context
 from app.services.v2.deals import _deal_dict, _event, current_version, deal_or_404
-from app.services.v2.errors import Conflict, Invalid, NotFound
+from app.services.v2.errors import ConflictError, InvalidInputError, NotFoundError
 from app.services.v2.serialize import row
 
 JSON = dict[str, Any]
@@ -30,11 +30,11 @@ def advance(deal_id: int, target: str, reason: str = "") -> JSON:
         try:
             res = lifecycle.evaluate(d.stage, target, _context(s, d))
         except ValueError as e:
-            raise Invalid(str(e)) from e
+            raise InvalidInputError(str(e)) from e
         if not res["allowed"]:
-            raise Conflict(res["reason"], res)
+            raise ConflictError(res["reason"], res)
         if res.get("direction") == "back" and not reason.strip():
-            raise Invalid("回退阶段须写原因")
+            raise InvalidInputError("回退阶段须写原因")
         before = d.stage
         d.stage = target
         _event(s, d.id, "stage_changed", {"from": before, "to": target, "reason": reason,
@@ -46,9 +46,9 @@ def advance(deal_id: int, target: str, reason: str = "") -> JSON:
 # ---------------------------------------------------------------- 任务
 def add_task(deal_id: int, title: str, stage: str = "", assignee: str = "", due: str = "") -> JSON:
     if not title.strip():
-        raise Invalid("任务标题不能为空")
+        raise InvalidInputError("任务标题不能为空")
     if stage and stage not in lifecycle.ORDER:
-        raise Invalid(f"未知阶段：{stage}")
+        raise InvalidInputError(f"未知阶段：{stage}")
     with session_scope() as s:
         d = deal_or_404(s, deal_id)
         t = Task(deal_id=d.id, title=title.strip(), stage=stage or d.stage, assignee=assignee, due=due,
@@ -61,13 +61,13 @@ def add_task(deal_id: int, title: str, stage: str = "", assignee: str = "", due:
 def update_task(deal_id: int, task_id: int, changes: JSON) -> JSON:
     allowed = {"title", "status", "assignee", "due"}
     if set(changes) - allowed:
-        raise Invalid("只能修改 title / status / assignee / due")
+        raise InvalidInputError("只能修改 title / status / assignee / due")
     if "status" in changes and changes["status"] not in ("open", "done"):
-        raise Invalid("任务状态只能是 open / done")
+        raise InvalidInputError("任务状态只能是 open / done")
     with session_scope() as s:
         t = s.get(Task, task_id)
         if t is None or t.deal_id != deal_id:
-            raise NotFound(f"任务 {task_id} 不存在")
+            raise NotFoundError(f"任务 {task_id} 不存在")
         before = row(t)
         for k, v in changes.items():
             setattr(t, k, v)
@@ -87,9 +87,9 @@ def list_tasks(deal_id: int) -> list[JSON]:
 # ---------------------------------------------------------------- 审批
 def request_approval(deal_id: int, kind: str, title: str, amount: float | None = None, note: str = "") -> JSON:
     if kind not in ("payment", "general", "stage_override"):
-        raise Invalid("审批类型只能是 payment / general / stage_override")
+        raise InvalidInputError("审批类型只能是 payment / general / stage_override")
     if kind == "payment" and (amount is None or amount <= 0):
-        raise Invalid("付款审批须填金额")
+        raise InvalidInputError("付款审批须填金额")
     with session_scope() as s:
         deal_or_404(s, deal_id)
         a = Approval(deal_id=deal_id, kind=kind, title=title.strip() or kind, amount=amount, note=note,
@@ -101,18 +101,18 @@ def request_approval(deal_id: int, kind: str, title: str, amount: float | None =
         return row(a)
 
 
-def decide_approval(deal_id: int, approval_id: int, approve: bool, note: str = "") -> JSON:
+def decide_approval(deal_id: int, approval_id: int, *, approve: bool, note: str = "") -> JSON:
     """付款类只能董事长批准；任何人不能批自己发起的申请（分权）。"""
     actor = current_actor()
     with session_scope() as s:
         a = s.get(Approval, approval_id)
         if a is None or a.deal_id != deal_id:
-            raise NotFound(f"审批 {approval_id} 不存在")
+            raise NotFoundError(f"审批 {approval_id} 不存在")
         if a.status != "pending":
-            raise Conflict(f"该审批已{('批准' if a.status == 'approved' else '驳回')}，不能重复决定")
+            raise ConflictError(f"该审批已{('批准' if a.status == 'approved' else '驳回')}，不能重复决定")
         security.require("payment.approve" if a.kind == "payment" else "approval.decide")
         if a.created_by == actor.username and actor.username not in ("local", "system"):
-            raise Conflict("不能审批自己发起的申请（分权）")
+            raise ConflictError("不能审批自己发起的申请（分权）")
         before = row(a)
         a.status = "approved" if approve else "rejected"
         a.decided_by, a.decided_at = actor.username, datetime.now(timezone.utc)
@@ -133,9 +133,9 @@ def list_approvals(deal_id: int) -> list[JSON]:
 # ---------------------------------------------------------------- 文件
 def upload_document(deal_id: int, filename: str, content_type: str, data: bytes, category: str = "other") -> JSON:
     if not data:
-        raise Invalid("文件为空")
+        raise InvalidInputError("文件为空")
     if len(data) > MAX_DOC_BYTES:
-        raise Invalid(f"文件超过 {MAX_DOC_BYTES // 1024 // 1024}MB 上限")
+        raise InvalidInputError(f"文件超过 {MAX_DOC_BYTES // 1024 // 1024}MB 上限")
     with session_scope() as s:
         deal_or_404(s, deal_id)
         doc = Document(deal_id=deal_id, filename=filename[:300] or "file", content_type=content_type or
@@ -158,7 +158,7 @@ def get_document(deal_id: int, doc_id: int) -> tuple[JSON, bytes]:
     with session_scope() as s:
         doc = s.get(Document, doc_id)
         if doc is None or doc.deal_id != deal_id:
-            raise NotFound(f"文件 {doc_id} 不存在")
+            raise NotFoundError(f"文件 {doc_id} 不存在")
         return row(doc, exclude=("content",)), bytes(doc.content)
 
 
@@ -166,9 +166,9 @@ def get_document(deal_id: int, doc_id: int) -> tuple[JSON, bytes]:
 def log_decision(deal_id: int, verdict: str, rationale: str) -> JSON:
     """记 BUY / HOLD / PASS：冻结当时的数字快照、运行编号与输入哈希（复盘看的是当时原样）。"""
     if verdict not in VERDICTS:
-        raise Invalid("结论只能是 BUY / HOLD / PASS")
+        raise InvalidInputError("结论只能是 BUY / HOLD / PASS")
     if len(rationale.strip()) < 10:
-        raise Invalid("理由至少写 10 个字（复盘时要看得懂当时为什么）")
+        raise InvalidInputError("理由至少写 10 个字（复盘时要看得懂当时为什么）")
     with session_scope() as s:
         d = deal_or_404(s, deal_id)
         v = current_version(s, d)

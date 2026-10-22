@@ -31,6 +31,7 @@ def fresh_db(tmp_path, monkeypatch):
     return path
 
 
+@pytest.mark.sqlite_only
 def test_adopts_existing_v1_database_without_data_loss(fresh_db):
     with sqlite3.connect(fresh_db) as c:
         c.executescript(V1_SCHEMA)
@@ -63,6 +64,7 @@ def test_v2_tables_carry_audit_columns(fresh_db):
         assert {"created_at", "updated_at", "created_by"} <= cols, t
 
 
+@pytest.mark.sqlite_only
 def test_db_file_deleted_and_recreated_is_remigrated(fresh_db):
     db.create_project("residential", "a", "b", {}, {})
     os.remove(fresh_db)
@@ -70,6 +72,7 @@ def test_db_file_deleted_and_recreated_is_remigrated(fresh_db):
     assert db.list_projects() == []
 
 
+@pytest.mark.sqlite_only
 def test_created_by_records_current_actor(fresh_db):
     from app.core.context import Actor, reset_actor, set_actor
     tok = set_actor(Actor("miao", "chairman"))
@@ -81,6 +84,7 @@ def test_created_by_records_current_actor(fresh_db):
         assert c.execute("select created_by from projects").fetchone()[0] == "miao"
 
 
+@pytest.mark.sqlite_only
 def test_database_url_rewrites_heroku_style(monkeypatch):
     monkeypatch.setenv("DATABASE_URL", "postgres://u:p@h/db")
     assert database_url() == "postgresql+psycopg://u:p@h/db"

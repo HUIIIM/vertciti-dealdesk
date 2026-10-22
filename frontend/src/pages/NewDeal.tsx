@@ -33,8 +33,9 @@ export function NewDeal({ onClose, onCreated }: { onClose: () => void; onCreated
   return (
     <Dialog title="新建交易" onClose={onClose} footer={<>
       <button className="btn ghost" type="button" onClick={onClose}>取消</button>
-      <button className="btn primary" type="button" onClick={submit} disabled={busy}>{busy ? "创建中…" : "创建并开始承销"}</button></>}>
-      <form onSubmit={(e) => { e.preventDefault(); void submit(); }} style={{ display: "grid", gap: 16 }}>
+      <button className="btn primary" type="submit" form="new-deal-form" disabled={busy}>{busy ? "创建中…" : "创建并开始承销"}</button></>}>
+      {/* 提交按钮在底栏，用 form 属性关联：表单内按 Enter 即可提交（键盘用户） */}
+      <form id="new-deal-form" onSubmit={(e) => { e.preventDefault(); void submit(); }} style={{ display: "grid", gap: 16 }}>
         <div className="seg" role="group" aria-label="赛道">
           <button type="button" aria-pressed={track === "commercial"} onClick={() => switchTrack("commercial")}>商业</button>
           <button type="button" aria-pressed={track === "residential"} onClick={() => switchTrack("residential")}>住宅</button>

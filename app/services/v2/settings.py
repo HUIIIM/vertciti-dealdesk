@@ -1,6 +1,7 @@
 """设置与运维：假设模板 / 市场默认值 / 淘汰条件模板、保存的视图、用户、审计查询、数据源状态。"""
 from __future__ import annotations
 
+import os
 from typing import Any
 
 from sqlalchemy import select
@@ -11,7 +12,7 @@ from app.domain.v2 import kill_criteria
 from app.services.persistence import audit
 from app.services.persistence.engine import session_scope
 from app.services.persistence.schema import AuditLog, SavedView, Template, User
-from app.services.v2.errors import Invalid, NotFound
+from app.services.v2.errors import InvalidInputError, NotFoundError
 from app.services.v2.serialize import row
 
 JSON = dict[str, Any]
@@ -37,12 +38,12 @@ def list_templates(kind: str | None = None) -> list[JSON]:
 def save_template(kind: str, name: str, payload: JSON) -> JSON:
     security.require("settings.write")
     if kind not in KINDS:
-        raise Invalid(f"模板类型只能是：{', '.join(KINDS)}")
+        raise InvalidInputError(f"模板类型只能是：{', '.join(KINDS)}")
     if kind == "kill_criteria":
         try:
             payload = {**payload, "criteria": kill_criteria.validate(payload.get("criteria", []))}
         except ValueError as e:
-            raise Invalid(str(e)) from e
+            raise InvalidInputError(str(e)) from e
     with session_scope() as s:
         t = s.scalar(select(Template).where(Template.kind == kind, Template.name == name))
         before = row(t) if t else None
@@ -64,7 +65,7 @@ def list_views() -> list[JSON]:
 def save_view(name: str, config: JSON) -> JSON:
     security.require("deal.write")
     if not name.strip():
-        raise Invalid("视图名称不能为空")
+        raise InvalidInputError("视图名称不能为空")
     with session_scope() as s:
         v = s.scalar(select(SavedView).where(SavedView.name == name.strip()))
         if v is None:
@@ -81,7 +82,7 @@ def delete_view(view_id: int) -> None:
     with session_scope() as s:
         v = s.get(SavedView, view_id)
         if v is None:
-            raise NotFound("视图不存在")
+            raise NotFoundError("视图不存在")
         s.delete(v)
 
 
@@ -96,11 +97,12 @@ def create_user(username: str, role: str, display_name: str = "") -> JSON:
     try:
         security.Role(role)
     except ValueError as e:
-        raise Invalid("角色只能是 chairman / analyst / viewer") from e
+        raise InvalidInputError("角色只能是 chairman / analyst / viewer") from e
     token = security.add_user(username, role, display_name)
     with session_scope() as s:
         u = s.scalar(select(User).where(User.username == username))
-        assert u is not None
+        if u is None:  # add_user 刚写入；读不到说明库状态异常
+            raise NotFoundError(f"用户 {username} 创建后读取失败")
         audit.record(s, "user", u.id, "create", None, {"username": username, "role": role})
         return {**row(u, exclude=("token_sha256",)), "token": token,
                 "note": "访问令牌只显示这一次，请立即妥善保存"}
@@ -119,7 +121,6 @@ def audit_log(entity: str | None = None, entity_id: str | None = None, limit: in
 
 def data_sources() -> list[JSON]:
     """数据源状态（只读、不发网络请求；TopHap 连通性看 /api/tophap/status）。"""
-    import os
     return [
         {"key": "tophap", "label": "TopHap 公共记录（MCP）", "configured": os.environ.get("TOPHAP_ENABLED") == "1",
          "detail": "OAuth token 1 小时有效；状态与重授权见 /api/tophap/status"},

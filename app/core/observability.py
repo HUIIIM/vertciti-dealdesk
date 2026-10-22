@@ -19,8 +19,10 @@ import traceback
 import uuid
 from collections import deque
 from datetime import datetime, timezone
+from typing import Any
 
-from starlette.middleware.base import BaseHTTPMiddleware
+import httpx
+from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
@@ -29,7 +31,7 @@ from app.core.context import current_actor, current_request_id, reset_actor, set
 
 log = logging.getLogger("dealdesk")
 access_log = logging.getLogger("dealdesk.access")
-RECENT_ERRORS: deque[dict] = deque(maxlen=100)
+RECENT_ERRORS: deque[dict[str, Any]] = deque(maxlen=100)
 _RID_OK = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 _V1_PROTECTED = re.compile(r"^/api/(projects|uw/projects)(/|$)")
 
@@ -39,8 +41,7 @@ class JsonFormatter(logging.Formatter):
         d = {"ts": datetime.fromtimestamp(record.created, timezone.utc).isoformat(timespec="milliseconds"),
              "level": record.levelname, "logger": record.name, "msg": record.getMessage(),
              "request_id": current_request_id() or None, "actor": current_actor().username}
-        for k, v in getattr(record, "extra_fields", {}).items():
-            d[k] = v
+        d.update(getattr(record, "extra_fields", {}))
         if record.exc_info:
             d["exc"] = "".join(traceback.format_exception(*record.exc_info))[-4000:]
         return json.dumps(d, ensure_ascii=False, default=str)
@@ -57,7 +58,7 @@ def configure_logging() -> None:
     root.propagate = False
 
 
-def _report(err: dict) -> None:
+def _report(err: dict[str, Any]) -> None:
     RECENT_ERRORS.appendleft(err)
     url = os.environ.get("DEALDESK_ERROR_WEBHOOK", "").strip()
     if not url:
@@ -65,7 +66,6 @@ def _report(err: dict) -> None:
 
     def _send() -> None:
         try:
-            import httpx
             httpx.post(url, json={k: err[k] for k in ("at", "request_id", "path", "method", "error")}, timeout=5)
         except Exception:  # noqa: BLE001 — 上报失败不影响主流程
             log.warning("error webhook 上报失败")
@@ -73,7 +73,7 @@ def _report(err: dict) -> None:
 
 
 class RequestContextMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next) -> Response:  # noqa: ANN001
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         rid = request.headers.get("x-request-id", "")
         rid = rid if _RID_OK.match(rid) else uuid.uuid4().hex
         rid_tok = set_request_id(rid)
@@ -90,21 +90,20 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
                                               status_code=401 if actor is security.ANONYMOUS else 403)
             else:
                 resp = await call_next(request)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             err = {"at": datetime.now(timezone.utc).isoformat(), "request_id": rid, "path": path,
                    "method": method, "actor": actor.username, "error": f"{type(e).__name__}: {str(e)[:300]}",
                    "trace": traceback.format_exc()[-4000:]}
-            log.error("unhandled exception", exc_info=True,
-                      extra={"extra_fields": {"path": path, "method": method}})
+            log.exception("unhandled exception",
+                          extra={"extra_fields": {"path": path, "method": method}})
             _report(err)
             resp = JSONResponse({"detail": "服务器内部错误", "request_id": rid}, status_code=500)
-        finally:
-            reset_actor(act_tok)
         resp.headers["X-Request-ID"] = rid
-        if path.startswith("/api/"):
+        if path.startswith("/api/"):  # 在重置身份之前写，日志里的 actor 才是本次请求的操作人
             access_log.info("request", extra={"extra_fields": {
                 "method": method, "path": path, "status": resp.status_code,
                 "ms": round((time.perf_counter() - t0) * 1000, 1)}})
+        reset_actor(act_tok)
         set_request_id("")  # 不跨请求泄漏
         del rid_tok
         return resp

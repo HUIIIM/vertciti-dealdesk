@@ -20,7 +20,7 @@ from app.services.render import committee_pack
 from app.services.v2 import evidence
 from app.services.v2.analysis import _context, _require_version
 from app.services.v2.deals import _deal_dict, _event, deal_or_404, version_dict
-from app.services.v2.errors import Invalid
+from app.services.v2.errors import InvalidInputError
 from app.services.v2.serialize import row
 
 JSON = dict[str, Any]
@@ -34,13 +34,13 @@ def _roles(s: Session) -> dict[str, str]:
 
 def vote(deal_id: int, choice: str, comment: str = "") -> JSON:
     if choice not in ("approve", "reject", "abstain"):
-        raise Invalid("投票只能是 approve / reject / abstain")
+        raise InvalidInputError("投票只能是 approve / reject / abstain")
     security.require("committee.vote")
     actor = current_actor()
     with session_scope() as s:
         d = deal_or_404(s, deal_id)
         if d.stage != "committee":
-            raise Invalid("只有处于“投委会”阶段的交易才能投票")
+            raise InvalidInputError("只有处于“投委会”阶段的交易才能投票")
         v = _require_version(s, d)
         existing = s.scalar(select(CommitteeVote).where(CommitteeVote.deal_id == d.id,
                                                         CommitteeVote.version_id == v.id,
@@ -86,7 +86,7 @@ def pack_data(s: Session, deal_id: int) -> JSON:
     diff = None
     if prev is not None:
         diff = {"a": {"version_no": prev.version_no, "label": prev.label}, "b": {"version_no": v.version_no},
-                **diffing.compare_versions(version_dict(prev, True), version_dict(v, True))}
+                **diffing.compare_versions(version_dict(prev, with_detail=True), version_dict(v, with_detail=True))}
     try:
         rt = redteam.run(d.track, v.inputs)
     except ModelInputError:
@@ -110,8 +110,9 @@ def pack_data(s: Session, deal_id: int) -> JSON:
         risks.append(f"过期证据（>30 天）{ctx['stale_evidence']} 条，需重拉")
     for r in rt.get("top", []):
         if r.get("material"):
-            risks.append(f"敏感假设：{r['label']} ±{rt['shock_pct']:g}% → {rt['metric_label']}波动 {r['swing_bps']:.0f} bp")
-    unknown = [k for k, val in ctx["metrics"].items() if val is None and k in CARD_KEYS[d.track]]  # type: ignore[index]
+            risks.append(f"敏感假设：{r['label']} ±{rt['shock_pct']:g}% → "
+                         f"{rt['metric_label']}波动 {r['swing_bps']:.0f} bp")
+    unknown = [k for k, val in ctx["metrics"].items() if val is None and k in CARD_KEYS[d.track]]
     if unknown:
         risks.append("以下结论卡指标未能计算（未知保持未知）：" + "、".join(unknown))
     st = status_in(s, d.id)
@@ -135,7 +136,7 @@ def pack_data(s: Session, deal_id: int) -> JSON:
 
 def generate_pack(deal_id: int, kind: str) -> tuple[bytes, JSON]:
     if kind not in ("pdf", "xlsx"):
-        raise Invalid("格式只能是 pdf / xlsx")
+        raise InvalidInputError("格式只能是 pdf / xlsx")
     security.require("committee.package")
     with session_scope() as s:
         data = pack_data(s, deal_id)

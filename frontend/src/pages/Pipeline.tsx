@@ -114,11 +114,11 @@ export function Pipeline() {
             if (s === "passed" && col.length === 0) return null;
             return (
               <section key={s} className="kcol" role="listitem" aria-label={`${label} ${col.length} 笔`}>
-                <h3><span>{label}</span><span className="muted">{col.length}</span></h3>
+                <h2><span>{label}</span><span className="muted">{col.length}</span></h2>
                 {col.map((d) => { const st = killState(d); const idx = ordered.indexOf(d);
                   return (
                     <a key={d.id} href={`#/deals/${d.id}`} className={`kcard ${st === "risk" ? "risk" : st === "verified" ? "ok" : st === "building" ? "warn" : ""}`}
-                      aria-selected={idx === selIdx ? true : undefined} onFocus={() => setSel(idx)}>
+                      aria-current={idx === selIdx ? "true" : undefined} onFocus={() => setSel(idx)}>
                       <div className="name">{d.name}</div>
                       <div className="addr">{d.address || "—"} · {d.track === "commercial" ? "商业" : "住宅"}</div>
                       <div className="kv"><span className="muted">价格</span><span>{fmtShort(m(d, "price") ?? d.asking_price)}</span></div>

@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.core.context import current_actor
 from app.domain.v2 import diffing, kill_criteria, lifecycle, max_bid, provenance, redteam, scenarios
+from app.domain.v2.committee import tally
 from app.domain.v2.model import METRICS, ModelInputError
 from app.services.persistence.engine import session_scope
 from app.services.persistence.schema import (
@@ -22,8 +23,7 @@ from app.services.persistence.schema import (
 )
 from app.services.v2 import evidence
 from app.services.v2.deals import _deal_dict, _event, current_version, deal_or_404, version_dict
-from app.services.v2.errors import Conflict, Invalid, NotFound
-from app.domain.v2.committee import tally
+from app.services.v2.errors import ConflictError, InvalidInputError, NotFoundError
 
 JSON = dict[str, Any]
 
@@ -31,7 +31,7 @@ JSON = dict[str, Any]
 def _require_version(s: Session, d: Deal) -> DealVersion:
     v = current_version(s, d)
     if v is None:
-        raise Conflict("这笔交易还没有承销版本：先在模型页保存一版")
+        raise ConflictError("这笔交易还没有承销版本：先在模型页保存一版")
     return v
 
 
@@ -60,25 +60,25 @@ def scenarios_for(deal_id: int, custom: list[JSON] | None = None) -> JSON:
         try:
             return scenarios.run(d.track, v.inputs, custom)
         except (ValueError, KeyError, ModelInputError) as e:
-            raise Invalid(str(e)) from e
+            raise InvalidInputError(str(e)) from e
 
 
-def max_bid_for(deal_id: int, targets: list[JSON], include_kill: bool = True) -> JSON:
+def max_bid_for(deal_id: int, targets: list[JSON], *, include_kill: bool = True) -> JSON:
     with session_scope() as s:
         d = deal_or_404(s, deal_id)
         v = _require_version(s, d)
         try:
-            return max_bid.run(d.track, v.inputs, targets, d.kill_criteria if include_kill else [])
+            return max_bid.run(d.track, v.inputs, targets, kill=d.kill_criteria if include_kill else [])
         except ValueError as e:
-            raise Invalid(str(e)) from e
+            raise InvalidInputError(str(e)) from e
 
 
 def diff_versions(deal_id: int, a: int, b: int) -> JSON:
     with session_scope() as s:
         va, vb = s.get(DealVersion, a), s.get(DealVersion, b)
         if va is None or vb is None or va.deal_id != deal_id or vb.deal_id != deal_id:
-            raise NotFound("版本不存在")
-        out = diffing.compare_versions(version_dict(va, True), version_dict(vb, True))
+            raise NotFoundError("版本不存在")
+        out = diffing.compare_versions(version_dict(va, with_detail=True), version_dict(vb, with_detail=True))
         return {"a": {"id": va.id, "version_no": va.version_no, "label": va.label, "run_id": va.run_id},
                 "b": {"id": vb.id, "version_no": vb.version_no, "label": vb.label, "run_id": vb.run_id}, **out}
 
@@ -148,14 +148,14 @@ def gate_check(deal_id: int, target: str) -> JSON:
         try:
             return lifecycle.evaluate(d.stage, target, _context(s, d))
         except ValueError as e:
-            raise Invalid(str(e)) from e
+            raise InvalidInputError(str(e)) from e
 
 
 def compare_deals(ids: list[int]) -> JSON:
     if not 2 <= len(ids) <= 4:
-        raise Invalid("比较页支持 2–4 笔交易")
+        raise InvalidInputError("比较页支持 2–4 笔交易")
     with session_scope() as s:
-        out = []
+        out: list[JSON] = []
         for i in ids:
             d = deal_or_404(s, i)
             v = current_version(s, d)
@@ -164,7 +164,11 @@ def compare_deals(ids: list[int]) -> JSON:
                         "kill": kill_criteria.evaluate(d.kill_criteria, m) if v else None})
         best: JSON = {}
         for k, meta in METRICS.items():
-            vals = [(x["deal"]["id"], x["metrics"].get(k)) for x in out if x["metrics"].get(k) is not None]
+            vals: list[tuple[int, float]] = []
+            for x in out:
+                v_ = (x["metrics"] or {}).get(k)
+                if isinstance(v_, (int, float)):
+                    vals.append((int(x["deal"]["id"]), float(v_)))
             if len(vals) >= 2:
                 pick = max(vals, key=lambda t: t[1]) if meta.better == "higher" else min(vals, key=lambda t: t[1])
                 best[k] = pick[0]

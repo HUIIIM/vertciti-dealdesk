@@ -1,6 +1,7 @@
 """数字护照：每个数字的来源、页码、抽取方式、可信度、复核、新鲜度与修改历史；跨来源矛盾登记。"""
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
@@ -11,9 +12,10 @@ from app.core.context import current_actor
 from app.domain.v2 import freshness, provenance
 from app.services.persistence import audit
 from app.services.persistence.engine import session_scope
-from app.services.persistence.schema import Conflict, FieldProvenance
+from app.services.persistence.schema import Conflict as ConflictRow
+from app.services.persistence.schema import FieldProvenance
 from app.services.v2.deals import _event, deal_or_404
-from app.services.v2.errors import Invalid, NotFound
+from app.services.v2.errors import InvalidInputError, NotFoundError
 from app.services.v2.serialize import row
 
 JSON = dict[str, Any]
@@ -25,7 +27,7 @@ def _parse_dt(v: Any) -> datetime | None:
     try:
         dt = datetime.fromisoformat(str(v).replace("Z", "+00:00"))
     except ValueError as e:
-        raise Invalid(f"时间格式不对（应为 ISO 8601）：{v!r}") from e
+        raise InvalidInputError(f"时间格式不对（应为 ISO 8601）：{v!r}") from e
     return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
 
 
@@ -39,17 +41,35 @@ def _passport_dict(p: FieldProvenance, now: datetime | None = None) -> JSON:
     return out
 
 
-def add_evidence(deal_id: int, field: str, value: Any, *, source: str, method: str, confidence: str,
-                 page: int | None = None, document_id: int | None = None, evidence_at: Any = None,
-                 market_data: bool = False, assumption_source: str = "document", note: str = "") -> JSON:
+@dataclass(frozen=True)
+class Evidence:
+    """一条来源登记：字段（输入路径）、值、出处与抽取方式等。"""
+
+    field: str
+    value: Any
+    source: str
+    method: str
+    confidence: str
+    page: int | None = None
+    document_id: int | None = None
+    evidence_at: Any = None
+    market_data: bool = False
+    assumption_source: str = "document"
+    note: str = ""
+
+
+def add_evidence(deal_id: int, ev: Evidence) -> JSON:
+    field, value, source, method, confidence = ev.field, ev.value, ev.source, ev.method, ev.confidence
+    page, document_id, evidence_at, market_data = ev.page, ev.document_id, ev.evidence_at, ev.market_data
+    assumption_source, note = ev.assumption_source, ev.note
     if method not in provenance.METHODS:
-        raise Invalid(f"抽取方式只能是：{', '.join(provenance.METHODS)}")
+        raise InvalidInputError(f"抽取方式只能是：{', '.join(provenance.METHODS)}")
     if confidence not in provenance.CONFIDENCE:
-        raise Invalid("可信度只能是 high / medium / low")
+        raise InvalidInputError("可信度只能是 high / medium / low")
     if assumption_source not in provenance.ASSUMPTION_SOURCES:
-        raise Invalid(f"假设来源只能是：{', '.join(provenance.ASSUMPTION_SOURCES)}")
+        raise InvalidInputError(f"假设来源只能是：{', '.join(provenance.ASSUMPTION_SOURCES)}")
     if not field.strip() or not source.strip():
-        raise Invalid("字段与来源不能为空")
+        raise InvalidInputError("字段与来源不能为空")
     with session_scope() as s:
         deal_or_404(s, deal_id)
         prior = s.scalars(select(FieldProvenance).where(FieldProvenance.deal_id == deal_id,
@@ -65,7 +85,7 @@ def add_evidence(deal_id: int, field: str, value: Any, *, source: str, method: s
         conflict = None
         other = next((x for x in prior if x.source != p.source), None)
         if other is not None and provenance.values_conflict(other.value, value):
-            c = Conflict(deal_id=deal_id, field=field, value_a=other.value, source_a=other.source, value_b=value,
+            c = ConflictRow(deal_id=deal_id, field=field, value_a=other.value, source_a=other.source, value_b=value,
                          source_b=p.source, diff_pct=provenance.diff_pct(other.value, value),
                          created_by=current_actor().username)
             s.add(c)
@@ -83,7 +103,7 @@ def review(deal_id: int, field: str, note: str = "") -> JSON:
         p = s.scalars(select(FieldProvenance).where(FieldProvenance.deal_id == deal_id, FieldProvenance.field == field)
                       .order_by(FieldProvenance.id.desc()).limit(1)).first()
         if p is None:
-            raise NotFound(f"字段 {field} 没有来源记录")
+            raise NotFoundError(f"字段 {field} 没有来源记录")
         before = p.review_status
         if p.review_status != "overridden":
             p.review_status = "reviewed"
@@ -103,9 +123,9 @@ def passport(deal_id: int, field: str) -> JSON:
                                                        FieldProvenance.field == field)
                          .order_by(FieldProvenance.id.desc())).all()
         if not hist:
-            raise NotFound(f"字段 {field} 没有来源记录（未知保持未知）")
-        cons = s.scalars(select(Conflict).where(Conflict.deal_id == deal_id, Conflict.field == field)
-                         .order_by(Conflict.id.desc())).all()
+            raise NotFoundError(f"字段 {field} 没有来源记录（未知保持未知）")
+        cons = s.scalars(select(ConflictRow).where(ConflictRow.deal_id == deal_id, ConflictRow.field == field)
+                         .order_by(ConflictRow.id.desc())).all()
         now = datetime.now(timezone.utc)
         return {"field": field, "current": _passport_dict(hist[0], now),
                 "history": [_passport_dict(h, now) for h in hist], "conflicts": [row(c) for c in cons]}
@@ -131,19 +151,19 @@ def list_passports(deal_id: int) -> list[JSON]:
 def list_conflicts(deal_id: int, status: str | None = None) -> list[JSON]:
     with session_scope() as s:
         deal_or_404(s, deal_id)
-        q = select(Conflict).where(Conflict.deal_id == deal_id)
+        q = select(ConflictRow).where(ConflictRow.deal_id == deal_id)
         if status:
-            q = q.where(Conflict.status == status)
-        return [row(c) for c in s.scalars(q.order_by(Conflict.id.desc())).all()]
+            q = q.where(ConflictRow.status == status)
+        return [row(c) for c in s.scalars(q.order_by(ConflictRow.id.desc())).all()]
 
 
 def resolve_conflict(deal_id: int, conflict_id: int, value: Any, note: str) -> JSON:
     if not note.strip():
-        raise Invalid("裁决须写理由（为什么采用这个值）")
+        raise InvalidInputError("裁决须写理由（为什么采用这个值）")
     with session_scope() as s:
-        c = s.get(Conflict, conflict_id)
+        c = s.get(ConflictRow, conflict_id)
         if c is None or c.deal_id != deal_id:
-            raise NotFound(f"矛盾 {conflict_id} 不存在")
+            raise NotFoundError(f"矛盾 {conflict_id} 不存在")
         before = row(c)
         c.status, c.resolved_value, c.resolution_note = "resolved", value, note.strip()
         c.resolved_by, c.resolved_at = current_actor().username, datetime.now(timezone.utc)
@@ -153,7 +173,8 @@ def resolve_conflict(deal_id: int, conflict_id: int, value: Any, note: str) -> J
 
 
 def counts(s: Session, deal_id: int) -> JSON:
-    open_c = len(s.scalars(select(Conflict.id).where(Conflict.deal_id == deal_id, Conflict.status == "open")).all())
+    open_c = len(s.scalars(select(ConflictRow.id).where(ConflictRow.deal_id == deal_id,
+                                                        ConflictRow.status == "open")).all())
     ps = latest_passports(s, deal_id)
     stale = sum(1 for p in ps.values() if p["freshness"]["state"] == "stale")
     review_due = sum(1 for p in ps.values() if p["freshness"]["state"] == "review")

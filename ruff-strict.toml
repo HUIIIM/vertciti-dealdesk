@@ -1,0 +1,35 @@
+# v2 新代码的 ruff 严格档：启用全部规则（ALL），只豁免下列与本项目冲突的规则（逐条注明理由）。
+# 用法：ruff check --config ruff-strict.toml app/domain/v2 app/services/v2 app/api/v2 app/core app/services/persistence app/paths.py
+extend = "pyproject.toml"
+
+[lint]
+select = ["ALL"]
+ignore = [
+  "RUF001", "RUF002", "RUF003",  # 中文全角标点（，：（）“”）是有意为之，不是易混淆字符
+  "D1",                          # 缺 docstring：模块级 docstring + OpenAPI 端点说明已覆盖；不为 getter 堆样板
+  "D203", "D213",                # 与 D211 / D212 互斥，取后者
+  "D400", "D415",                # 句末英文句号：中文 docstring 以“。”或无标点结尾
+  "COM812", "ISC001",            # 与格式化器冲突（ruff 官方建议同时关闭）
+  "CPY001",                      # 版权头：仓库根 LICENSE（MIT）统一声明
+  "EM101", "EM102", "TRY003",    # 异常直接带中文用户可读信息（服务层 → API 422/409 原样展示），是设计
+  "ANN401",                      # JSON 载荷（模型输入 / 输出）本质是 Any，结构由 Pydantic 响应模型约束
+  "FAST002",                     # 依赖注入沿用 v1 写法（参数默认值），与既有路由风格一致
+  "PLR2004",                     # 金融阈值（如 1.25×、100bp）就地写出比抽常量更可读，已在 docstring 说明口径
+  "TD", "FIX",                   # 允许 TODO（暂无）
+  "TC",                          # TYPE_CHECKING 块：FastAPI / Pydantic / SQLAlchemy 运行时求值注解，挪走会在运行时失败
+]
+
+[lint.per-file-ignores]
+"app/core/security.py" = ["T201"]                       # 运维命令行入口打印一次性令牌
+"app/services/persistence/migrate.py" = ["T201"]        # 迁移命令行输出
+"app/core/brand.py" = ["E501"]                          # 报告 CSS 字面量：折行会改变 v1 报告字节（金标准锁定）
+
+[lint.flake8-type-checking]
+# FastAPI / Pydantic / SQLAlchemy 在运行时读取注解：这些类型的导入必须留在运行时
+runtime-evaluated-base-classes = ["pydantic.BaseModel", "sqlalchemy.orm.DeclarativeBase", "app.api.v2.schemas.In", "app.api.v2.schemas.Out"]
+runtime-evaluated-decorators = ["fastapi.APIRouter.get", "fastapi.APIRouter.post", "fastapi.APIRouter.put", "fastapi.APIRouter.patch", "fastapi.APIRouter.delete"]
+
+[lint.pylint]
+# 审计记录（会话、实体、编号、动作、改前、改后）等必需维度：放宽到 6 个位置参数；其余一律仅限关键字
+max-args = 8
+max-positional-args = 6

@@ -38,8 +38,7 @@ def _ok(track: str, inputs: JSON, price: float, metric: str, op: str, target: fl
     return bool(kill_criteria.OPS[op](float(v), target))
 
 
-def solve_one(track: str, inputs: JSON, metric: str, op: str, target: float, hi: float,
-              asking: float) -> JSON:
+def solve_one(track: str, inputs: JSON, *, metric: str, op: str, target: float, hi: float, asking: float) -> JSON:
     """满足 metric op target 的最高价格（op 为 >= 或 >）。
 
     先在 [搜索上限, 要价, 要价×0.9 … ×0.05] 网格上自上而下找第一个满足点，再在它与上一个
@@ -60,7 +59,7 @@ def solve_one(track: str, inputs: JSON, metric: str, op: str, target: float, hi:
     if lo is None:
         if saw_unknown:
             return {"price": None, "status": "unknown", "reason": f"{METRICS[metric].label}在搜索区间内无法计算"}
-        return {"price": None, "status": "infeasible", "reason": f"降到要价的 5% 仍达不到目标"}
+        return {"price": None, "status": "infeasible", "reason": "降到要价的 5% 仍达不到目标"}
     hi_b = upper
     while hi_b - lo > STEP:
         mid = (lo + hi_b) / 2
@@ -71,7 +70,7 @@ def solve_one(track: str, inputs: JSON, metric: str, op: str, target: float, hi:
     return {"price": float(int(lo // STEP) * STEP), "status": "ok", "reason": ""}
 
 
-def run(track: str, inputs: JSON, targets: list[JSON], kill: list[JSON] | None = None,
+def run(track: str, inputs: JSON, targets: list[JSON], *, kill: list[JSON] | None = None,
         search_multiple: float = 3.0) -> JSON:
     """targets: [{"metric": "irr_pct", "min": 12}, {"metric": "dscr", "min": 1.25}]。"""
     asking = get_path(inputs, PRICE_PATH[track])  # type: ignore[index]
@@ -82,14 +81,14 @@ def run(track: str, inputs: JSON, targets: list[JSON], kill: list[JSON] | None =
     for t in targets:
         if t.get("metric") not in METRICS or not isinstance(t.get("min"), (int, float)):
             raise ValueError(f"目标格式应为 {{metric, min}}：{t!r}")
-        r = solve_one(track, inputs, t["metric"], ">=", float(t["min"]), hi, float(asking))
+        r = solve_one(track, inputs, metric=t["metric"], op=">=", target=float(t["min"]), hi=hi, asking=float(asking))
         cons.append({"source": "target", "metric": t["metric"], "label": f"{METRICS[t['metric']].label} ≥ {t['min']:g}",
                      **r})
     # 淘汰条件 “metric < X 即放弃” 等价于约束 metric >= X（只取下限型条件）
     for c in kill_criteria.validate(kill or []):
         if c["op"] in ("<", "<="):
             op = ">=" if c["op"] == "<" else ">"
-            r = solve_one(track, inputs, c["metric"], op, c["threshold"], hi, float(asking))
+            r = solve_one(track, inputs, metric=c["metric"], op=op, target=c["threshold"], hi=hi, asking=float(asking))
             cons.append({"source": "kill_criteria", "metric": c["metric"], "label": kill_criteria.describe(c), **r})
     priced = [c for c in cons if c["status"] in ("ok", "above_range") and c["price"] is not None]
     blocked = [c for c in cons if c["status"] in ("infeasible", "unknown")]

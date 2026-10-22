@@ -36,7 +36,6 @@ import os
 import re
 import secrets
 import sys
-import threading
 import time
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, HTTPServer

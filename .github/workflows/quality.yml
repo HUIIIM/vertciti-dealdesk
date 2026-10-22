@@ -8,25 +8,97 @@ permissions: { contents: read }
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+
+env:
+  # PyMuPDF 仅测试用（6 个测试文件生成/断言 PDF），不进 requirements.txt；缺它 20 个测试会挂（见 commit 10cce05）
+  PY_TEST_DEPS: pytest pytest-cov ruff mypy pip-audit "PyMuPDF==1.28.2"
+  V2_STRICT: ^app/(domain/v2|services/v2|api/v2|core|services/persistence/[a-z_]+\.py|paths\.py)
+
 jobs:
-  quality:
+  backend:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: "3.12", cache: pip }
       - name: Install deps
-        # PyMuPDF 仅测试用（6 个测试文件生成/断言 PDF），不进 requirements.txt；缺它 20 个测试会挂（见 commit 10cce05）
-        run: pip install -r requirements.txt pytest pytest-cov ruff mypy pip-audit "PyMuPDF==1.28.2"
-      - name: Lint (ruff, 真错误规则)
-        run: ruff check app tests
-      - name: Tests + coverage (至少 80%，与 AGENTS.md 覆盖率目标一致)
+        run: pip install -r requirements.txt $PY_TEST_DEPS
+      - name: Lint (ruff, 全仓真错误规则)
+        run: ruff check app tests tools
+      - name: Lint (ruff ALL 规则，v2 分层代码，阻塞)
+        run: >
+          ruff check --config ruff-strict.toml app/domain/v2 app/services/v2 app/api/v2 app/core
+          app/services/persistence app/paths.py --exclude app/services/persistence/migrations
+      - name: Type check (mypy strict 覆盖 v2 分层，阻塞；v1 只报告)
+        run: |
+          mypy app > mypy.txt || true
+          tail -1 mypy.txt
+          if grep -E "$V2_STRICT" mypy.txt | grep -v migrations; then echo "::error::v2 代码出现 mypy strict 错误"; exit 1; fi
+      - name: Tests + coverage（含金标准 v1 对比，偏离即失败）
         run: |
           rm -f dealdesk.db
           pytest --cov=app --cov-report=term --cov-fail-under=80
-      - name: Type check (mypy, 第一阶段只报告不阻塞)
-        run: mypy app || true
       - name: Dependency vulnerabilities (pip-audit)
         run: pip-audit -r requirements.txt
-      - name: Frontend JS syntax
+      - name: v1 前端 JS 语法
         run: for f in static/*.js; do node --check "$f"; done
+
+  postgres:
+    # 生产库形态：同一套持久化 / v2 测试跑在 Postgres 16 上，每个测试一个独立库
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_USER: dd, POSTGRES_PASSWORD: dd, POSTGRES_DB: postgres }
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U dd" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      PG_ADMIN_URL: postgresql://dd:dd@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip }
+      - run: pip install -r requirements.txt $PY_TEST_DEPS
+      - name: Persistence + v2 on Postgres
+        run: >
+          pytest -p tests.pg_plugin tests/test_persistence.py tests/test_v2_domain.py tests/test_v2_api.py
+          tests/test_v2_security.py tests/test_ownership.py tests/test_routers_smoke.py
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run: { working-directory: frontend }
+    env:
+      PYTHON: python
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip }
+      - run: pip install -r requirements.txt
+        working-directory: .
+      - uses: actions/setup-node@v4
+        with: { node-version: "22", cache: npm, cache-dependency-path: frontend/package-lock.json }
+      - name: Install (npm 11，与 packageManager 一致)
+        run: npx -y npm@11.21.0 ci
+      - name: OpenAPI 漂移（后端接口改了而前端类型没重新生成即失败）
+        run: |
+          npm run gen:api
+          git diff --exit-code -- openapi.json src/api/schema.d.ts
+      - run: npm run typecheck
+      - run: npm run lint
+      - name: Unit + component tests (vitest, 覆盖率门槛见 vite.config.ts)
+        run: npm run test:cov
+      - name: 构建产物与仓库一致（static/app 是零构建部署的源）
+        run: |
+          npm run build
+          git diff --exit-code -- ../static/app
+      - name: Dependency vulnerabilities (npm audit)
+        run: npm audit --audit-level=high
+      - name: E2E（真实后端 + Chromium：纯键盘新建→承销→投委会包；axe 无障碍）
+        run: |
+          npx playwright install --with-deps chromium
+          npm run e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with: { name: playwright-traces, path: frontend/test-results, retention-days: 7 }

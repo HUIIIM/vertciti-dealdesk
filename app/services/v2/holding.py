@@ -12,7 +12,7 @@ from app.services.persistence.engine import session_scope
 from app.services.persistence.schema import DealVersion, Decision, HoldingActual
 from app.services.v2.analysis import _require_version
 from app.services.v2.deals import deal_or_404
-from app.services.v2.errors import Invalid
+from app.services.v2.errors import InvalidInputError
 from app.services.v2.serialize import row
 
 JSON = dict[str, Any]
@@ -21,13 +21,13 @@ FIELDS = ("noi", "occupancy_pct", "capex", "debt_service", "cash_flow")
 
 def upsert_actual(deal_id: int, period: str, values: JSON) -> JSON:
     if not (len(period) in (4, 7) and period[:4].isdigit()):
-        raise Invalid("期间格式为 YYYY 或 YYYY-MM")
+        raise InvalidInputError("期间格式为 YYYY 或 YYYY-MM")
     bad = set(values) - set(FIELDS)
     if bad:
-        raise Invalid(f"未知字段：{', '.join(sorted(bad))}")
+        raise InvalidInputError(f"未知字段：{', '.join(sorted(bad))}")
     occ = values.get("occupancy_pct")
     if occ is not None and not 0 <= occ <= 100:
-        raise Invalid("出租率用百分比数（0–100）")
+        raise InvalidInputError("出租率用百分比数（0–100）")
     with session_scope() as s:
         deal_or_404(s, deal_id)
         rec = s.scalar(select(HoldingActual).where(HoldingActual.deal_id == deal_id, HoldingActual.period == period))

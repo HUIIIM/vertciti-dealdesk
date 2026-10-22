@@ -8,6 +8,7 @@ testpaths = ["tests"]
 addopts = "-q"
 # 等价于 AGENTS.md 里的 PYTHONPATH=.：本机直接 pytest 不再 ModuleNotFoundError
 pythonpath = ["."]
+markers = ["sqlite_only: 直接检查 SQLite 库文件的测试（Postgres 插件下跳过）"]
 
 [tool.coverage.run]
 source = ["app"]
@@ -35,3 +36,16 @@ python_version = "3.10"
 ignore_missing_imports = true
 check_untyped_defs = false
 warn_unused_ignores = true
+plugins = ["pydantic.mypy"]
+
+# v2 新代码：mypy 严格模式（阻塞）。v1 模块由金标准锁定，类型化按 ENGINEERING.md 第 5 步渐进推进。
+[[tool.mypy.overrides]]
+module = ["app.domain.v2.*", "app.services.v2.*", "app.api.v2.*", "app.core.*", "app.services.persistence.*", "app.paths"]
+strict = true
+# 调用 v1 计算引擎（未标注、口径锁定）不可避免：只放开这一项
+disallow_untyped_calls = false
+warn_return_any = false
+
+[[tool.mypy.overrides]]
+module = ["app.services.persistence.migrations.*"]
+ignore_errors = true

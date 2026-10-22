@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import time
+from typing import Any
 
 from fastapi import APIRouter, Query
 from sqlalchemy import text
@@ -33,7 +34,7 @@ _STARTED = time.time()
 
 
 @router.get("/health", response_model=HealthOut)
-def health():
+def health() -> dict[str, Any]:
     """存活 + 数据库连通 + 迁移版本 + 引擎版本（部署后第一动作）。"""
     db_ok, rev, err = True, None, ""
     try:
@@ -50,7 +51,7 @@ def health():
 
 
 @router.get("/me", response_model=MeOut)
-def me():
+def me() -> dict[str, Any]:
     a = current_actor()
     return {"username": a.username, "role": a.role, "role_label": security.ROLE_LABEL.get(a.role, a.role),
             "display_name": a.display_name, "auth": security.auth_enabled(),
@@ -58,51 +59,53 @@ def me():
 
 
 @router.get("/admin/errors", response_model=list[Generic], dependencies=[need("audit.read")])
-def errors(limit: int = Query(50, ge=1, le=100)):
+def errors(limit: int = Query(50, ge=1, le=100)) -> list[dict[str, Any]]:
     return list(RECENT_ERRORS)[:limit]
 
 
 @router.get("/admin/users", response_model=list[UserOut], dependencies=[need("users.manage")])
-def users():
+def users() -> list[dict[str, Any]]:
     return settings.list_users()
 
 
 @router.post("/admin/users", response_model=UserCreatedOut, status_code=201, dependencies=[need("users.manage")])
-def create_user(body: UserIn):
+def create_user(body: UserIn) -> dict[str, Any]:
     """创建用户并返回一次性访问令牌（只显示这一次）。"""
     return settings.create_user(body.username, body.role, body.display_name)
 
 
 @router.get("/admin/audit", response_model=list[AuditOut], dependencies=[need("audit.read")])
-def audit(entity: str | None = None, entity_id: str | None = None, limit: int = Query(200, ge=1, le=1000)):
+def audit(
+    entity: str | None = None, entity_id: str | None = None, limit: int = Query(200, ge=1, le=1000),
+) -> list[dict[str, Any]]:
     return settings.audit_log(entity, entity_id, limit)
 
 
 @router.get("/settings/templates", response_model=list[TemplateOut], dependencies=[need("deal.read")])
-def templates(kind: str | None = None):
+def templates(kind: str | None = None) -> list[dict[str, Any]]:
     return settings.list_templates(kind)
 
 
 @router.put("/settings/templates", response_model=TemplateOut, dependencies=[need("settings.write")])
-def save_template(body: TemplateIn):
+def save_template(body: TemplateIn) -> dict[str, Any]:
     return settings.save_template(body.kind, body.name, body.payload)
 
 
 @router.get("/settings/views", response_model=list[ViewOut], dependencies=[need("deal.read")])
-def views():
+def views() -> list[dict[str, Any]]:
     return settings.list_views()
 
 
 @router.put("/settings/views", response_model=ViewOut, dependencies=[need("deal.write")])
-def save_view(body: ViewIn):
+def save_view(body: ViewIn) -> dict[str, Any]:
     return settings.save_view(body.name, body.config)
 
 
 @router.delete("/settings/views/{view_id}", status_code=204, dependencies=[need("deal.write")])
-def delete_view(view_id: int):
+def delete_view(view_id: int) -> None:
     settings.delete_view(view_id)
 
 
 @router.get("/settings/data-sources", response_model=list[DataSourceOut], dependencies=[need("deal.read")])
-def data_sources():
+def data_sources() -> list[dict[str, Any]]:
     return settings.data_sources()

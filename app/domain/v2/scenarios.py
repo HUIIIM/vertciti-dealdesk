@@ -7,10 +7,11 @@ change 支持 pct（相对变动 %）、add（加减绝对值，百分比类字�
 """
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 from app.domain.v2.assumptions import find
-from app.domain.v2.model import PRIMARY_METRIC, METRICS, run_model
+from app.domain.v2.model import METRICS, PRIMARY_METRIC, run_model
 from app.domain.v2.paths import set_path, update_path
 
 JSON = dict[str, Any]
@@ -34,6 +35,19 @@ def default_scenarios(track: str) -> list[JSON]:
     ]
 
 
+def _is_num(v: Any) -> bool:
+    return isinstance(v, (int, float)) and not isinstance(v, bool)
+
+
+def _adder(d: float) -> Callable[[Any], Any]:
+    """加减绝对值（百分比类字段即加减百分点）；原值为空时直接取 d。"""
+    return lambda v: v + d if _is_num(v) else (d if v is None else v)
+
+
+def _scaler(f: float) -> Callable[[Any], Any]:
+    return lambda v: v * f if _is_num(v) else v
+
+
 def _apply_change(track: str, inputs: JSON, ch: JSON) -> JSON:
     paths = list(find(track, ch["assumption"]).paths) if ch.get("assumption") else [ch["path"]]
     out = inputs
@@ -41,11 +55,9 @@ def _apply_change(track: str, inputs: JSON, ch: JSON) -> JSON:
         if "set" in ch:
             out = set_path(out, p, ch["set"])
         elif "add" in ch:
-            out = update_path(out, p, lambda v, d=float(ch["add"]): (v + d) if isinstance(v, (int, float))
-                              and not isinstance(v, bool) else (d if v is None else v))
+            out = update_path(out, p, _adder(float(ch["add"])))
         elif "pct" in ch:
-            out = update_path(out, p, lambda v, f=1 + float(ch["pct"]) / 100: v * f if isinstance(v, (int, float))
-                              and not isinstance(v, bool) else v)
+            out = update_path(out, p, _scaler(1 + float(ch["pct"]) / 100))
         else:
             raise ValueError("情景变动须含 pct / add / set 之一")
     return out

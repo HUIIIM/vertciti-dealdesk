@@ -18,8 +18,11 @@ import sys
 from enum import Enum
 
 from fastapi import HTTPException
+from sqlalchemy import select
 
 from app.core.context import Actor, current_actor
+from app.services.persistence.engine import session_scope
+from app.services.persistence.schema import User
 
 
 class Role(str, Enum):
@@ -84,15 +87,11 @@ def require(action: str) -> Actor:
 
 
 def resolve_token(token: str | None) -> Actor:
-    """token → 操作人；认证关闭时恒为本机董事长。"""
+    """Token → 操作人；认证关闭时恒为本机董事长。"""
     if not auth_enabled():
         return LOCAL
     if not token:
         return ANONYMOUS
-    from sqlalchemy import select
-
-    from app.services.persistence.engine import session_scope
-    from app.services.persistence.schema import User
     with session_scope() as s:
         u = s.scalar(select(User).where(User.token_sha256 == token_hash(token), User.active.is_(True)))
         if u is None:
@@ -103,8 +102,6 @@ def resolve_token(token: str | None) -> Actor:
 def add_user(username: str, role: str, display_name: str = "") -> str:
     """创建用户并返回一次性明文 token。"""
     Role(role)  # 校验
-    from app.services.persistence.engine import session_scope
-    from app.services.persistence.schema import User
     token = "dd_" + secrets.token_urlsafe(32)
     with session_scope() as s:
         s.add(User(username=username, role=role, display_name=display_name or username,

@@ -15,7 +15,7 @@ export function Settings({ section }: { section: string }) {
     <>
       <div className="page-head"><div><p className="eyebrow">设置</p><h1>{SECTIONS.find(([k]) => k === section)?.[1] ?? "设置"}</h1></div></div>
       <nav className="tabs" aria-label="设置分区">{SECTIONS.filter(([k]) => k !== "users" || can("users.manage")).map(([k, l]) =>
-        <a key={k} href={`#/settings/${k}`} aria-selected={section === k}>{l}</a>)}</nav>
+        <a key={k} href={`#/settings/${k}`} aria-current={section === k ? "page" : undefined}>{l}</a>)}</nav>
       {section === "sources" ? <Sources /> : section === "users" ? <Users /> : section === "shortcuts" ? (
         <section className="card"><table className="t"><tbody>{GLOBAL_HELP.map((h) => <tr key={h.combo}><td><Kbd k={h.combo} /></td><td>{h.label}</td></tr>)}</tbody></table></section>) : <Templates />}
     </>

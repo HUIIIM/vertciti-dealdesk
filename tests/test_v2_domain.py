@@ -120,7 +120,7 @@ def test_scenarios_expected_value_and_loss_probability():
 # ---------------------------------------------------------------- 反推最高出价
 def test_max_bid_is_tight_and_binding_constraint_is_lowest():
     r = max_bid.run("commercial", COM, [{"metric": "irr_pct", "min": 8}, {"metric": "dscr", "min": 1.25}],
-                    [{"metric": "dscr", "op": "<", "threshold": 1.2}])
+                    kill=[{"metric": "dscr", "op": "<", "threshold": 1.2}])
     best = r["max_bid"]
     assert best == min(c["price"] for c in r["constraints"]) and r["binding"]["label"] == "IRR ≥ 8"
     at = run_model("commercial", max_bid.with_price("commercial", COM, best))["metrics"]

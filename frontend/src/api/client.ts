@@ -51,7 +51,7 @@ const auth: Middleware = {
   },
 };
 
-export const api = createClient<paths>({ baseUrl: "" });
+export const api = createClient<paths>({ baseUrl: typeof window === "undefined" ? "" : window.location.origin });
 api.use(auth);
 
 /** 统一取数：成功返回 data，失败抛 ApiError（带后端 request_id，便于对账日志）。 */

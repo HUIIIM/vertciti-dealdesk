@@ -13,7 +13,7 @@ export function isNum(v: unknown): v is number {
 
 /** 表格单元格用：不带单位符号（单位在表头），负数加括号。 */
 export function fmtCell(v: unknown, unit: Unit): string {
-  if (!isNum(v)) return v == null || v === "" ? DASH : String(v);
+  if (!isNum(v)) return v == null || v === "" || typeof v === "number" ? DASH : String(v);
   const a = Math.abs(v);
   const body = unit === "usd" || unit === "usd_month" || unit === "int" ? usd0.format(a) : dec2.format(a);
   return v < 0 ? `(${body})` : body;
@@ -21,7 +21,7 @@ export function fmtCell(v: unknown, unit: Unit): string {
 
 /** 独立展示用（指标卡、句子里）：带单位符号。 */
 export function fmt(v: unknown, unit: Unit): string {
-  if (!isNum(v)) return v == null || v === "" ? DASH : String(v);
+  if (!isNum(v)) return v == null || v === "" || typeof v === "number" ? DASH : String(v);
   const a = Math.abs(v);
   let s: string;
   switch (unit) {

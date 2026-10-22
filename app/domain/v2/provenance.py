@@ -44,8 +44,8 @@ def key_number_status(key_fields: list[str], passports: dict[str, dict[str, Any]
             rows.append({"field": f, "ok": False, "reason": "没有来源记录（数字护照为空）"})
             continue
         if not confidence_at_least(p.get("confidence", "low"), floor):
-            rows.append({"field": f, "ok": False,
-                         "reason": f"可信度{CONFIDENCE_LABEL.get(p.get('confidence', 'low'))}，低于{CONFIDENCE_LABEL[floor]}"})
+            got = CONFIDENCE_LABEL.get(p.get("confidence", "low"))
+            rows.append({"field": f, "ok": False, "reason": f"可信度{got}，低于{CONFIDENCE_LABEL[floor]}"})
             continue
         if p.get("review_status", "pending") == "pending":
             rows.append({"field": f, "ok": False, "reason": "尚未复核"})

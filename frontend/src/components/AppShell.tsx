@@ -29,7 +29,7 @@ export function AppShell({ route, children, onCmdk, density, setDensity, theme, 
           <a href="#/settings/templates" aria-current={cur("settings")}>设置</a>
         </nav>
         <span className="sp" />
-        <button type="button" className="cmdk-trigger" onClick={onCmdk} aria-label="打开命令栏（⌘K）">
+        <button type="button" className="cmdk-trigger" onClick={onCmdk} aria-label="搜交易、跳转、执行命令（命令栏 ⌘K）">
           <span className="label">搜交易、跳转、执行命令</span><span className="sp" style={{ flex: 1 }} /><Kbd k="⌘ K" />
         </button>
         <div className="seg desktop-only" role="group" aria-label="密度">

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import Any
 
 from fastapi import Depends
 
@@ -16,5 +17,5 @@ def perm(action: str) -> Callable[[], Actor]:
     return _dep
 
 
-def need(action: str):  # noqa: ANN201 — FastAPI Depends 对象
+def need(action: str) -> Any:  # FastAPI 的 Depends(...) 返回值没有公开类型
     return Depends(perm(action))

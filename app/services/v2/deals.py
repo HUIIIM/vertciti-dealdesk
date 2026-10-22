@@ -15,7 +15,7 @@ from app.domain.v2.paths import get_path
 from app.services.persistence import audit
 from app.services.persistence.engine import session_scope
 from app.services.persistence.schema import Deal, DealEvent, DealVersion, Run
-from app.services.v2.errors import Invalid, NotFound
+from app.services.v2.errors import InvalidInputError, NotFoundError
 from app.services.v2.serialize import row
 
 JSON = dict[str, Any]
@@ -29,7 +29,7 @@ def _event(s: Session, deal_id: int, kind: str, payload: JSON | None = None) -> 
 def deal_or_404(s: Session, deal_id: int) -> Deal:
     d = s.get(Deal, deal_id)
     if d is None or d.archived:
-        raise NotFound(f"交易 {deal_id} 不存在")
+        raise NotFoundError(f"交易 {deal_id} 不存在")
     return d
 
 
@@ -39,16 +39,16 @@ def _deal_dict(d: Deal) -> JSON:
     return out
 
 
-def create_deal(name: str, track: str, address: str = "", asking_price: float | None = None,
+def create_deal(name: str, track: str, *, address: str = "", asking_price: float | None = None,
                 kill: list[JSON] | None = None, tags: list[str] | None = None) -> JSON:
     if track not in TRACKS:
-        raise Invalid("赛道只能是 residential 或 commercial")
+        raise InvalidInputError("赛道只能是 residential 或 commercial")
     if not name.strip():
-        raise Invalid("交易名称不能为空")
+        raise InvalidInputError("交易名称不能为空")
     try:
         crit = kill_criteria.validate(kill or [])
     except ValueError as e:
-        raise Invalid(str(e)) from e
+        raise InvalidInputError(str(e)) from e
     with session_scope() as s:
         d = Deal(name=name.strip(), track=track, address=address.strip(), asking_price=asking_price,
                  kill_criteria=crit, tags=list(tags or []), created_by=current_actor().username)
@@ -63,7 +63,7 @@ def update_deal(deal_id: int, changes: JSON) -> JSON:
     allowed = {"name", "address", "asking_price", "tags", "kill_criteria"}
     bad = set(changes) - allowed
     if bad:
-        raise Invalid(f"不能修改的字段：{', '.join(sorted(bad))}")
+        raise InvalidInputError(f"不能修改的字段：{', '.join(sorted(bad))}")
     with session_scope() as s:
         d = deal_or_404(s, deal_id)
         before = _deal_dict(d)
@@ -71,7 +71,7 @@ def update_deal(deal_id: int, changes: JSON) -> JSON:
             try:
                 changes["kill_criteria"] = kill_criteria.validate(changes["kill_criteria"])
             except ValueError as e:
-                raise Invalid(str(e)) from e
+                raise InvalidInputError(str(e)) from e
         for k, v in changes.items():
             setattr(d, k, v)
         s.flush()
@@ -103,13 +103,13 @@ def _store_run(s: Session, kind: str, inputs: JSON, outputs: JSON) -> Run:
 
 
 def save_version(deal_id: int, inputs: JSON, label: str = "") -> JSON:
-    """保存一版承销：跑模型 → 记可复现运行 → 生成版本 → 设为当前版。坏输入 → Invalid。"""
+    """保存一版承销：跑模型 → 记可复现运行 → 生成版本 → 设为当前版。坏输入 → InvalidInputError。"""
     with session_scope() as s:
         d = deal_or_404(s, deal_id)
         try:
             outputs = run_model(d.track, inputs)
         except ModelInputError as e:
-            raise Invalid(str(e)) from e
+            raise InvalidInputError(str(e)) from e
         run = _store_run(s, RUN_KIND + ":" + d.track, inputs, outputs)
         n = (s.scalar(select(func.max(DealVersion.version_no)).where(DealVersion.deal_id == d.id)) or 0) + 1
         v = DealVersion(deal_id=d.id, version_no=n, label=label or f"第 {n} 版", inputs=inputs, outputs=outputs,
@@ -125,7 +125,7 @@ def save_version(deal_id: int, inputs: JSON, label: str = "") -> JSON:
         return version_dict(v)
 
 
-def version_dict(v: DealVersion, with_detail: bool = False) -> JSON:
+def version_dict(v: DealVersion, *, with_detail: bool = False) -> JSON:
     out = row(v)
     if not with_detail:
         out["outputs"] = {"track": v.outputs.get("track"), "metrics": v.outputs.get("metrics", {})}
@@ -140,12 +140,12 @@ def list_versions(deal_id: int) -> list[JSON]:
         return [version_dict(v) for v in vs]
 
 
-def get_version(deal_id: int, version_id: int, with_detail: bool = True) -> JSON:
+def get_version(deal_id: int, version_id: int, *, with_detail: bool = True) -> JSON:
     with session_scope() as s:
         v = s.get(DealVersion, version_id)
         if v is None or v.deal_id != deal_id:
-            raise NotFound(f"版本 {version_id} 不存在")
-        return version_dict(v, with_detail)
+            raise NotFoundError(f"版本 {version_id} 不存在")
+        return version_dict(v, with_detail=with_detail)
 
 
 def current_version(s: Session, d: Deal) -> DealVersion | None:
@@ -156,7 +156,7 @@ def get_run(rid: str) -> JSON:
     with session_scope() as s:
         r = s.get(Run, rid)
         if r is None:
-            raise NotFound(f"运行编号 {rid} 不存在")
+            raise NotFoundError(f"运行编号 {rid} 不存在")
         return row(r)
 
 

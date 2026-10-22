@@ -37,7 +37,8 @@ def validate(criteria: list[dict[str, Any]]) -> list[dict[str, Any]]:
         if op not in OPS:
             raise ValueError(f"第 {i + 1} 条淘汰条件：比较符只能是 < <= > >=")
         if isinstance(th, bool) or not isinstance(th, (int, float)):
-            raise ValueError(f"第 {i + 1} 条淘汰条件：阈值必须是数字")
+            # 输入校验错误（用户填错），统一 ValueError → 422，而非编程错误的 TypeError
+            raise ValueError(f"第 {i + 1} 条淘汰条件：阈值必须是数字")  # noqa: TRY004
         out.append({"metric": m, "op": op, "threshold": float(th)})
     return out
 
@@ -54,9 +55,11 @@ def evaluate(criteria: list[dict[str, Any]], metrics: dict[str, Any]) -> dict[st
     for c in validate(criteria):
         v = metrics.get(c["metric"])
         if v is None:
-            state = "unknown"
+            state = "unknown"  # 未知保持未知：缺数不算通过也不算触发
+        elif OPS[c["op"]](float(v), c["threshold"]):
+            state = "triggered"
         else:
-            state = "triggered" if OPS[c["op"]](float(v), c["threshold"]) else "ok"
+            state = "ok"
         rows.append({**c, "value": v, "state": state, "text": describe(c)})
     return {
         "items": rows,

@@ -8,7 +8,7 @@ from fastapi import APIRouter, FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from app.core.context import current_request_id
-from app.services.v2.errors import Conflict, Invalid, NotFound
+from app.services.v2.errors import ConflictError, InvalidInputError, NotFoundError
 
 
 def install_error_handlers(app: FastAPI) -> None:
@@ -20,11 +20,12 @@ def install_error_handlers(app: FastAPI) -> None:
                 body["gate"] = extra
             return JSONResponse(body, status_code=status)
         return handler
-    app.add_exception_handler(NotFound, _h(404))
-    app.add_exception_handler(Conflict, _h(409))
-    app.add_exception_handler(Invalid, _h(422))
+    app.add_exception_handler(NotFoundError, _h(404))
+    app.add_exception_handler(ConflictError, _h(409))
+    app.add_exception_handler(InvalidInputError, _h(422))
 
 
 def routers() -> list[APIRouter]:
-    from app.api.v2 import admin, committee, deals, documents, portfolio, underwriting
+    # 延迟导入：子路由模块会反向导入本包（deps / schemas），放顶层会形成循环
+    from app.api.v2 import admin, committee, deals, documents, portfolio, underwriting  # noqa: PLC0415
     return [deals.router, underwriting.router, documents.router, committee.router, portfolio.router, admin.router]

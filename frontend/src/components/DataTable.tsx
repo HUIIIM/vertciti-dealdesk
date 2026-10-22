@@ -59,7 +59,7 @@ export function DataTable<T>({ id, columns, rows, rowKey, selected, onRowClick, 
         </thead>
         <tbody>
           {sorted.map((r, i) => (
-            <tr key={rowKey(r)} aria-selected={selected === i ? true : undefined} onClick={onRowClick ? () => onRowClick(r) : undefined}
+            <tr key={rowKey(r)} data-selected={selected === i ? "" : undefined} onClick={onRowClick ? () => onRowClick(r) : undefined}
               style={onRowClick ? { cursor: "pointer" } : undefined}>
               {columns.map((c) => <td key={c.key} className={c.numeric || c.unit ? "num" : undefined}>{c.render(r)}</td>)}
             </tr>))}

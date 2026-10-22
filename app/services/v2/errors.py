@@ -2,11 +2,11 @@
 from __future__ import annotations
 
 
-class NotFound(LookupError):
+class NotFoundError(LookupError):
     pass
 
 
-class Conflict(RuntimeError):
+class ConflictError(RuntimeError):
     """状态冲突（关卡未过、重复投票等）→ 409。"""
 
     def __init__(self, message: str, detail: object | None = None) -> None:
@@ -14,5 +14,5 @@ class Conflict(RuntimeError):
         self.detail = detail
 
 
-class Invalid(ValueError):
+class InvalidInputError(ValueError):
     """输入不合法 → 422。"""

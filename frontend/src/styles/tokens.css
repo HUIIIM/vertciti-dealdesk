@@ -6,7 +6,8 @@
   --red: #b3261e; --amber-text: #8a5a00;
   --bg: var(--mist); --surface: var(--paper); --surface-2: var(--mist); --text: var(--ink); --text-2: var(--graphite);
   --text-3: var(--stone); --border: var(--line); --hover: #f0f0f0; --selected: #fff3ee;
-  --ok: var(--green); --ok-bg: #e8f3ec; --warn: var(--amber-text); --warn-bg: #fff5cc; --risk: var(--red);
+  /* 文字用深一档绿（#17703C 在浅绿底 5.4:1，DNA 绿 4.2:1 不达标）；色块 / 进度 / 图表用 DNA 原绿 */
+  --ok: #17703c; --ok-mark: var(--green); --ok-bg: #e8f3ec; --warn: var(--amber-text); --warn-bg: #fff5cc; --risk: var(--red);
   --risk-bg: #f7e9e8; --plan: var(--stone); --plan-bg: var(--mist); --accent: var(--orange); --accent-text: var(--orange-text);
   --font: "Nunito Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -22,7 +23,7 @@
 :root[data-theme="dark"] {
   --bg: #0b0b0b; --surface: #141414; --surface-2: #1c1c1c; --text: #f2f2f2; --text-2: #c8c8c8; --text-3: #9a9a9a;
   --border: #2e2e2e; --hover: #1f1f1f; --selected: #2a1710;
-  --ok: #5fc48a; --ok-bg: #12261a; --warn: #f2c94c; --warn-bg: #2a2410; --risk: #ff8a80; --risk-bg: #2b1513;
+  --ok: #5fc48a; --ok-mark: #3fa86a; --ok-bg: #12261a; --warn: #f2c94c; --warn-bg: #2a2410; --risk: #ff8a80; --risk-bg: #2b1513;
   --plan: #9a9a9a; --plan-bg: #1c1c1c; --accent-text: #ff7a52; --shadow: 0 1px 0 #2e2e2e, 0 8px 24px rgba(0, 0, 0, .5);
   color-scheme: dark;
 }

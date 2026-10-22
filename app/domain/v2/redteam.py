@@ -5,10 +5,11 @@ vertciti 独有：用同一结果客观定义“关键数字”——凡是 ±10
 """
 from __future__ import annotations
 
+from functools import partial
 from typing import Any
 
 from app.domain.v2.assumptions import BY_TRACK, Assumption
-from app.domain.v2.model import PRIMARY_METRIC, METRICS, ModelInputError, primary_value, run_model
+from app.domain.v2.model import METRICS, PRIMARY_METRIC, ModelInputError, primary_value, run_model
 from app.domain.v2.paths import get_path, scale_numeric, update_path
 
 SHOCK = 0.10
@@ -29,7 +30,7 @@ def _has_value(inputs: JSON, a: Assumption) -> bool:
 def shock(inputs: JSON, a: Assumption, factor: float) -> JSON:
     out = inputs
     for p in a.paths:
-        out = update_path(out, p, lambda v, f=factor: scale_numeric(v, f))
+        out = update_path(out, p, partial(scale_numeric, factor=factor))
     return out
 
 
