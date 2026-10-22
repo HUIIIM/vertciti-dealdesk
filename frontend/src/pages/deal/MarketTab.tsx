@@ -13,6 +13,23 @@ interface TreeNode { id: string; level: number; display: string; confidence: str
 interface TreeOut { ok: boolean; owner_resolved: boolean; nodes: TreeNode[]; caveats: string[] }
 interface Signal { id: string; label: string; status: string; earned: number; points: number; value: string; source: string }
 interface SellOut { ok: boolean; score: number; max_score: number; tier_note: string; signals: Signal[]; caveats: string[] }
+interface Mention { title: string; url: string; source: string; published_at: string | null }
+interface EvDim { dim: string; label: string; query: string; items: Mention[]; error?: string }
+interface EvidenceOut { ok: boolean; reason?: string; source?: string; window?: string; dims: EvDim[] }
+
+const DIM_LABEL: Record<string, string> = {
+  supply: T("供给"), demand: T("需求"), vacancy: T("空置率"), rent_trend: T("租金趋势"), population: T("人口"), employment: T("就业"),
+};
+
+/** City guess for the EchoWatch query: "123 Main St, Tampa, FL 33602" -> "Tampa"; "39-09 Main St Flushing NY 11354" -> "Flushing". */
+export function guessArea(address: string): string {
+  const parts = address.split(",").map((p) => p.trim()).filter(Boolean);
+  if (parts.length >= 3) return parts[parts.length - 2] ?? "";
+  const m = address.match(/([A-Za-z][A-Za-z .'-]*?)\s+[A-Z]{2}\s+\d{5}/);
+  if (!m?.[1]) return "";
+  const words = m[1].trim().split(/\s+/);
+  return words[words.length - 1] ?? "";
+}
 
 function useOnDemand<T>(fn: () => Promise<T>) {
   const [st, set] = useState<{ data?: T; error?: Error; loading: boolean }>({ loading: false });
@@ -26,6 +43,8 @@ export function MarketTab() {
   const comps = useOnDemand(() => rawJson<CompsOut>("/api/wb/comps/pull", { address: addr }));
   const tree = useOnDemand(() => rawJson<TreeOut>("/api/wb/ownership/tree", { address: addr }));
   const sell = useOnDemand(() => rawJson<SellOut>("/api/wb/sell-readiness/score", { address: addr }));
+  const [area, setArea] = useState(() => guessArea(addr ?? ""));
+  const ev = useOnDemand(() => rawJson<EvidenceOut>(`/api/wb/research/evidence?area=${encodeURIComponent(area.slice(0, 120))}`));
   if (!addr) return <Empty title={T("先填地址")}>{T("市场数据按地址检索。")}</Empty>;
   const rows = comps.data?.rows ?? [];
   return (
@@ -44,6 +63,21 @@ export function MarketTab() {
             <th scope="col" className="num">{T("面积")}<span className="unit">{T("（SF）")}</span></th><th scope="col" className="num">$/SF</th><th scope="col" className="num">{T("距离")}<span className="unit">{T("（英里）")}</span></th><th scope="col">{T("来源")}</th></tr></thead>
             <tbody>{rows.map((c, i) => <tr key={i}><td>{c.address}</td><td>{c.sale_date}</td><NumCell v={c.price} unit="usd" /><NumCell v={c.sf} unit="int" />
               <NumCell v={c.sf ? c.price / c.sf : null} unit="usd" /><NumCell v={c.distance_miles} unit="x" /><td className="muted">{c.source}</td></tr>)}</tbody></table></div></>) : null}
+      </section>
+      <section className="card" aria-label={T("舆情证据")}>
+        <div className="row" style={{ justifyContent: "space-between" }}><h2 style={{ margin: 0 }}>{T("舆情证据（EchoWatch）")}</h2>
+          <span className="row"><input aria-label={T("检索区域")} value={area} onChange={(e) => setArea(e.target.value)} placeholder={T("城市，如 Tampa")} style={{ width: 160 }} />
+            <button className="btn sm" type="button" onClick={ev.run} disabled={ev.loading || !area.trim()}>{ev.loading ? T("拉取中…") : T("拉取证据")}</button></span></div>
+        <p className="sub">{T("按区域检索近 30 天带出处的公开提及：供给 / 需求 / 空置 / 租金 / 人口 / 就业。提及确实存在，但不等于它说的数字已核实——引用前请点开原文。")}</p>
+        {ev.loading ? <Skeleton rows={3} /> : null}
+        {ev.error ? <ErrorBox error={ev.error} /> : null}
+        {ev.data && !ev.data.ok ? <div className="banner warn">{T("没拉到：")}{ev.data.reason}{T("。未覆盖的维度请手动登记，不要猜。")}</div> : null}
+        {ev.data?.dims.length ? (<ul className="checks">{ev.data.dims.map((d) => <li key={d.dim}>
+          <Status s={d.items.length ? "verified" : "planned"}>{DIM_LABEL[d.dim] ?? d.dim}</Status>
+          <span>{d.items.length ? d.items.map((m) => <div key={m.url}><a href={m.url} target="_blank" rel="noopener noreferrer">{m.title || m.url}</a>
+            <div className="d">{m.source}{m.published_at ? ` · ${m.published_at.slice(0, 10)}` : ""}</div></div>)
+            : <span className="muted">{d.error ?? T("无匹配提及")}</span>}<div className="d">{T("检索：")}{d.query}</div></span></li>)}</ul>) : null}
+        {ev.data?.source ? <p className="sub">{T("来源：")}{ev.data.source}</p> : null}
       </section>
       <div className="split">
         <section className="card" aria-label={T("产权穿透")}>

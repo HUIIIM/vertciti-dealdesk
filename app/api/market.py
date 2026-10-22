@@ -182,6 +182,15 @@ def wb_research(req: _WbResearchReq):
     return workbench.research_payload(r, req.valuation, req.forecast)
 
 
+@router.get("/api/wb/research/evidence")
+def wb_research_evidence(market_key: str = "", area: str = ""):
+    """EchoWatch 候选证据：六维各几条带链接的公开提及，供人工核对，不自动写入."""
+    from app.services import echowatch_bridge
+    if len(area) > 120:
+        raise HTTPException(422, "area 过长（≤120 字符）")
+    return echowatch_bridge.fetch_evidence(market_key, area=area)
+
+
 @router.post("/api/wb/research/report", response_class=HTMLResponse)
 def wb_research_report(req: _WbResearchReq):
     r = _validate(WbResearch, req.research, "研究")
