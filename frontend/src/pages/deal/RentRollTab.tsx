@@ -9,10 +9,16 @@ import { saveResponse } from "@/lib/download";
 import { RES_INCOME } from "@/domain/fields";
 import { getPath } from "@/lib/paths";
 import { useDeal } from "./Deal";
+import { InstRentRoll } from "./InstTabs";
 
 interface Tenant { suite?: string; tenant?: string; sf?: number; monthly_rent?: number; underwritten_annual?: number | null }
 
 export function RentRollTab() {
+  const { track } = useDeal();
+  return track === "institutional" ? <InstRentRoll /> : <ClassicRentRoll />;
+}
+
+function ClassicRentRoll() {
   const { track, draft, set, preview, passports, openPassport } = useDeal();
   const toast = useToast();
   const xf = useRef<HTMLInputElement>(null);

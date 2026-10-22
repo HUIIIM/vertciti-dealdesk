@@ -6,7 +6,7 @@ from typing import Annotated, Any, Literal, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-Track = Literal["residential", "commercial"]
+Track = Literal["residential", "commercial", "institutional"]
 Stage = Literal["sourcing", "screening", "underwriting", "committee", "diligence", "closing", "holding", "passed"]
 
 

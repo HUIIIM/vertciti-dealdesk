@@ -19,7 +19,7 @@ JSON = dict[str, Any]
 
 
 def default_scenarios(track: str) -> list[JSON]:
-    if track == "commercial":
+    if track in ("commercial", "institutional"):
         return [
             {"name": T("基准"), "probability": 50, "changes": []},
             {"name": T("乐观"), "probability": 25, "changes": [{"assumption": "rent_level", "pct": 5},
@@ -80,7 +80,7 @@ def _apply_change(track: str, inputs: JSON, ch: JSON) -> JSON:
 
 
 def _is_loss(track: str, m: JSON) -> bool | None:
-    if track == "commercial":
+    if track in ("commercial", "institutional"):
         em = m.get("equity_multiple")
         return None if em is None else em < 1
     cf = m.get("annual_cash_flow")

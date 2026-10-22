@@ -42,7 +42,21 @@ RESIDENTIAL: tuple[Assumption, ...] = (
     Assumption("initial_repairs", "初始维修", ("initial_repairs",)),
 )
 
-BY_TRACK = {"commercial": COMMERCIAL, "residential": RESIDENTIAL}
+INSTITUTIONAL: tuple[Assumption, ...] = (
+    Assumption("rent_level", "租金水平", ("leases.*.rent_psf_yr", "market.rent_psf_yr"), "document"),
+    Assumption("market_rent_growth", "市场租金增长", ("market.rent_growth_pct",), "benchmark"),
+    Assumption("renewal", "续租概率", ("market.renewal_prob_pct",), "benchmark"),
+    Assumption("downtime", "新租空置月数", ("market.downtime_months",), "benchmark"),
+    Assumption("ti_new", "新租 TI", ("market.ti_new_psf",), "benchmark"),
+    Assumption("vacancy", "一般空置率", ("general_vacancy_pct",), "benchmark"),
+    Assumption("exit_cap", "退出 Cap Rate", ("exit_cap_pct",), "benchmark"),
+    Assumption("opex", "运营费用", ("opex.recoverable_psf_yr", "opex.non_recoverable_psf_yr"), "historical"),
+    Assumption("opex_growth", "费用增长", ("opex.growth_pct",), "historical"),
+    Assumption("rate", "贷款利率", ("debt.rate_pct", "debt.spread_bps"), "benchmark"),
+    Assumption("closing_costs", "交割费用", ("closing_costs_pct",)),
+)
+
+BY_TRACK = {"commercial": COMMERCIAL, "residential": RESIDENTIAL, "institutional": INSTITUTIONAL}
 
 
 def find(track: str, key: str) -> Assumption:

@@ -214,7 +214,7 @@ def test_health_catalog_and_templates(client):
     cat = c.get("/api/v2/catalog").json()
     assert cat["primary_metric"]["commercial"] == "irr_pct" and "rent_level" in str(cat["assumptions"])
     t = c.get("/api/v2/settings/templates", params={"kind": "kill_criteria"}).json()
-    assert {x["name"] for x in t} == {"商业默认", "住宅默认"}
+    assert {x["name"] for x in t} == {"商业默认", "住宅默认", "机构默认"}
     assert c.put("/api/v2/settings/templates", json={"kind": "kill_criteria", "name": "保守",
                                                      "payload": {"criteria": [{"metric": "dscr", "op": "<",
                                                                                "threshold": 1.4}]}}).status_code == 200

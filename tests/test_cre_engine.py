@@ -195,13 +195,13 @@ def test_api_preview_and_example(tmp_path, monkeypatch):
     monkeypatch.delenv("DATABASE_URL", raising=False)
     monkeypatch.delenv("DEALDESK_AUTH", raising=False)
     c = TestClient(app)
-    ex = c.get("/api/v2/model/institutional/example").json()
-    r = c.post("/api/v2/model/institutional", json=ex)
+    ex = c.get("/api/v2/cre/example").json()
+    r = c.post("/api/v2/cre/run", json=ex)
     assert r.status_code == 200, r.text
     out = r.json()
     assert out["engine"] == "cre-1.0" and out["waterfall"]["lp_irr_pct"] < out["metrics"]["levered_irr_pct"]
     assert any(s["speculative"] for s in out["rent_roll"])  # 到期租约与空置面积都滚出了假设段
-    bad = c.post("/api/v2/model/institutional", json={**ex, "hold_years": 0})
+    bad = c.post("/api/v2/cre/run", json={**ex, "hold_years": 0})
     assert bad.status_code == 422 and "hold_years" in bad.json()["detail"]
 
 

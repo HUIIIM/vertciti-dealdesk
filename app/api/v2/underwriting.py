@@ -27,16 +27,16 @@ from app.domain.v2 import kill_criteria, scenarios
 from app.domain.v2.assumptions import BY_TRACK
 from app.domain.v2.cre import engine as cre_engine
 from app.domain.v2.cre.example import suburban_office
-from app.domain.v2.model import METRICS, PRIMARY_METRIC, ModelInputError, run_model
+from app.domain.v2.model import METRICS, PRIMARY_METRIC, TRACKS, ModelInputError, run_model
 from app.services.v2 import analysis
 from app.services.v2.errors import InvalidInputError
 
 router = APIRouter(prefix="/api/v2", tags=["v2 · underwriting"], route_class=LocalizedRoute)
 
 
-@router.post("/model/institutional", response_model=InstitutionalOut, dependencies=[need("deal.read")])
+@router.post("/cre/run", response_model=InstitutionalOut, dependencies=[need("deal.read")])
 def institutional(inputs: dict[str, Any]) -> dict[str, Any]:
-    """机构级承销（office / retail / industrial），不保存的试算。
+    """机构级引擎的完整结果（逐月 / 逐年 / 租期段 / 瀑布）；工作台试算走 POST /model/institutional（统一指标口径）。
 
     逐租约按月现金流、到期续租（MLA 加权）、TI / LC、费用回收、一般空置抵减周转空置、
     固定 / 浮动债务（含利率上限）、按下一年 NOI 退出、有杠杆 / 无杠杆收益与 GP / LP 瀑布。
@@ -47,7 +47,7 @@ def institutional(inputs: dict[str, Any]) -> dict[str, Any]:
         raise InvalidInputError(str(e)) from e
 
 
-@router.get("/model/institutional/example", dependencies=[need("deal.read")])
+@router.get("/cre/example", dependencies=[need("deal.read")])
 def institutional_example() -> dict[str, Any]:
     """示例输入：4 租户郊区办公楼（含空置、基年租约、即将到期租约、浮动利率带上限、两档瀑布）；演示数字。"""
     return suburban_office()
@@ -74,8 +74,9 @@ def catalog() -> dict[str, Any]:
                              "source_hint": label(a.source_hint)}
                             for a in v] for t, v in BY_TRACK.items()},
         "kill_criteria_defaults": {"commercial": kill_criteria.DEFAULT_COMMERCIAL,
-                                   "residential": kill_criteria.DEFAULT_RESIDENTIAL},
-        "scenario_defaults": {t: scenarios.default_scenarios(t) for t in ("commercial", "residential")},
+                                   "residential": kill_criteria.DEFAULT_RESIDENTIAL,
+                                   "institutional": kill_criteria.DEFAULT_INSTITUTIONAL},
+        "scenario_defaults": {t: scenarios.default_scenarios(t) for t in TRACKS},
     }
 
 

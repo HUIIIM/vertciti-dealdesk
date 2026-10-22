@@ -1,9 +1,13 @@
-// 两条赛道的表单字段（路径、标签、单位、说明）。路径与后端输入结构一致，护照（来源）按同一路径登记。
+// 三条赛道的表单字段（路径、标签、单位、说明）。路径与后端输入结构一致，护照（来源）按同一路径登记。
 import { T } from "@/i18n";
 import type { Unit } from "@/lib/format";
 import type { JsonObj } from "@/lib/paths";
 
-export type Track = "residential" | "commercial";
+export type Track = "residential" | "commercial" | "institutional";
+
+export function trackLabel(t: string): string {
+  return t === "commercial" ? T("商业") : t === "institutional" ? T("机构级") : T("住宅");
+}
 export interface FieldSpec { path: string; label: string; unit: Unit | "select" | "bool"; hint?: string; options?: [string, string][]; step?: number }
 
 // ---------------------------------------------------------------- 商业（v1 机构级核保模型）
@@ -56,6 +60,71 @@ export function blankCommercial(name = "", address = ""): JsonObj {
   };
 }
 
+// ---------------------------------------------------------------- 机构级（逐租约按月引擎，cre-1.0；百分比一律按百分比数）
+export const INST_DEAL: FieldSpec[] = [
+  { path: "purchase_price", label: T("收购价"), unit: "usd" },
+  { path: "closing_costs_pct", label: T("交割成本"), unit: "pct", step: 0.1 },
+  { path: "analysis_start", label: T("交割月"), unit: "text", hint: "YYYY-MM" },
+  { path: "hold_years", label: T("持有年数"), unit: "int" },
+  { path: "area_sf", label: T("可租面积"), unit: "int", hint: "SF" },
+  { path: "general_vacancy_pct", label: T("一般空置率"), unit: "pct", step: 0.5, hint: T("会先扣除已建模的周转空置") },
+  { path: "credit_loss_pct", label: T("信用损失"), unit: "pct", step: 0.25 },
+  { path: "exit_cap_pct", label: T("退出 Cap Rate"), unit: "pct", step: 0.05, hint: T("按下一年 NOI") },
+  { path: "selling_costs_pct", label: T("卖方成本"), unit: "pct", step: 0.25 },
+  { path: "discount_rate_pct", label: T("折现率"), unit: "pct", step: 0.25, hint: "NPV" },
+];
+export const INST_MARKET: FieldSpec[] = [
+  { path: "market.rent_psf_yr", label: T("市场租金"), unit: "usd", hint: T("$/SF/年") },
+  { path: "market.rent_growth_pct", label: T("市场租金增长"), unit: "pct", step: 0.25 },
+  { path: "market.renewal_prob_pct", label: T("续租概率"), unit: "pct", step: 5 },
+  { path: "market.downtime_months", label: T("新租空置月数"), unit: "int" },
+  { path: "market.free_rent_new_months", label: T("新租免租月"), unit: "int" },
+  { path: "market.free_rent_renew_months", label: T("续租免租月"), unit: "int" },
+  { path: "market.ti_new_psf", label: T("新租 TI"), unit: "usd", hint: "$/SF" },
+  { path: "market.ti_renew_psf", label: T("续租 TI"), unit: "usd", hint: "$/SF" },
+  { path: "market.lc_new_pct", label: T("新租佣金"), unit: "pct", step: 0.5, hint: T("占租期租金总额") },
+  { path: "market.lc_renew_pct", label: T("续租佣金"), unit: "pct", step: 0.5 },
+  { path: "market.lease_term_years", label: T("新租期"), unit: "int", hint: T("年") },
+  { path: "market.escalation_pct", label: T("新租年递增"), unit: "pct", step: 0.25 },
+];
+export const INST_OPEX: FieldSpec[] = [
+  { path: "opex.recoverable_psf_yr", label: T("可回收费用"), unit: "usd", hint: T("税 / 保险 / CAM，$/SF/年") },
+  { path: "opex.non_recoverable_psf_yr", label: T("不可回收费用"), unit: "usd", hint: T("$/SF/年") },
+  { path: "opex.growth_pct", label: T("费用增长"), unit: "pct", step: 0.25 },
+  { path: "opex.mgmt_fee_pct_egr", label: T("管理费"), unit: "pct", step: 0.25, hint: T("占有效总收入") },
+  { path: "opex.reserves_psf_yr", label: T("资本储备"), unit: "usd", hint: T("$/SF/年") },
+];
+export const INST_DEBT: FieldSpec[] = [
+  { path: "debt.ltv_pct", label: "LTV", unit: "pct", step: 1 },
+  { path: "debt.rate_type", label: T("利率类型"), unit: "select", options: [["fixed", T("固定")], ["floating", T("浮动（SOFR + 利差）")]] },
+  { path: "debt.rate_pct", label: T("固定利率"), unit: "pct", step: 0.05 },
+  { path: "debt.spread_bps", label: T("利差"), unit: "int", hint: "bp" },
+  { path: "debt.cap_strike_pct", label: T("利率上限"), unit: "pct", step: 0.25, hint: T("SOFR 上限，空 = 无") },
+  { path: "debt.io_months", label: T("只付息月数"), unit: "int" },
+  { path: "debt.amort_years", label: T("摊还年数"), unit: "int" },
+  { path: "debt.orig_fee_pct", label: T("贷款开办费"), unit: "pct", step: 0.25 },
+];
+export const INST_WATERFALL: FieldSpec[] = [
+  { path: "waterfall.lp_equity_pct", label: T("LP 出资比例"), unit: "pct", step: 1 },
+  { path: "waterfall.pref_pct", label: T("优先回报"), unit: "pct", step: 0.5, hint: T("LP IRR 门槛") },
+  { path: "waterfall.final_lp_share_pct", label: T("最后一档 LP 份额"), unit: "pct", step: 5 },
+];
+
+export function blankInstitutional(price?: number | null): JsonObj {
+  const now = new Date();
+  const start = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  return {
+    analysis_start: start, hold_years: 7, area_sf: 0, purchase_price: price && price > 0 ? price : 0, closing_costs_pct: 1.5,
+    leases: [], general_vacancy_pct: 5, credit_loss_pct: 1, exit_cap_pct: 7, selling_costs_pct: 2, discount_rate_pct: 8,
+    market: { rent_psf_yr: 30, rent_growth_pct: 3, renewal_prob_pct: 65, downtime_months: 6, free_rent_new_months: 3,
+      free_rent_renew_months: 1, ti_new_psf: 40, ti_renew_psf: 15, lc_new_pct: 6, lc_renew_pct: 3, lease_term_years: 5, escalation_pct: 3 },
+    opex: { recoverable_psf_yr: 10, non_recoverable_psf_yr: 1.5, growth_pct: 3, mgmt_fee_pct_egr: 3, reserves_psf_yr: 0.25 },
+    debt: { ltv_pct: 60, rate_type: "fixed", rate_pct: 6.5, sofr_curve_pct: [], spread_bps: 250, cap_strike_pct: null, io_months: 24,
+      amort_years: 30, orig_fee_pct: 1 },
+    waterfall: { lp_equity_pct: 90, pref_pct: 8, tiers: [{ irr_pct: 12, lp_share_pct: 80 }], final_lp_share_pct: 70 },
+  };
+}
+
 // ---------------------------------------------------------------- 住宅（v1 打分引擎）
 export const RES_DEAL: FieldSpec[] = [
   { path: "price", label: T("收购价"), unit: "usd" },
@@ -103,6 +172,7 @@ export function blankResidential(): JsonObj {
 }
 
 export function blankInputs(track: Track, name = "", address = "", price?: number | null): JsonObj {
+  if (track === "institutional") return blankInstitutional(price);
   const base = track === "commercial" ? blankCommercial(name, address) : blankResidential();
   if (price && price > 0) {
     if (track === "commercial") (base.analysis as JsonObj).purchase_price = price;
@@ -113,13 +183,18 @@ export function blankInputs(track: Track, name = "", address = "", price?: numbe
 
 /** 输入路径 → 中文标签（数字护照、矛盾登记、版本对比里不露内部字段名）。 */
 const LABELS: Record<string, string> = Object.fromEntries([
-  ...[...COM_ANALYSIS, ...COM_PROPERTY, ...RES_DEAL, ...RES_INCOME, ...RES_EXPENSES, ...RES_EXIT].map((f) => [f.path, f.label]),
+  ...[...COM_ANALYSIS, ...COM_PROPERTY, ...RES_DEAL, ...RES_INCOME, ...RES_EXPENSES, ...RES_EXIT,
+    ...INST_DEAL, ...INST_MARKET, ...INST_OPEX, ...INST_DEBT, ...INST_WATERFALL].map((f) => [f.path, f.label]),
+  ["leases.*.rent_psf_yr", T("租金水平（各租约 $/SF）")],
   ...[...COM_INCOME, ...COM_EXPENSES, ...COM_BELOW_LINE].flatMap(([k, l]) => [[`proforma.${k}`, T("{0}（预测）", [l])], [`historical.${k}`, T("{0}（历史）", [l])]]),
   ["proforma.vacancy_pct", T("空置率（预测）")], ["historical.vacancy_pct", T("空置率（历史）")],
   ["tenants.*.monthly_rent", T("租金水平（各租户月租）")], ["tenants.*.underwritten_annual", T("租金水平（承销年租）")],
 ]);
 export function fieldLabel(path: string): string {
   if (LABELS[path]) return LABELS[path]!;
+  const lm = /^leases\.(\d+)\.(\w+)$/.exec(path);
+  if (lm) return T("第 {0} 份租约 · {1}", [Number(lm[1]) + 1, { rent_psf_yr: T("租金 $/SF"), sf: T("面积"), tenant: T("租户"), suite: T("单元"),
+    start: T("起租"), end: T("到期"), escalation_pct: T("年递增"), free_rent_months: T("免租月"), recovery: T("回收方式") }[lm[2]!] ?? lm[2]]);
   const m = /^tenants\.(\d+)\.(\w+)$/.exec(path);
   if (m) return T("第 {0} 户 · {1}", [Number(m[1]) + 1, { monthly_rent: T("月租"), sf: T("面积"), tenant: T("租户"), suite: T("单元"), underwritten_annual: T("承销年租") }[m[2]!] ?? m[2]]);
   return path;
@@ -129,6 +204,7 @@ export function fieldLabel(path: string): string {
 export const CARD_METRICS: Record<Track, string[]> = {
   commercial: ["irr_pct", "cap_rate_pct", "dscr", "coc_pct", "equity_multiple"],
   residential: ["coc_pct", "cap_rate_pct", "dscr", "annual_cash_flow", "score"],
+  institutional: ["irr_pct", "unlevered_irr_pct", "cap_rate_pct", "dscr", "debt_yield_pct"],
 };
 
 export const STAGES: [string, string][] = [

@@ -6,8 +6,14 @@ import { NumCell } from "@/components/ui";
 import { COM_BELOW_LINE, COM_EXPENSES, COM_INCOME, RES_EXPENSES } from "@/domain/fields";
 import { getPath } from "@/lib/paths";
 import { useDeal } from "./Deal";
+import { InstMarketOpex } from "./InstTabs";
 
 export function T12Tab() {
+  const { track } = useDeal();
+  return track === "institutional" ? <InstMarketOpex /> : <ClassicT12 />;
+}
+
+function ClassicT12() {
   const { track, draft, set, preview, passports, openPassport } = useDeal();
   if (track === "residential") {
     return (

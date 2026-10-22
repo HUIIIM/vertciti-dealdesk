@@ -116,6 +116,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v2/cre/example": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Institutional Example
+         * @description 示例输入：4 租户郊区办公楼（含空置、基年租约、即将到期租约、浮动利率带上限、两档瀑布）；演示数字。
+         */
+        get: operations["institutional_example_api_v2_cre_example_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/cre/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Institutional
+         * @description 机构级引擎的完整结果（逐月 / 逐年 / 租期段 / 瀑布）；工作台试算走 POST /model/institutional（统一指标口径）。
+         *
+         *     逐租约按月现金流、到期续租（MLA 加权）、TI / LC、费用回收、一般空置抵减周转空置、
+         *     固定 / 浮动债务（含利率上限）、按下一年 NOI 退出、有杠杆 / 无杠杆收益与 GP / LP 瀑布。
+         */
+        post: operations["institutional_api_v2_cre_run_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v2/deals": {
         parameters: {
             query?: never;
@@ -893,49 +936,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v2/model/institutional": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Institutional
-         * @description 机构级承销（office / retail / industrial），不保存的试算。
-         *
-         *     逐租约按月现金流、到期续租（MLA 加权）、TI / LC、费用回收、一般空置抵减周转空置、
-         *     固定 / 浮动债务（含利率上限）、按下一年 NOI 退出、有杠杆 / 无杠杆收益与 GP / LP 瀑布。
-         */
-        post: operations["institutional_api_v2_model_institutional_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/model/institutional/example": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Institutional Example
-         * @description 示例输入：4 租户郊区办公楼（含空置、基年租约、即将到期租约、浮动利率带上限、两档瀑布）；演示数字。
-         */
-        get: operations["institutional_example_api_v2_model_institutional_example_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v2/model/{track}": {
         parameters: {
             query?: never;
@@ -1512,7 +1512,7 @@ export interface components {
              * Track
              * @enum {string}
              */
-            track: "residential" | "commercial";
+            track: "residential" | "commercial" | "institutional";
         };
         /** DealListItem */
         DealListItem: {
@@ -1556,7 +1556,7 @@ export interface components {
              * Track
              * @enum {string}
              */
-            track: "residential" | "commercial";
+            track: "residential" | "commercial" | "institutional";
             /** Updated At */
             updated_at: string;
         } & {
@@ -1594,7 +1594,7 @@ export interface components {
              * Track
              * @enum {string}
              */
-            track: "residential" | "commercial";
+            track: "residential" | "commercial" | "institutional";
             /** Updated At */
             updated_at: string;
         } & {
@@ -1834,7 +1834,7 @@ export interface components {
              * Track
              * @enum {string}
              */
-            track: "residential" | "commercial";
+            track: "residential" | "commercial" | "institutional";
         } & {
             [key: string]: unknown;
         };
@@ -2075,7 +2075,7 @@ export interface components {
              * Track
              * @enum {string}
              */
-            track: "residential" | "commercial";
+            track: "residential" | "commercial" | "institutional";
             /** Updated At */
             updated_at: number | null;
         } & {
@@ -2178,7 +2178,7 @@ export interface components {
              * Track
              * @enum {string}
              */
-            track: "residential" | "commercial";
+            track: "residential" | "commercial" | "institutional";
         } & {
             [key: string]: unknown;
         };
@@ -2437,7 +2437,7 @@ export interface components {
              * Track
              * @enum {string}
              */
-            track: "residential" | "commercial";
+            track: "residential" | "commercial" | "institutional";
         };
         /** ResearchOut */
         ResearchOut: {
@@ -2455,7 +2455,7 @@ export interface components {
              * Track
              * @enum {string}
              */
-            track: "residential" | "commercial";
+            track: "residential" | "commercial" | "institutional";
         } & {
             [key: string]: unknown;
         };
@@ -3553,11 +3553,68 @@ export interface operations {
             };
         };
     };
+    institutional_example_api_v2_cre_example_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    institutional_api_v2_cre_run_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstitutionalOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_deals_api_v2_deals_get: {
         parameters: {
             query?: {
                 stage?: ("sourcing" | "screening" | "underwriting" | "committee" | "diligence" | "closing" | "holding" | "passed") | null;
-                track?: ("residential" | "commercial") | null;
+                track?: ("residential" | "commercial" | "institutional") | null;
                 q?: string | null;
             };
             header?: never;
@@ -5103,69 +5160,12 @@ export interface operations {
             };
         };
     };
-    institutional_api_v2_model_institutional_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    [key: string]: unknown;
-                };
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["InstitutionalOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    institutional_example_api_v2_model_institutional_example_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-        };
-    };
     preview_api_v2_model__track__post: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                track: "residential" | "commercial";
+                track: "residential" | "commercial" | "institutional";
             };
             cookie?: never;
         };

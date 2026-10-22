@@ -6,7 +6,7 @@ import { useApi } from "@/api/useApi";
 import { useApp } from "@/app-context";
 import { DataTable, type Column } from "@/components/DataTable";
 import { Empty, ErrorBox, Kbd, Skeleton, Status, useToast } from "@/components/ui";
-import { STAGES } from "@/domain/fields";
+import { STAGES, trackLabel } from "@/domain/fields";
 import { fmt, fmtShort } from "@/lib/format";
 import { useHotkeys } from "@/lib/hotkeys";
 import { usePref } from "@/lib/prefs";
@@ -14,13 +14,13 @@ import { navigate } from "@/lib/router";
 import { NewDeal } from "./NewDeal";
 
 type View = "board" | "table";
-interface Filters { track: "" | "residential" | "commercial"; q: string; kill: "" | "triggered" | "clear" | "unknown" }
+interface Filters { track: "" | "residential" | "commercial" | "institutional"; q: string; kill: "" | "triggered" | "clear" | "unknown" }
 const NONE: Filters = { track: "", q: "", kill: "" };
 
 /** 服务端保存的视图配置是任意 JSON：逐字段收窄，不信任形状。 */
 export function toFilters(c: Record<string, unknown>): { filters: Filters; view: View | null } {
   const pick = <T extends string>(v: unknown, ok: readonly T[]): T | "" => (typeof v === "string" && (ok as readonly string[]).includes(v) ? (v as T) : "");
-  return { filters: { track: pick(c.track, ["residential", "commercial"] as const), q: typeof c.q === "string" ? c.q : "",
+  return { filters: { track: pick(c.track, ["residential", "commercial", "institutional"] as const), q: typeof c.q === "string" ? c.q : "",
     kill: pick(c.kill, ["triggered", "clear", "unknown"] as const) }, view: c.view === "board" || c.view === "table" ? c.view : null };
 }
 
@@ -60,7 +60,7 @@ export function Pipeline() {
   const columns: Column<DealListItem>[] = [
     { key: "name", header: T("交易"), width: 240, render: (d) => <a className="rowlink" href={`#/deals/${d.id}`}>{d.name}</a>, sortValue: (d) => d.name },
     { key: "stage", header: T("阶段"), width: 90, render: (d) => d.stage_label, sortValue: (d) => d.stage_index },
-    { key: "track", header: T("赛道"), width: 70, render: (d) => (d.track === "commercial" ? T("商业") : T("住宅")), sortValue: (d) => d.track },
+    { key: "track", header: T("赛道"), width: 70, render: (d) => trackLabel(d.track), sortValue: (d) => d.track },
     { key: "price", header: T("收购价"), unit: "usd", width: 130, render: (d) => fmt(m(d, "price") ?? d.asking_price, "int"), sortValue: (d) => m(d, "price") ?? d.asking_price ?? null },
     { key: "primary", header: T("主回报"), unit: "pct", width: 100, render: (d) => fmt(m(d, primary(d)), "pct").replace("%", ""), sortValue: (d) => m(d, primary(d)) },
     { key: "dscr", header: "DSCR", unit: "x", width: 80, render: (d) => fmt(m(d, "dscr"), "x").replace("×", ""), sortValue: (d) => m(d, "dscr") },
@@ -88,7 +88,7 @@ export function Pipeline() {
       <div className="row" style={{ marginBottom: 16 }} role="search">
         <input className="input" style={{ maxWidth: 280 }} placeholder={T("筛选：名称 / 地址")} aria-label={T("筛选名称或地址")} value={f.q} onChange={(e) => setF({ ...f, q: e.target.value })} />
         <select className="input" style={{ width: 120 }} aria-label={T("赛道")} value={f.track} onChange={(e) => setF({ ...f, track: e.target.value as Filters["track"] })}>
-          <option value="">{T("全部赛道")}</option><option value="commercial">{T("商业")}</option><option value="residential">{T("住宅")}</option>
+          <option value="">{T("全部赛道")}</option><option value="institutional">{T("机构级")}</option><option value="commercial">{T("商业")}</option><option value="residential">{T("住宅")}</option>
         </select>
         <select className="input" style={{ width: 150 }} aria-label={T("淘汰条件")} value={f.kill} onChange={(e) => setF({ ...f, kill: e.target.value as Filters["kill"] })}>
           <option value="">{T("淘汰条件：全部")}</option><option value="triggered">{T("触发淘汰")}</option><option value="clear">{T("未触发")}</option><option value="unknown">{T("指标未知")}</option>
@@ -121,7 +121,7 @@ export function Pipeline() {
                     <a key={d.id} href={`#/deals/${d.id}`} className={`kcard ${st === "risk" ? "risk" : st === "verified" ? "ok" : st === "building" ? "warn" : ""}`}
                       aria-current={idx === selIdx ? "true" : undefined} onFocus={() => setSel(idx)}>
                       <div className="name" title={d.name}>{d.name}</div>
-                      <div className="addr" title={d.address || undefined}>{d.address || "—"} · {d.track === "commercial" ? T("商业") : T("住宅")}</div>
+                      <div className="addr" title={d.address || undefined}>{d.address || "—"} · {trackLabel(d.track)}</div>
                       <div className="kv"><span className="muted">{T("价格")}</span><span>{fmtShort(m(d, "price") ?? d.asking_price)}</span></div>
                       <div className="kv"><span className="muted">{catalog.metrics[primary(d)]?.label}</span><span>{fmt(m(d, primary(d)), "pct")}</span></div>
                       <div className="kv"><span className="muted">DSCR</span><span>{fmt(m(d, "dscr"), "x")}</span></div>

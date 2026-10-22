@@ -1,7 +1,8 @@
 # 机构级承销引擎 · 方法论（cre-1.0）
 
 > 适用：office / retail / industrial（按租约出租的商业物业）。multifamily（按单元）不在本版范围。
-> 代码：`app/domain/v2/cre/`；接口：`POST /api/v2/model/institutional`（示例输入：`GET /api/v2/model/institutional/example`）。
+> 代码：`app/domain/v2/cre/`；接口：`POST /api/v2/cre/run` 给完整结果（示例输入：`GET /api/v2/cre/example`）；
+> 工作台按“机构级”赛道走统一的 `POST /api/v2/model/institutional`（指标口径与其他赛道一致，完整结果在 `detail.cre`）。
 > 验证：`tests/test_cre_engine.py`（每条口径都有可手算的基准用例）。改任何口径，必须同时改本文与对应用例。
 
 ## 1. 时间约定

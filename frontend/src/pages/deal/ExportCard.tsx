@@ -23,9 +23,10 @@ export function ExportCard() {
     <section className="card flat" aria-label={T("导出")}>
       <h2>{T("导出")}</h2>
       <p className="sub">{ov.version ? T("按当前版本（第 {0} 版）现算；缺的数显示“—”，不估算。", [ov.version.version_no]) : T("先保存一版承销才能导出。")}</p>
-      <div className="row">{kinds.map(([k, l]) => (
-        <button key={k} className={k === "memo" ? "btn primary" : "btn"} type="button" disabled={!ov.version || busy !== null} onClick={() => void go(k)}>
-          {busy === k ? T("生成中…") : l}</button>))}</div>
+      {track === "institutional" ? <p className="muted">{T("机构级交易的导出（带公式的 Excel、机构格式投委会备忘录）在下一版提供；现在可在“投委会”页生成投委会包。")}</p>
+        : <div className="row">{kinds.map(([k, l]) => (
+          <button key={k} className={k === "memo" ? "btn primary" : "btn"} type="button" disabled={!ov.version || busy !== null} onClick={() => void go(k)}>
+            {busy === k ? T("生成中…") : l}</button>))}</div>}
     </section>
   );
 }

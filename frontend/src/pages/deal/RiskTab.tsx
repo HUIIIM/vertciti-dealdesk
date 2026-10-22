@@ -118,13 +118,13 @@ function ScenariosCard() {
 
 function MaxBidCard() {
   const { id, track, ov } = useDeal();
-  const primary = track === "commercial" ? "irr_pct" : "coc_pct";
-  const [t1, setT1] = useState(track === "commercial" ? 12 : 8);
+  const { catalog } = useApp();
+  const primary = catalog.primary_metric[track] ?? "irr_pct";
+  const [t1, setT1] = useState(track === "residential" ? 8 : 12);
   const [t2, setT2] = useState(1.25);
   const [run, setRun] = useState(0);
   const mb = useApi(() => call(api.POST("/api/v2/deals/{deal_id}/max-bid", { params: { path: { deal_id: id } },
     body: { targets: [{ metric: primary, min: t1 }, { metric: "dscr", min: t2 }], include_kill_criteria: true } })), [id, run, ov.deal.current_version_id]);
-  const { catalog } = useApp();
   return (
     <section className="card" aria-label={T("反推最高出价")}>
       <h2>{T("反推最高出价")}</h2>

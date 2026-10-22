@@ -17,7 +17,7 @@ EN: dict[str, str] = {
     "文件抽取": "Document extraction", "历史数据": "Historical data", "市场基准": "Market benchmark",
     "可比交易": "Comparable deals", "分析师判断": "Analyst judgment",
     "低于": "below", "不高于": "at or below", "高于": "above", "不低于": "at or above",
-    "商业默认": "Commercial default", "住宅默认": "Residential default",
+    "商业默认": "Commercial default", "住宅默认": "Residential default", "机构默认": "Institutional default",
     "已停用·需重拉": "Stale · re-pull", "时间未知": "Date unknown",
     # 假设与指标
     "租金水平": "Rent level", "月租金": "Monthly rent", "其他收入": "Other income", "空置率": "Vacancy",
@@ -68,7 +68,15 @@ EN: dict[str, str] = {
     "第 {0} 条淘汰条件：未知指标 {1!r}": "Kill criterion #{0}: unknown metric {1!r}",
     "第 {0} 条淘汰条件：比较符只能是 < <= > >=": "Kill criterion #{0}: operator must be < <= > >=",
     "第 {0} 条淘汰条件：阈值必须是数字": "Kill criterion #{0}: threshold must be a number",
-    "未知赛道：{0!r}（只支持 residential / commercial）": "Unknown track: {0!r} (residential / commercial only)",
+    "未知赛道：{0!r}（只支持 residential / commercial / institutional）":
+        "Unknown track: {0!r} (residential / commercial / institutional only)",
+    "机构级交易的导出（带公式的 Excel、机构格式投委会备忘录）在下一版提供":
+        "Exports for institutional deals (formula-linked Excel, institutional IC memo) arrive in the next release",
+    "机构级承销输入校验失败：{0}": "Institutional underwriting inputs are invalid: {0}",
+    "一般空置率": "General vacancy", "债务收益率": "Debt yield", "市场租金增长": "Market rent growth",
+    "平均出租率": "Average occupancy", "新租 TI": "New-lease TI", "新租空置月数": "New-lease downtime (months)",
+    "无杠杆 IRR": "Unlevered IRR", "续租概率": "Renewal probability", "费用增长": "Expense growth",
+    "运营费用": "Operating expenses",
     "住宅输入校验失败：": "Residential input check failed: ",
     "商业核保计算失败：{0}": "Commercial underwriting failed: {0}",
     "出租率用百分比数（0–100）": "Occupancy is a percent number (0–100)",

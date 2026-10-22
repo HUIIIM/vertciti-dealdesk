@@ -9,8 +9,14 @@ import { COM_ANALYSIS, COM_PROPERTY, RES_DEAL, RES_EXIT } from "@/domain/fields"
 import type { Unit } from "@/lib/format";
 import { getPath } from "@/lib/paths";
 import { useDeal } from "./Deal";
+import { InstModel } from "./InstTabs";
 
 export function ModelTab() {
+  const { track } = useDeal();
+  return track === "institutional" ? <InstModel /> : <ClassicModel />;
+}
+
+function ClassicModel() {
   const { track, draft, set, preview, previewing, passports, openPassport } = useDeal();
   const { catalog } = useApp();
   const [period, setPeriod] = useState<"year" | "month">("year");

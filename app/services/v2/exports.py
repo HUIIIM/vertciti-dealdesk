@@ -88,6 +88,8 @@ def export(deal_id: int, kind: str) -> tuple[str, str, bytes]:
         v = current_version(s, d)
         if v is None:
             raise InvalidInputError(T("还没有承销版本：先在模型页保存一版再导出"))
+        if d.track == "institutional":
+            raise InvalidInputError(T("机构级交易的导出（带公式的 Excel、机构格式投委会备忘录）在下一版提供"))
         if d.track not in tracks:
             raise InvalidInputError(T("这种导出只适用于商业交易"))
         name, address, track, inputs, version_no = d.name, d.address, d.track, dict(v.inputs or {}), v.version_no

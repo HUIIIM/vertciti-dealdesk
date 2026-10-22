@@ -1129,7 +1129,8 @@
      "track": {
       "enum": [
        "residential",
-       "commercial"
+       "commercial",
+       "institutional"
       ],
       "title": "Track",
       "type": "string"
@@ -1238,7 +1239,8 @@
      "track": {
       "enum": [
        "residential",
-       "commercial"
+       "commercial",
+       "institutional"
       ],
       "title": "Track",
       "type": "string"
@@ -1345,7 +1347,8 @@
      "track": {
       "enum": [
        "residential",
-       "commercial"
+       "commercial",
+       "institutional"
       ],
       "title": "Track",
       "type": "string"
@@ -1977,7 +1980,8 @@
      "track": {
       "enum": [
        "residential",
-       "commercial"
+       "commercial",
+       "institutional"
       ],
       "title": "Track",
       "type": "string"
@@ -2590,7 +2594,8 @@
      "track": {
       "enum": [
        "residential",
-       "commercial"
+       "commercial",
+       "institutional"
       ],
       "title": "Track",
       "type": "string"
@@ -2852,7 +2857,8 @@
      "track": {
       "enum": [
        "residential",
-       "commercial"
+       "commercial",
+       "institutional"
       ],
       "title": "Track",
       "type": "string"
@@ -3493,7 +3499,8 @@
      "track": {
       "enum": [
        "residential",
-       "commercial"
+       "commercial",
+       "institutional"
       ],
       "title": "Track",
       "type": "string"
@@ -3538,7 +3545,8 @@
      "track": {
       "enum": [
        "residential",
-       "commercial"
+       "commercial",
+       "institutional"
       ],
       "title": "Track",
       "type": "string"
@@ -5738,6 +5746,74 @@
     ]
    }
   },
+  "/api/v2/cre/example": {
+   "get": {
+    "description": "示例输入：4 租户郊区办公楼（含空置、基年租约、即将到期租约、浮动利率带上限、两档瀑布）；演示数字。",
+    "operationId": "institutional_example_api_v2_cre_example_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Institutional Example Api V2 Cre Example Get",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Institutional Example",
+    "tags": [
+     "v2 · underwriting"
+    ]
+   }
+  },
+  "/api/v2/cre/run": {
+   "post": {
+    "description": "机构级引擎的完整结果（逐月 / 逐年 / 租期段 / 瀑布）；工作台试算走 POST /model/institutional（统一指标口径）。\n\n逐租约按月现金流、到期续租（MLA 加权）、TI / LC、费用回收、一般空置抵减周转空置、\n固定 / 浮动债务（含利率上限）、按下一年 NOI 退出、有杠杆 / 无杠杆收益与 GP / LP 瀑布。",
+    "operationId": "institutional_api_v2_cre_run_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "additionalProperties": true,
+        "title": "Inputs",
+        "type": "object"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/InstitutionalOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Institutional",
+    "tags": [
+     "v2 · underwriting"
+    ]
+   }
+  },
   "/api/v2/deals": {
    "get": {
     "description": "流水线：全部交易（含当前版本标准指标与淘汰条件状态），看板与表格两种视图共用。",
@@ -5778,7 +5854,8 @@
         {
          "enum": [
           "residential",
-          "commercial"
+          "commercial",
+          "institutional"
          ],
          "type": "string"
         },
@@ -8128,74 +8205,6 @@
     ]
    }
   },
-  "/api/v2/model/institutional": {
-   "post": {
-    "description": "机构级承销（office / retail / industrial），不保存的试算。\n\n逐租约按月现金流、到期续租（MLA 加权）、TI / LC、费用回收、一般空置抵减周转空置、\n固定 / 浮动债务（含利率上限）、按下一年 NOI 退出、有杠杆 / 无杠杆收益与 GP / LP 瀑布。",
-    "operationId": "institutional_api_v2_model_institutional_post",
-    "requestBody": {
-     "content": {
-      "application/json": {
-       "schema": {
-        "additionalProperties": true,
-        "title": "Inputs",
-        "type": "object"
-       }
-      }
-     },
-     "required": true
-    },
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/InstitutionalOut"
-        }
-       }
-      },
-      "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
-     }
-    },
-    "summary": "Institutional",
-    "tags": [
-     "v2 · underwriting"
-    ]
-   }
-  },
-  "/api/v2/model/institutional/example": {
-   "get": {
-    "description": "示例输入：4 租户郊区办公楼（含空置、基年租约、即将到期租约、浮动利率带上限、两档瀑布）；演示数字。",
-    "operationId": "institutional_example_api_v2_model_institutional_example_get",
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "additionalProperties": true,
-         "title": "Response Institutional Example Api V2 Model Institutional Example Get",
-         "type": "object"
-        }
-       }
-      },
-      "description": "Successful Response"
-     }
-    },
-    "summary": "Institutional Example",
-    "tags": [
-     "v2 · underwriting"
-    ]
-   }
-  },
   "/api/v2/model/{track}": {
    "post": {
     "description": "不保存的试算（模型页左改假设、右侧实时更新）。",
@@ -8208,7 +8217,8 @@
       "schema": {
        "enum": [
         "residential",
-        "commercial"
+        "commercial",
+        "institutional"
        ],
        "title": "Track",
        "type": "string"
