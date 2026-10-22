@@ -1,7 +1,8 @@
 // DNA 基础组件。状态词全系统统一：已验证 / 建设中 / 计划中 / 风险（颜色 + 图标 + 文字三重表意）。
-import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { ApiError } from "@/api/client";
 import { fmt, fmtCell, fmtShort, isNeg, isNum, type Unit } from "@/lib/format";
+import { useTween } from "@/lib/motion";
 
 export type StatusKey = "verified" | "building" | "planned" | "risk";
 export const STATUS_LABEL: Record<StatusKey, string> = { verified: "已验证", building: "建设中", planned: "计划中", risk: "风险" };
@@ -19,8 +20,9 @@ export function Metric({ label, value, unit, note, onOpen, testId }: {
   label: string; value: number | null | undefined; unit: Unit; note?: ReactNode; onOpen?: () => void; testId?: string;
 }) {
   const full = fmt(value, unit);
-  // 百万级金额在卡片里用紧凑写法（$36.00M），完整数放 title 与读屏文本，避免截断
-  const text = (unit === "usd" || unit === "usd_month") && isNum(value) && Math.abs(value) >= 1e6 ? fmtShort(value) : full;
+  const shown = useTween(value);
+  // 百万级金额在卡片里用紧凑写法（$36.00M），完整数放 title 与读屏文本，避免截断；滚动中的过渡值只给眼睛看
+  const text = (unit === "usd" || unit === "usd_month") && isNum(value) && Math.abs(value) >= 1e6 ? fmtShort(shown) : fmt(shown, unit);
   return (
     <div className="metric" data-testid={testId}>
       <div className="k">{label}</div>
@@ -28,6 +30,28 @@ export function Metric({ label, value, unit, note, onOpen, testId }: {
         {onOpen ? <button type="button" onClick={onOpen} aria-label={`${label} ${full}，查看来源与计算`}>{text}</button> : text}
       </div>
       {note ? <div className="note">{note}</div> : null}
+    </div>
+  );
+}
+
+/**
+ * 指标格：列数由个数决定、空位用占位格补齐，保证每一行都满、每个格子一样大（不出现参差的末行）。
+ * 桌面 ≤ 6 列；手机固定 2 列。
+ */
+export function metricCols(n: number): number {
+  if (n <= 6) return Math.max(n, 1);
+  const best = [6, 5, 4].map((c) => ({ c, pad: (c - (n % c)) % c })).sort((a, b) => a.pad - b.pad || b.c - a.c)[0]!;
+  return best.c;
+}
+
+export function MetricGrid({ count, children, style }: { count: number; children: ReactNode; style?: CSSProperties }) {
+  const cols = metricCols(count);
+  const pad = (cols - (count % cols)) % cols;
+  return (
+    <div className="metrics" style={{ ...style, ["--cols" as string]: cols }}>
+      {children}
+      {Array.from({ length: pad }, (_, i) => <div key={`d${i}`} className="metric fill fill-d" aria-hidden="true" />)}
+      {count % 2 ? <div className="metric fill fill-m" aria-hidden="true" /> : null}
     </div>
   );
 }

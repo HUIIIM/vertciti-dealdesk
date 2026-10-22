@@ -9,20 +9,22 @@
   /* 文字用深一档绿（#17703C 在浅绿底 5.4:1，DNA 绿 4.2:1 不达标）；色块 / 进度 / 图表用 DNA 原绿 */
   --ok: #17703c; --ok-mark: var(--green); --ok-bg: #e8f3ec; --warn: var(--amber-text); --warn-bg: #fff5cc; --risk: var(--red);
   --risk-bg: #f7e9e8; --plan: var(--stone); --plan-bg: var(--mist); --accent: var(--orange); --accent-text: var(--orange-text);
-  --font: "Nunito Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  /* 与官网 :root --font 完全一致 */
+  --font: "Nunito Sans", "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Microsoft YaHei", system-ui, sans-serif;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   /* 8 点网格 */
   --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px; --s7: 48px; --s8: 64px;
   /* 密度：舒适（缺省）行高 44 / 15px；紧凑 32 / 13px */
   --row-h: 44px; --fs: 15px; --fs-sm: 13px; --fs-xs: 12px; --cell-px: 12px;
-  --ease: cubic-bezier(.2, .7, .2, 1); --dur: 200ms;
+  /* 动效语言取自官网：同一条缓动曲线；入场 .7s、条形生长 1.2s、悬停 .2s */
+  --ease: cubic-bezier(.2, .7, .2, 1); --dur: 200ms; --dur-in: 700ms; --dur-grow: 1200ms;
   --shadow: 0 1px 0 var(--line), 0 8px 24px rgba(0, 0, 0, .08);
   color-scheme: light;
 }
 :root[data-density="compact"] { --row-h: 32px; --fs: 13px; --fs-sm: 12px; --fs-xs: 11px; --cell-px: 8px; }
 :root[data-theme="dark"] {
   --bg: #0b0b0b; --surface: #141414; --surface-2: #1c1c1c; --text: #f2f2f2; --text-2: #c8c8c8; --text-3: #9a9a9a;
-  --border: #2e2e2e; --hover: #1f1f1f; --selected: #2a1710;
+  --border: #2e2e2e; --line-soft: #242424; --hover: #1f1f1f; --selected: #2a1710;
   --ok: #5fc48a; --ok-mark: #3fa86a; --ok-bg: #12261a; --warn: #f2c94c; --warn-bg: #2a2410; --risk: #ff8a80; --risk-bg: #2b1513;
   --plan: #9a9a9a; --plan-bg: #1c1c1c; --accent-text: #ff7a52; --shadow: 0 1px 0 #2e2e2e, 0 8px 24px rgba(0, 0, 0, .5);
   color-scheme: dark;
@@ -30,8 +32,9 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]):not([data-theme="dark"])[data-theme-auto="1"] {
     --bg: #0b0b0b; --surface: #141414; --surface-2: #1c1c1c; --text: #f2f2f2; --text-2: #c8c8c8; --text-3: #9a9a9a;
-    --border: #2e2e2e; --hover: #1f1f1f; --selected: #2a1710; --ok: #5fc48a; --ok-bg: #12261a; --warn: #f2c94c;
-    --warn-bg: #2a2410; --risk: #ff8a80; --risk-bg: #2b1513; --accent-text: #ff7a52; color-scheme: dark;
+    --border: #2e2e2e; --line-soft: #242424; --hover: #1f1f1f; --selected: #2a1710; --ok: #5fc48a; --ok-bg: #12261a; --warn: #f2c94c;
+    --warn-bg: #2a2410; --risk: #ff8a80; --risk-bg: #2b1513; --accent-text: #ff7a52; --ok-mark: #3fa86a;
+    --plan: #9a9a9a; --plan-bg: #1c1c1c; --shadow: 0 1px 0 #2e2e2e, 0 8px 24px rgba(0, 0, 0, .5); color-scheme: dark;
   }
 }
-@media (prefers-reduced-motion: reduce) { :root { --dur: 0ms; } }
+@media (prefers-reduced-motion: reduce) { :root { --dur: 0ms; --dur-in: 0ms; --dur-grow: 0ms; } }

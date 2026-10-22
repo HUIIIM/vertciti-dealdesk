@@ -25,10 +25,10 @@ export function FieldInput({ spec, value, onChange, onPassport, passportState }:
   const unitTxt = spec.unit === "pct" ? "%" : spec.unit === "usd" ? "$" : spec.unit === "usd_month" ? "$/月" : spec.unit === "x" ? "×" : "";
   return (
     <div className="field">
-      <label htmlFor={id} style={{ display: "flex", gap: 6, alignItems: "center" }}>
-        <span>{spec.label}{unitTxt ? <span className="hint">（{unitTxt}）</span> : null}</span>
+      <label htmlFor={id} className="flabel" title={`${spec.label}${unitTxt ? `（${unitTxt}）` : ""}`}>
+        <span className="t">{spec.label}{unitTxt ? <span className="hint">（{unitTxt}）</span> : null}</span>
         {onPassport ? (
-          <button type="button" className="btn ghost sm" style={{ minHeight: 24, padding: "0 6px", marginLeft: "auto" }}
+          <button type="button" className="btn ghost sm src-btn"
             onClick={() => onPassport(spec.path)} aria-label={`${spec.label} 的数字护照`} title="来源 · 复核 · 修改历史">
             <span className={`status ${passportState ?? "planned"}`} style={{ padding: "0 4px" }}><i aria-hidden="true" />源</span>
           </button>) : null}
@@ -40,7 +40,7 @@ export function FieldInput({ spec, value, onChange, onPassport, passportState }:
       ) : spec.unit === "text" ? (
         <input id={id} className="input" value={String(value ?? "")} onChange={(e) => onChange(e.target.value)} />
       ) : spec.unit === "bool" ? (
-        <input id={id} type="checkbox" checked={Boolean(value)} onChange={(e) => onChange(e.target.checked)} style={{ width: 24, height: 24 }} />
+        <span className="checkbox-row"><input id={id} type="checkbox" checked={Boolean(value)} onChange={(e) => onChange(e.target.checked)} /></span>
       ) : (
         <span id={id} style={{ display: "contents" }}>
           <NumberInput value={value} onChange={onChange} unit={spec.unit as Unit} label={spec.label} step={spec.step} />

@@ -15,7 +15,9 @@ export function Tornado({ rows, base, label, shock }: { rows: RedTeamRow[]; base
         const y = top + i * rowH;
         const bar = (d: number, k: string) => {
           const w = Math.abs(d) * scale;
-          return <rect key={k} x={d >= 0 ? mid : mid - w} y={y + 6} width={Math.max(w, 1)} height={rowH - 14} className={d < 0 ? "negbar" : "pos"}>
+          // 从中轴向外生长（官网“条形生长”同一节奏），逐行错开
+          return <rect key={k} x={d >= 0 ? mid : mid - w} y={y + 6} width={Math.max(w, 1)} height={rowH - 14}
+            className={`${d < 0 ? "negbar grow-l" : "pos grow-r"}`} style={{ animationDelay: `${i * 70}ms` }}>
             <title>{`${r.label} ${k === "m" ? "-" : "+"}${shock}%：${label} ${d >= 0 ? "+" : ""}${d.toFixed(2)} 个百分点`}</title></rect>;
         };
         return (
@@ -37,17 +39,19 @@ export function Waterfall({ start, steps, end, label }: { start: number; steps: 
   return (
     <svg className="chart" viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label={`${label}归因瀑布图`}>
       <line className="grid" x1={pad} x2={W - pad} y1={y(0)} y2={y(0)} />
-      <rect className="base" x={pad + (gap - bw) / 2} y={Math.min(y(start), y(0))} width={bw} height={Math.abs(y(start) - y(0))} />
+      <rect className="base grow-up" x={pad + (gap - bw) / 2} y={Math.min(y(start), y(0))} width={bw} height={Math.abs(y(start) - y(0))} />
       <text x={pad + gap / 2} y={H - 10} textAnchor="middle">承销</text>
       <text x={pad + gap / 2} y={Math.min(y(start), y(0)) - 6} textAnchor="middle">{fmt(start, "pct")}</text>
       {steps.map((s, i) => {
         const a = cum[i]!, b = cum[i + 1]!, x = pad + gap * (i + 1) + (gap - bw) / 2;
         return (<g key={s.label}>
-          <rect className={s.v < 0 ? "negbar" : "pos"} x={x} y={Math.min(y(a), y(b))} width={bw} height={Math.max(1, Math.abs(y(a) - y(b)))} />
-          <text x={x + bw / 2} y={Math.min(y(a), y(b)) - 6} textAnchor="middle">{s.v >= 0 ? "+" : ""}{s.v.toFixed(2)}</text>
+          <rect className={s.v < 0 ? "negbar grow-down" : "pos grow-up"} x={x} y={Math.min(y(a), y(b))} width={bw}
+            height={Math.max(1, Math.abs(y(a) - y(b)))} style={{ animationDelay: `${(i + 1) * 140}ms` }} />
+          <text className="fade-in" style={{ animationDelay: `${(i + 1) * 140 + 300}ms` }} x={x + bw / 2} y={Math.min(y(a), y(b)) - 6}
+            textAnchor="middle">{s.v >= 0 ? "+" : ""}{s.v.toFixed(2)}</text>
           <text x={x + bw / 2} y={H - 10} textAnchor="middle">{s.label.length > 8 ? s.label.slice(0, 8) + "…" : s.label}</text></g>);
       })}
-      <rect className="base" x={pad + gap * (n - 1) + (gap - bw) / 2} y={Math.min(y(end), y(0))} width={bw} height={Math.abs(y(end) - y(0))} />
+      <rect className="base grow-up" style={{ animationDelay: `${(n - 1) * 140}ms` }} x={pad + gap * (n - 1) + (gap - bw) / 2} y={Math.min(y(end), y(0))} width={bw} height={Math.abs(y(end) - y(0))} />
       <text x={pad + gap * (n - 1) + gap / 2} y={H - 10} textAnchor="middle">实际推算</text>
       <text x={pad + gap * (n - 1) + gap / 2} y={Math.min(y(end), y(0)) - 6} textAnchor="middle">{fmt(end, "pct")}</text>
     </svg>

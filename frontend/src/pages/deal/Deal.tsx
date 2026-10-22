@@ -6,10 +6,11 @@ import type { KillEval, MaxBid, Metrics } from "@/api/types";
 import { useApi } from "@/api/useApi";
 import { useApp } from "@/app-context";
 import { passportStatus, PassportDialog } from "@/components/Passport";
-import { Dialog, ErrorBox, Kbd, Metric, Skeleton, Status, useToast, type StatusKey } from "@/components/ui";
+import { Dialog, ErrorBox, Kbd, Metric, MetricGrid, Skeleton, Status, useToast, type StatusKey } from "@/components/ui";
 import { blankInputs, CARD_METRICS, fieldLabel, STAGES, type Track } from "@/domain/fields";
-import { fmt, type Unit } from "@/lib/format";
+import { fmt, fmtShort, type Unit } from "@/lib/format";
 import { useHotkeys } from "@/lib/hotkeys";
+import { useTween } from "@/lib/motion";
 import { getPath, setPath, type JsonObj } from "@/lib/paths";
 import { DEAL_TABS, navigate, type DealTab } from "@/lib/router";
 import { CommitteeTab } from "./CommitteeTab";
@@ -112,6 +113,7 @@ export function DealPage({ id, tab }: { id: number; tab: DealTab }) {
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirty]);
 
+  const mb = useMaxBid(id, Boolean(ov.data?.version), ov.data?.kill as unknown as KillEval | undefined);
   if (ov.error) return <ErrorBox error={ov.error} onRetry={ov.reload} />;
   if (!ov.data || !draft) return <Skeleton rows={6} h={28} />;
   const o = ov.data;
@@ -135,19 +137,20 @@ export function DealPage({ id, tab }: { id: number; tab: DealTab }) {
             <span className="muted" style={{ fontWeight: 800, fontSize: 13 }}>结论</span>
             <Status s={killStatus(kill)}>{kill.triggered.length ? `触发淘汰 ${kill.triggered.length} 条` : kill.unknown.length ? "淘汰条件无法判定" : kill.clear ? "淘汰条件未触发" : "未承销"}</Status>
             {o.last_verdict ? <span className="chip">最近决策 {o.last_verdict}</span> : null}
-            <MaxBidInline id={id} hasVersion={Boolean(o.version)} dirty={dirty} kill={kill} />
+            <MaxBidInline mb={mb} hasVersion={Boolean(o.version)} dirty={dirty} />
           </div>
-          <div className="metrics" style={{ marginTop: 8 }}>
+          <MetricGrid count={metricKeys.length} style={{ marginTop: 8 }}>
             {metricKeys.map((k) => { const meta = catalog.metrics[k]!;
               return <Metric key={k} label={meta.label} value={m[k] ?? null} unit={meta.unit as Unit} testId={`metric-${k}`}
                 note={dirty ? "草稿重算" : undefined} onOpen={() => setPassport({ path: `metric:${k}`, label: meta.label })} />; })}
-          </div>
+          </MetricGrid>
           {kill.items.length ? (
             <ul className="checks" style={{ marginTop: 12 }} aria-label="淘汰条件">
               {kill.items.map((k, i) => <li key={i}><Status s={k.state === "triggered" ? "risk" : k.state === "unknown" ? "building" : "verified"}>
                 {k.state === "triggered" ? "触发" : k.state === "unknown" ? "未知" : "未触发"}</Status><span>{k.text}<span className="muted"> · 当前 {fmt(k.value, (catalog.metrics[k.metric]?.unit ?? "x") as Unit)}</span></span></li>)}
             </ul>) : <div className="banner warn" style={{ marginTop: 12 }}>还没写淘汰条件：进入承销前必须先写“什么情况下放弃”。</div>}
-          <ol className="stepper" aria-label="阶段">
+          {mb.data && o.version ? <PriceLadder mb={mb.data} /> : null}
+          <ol className="stepper" aria-label="阶段" style={{ marginTop: "auto", paddingTop: 16 }}>
             {STAGES.map(([s, l], i) => <li key={s} className={i < stageIdx ? "done" : i === stageIdx ? "current" : ""} aria-current={i === stageIdx ? "step" : undefined}>{l}</li>)}
           </ol>
         </section>
@@ -179,7 +182,7 @@ export function DealPage({ id, tab }: { id: number; tab: DealTab }) {
       </div>
       {dirty ? (
         <div className="draftbar" role="region" aria-label="未保存的草稿">
-          <span>草稿有改动 · 结果为实时重算{previewing ? "（计算中…）" : ""}{preview?.error ? ` · ${preview.error}` : ""}</span>
+          <span>{previewing ? <span className="live-dot" aria-hidden="true" /> : null}草稿有改动 · 结果为实时重算{previewing ? "（计算中…）" : ""}{preview?.error ? ` · ${preview.error}` : ""}</span>
           <span style={{ flex: 1 }} />
           <button className="btn sm" type="button" onClick={() => setEdit(null)}>放弃改动</button>
           {can("deal.write") ? <button className="btn sm primary" type="button" onClick={save}>保存为新版本 <Kbd k="⌘ S" /></button> : null}
@@ -203,20 +206,60 @@ export function DealPage({ id, tab }: { id: number; tab: DealTab }) {
   );
 }
 
-function MaxBidInline({ id, hasVersion, dirty, kill }: { id: number; hasVersion: boolean; dirty: boolean; kill: KillEval }) {
-  const targets = kill.items.filter((k) => k.op === "<" || k.op === "<=").map((k) => ({ metric: k.metric, min: k.threshold }));
-  const mb = useApi<MaxBid | null>(() => (hasVersion && targets.length ? call(api.POST("/api/v2/deals/{deal_id}/max-bid", {
+/** 最高出价：结论卡的行内大字与“出价空间”梯子共用一次请求。 */
+function useMaxBid(id: number, hasVersion: boolean, kill: KillEval | undefined) {
+  const targets = (kill?.items ?? []).filter((k) => k.op === "<" || k.op === "<=").map((k) => ({ metric: k.metric, min: k.threshold }));
+  return useApi<MaxBid | null>(() => (hasVersion && targets.length ? call(api.POST("/api/v2/deals/{deal_id}/max-bid", {
     params: { path: { deal_id: id } }, body: { targets: [], include_kill_criteria: true } })) : Promise.resolve(null)),
   [id, hasVersion, JSON.stringify(targets)]);
+}
+
+function MaxBidInline({ mb, hasVersion, dirty }: { mb: ReturnType<typeof useMaxBid>; hasVersion: boolean; dirty: boolean }) {
   if (!hasVersion) return null;
   if (mb.loading && !mb.data) return <span className="muted">最高出价计算中…</span>;
   if (!mb.data) return <span className="muted">最高出价：需下限型淘汰条件</span>;
   return (
     <span style={{ display: "inline-flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }} data-testid="max-bid">
       <span className="muted" style={{ fontWeight: 800, fontSize: 13 }}>最高出价</span>
-      <span className="v">{fmt(mb.data.max_bid, "usd")}</span>
+      <TweenUsd value={mb.data.max_bid} />
       <span className="muted" style={{ fontSize: 13 }}>{mb.data.binding ? `卡在：${mb.data.binding.label}` : ""}{dirty ? " · 按已保存版本" : ""}</span>
     </span>
+  );
+}
+
+/**
+ * 出价空间（vertciti 独有）：每条约束各自允许的最高价画成一个点，竖线是要价，点与竖线之间的段是差额。
+ * 坐标轴为放大的价格区间（不从 0 开始），所以用点与差额段而不用从 0 起的长条——避免夸大差异。
+ * 一眼看出哪条约束卡住价格（橙色）、离要价还差多少；无法满足的约束写明，不画假条。
+ */
+export function PriceLadder({ mb }: { mb: MaxBid }) {
+  const priced = mb.constraints.map((c) => c.price).filter((v): v is number => typeof v === "number");
+  if (!priced.length) return null;
+  const vals = [mb.asking, ...priced];
+  const lo = Math.min(...vals) * 0.85, hi = Math.max(...vals) * 1.04;
+  const pos = (v: number) => Math.max(0, Math.min(100, ((v - lo) / (hi - lo)) * 100));
+  const ask = pos(mb.asking);
+  return (
+    <section className="ladder" aria-label="出价空间">
+      <div className="ladder-head"><strong>出价空间</strong><span className="muted">方块 = 该约束允许的最高价 · 竖线 = 要价 {fmtShort(mb.asking)} · 橙色 = 卡住价格的约束</span></div>
+      {mb.constraints.map((c, i) => {
+        const bind = mb.binding?.label === c.label;
+        return (
+          <div className="lrow" key={`${c.source}-${c.label}`}>
+            <span className="ll" title={c.label}>{c.label}</span>
+            <span className="lt">
+              {typeof c.price === "number" ? (<>
+                {/* 段 = 要价到允许价的差：绿 = 比要价还能多出，红 = 需要折价；从要价线向外生长 */}
+                <i className={`gap ${c.price >= mb.asking ? "up" : "down"}`} style={{ left: `${Math.min(ask, pos(c.price))}%`,
+                  width: `${Math.abs(pos(c.price) - ask)}%`, animationDelay: `${150 + i * 90}ms` }} />
+                <s className={`mk${bind ? " bind" : ""}`} style={{ left: `${pos(c.price)}%`, animationDelay: `${150 + i * 90}ms` }} />
+              </>) : <em className="lx">无法满足</em>}
+              <b className="ask" style={{ left: `${ask}%` }} aria-hidden="true" />
+            </span>
+            <span className={`lv num${bind ? " bind" : ""}`}>{typeof c.price === "number" ? fmtShort(c.price) : "—"}{c.status === "above_range" ? "+" : ""}</span>
+          </div>);
+      })}
+    </section>
   );
 }
 
@@ -235,4 +278,10 @@ function MetricExplain({ metric, label, onClose }: { metric: string; label: stri
           <button type="button" className="btn ghost sm" title={k} onClick={() => { onClose(); openPassport(k, fieldLabel(k)); }}>{fieldLabel(k)}</button></li>)}</ul></>) : null}
     </Dialog>
   );
+}
+
+/** 最高出价大字：滚动到终值；完整值放 title 与读屏文本。 */
+function TweenUsd({ value }: { value: number | null | undefined }) {
+  const shown = useTween(value, 900);
+  return <span className="v" title={fmt(value, "usd")} aria-label={fmt(value, "usd")}>{fmt(shown === null || shown === undefined ? shown : Math.round(shown / 100) * 100, "usd")}</span>;
 }

@@ -89,6 +89,8 @@ test.describe("无障碍（有真实数据）", () => {
   test(`${name}页无严重 / 关键问题`, async ({ page }) => {
     const path = tab === null ? "/app/#/" : tab === "compare" ? `/app/#/compare?ids=${seeded}` : tab === "settings" ? "/app/#/settings/templates"
       : `/app/#/deals/${seeded}${tab}`;
+    // 入场动效会让元素短暂半透明：无障碍扫描量的是静止状态的对比度，按“减少动态效果”跑
+    await page.emulateMedia({ reducedMotion: "reduce" });
     // 严格 CSP（app/core/hardening.py）下页面不得触发任何违规：样式 / 脚本 / 图片都只能同源
     await page.addInitScript(() => {
       const w = window as unknown as { __csp: string[] };
@@ -129,4 +131,17 @@ test("手机 390 宽：只读——看得到数字与进度，没有任何写操
   await page.goto("/app/#/");
   await expect(page.getByRole("button", { name: /新建交易/ })).toHaveCount(0);
   await page.close();
+});
+
+test("字体与官网一致：Nunito Sans 自托管加载成功，正文实际用它渲染", async ({ page }) => {
+  await page.goto("/app/#/");
+  await expect(page.getByRole("heading", { name: /笔交易/ })).toBeVisible();
+  const r = await page.evaluate(async () => {
+    await document.fonts.ready;
+    const loaded = [...document.fonts].filter((f) => f.family.replace(/"/g, "") === "Nunito Sans" && f.status === "loaded").length;
+    return { loaded, check: document.fonts.check('800 16px "Nunito Sans"', "DealDesk 39"), family: getComputedStyle(document.body).fontFamily };
+  });
+  expect(r.loaded).toBeGreaterThan(0);
+  expect(r.check).toBe(true);
+  expect(r.family.startsWith('"Nunito Sans"')).toBe(true);
 });

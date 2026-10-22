@@ -108,3 +108,41 @@ describe("图表", () => {
     expect(container.textContent).toContain("-2.00");
   });
 });
+
+describe("指标格：每行都满、格子一样大", () => {
+  it("列数按个数取，补位最少", async () => {
+    const { metricCols } = await import("@/components/ui");
+    expect([1, 5, 6, 7, 8, 9, 11, 12].map(metricCols)).toEqual([1, 5, 6, 4, 4, 5, 6, 6]);
+  });
+  it("补占位格（读屏忽略），手机奇数个再补一格", async () => {
+    const { MetricGrid } = await import("@/components/ui");
+    const { container } = render(<MetricGrid count={11}>{Array.from({ length: 11 }, (_, i) => <div key={i} className="metric">x</div>)}</MetricGrid>);
+    expect(container.querySelectorAll(".metric.fill-d")).toHaveLength(1);
+    expect(container.querySelectorAll(".metric.fill-m")).toHaveLength(1);
+    expect(container.querySelector(".metric.fill")?.getAttribute("aria-hidden")).toBe("true");
+  });
+});
+
+describe("数字滚动", () => {
+  it("开启动效时从 0 滚到终值、结束时精确等于终值；未知不滚动", async () => {
+    const frames: FrameRequestCallback[] = [];
+    vi.stubGlobal("matchMedia", (q: string) => ({ matches: false, media: q, addEventListener() {}, removeEventListener() {} }));
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => frames.push(cb));
+    vi.stubGlobal("cancelAnimationFrame", () => {});
+    const { useTween } = await import("@/lib/motion");
+    const seen: (number | null | undefined)[] = [];
+    function Probe({ v }: { v: number | null }) { const x = useTween(v, 100); seen.push(x); return <span>{String(x)}</span>; }
+    const { container, rerender } = render(<Probe v={8.94} />);
+    expect(seen[0]).toBe(0);
+    const t0 = performance.now();
+    await act(async () => { frames.shift()?.(t0 + 50); });
+    const mid = Number(container.textContent);
+    expect(mid).toBeGreaterThan(0);
+    expect(mid).toBeLessThan(8.94);
+    await act(async () => { while (frames.length) frames.shift()?.(t0 + 10_000); });
+    expect(container.textContent).toBe("8.94");
+    rerender(<Probe v={null} />);
+    expect(container.textContent).toBe("null");
+    vi.unstubAllGlobals();
+  });
+});

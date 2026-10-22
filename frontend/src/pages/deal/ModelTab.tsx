@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useApp } from "@/app-context";
 import { FieldInput } from "@/components/FieldInput";
 import { passportStatus } from "@/components/Passport";
-import { Metric, NumCell } from "@/components/ui";
+import { Metric, MetricGrid, NumCell } from "@/components/ui";
 import { COM_ANALYSIS, COM_PROPERTY, RES_DEAL, RES_EXIT } from "@/domain/fields";
 import type { Unit } from "@/lib/format";
 import { getPath } from "@/lib/paths";
@@ -15,6 +15,8 @@ export function ModelTab() {
   const [period, setPeriod] = useState<"year" | "month">("year");
   const specs = track === "commercial" ? [...COM_ANALYSIS, ...COM_PROPERTY] : [...RES_DEAL, ...RES_EXIT];
   const m = preview?.metrics ?? {};
+  const shownMetrics = Object.entries(catalog.metrics).filter(([k]) => m[k] !== undefined
+    && !(track === "residential" && (k === "irr_pct" || k === "equity_multiple" || k === "breakeven_occupancy_pct")));
   const det = (preview?.detail ?? {}) as { compute?: { analysis?: { exit?: { cash_flows?: number[]; sale_proceeds?: number | null } } };
     score?: { metrics?: Record<string, number>; total?: number; grade?: string; vetoes?: { message: string }[] } };
   const flows = det.compute?.analysis?.exit?.cash_flows ?? [];
@@ -29,14 +31,13 @@ export function ModelTab() {
         </div>
       </section>
       <section className="card" aria-label="结果" aria-busy={previewing}>
-        <div className="row" style={{ justifyContent: "space-between" }}><h2 style={{ margin: 0 }}>结果{previewing ? <span className="muted" style={{ fontSize: 13 }}> · 计算中…</span> : null}</h2>
+        <div className="row" style={{ justifyContent: "space-between" }}><h2 style={{ margin: 0 }}>结果{previewing ? <span className="muted" style={{ fontSize: 13, marginLeft: 8 }}><span className="live-dot" aria-hidden="true" />计算中…</span> : null}</h2>
           <div className="seg" role="group" aria-label="现金流周期"><button type="button" aria-pressed={period === "year"} onClick={() => setPeriod("year")}>按年</button>
             <button type="button" aria-pressed={period === "month"} onClick={() => setPeriod("month")}>按月</button></div></div>
         {preview?.error ? <div className="banner risk" role="alert" style={{ marginTop: 12 }}>{preview.error}</div> : null}
-        <div className="metrics" style={{ marginTop: 12 }}>
-          {Object.entries(catalog.metrics).filter(([k]) => m[k] !== undefined && !(track === "residential" && (k === "irr_pct" || k === "equity_multiple" || k === "breakeven_occupancy_pct")))
-            .map(([k, meta]) => <Metric key={k} label={meta.label} value={m[k] ?? null} unit={meta.unit as Unit} />)}
-        </div>
+        <MetricGrid count={shownMetrics.length} style={{ marginTop: 12 }}>
+          {shownMetrics.map(([k, meta]) => <Metric key={k} label={meta.label} value={m[k] ?? null} unit={meta.unit as Unit} />)}
+        </MetricGrid>
         {track === "commercial" ? (<>
           <h3 style={{ marginTop: 20, fontSize: 15 }}>持有期现金流（{period === "year" ? "年" : "月均"}）</h3>
           <div className="table-wrap" style={{ maxHeight: "none" }}>

@@ -119,12 +119,12 @@ export function Pipeline() {
                   return (
                     <a key={d.id} href={`#/deals/${d.id}`} className={`kcard ${st === "risk" ? "risk" : st === "verified" ? "ok" : st === "building" ? "warn" : ""}`}
                       aria-current={idx === selIdx ? "true" : undefined} onFocus={() => setSel(idx)}>
-                      <div className="name">{d.name}</div>
-                      <div className="addr">{d.address || "—"} · {d.track === "commercial" ? "商业" : "住宅"}</div>
+                      <div className="name" title={d.name}>{d.name}</div>
+                      <div className="addr" title={d.address || undefined}>{d.address || "—"} · {d.track === "commercial" ? "商业" : "住宅"}</div>
                       <div className="kv"><span className="muted">价格</span><span>{fmtShort(m(d, "price") ?? d.asking_price)}</span></div>
                       <div className="kv"><span className="muted">{catalog.metrics[primary(d)]?.label}</span><span>{fmt(m(d, primary(d)), "pct")}</span></div>
                       <div className="kv"><span className="muted">DSCR</span><span>{fmt(m(d, "dscr"), "x")}</span></div>
-                      <div style={{ marginTop: 8 }}><Status s={st}>{KILL_TEXT[st]}</Status></div>
+                      <div className="foot"><Status s={st}>{KILL_TEXT[st]}</Status></div>
                     </a>); })}
               </section>);
           })}
