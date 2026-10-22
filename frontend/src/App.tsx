@@ -49,7 +49,6 @@ export function App() {
     { id: "dense", group: T("外观"), label: density === "compact" ? T("切换到舒适密度") : T("切换到紧凑密度"), run: () => setDensity(density === "compact" ? "comfortable" : "compact") },
     { id: "theme", group: T("外观"), label: theme === "dark" ? T("切换到浅色") : T("切换到深色（长时间建模）"), run: () => setTheme(theme === "dark" ? "light" : "dark") },
     { id: "help", group: T("帮助"), label: T("显示全部快捷键"), hint: "?", run: () => setHelp(true) },
-    { id: "v1", group: T("跳转"), label: T("v1 单页决策（旧版入口）"), run: () => { window.location.href = "/"; } },
   ], [density, theme, setDensity, setTheme, canWrite]);
   const overlay = cmdk || help || creating;
   useHotkeys([

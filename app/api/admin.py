@@ -1,13 +1,9 @@
-"""运维：健康检查、数据源状态、统一 dashboard 页面。"""
+"""运维：健康检查、数据源状态；旧版页面地址跳转到 v2 工作台。"""
 
 from __future__ import annotations
 
-import os
-
-from fastapi import APIRouter, HTTPException
-from fastapi.responses import HTMLResponse
-
-from app.api.common import STATIC_DIR
+from fastapi import APIRouter
+from fastapi.responses import RedirectResponse
 
 router = APIRouter(tags=["admin"])
 
@@ -24,11 +20,14 @@ def tophap_status():
     return tophap.status()
 
 
-# ---------------- 统一 dashboard 路由 ----------------
-@router.get("/d", response_class=HTMLResponse)
-def dashboard_page():
-    """统一 dashboard（spec §2）：/d?addr=…&type=res|com."""
-    path = os.path.join(STATIC_DIR, "d.html")
-    if not os.path.exists(path):
-        raise HTTPException(404, "dashboard 未构建")
-    return HTMLResponse(open(path, encoding="utf-8").read())
+# ---------------- 旧版页面 → v2 工作台 ----------------
+# v1 单页界面已下线：旧书签、旧外链统一 307 到 /app/（接口 /api/... 仍保留，v2 的市场 / 研究等功能在用）
+LEGACY_PAGES = ("/", "/index.html", "/d", "/d.html", "/workbench.html", "/uw-commercial.html", "/res-legacy.html")
+
+
+def _to_app() -> RedirectResponse:
+    return RedirectResponse("/app/", status_code=307)
+
+
+for _p in LEGACY_PAGES:
+    router.add_api_route(_p, _to_app, methods=["GET"], include_in_schema=False)

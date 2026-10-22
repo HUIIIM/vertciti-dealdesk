@@ -108,14 +108,11 @@ test.describe("无障碍（有真实数据）", () => {
   }
 });
 
-test("v1 页面回归：首页与工作台加载无 JS 报错", async ({ page }) => {
-  const errs: string[] = [];
-  page.on("pageerror", (e) => errs.push(e.message));
-  for (const p of ["/", "/workbench.html", "/uw-commercial.html", "/d.html?addr=1%20Main%20St"]) {
+test("旧版页面已下线：旧地址都跳到 v2 工作台", async ({ page }) => {
+  for (const p of ["/", "/workbench.html", "/uw-commercial.html", "/d.html?addr=1%20Main%20St", "/d"]) {
     await page.goto(p);
-    await page.waitForTimeout(800);
+    await expect(page).toHaveURL(/\/app\/(#.*)?$/);
   }
-  expect(errs).toEqual([]);
 });
 
 test("手机 390 宽：只读——看得到数字与进度，没有任何写操作入口", async ({ browser, request }) => {

@@ -23,7 +23,6 @@ export function AppShell({ route, children, onCmdk, density, setDensity, theme, 
         <button type="button" className="langsw" onClick={() => setLang(lang() === "en" ? "zh" : "en")}
           aria-label={lang() === "en" ? "切换到中文" : "Switch to English"} lang={lang() === "en" ? "zh-CN" : "en"}> {/* i18n-exempt：切换按钮用目标语言标注 */}
           {lang() === "en" ? "中文" : "EN"}</button>{/* i18n-exempt：同上 */}
-        <a href="/" title={T("v1 单页决策（旧版入口）")}>v1</a>
       </div>
       <header className="appbar">
         <span className="prod">{T("交易工作台")}</span>

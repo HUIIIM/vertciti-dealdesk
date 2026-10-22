@@ -57,18 +57,15 @@ rsync -a --delete --delete-excluded \
     || fail "static/ 同步失败"
 log "  static/ 同步完成"
 
-# ---- 步骤 3：复制根静态文件 ----
-# 注意：/d 由 vercel.json rewrite 到根 /d.html，其引用的 /d.js、/d.css、
-# /index.html 也都走根级文件——根拷贝列表必须与 static/ 保持同步，
-# 否则生产站会 serve 旧前端（Phase 5 教训）。
-log "步骤 3/6：复制根静态文件到 ${DEPLOY_DIR}/ 根 ..."
-for f in index.html d.html d.js d.css workbench.html workbench.js uw-commercial.html uw-commercial.js app.js style.css; do
-    if [ -f "static/${f}" ]; then
-        cp "static/${f}" "${DEPLOY_DIR}/${f}" \
-            || fail "复制 static/${f} 失败"
-        log "  已复制 static/${f} -> ${DEPLOY_DIR}/${f}"
-    else
-        log "  跳过 ${f}（static/ 下不存在）"
+# ---- 步骤 3：清掉根目录的旧版页面副本 ----
+# v1 单页界面已下线（旧地址由 vercel.json / FastAPI 307 到 /app/）。根目录若还留着旧副本，
+# Vercel 会优先把静态文件发出去，用户看到的就还是老版——所以这里必须删，而不是“跳过”。
+log "步骤 3/6：删除 ${DEPLOY_DIR}/ 根的旧版页面副本 ..."
+for f in index.html d.html d.js d.css workbench.html workbench.js uw-commercial.html uw-commercial.js \
+         res-legacy.html app.js style.css legacy-readonly.js safe.js i18n.js vc-dna.css; do
+    if [ -f "${DEPLOY_DIR}/${f}" ]; then
+        rm -f "${DEPLOY_DIR}/${f}" || fail "删除 ${DEPLOY_DIR}/${f} 失败"
+        log "  已删除 ${DEPLOY_DIR}/${f}"
     fi
 done
 

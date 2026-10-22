@@ -34,7 +34,6 @@ export const EN: Record<string, string> = {
   "due-on-sale 预案": "Due-on-sale plan",
   "useApp 必须在 <App> 内使用": "useApp must be used inside <App>",
   "useDeal 必须在交易页内使用": "useDeal must be used inside the deal page",
-  "v1 单页决策（旧版入口）": "v1 single-page tool (legacy entry)",
   "vertciti 业务版图": "vertciti portfolio",
   "vertciti 官网": "vertciti website",
   "{0} {1} 笔": "{0} {1} deals",

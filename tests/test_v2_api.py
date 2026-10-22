@@ -233,3 +233,11 @@ def test_health_does_not_leak_db_error_text(client, monkeypatch):
     h = client.get("/api/v2/health").json()
     assert h["ok"] is False and h["db"]["error"] == "RuntimeError"
     assert "s3cret" not in str(h) and "db.internal" not in str(h)
+
+
+@pytest.mark.parametrize("path", ["/", "/index.html", "/d", "/d.html?addr=1", "/workbench.html", "/uw-commercial.html", "/res-legacy.html"])
+def test_legacy_pages_redirect_to_v2(client, path):
+    """v1 单页界面已下线：旧书签都 307 到 /app/；接口照常可用。"""
+    r = client.get(path, follow_redirects=False)
+    assert r.status_code == 307 and r.headers["location"] == "/app/"
+    assert client.get("/api/health").json()["ok"] is True

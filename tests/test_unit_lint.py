@@ -24,7 +24,6 @@ from app.uw_commercial import (
 )
 
 APP = Path(__file__).resolve().parent.parent / "app"
-STATIC = Path(__file__).resolve().parent.parent / "static"
 
 
 # ---------------------------------------------------------------- LINT-01
@@ -178,7 +177,7 @@ class TestLint04HonestFormatters:
 
     def test_no_noi_or_zero_fallback_in_sources(self):
         bad = []
-        for p in (*sorted(APP.rglob("*.py")), STATIC / "d.js"):  # v2 分层后扫全部后端源码
+        for p in sorted(APP.rglob("*.py")):  # v2 分层后扫全部后端源码（v1 前端已下线）
             src = p.read_text()
             for i, line in enumerate(src.splitlines(), 1):
                 if re.search(r"noi_annual\s*\|\|\s*0", line):
