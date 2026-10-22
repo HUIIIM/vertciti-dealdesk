@@ -163,3 +163,21 @@ test("出价空间：键盘拖动试算价，实时给出该价下的回报与�
   await out.getByRole("button", { name: "回到要价" }).click();
   await expect(out).toHaveCount(0);
 });
+
+test("别人做不到的：先核哪个 + 反方备忘录（不经 AI），真实后端出数", async ({ page, request }) => {
+  const tpl = await (await request.get("/api/uw/template")).json();
+  const d = await (await request.post("/api/v2/deals", { data: { name: "反方样例", track: "commercial", address: "3 Doubt St",
+    kill_criteria: [{ metric: "irr_pct", op: "<", threshold: 12 }] } })).json();
+  await request.post(`/api/v2/deals/${d.id}/versions`, { data: { inputs: tpl.example_39_main, label: "样例" } });
+  for (const [src, v] of [["OM", 5], ["经纪人电话", 5.75]] as const)
+    await request.post(`/api/v2/deals/${d.id}/evidence`, { data: { field: "analysis.exit_cap_rate", value: v, source: src, method: "pdf", confidence: "high" } });
+  await page.goto(`/app/#/deals/${d.id}`);
+  const vf = page.getByRole("region", { name: "先核哪个" });
+  await expect(vf.locator("li")).toHaveCount(3);
+  await expect(vf.locator("li").first()).toContainText(/\d+ bp/);
+  await page.goto(`/app/#/deals/${d.id}/risk`);
+  const memo = page.getByRole("region", { name: "反方备忘录" });
+  await expect(memo).toContainText(/\d+ 条高危/);
+  await expect(memo).toContainText("已触发淘汰条件");
+  await expect(memo).toContainText("不经 AI");
+});

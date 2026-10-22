@@ -8,6 +8,7 @@ from fastapi import APIRouter
 from app.api.v2.deps import need
 from app.api.v2.schemas import (
     CatalogOut,
+    DevilsMemoOut,
     MaxBidIn,
     MaxBidOut,
     ModelOut,
@@ -18,6 +19,7 @@ from app.api.v2.schemas import (
     ScenariosIn,
     ScenariosOut,
     Track,
+    VerifyQueueOut,
 )
 from app.domain.v2 import kill_criteria, scenarios
 from app.domain.v2.assumptions import BY_TRACK
@@ -70,6 +72,18 @@ def run_scenarios(deal_id: int, body: ScenariosIn) -> dict[str, Any]:
     """基准 / 乐观 / 悲观加概率：期望回报与亏损概率。不传 scenarios 用默认三情景。"""
     custom = [s.model_dump(exclude_none=True) for s in body.scenarios] if body.scenarios else None
     return analysis.scenarios_for(deal_id, custom)
+
+
+@router.get("/deals/{deal_id}/devils-memo", response_model=DevilsMemoOut, dependencies=[need("deal.read")])
+def devils_memo(deal_id: int) -> dict[str, Any]:
+    """反方备忘录：这笔交易最可能怎么失败（确定性规则，不经 AI）。"""
+    return analysis.devils_memo(deal_id)
+
+
+@router.get("/deals/{deal_id}/verify-queue", response_model=VerifyQueueOut, dependencies=[need("deal.read")])
+def verify_queue(deal_id: int) -> dict[str, Any]:
+    """先核哪个：每处待核（矛盾 / 未复核关键数字）按对主回报指标的摆动排序。"""
+    return analysis.verification_queue(deal_id)
 
 
 @router.post("/deals/{deal_id}/price-check", response_model=PriceCheckOut, dependencies=[need("deal.read")])

@@ -58,3 +58,60 @@ Dealpath《2026 State of AI in CRE Investing》（103 家机构）：97% 已把 
 - 投委会与审计轨迹：https://rets.ai/blog/the-audit-trail-problem-why-investment-committees-don-t-trust-ai ，https://rets.ai/blog/commercial-real-estate-underwriting-software-how-to-evaluate ，https://leni.co/blog/verifiable-ai-outputs-real-estate ，https://botminds.ai/solutions/investment-memo-ic-pack-generation
 - 界面：https://www.925studios.co/blog/linear-design-breakdown-saas-ui-2026 ，https://adminlte.io/blog/fintech-dashboard-design-examples/
 - 流水线工具：https://growthfactor.ai/blog-posts/commercial-real-estate-deal-software-guide ，https://lev.com/lp/pipeline
+
+## 6. 全球扩展扫描（2026-10-22 第二轮）
+
+上面几节覆盖的是美国机构端。这一轮扩到英国、欧洲、澳洲、亚洲，以及散户投资工具、数据与估值模型、LP / 资管平台。描述大多来自厂商自述，日期注在条目里；没核实到的单列在本节末尾。
+
+| 产品 | 地区 / 类别 | 值得学的具体做法 | 我们 |
+|---|---|---|---|
+| LandTech LandInsight AI Assistant（2026-07-29） | 英国·选址 | 每条结论点开就是官方原始记录；口径冲突时并列解释，不替用户选 | 部分（有数字护照、矛盾登记） |
+| Nimbus Maps（2026-06-23） | 英国 | 多源数据合成一个物业主档；AI 交易信号预警 | 部分 |
+| Pricefinder Investor Scout（beta） | 澳洲 | 地图选盘，带 19 个投资旗标 | 没有 |
+| Archistar | 澳洲 | 按区划规则自动出建筑体量和收益测算 | 没有 |
+| Cotality MCP / Claude 连接器（2026-10-12） | 澳洲 / 美国·数据 | 数据集附"语义说明文件"，供 AI 调用 | 没有 |
+| PropStream AI Search（2026-09-28） | 美国·住宅 | 自然语言转成**用户看得见、改得了的**筛选条件 | 没有 |
+| DealCheck | 美国·住宅 | 按多条标准倒推报价；生成带品牌的报告分享给贷款人 | 部分（没有对外分享） |
+| HouseCanary | 美国·估值模型 | 公开估值模型的中位误差 | 部分 |
+| Juniper Square Fay（2026-07-28） | LP / 基金 | 150+ 条确定性核对，只把例外交给人；"推理用 AI，算术不用" | 部分 |
+| MRI Agora（2026-06-25） | 资管 | agent 每个动作都有可检索、可导出的审计记录 | 部分 |
+| Ramp Policy Agent | 界面参考 | 拿不准就标"需复核"；可以直接选"规则错了"去改规则 | 部分 |
+
+**别人有、我们没有（按对小团队收购台的价值排序）：**
+1. 地图视图加策略旗标（MapLibre 叠 NYC PLUTO 地块）。
+2. 定时扫盘雷达。
+3. 只读 MCP server。
+4. 例外收件箱（确定性规则库，带"规则错了"按钮）。
+5. 自然语言转可见筛选条件。
+6. NYC 区划剩余开发权测算。
+7. 业主触达清单。
+8. 给贷款人和合伙人的只读分享链接。
+
+**未核实：** "JunieAI" 这个名字只在二手摘要里出现过；明源云没找到投资测算功能；Trepp 没找到 AI 产品；Keyway 的现行定位说法互相矛盾。
+
+来源（节选，全量见调研记录）：
+- https://land.tech/blog/introducing-the-ai-assistant-site-appraisals-you-can-actually-check
+- https://www.cotality.com/press-releases/cotality-launches-claude-connector-to-deliver-trusted-property-intelligence-in-ai-workflows
+- https://www.rismedia.com/2026/09/28/propstream-launches-ai-search-for-faster-more-conversational-property-search/
+- https://financialit.net/news/artificial-intelligence/juniper-square-launches-new-ai-powered-fund-admin-oversight-agent-gps
+- https://www.mannpublications.com/mannreport/2026/06/25/mri-software-launches-agora-intelligence-and-agora-orchestrator/
+- https://support.ramp.com/hc/en-us/articles/44072387128979-Policy-agent
+- https://help.pricefinder.com.au/hc/en-us/articles/60171327207961-How-to-use-Investor-Scout-in-Pricefinder
+- https://www.housecanary.com/solutions/real-estate-investor/
+
+## 7. 别人不敢做、做不到的（我们的打法）
+
+同行做不到，大多不是因为技术难，而是因为**结构上不能做**：
+- 卖给成百上千家客户的平台，不敢公开"你的承销错了多少"。
+- 卖 AI 的厂商，不敢承诺"数字不经 AI"。
+- 只做抽取和填表的工具，手上没有"冻结的决策 + 同一运行编号重放"，想做也做不了。
+
+| # | 做法 | 为什么别人做不到 | 状态 |
+|---|---|---|---|
+| 1 | **先核哪个**：每处待核（矛盾、未复核关键数字）按能让 IRR 摆动多少基点排序，第一条就是该先追的那份文件 | 要先有"敏感性定义关键数字"和"矛盾登记"两套底座 | ✅ 2026-10-22 上线（交易页核对进度卡） |
+| 2 | **反方备忘录**：上会前先写"最可能怎么失败"，固定规则生成、不经 AI，每个数字可追溯；同时写进投委会包 | AI 厂商的卖点是"帮你写看多论据"；确定性反方意见需要全套已算结果 | ✅ 2026-10-22 上线（红队页 + 投委会包） |
+| 3 | **出价空间与试算**：每条约束允许价和要价的差额一目了然，拖动价格实时看回报和每条底线 | 别人只给一个"最高出价"数字，不给约束结构 | ✅ 2026-10-22 上线 |
+| 4 | **承销准确度记分卡**：用事后归因，按假设拆出本团队的历史偏差（比如"租金增长平均高估 1.2 个点"），并自动生成"按你的历史偏差修正后"的情景 | 平台不敢公开客户的错误；也没有冻结决策可以重放 | 下一步（需要至少一笔持有期实际数） |
+| 5 | **带数字护照的 MCP**：AI 来查数时，数值连同来源、可信度、新鲜度一起返回，可以拒用低可信的数 | 现有地产 MCP（Cotality、Morningstar、Juniper）只返回数值 | 下一步 |
+| 6 | **区划剩余开发权作为第四条约束线**：NYC PLUTO 的 FAR 进入反推最高出价 | 区划工具只算体量、不算出价；承销工具不懂区划 | 需要接 PLUTO 数据（外网） |
+| 7 | **矛盾直接变情景**：每条未裁决矛盾自动生成两个来源值的加权情景，显示"这条矛盾值多少 IRR" | 要先有矛盾登记和情景引擎 | 第 1 项已给出摆动值；情景化下一步 |

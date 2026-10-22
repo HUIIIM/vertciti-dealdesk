@@ -1421,6 +1421,55 @@
     "title": "DecisionOut",
     "type": "object"
    },
+   "DevilsMemoOut": {
+    "additionalProperties": true,
+    "properties": {
+     "headline": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Headline"
+     },
+     "high": {
+      "title": "High",
+      "type": "integer"
+     },
+     "note": {
+      "title": "Note",
+      "type": "string"
+     },
+     "points": {
+      "items": {
+       "$ref": "#/components/schemas/MemoPointOut"
+      },
+      "title": "Points",
+      "type": "array"
+     },
+     "run_id": {
+      "title": "Run Id",
+      "type": "string"
+     },
+     "version_id": {
+      "title": "Version Id",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "headline",
+     "points",
+     "high",
+     "note",
+     "version_id",
+     "run_id"
+    ],
+    "title": "DevilsMemoOut",
+    "type": "object"
+   },
    "DiffOut": {
     "additionalProperties": true,
     "properties": {
@@ -2269,6 +2318,50 @@
      "permissions"
     ],
     "title": "MeOut",
+    "type": "object"
+   },
+   "MemoPointOut": {
+    "additionalProperties": true,
+    "properties": {
+     "key": {
+      "title": "Key",
+      "type": "string"
+     },
+     "severity": {
+      "enum": [
+       "high",
+       "medium"
+      ],
+      "title": "Severity",
+      "type": "string"
+     },
+     "tab": {
+      "enum": [
+       "overview",
+       "risk",
+       "files",
+       "model"
+      ],
+      "title": "Tab",
+      "type": "string"
+     },
+     "text": {
+      "title": "Text",
+      "type": "string"
+     },
+     "title": {
+      "title": "Title",
+      "type": "string"
+     }
+    },
+    "required": [
+     "key",
+     "severity",
+     "title",
+     "text",
+     "tab"
+    ],
+    "title": "MemoPointOut",
     "type": "object"
    },
    "MetricMetaOut": {
@@ -3936,6 +4029,92 @@
     "title": "VarianceRowOut",
     "type": "object"
    },
+   "VerifyItemOut": {
+    "additionalProperties": true,
+    "properties": {
+     "action": {
+      "title": "Action",
+      "type": "string"
+     },
+     "conflict_id": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Conflict Id"
+     },
+     "detail": {
+      "title": "Detail",
+      "type": "string"
+     },
+     "field": {
+      "title": "Field",
+      "type": "string"
+     },
+     "kind": {
+      "enum": [
+       "conflict",
+       "unverified"
+      ],
+      "title": "Kind",
+      "type": "string"
+     },
+     "label": {
+      "title": "Label",
+      "type": "string"
+     },
+     "primary_a": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Primary A"
+     },
+     "primary_b": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Primary B"
+     },
+     "swing_bps": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Swing Bps"
+     }
+    },
+    "required": [
+     "kind",
+     "field",
+     "label",
+     "conflict_id",
+     "swing_bps",
+     "detail",
+     "primary_a",
+     "primary_b",
+     "action"
+    ],
+    "title": "VerifyItemOut",
+    "type": "object"
+   },
    "VerifyOut": {
     "additionalProperties": true,
     "properties": {
@@ -3991,6 +4170,55 @@
      "message"
     ],
     "title": "VerifyOut",
+    "type": "object"
+   },
+   "VerifyQueueOut": {
+    "additionalProperties": true,
+    "properties": {
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/VerifyItemOut"
+      },
+      "title": "Items",
+      "type": "array"
+     },
+     "metric": {
+      "title": "Metric",
+      "type": "string"
+     },
+     "metric_label": {
+      "title": "Metric Label",
+      "type": "string"
+     },
+     "note": {
+      "title": "Note",
+      "type": "string"
+     },
+     "top_share_pct": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Top Share Pct"
+     },
+     "version_id": {
+      "title": "Version Id",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "metric",
+     "metric_label",
+     "items",
+     "top_share_pct",
+     "note",
+     "version_id"
+    ],
+    "title": "VerifyQueueOut",
     "type": "object"
    },
    "VersionCreate": {
@@ -5866,6 +6094,49 @@
     ]
    }
   },
+  "/api/v2/deals/{deal_id}/devils-memo": {
+   "get": {
+    "description": "反方备忘录：这笔交易最可能怎么失败（确定性规则，不经 AI）。",
+    "operationId": "devils_memo_api_v2_deals__deal_id__devils_memo_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "deal_id",
+      "required": true,
+      "schema": {
+       "title": "Deal Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DevilsMemoOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Devils Memo",
+    "tags": [
+     "v2 · underwriting"
+    ]
+   }
+  },
   "/api/v2/deals/{deal_id}/diff": {
    "get": {
     "description": "任意两版并排：假设与结果的逐项差异。",
@@ -6894,6 +7165,49 @@
     "summary": "Patch Task",
     "tags": [
      "v2 · committee"
+    ]
+   }
+  },
+  "/api/v2/deals/{deal_id}/verify-queue": {
+   "get": {
+    "description": "先核哪个：每处待核（矛盾 / 未复核关键数字）按对主回报指标的摆动排序。",
+    "operationId": "verify_queue_api_v2_deals__deal_id__verify_queue_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "deal_id",
+      "required": true,
+      "schema": {
+       "title": "Deal Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/VerifyQueueOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Verify Queue",
+    "tags": [
+     "v2 · underwriting"
     ]
    }
   },

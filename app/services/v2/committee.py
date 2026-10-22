@@ -10,12 +10,22 @@ from sqlalchemy.orm import Session
 
 from app.core import security
 from app.core.context import current_actor
-from app.domain.v2 import diffing, max_bid, redteam, reproducible, scenarios
+from app.domain.v2 import (
+    devils_advocate,
+    diffing,
+    max_bid,
+    provenance,
+    redteam,
+    reproducible,
+    scenarios,
+    verification_value,
+)
 from app.domain.v2.committee import tally
 from app.domain.v2.model import METRICS, ModelInputError
 from app.services.persistence import audit
 from app.services.persistence.engine import session_scope
 from app.services.persistence.schema import CommitteePack, CommitteeVote, DealVersion, Decision, User
+from app.services.persistence.schema import Conflict as ConflictRow
 from app.services.render import committee_pack
 from app.services.v2 import evidence
 from app.services.v2.analysis import _context, _require_version
@@ -115,6 +125,15 @@ def pack_data(s: Session, deal_id: int) -> JSON:
     unknown = [k for k, val in ctx["metrics"].items() if val is None and k in CARD_KEYS[d.track]]
     if unknown:
         risks.append("以下结论卡指标未能计算（未知保持未知）：" + "、".join(unknown))
+    # 反方意见（不经 AI）：与交易页同一套规则；附“先核哪个”提示
+    cons = [{"id": c.id, "field": c.field, "value_a": c.value_a, "source_a": c.source_a, "value_b": c.value_b,
+             "source_b": c.source_b} for c in s.scalars(select(ConflictRow).where(
+                 ConflictRow.deal_id == d.id, ConflictRow.status == "open").order_by(ConflictRow.id)).all()]
+    queue = verification_value.rank(d.track, v.inputs, rt, provenance.key_number_status(
+        rt.get("key_fields", []), evidence.latest_passports(s, d.id)), cons) if rt.get("all") else None
+    devils = devils_advocate.build(d.track, v.inputs, ctx["metrics"], {
+        "kill": ctx["kill"], "redteam": rt or None, "scenarios": sc, "max_bid": mb, "key_numbers": ctx["key_numbers"],
+        "queue": queue, "stale": ctx["stale_evidence"]})
     st = status_in(s, d.id)
     decisions = [row(x) for x in s.scalars(select(Decision).where(Decision.deal_id == d.id)
                                            .order_by(Decision.id.desc()).limit(10)).all()]
@@ -123,13 +142,14 @@ def pack_data(s: Session, deal_id: int) -> JSON:
         "engine_version": reproducible.engine_version(), "metrics": ctx["metrics"],
         "metric_catalog": {k: {"label": m.label, "unit": m.unit} for k, m in METRICS.items()},
         "card_keys": CARD_KEYS[d.track], "kill": ctx["kill"], "max_bid": mb, "redteam": rt, "scenarios": sc,
-        "diff": diff, "risks": risks, "committee": st["tally"], "votes": st["votes"], "decisions": decisions,
+        "diff": diff, "risks": risks, "devils": devils, "committee": st["tally"], "votes": st["votes"],
+        "decisions": decisions,
         "verification": {"key_reviewed": ctx["key_numbers"]["done"], "key_total": ctx["key_numbers"]["total"],
                          "open_conflicts": ctx["open_conflicts"], "stale_evidence": ctx["stale_evidence"]},
         "passports": sorted(evidence.latest_passports(s, d.id).values(), key=lambda p: p["field"]),
     }
     data["data_sha256"] = reproducible.sha256_hex(reproducible.canonical_json(
-        {k: data[k] for k in ("run_id", "metrics", "kill", "risks", "committee", "votes")}))
+        {k: data[k] for k in ("run_id", "metrics", "kill", "risks", "devils", "committee", "votes")}))
     data["generated_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     return data
 

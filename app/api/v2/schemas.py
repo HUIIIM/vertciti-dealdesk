@@ -374,6 +374,44 @@ class ConstraintOut(Out):
     reason: str
 
 
+class VerifyItemOut(Out):
+    kind: Literal["conflict", "unverified"]
+    field: str
+    label: str
+    conflict_id: int | None
+    swing_bps: float | None
+    detail: str
+    primary_a: float | None
+    primary_b: float | None
+    action: str
+
+
+class VerifyQueueOut(Out):
+    metric: str
+    metric_label: str
+    items: list[VerifyItemOut]
+    top_share_pct: float | None
+    note: str
+    version_id: int
+
+
+class MemoPointOut(Out):
+    key: str
+    severity: Literal["high", "medium"]
+    title: str
+    text: str
+    tab: Literal["overview", "risk", "files", "model"]
+
+
+class DevilsMemoOut(Out):
+    headline: str | None
+    points: list[MemoPointOut]
+    high: int
+    note: str
+    version_id: int
+    run_id: str
+
+
 class PriceCheckIn(In):
     price: float = Field(gt=0, le=1e10, description="试算出价（美元）")
 

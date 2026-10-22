@@ -7,7 +7,17 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.context import current_actor
-from app.domain.v2 import diffing, kill_criteria, lifecycle, max_bid, provenance, redteam, scenarios
+from app.domain.v2 import (
+    devils_advocate,
+    diffing,
+    kill_criteria,
+    lifecycle,
+    max_bid,
+    provenance,
+    redteam,
+    scenarios,
+    verification_value,
+)
 from app.domain.v2.committee import tally
 from app.domain.v2.model import METRICS, ModelInputError
 from app.services.persistence.engine import session_scope
@@ -20,6 +30,9 @@ from app.services.persistence.schema import (
     Decision,
     Task,
     User,
+)
+from app.services.persistence.schema import (
+    Conflict as ConflictRow,
 )
 from app.services.v2 import evidence
 from app.services.v2.deals import _deal_dict, _event, current_version, deal_or_404, version_dict
@@ -81,6 +94,48 @@ def price_check_for(deal_id: int, price: float) -> JSON:
             return max_bid.price_check(d.track, v.inputs, price, kill=d.kill_criteria)
         except ValueError as e:
             raise InvalidInputError(str(e)) from e
+
+
+def verification_queue(deal_id: int) -> JSON:
+    """先核哪个：未裁决矛盾 + 未达标关键数字，按对主回报指标的摆动排序。"""
+    with session_scope() as s:
+        d = deal_or_404(s, deal_id)
+        v = _require_version(s, d)
+        try:
+            rt = redteam.run(d.track, v.inputs)
+        except ModelInputError as e:
+            raise InvalidInputError(str(e)) from e
+        ps = evidence.latest_passports(s, d.id)
+        ks = provenance.key_number_status(rt["key_fields"], ps)
+        cons = [{"id": c.id, "field": c.field, "value_a": c.value_a, "source_a": c.source_a, "value_b": c.value_b,
+                 "source_b": c.source_b} for c in s.scalars(select(ConflictRow).where(
+                     ConflictRow.deal_id == d.id, ConflictRow.status == "open").order_by(ConflictRow.id)).all()]
+        return {**verification_value.rank(d.track, v.inputs, rt, ks, cons), "version_id": v.id}
+
+
+def devils_memo(deal_id: int) -> JSON:
+    """反方备忘录：确定性规则拼出“这笔交易最可能怎么失败”，不经 AI。"""
+    queue = verification_queue(deal_id)
+    with session_scope() as s:
+        d = deal_or_404(s, deal_id)
+        v = _require_version(s, d)
+        ctx = _context(s, d)
+        try:
+            rt = redteam.run(d.track, v.inputs)
+        except ModelInputError:
+            rt = None
+        try:
+            sc = scenarios.run(d.track, v.inputs)
+        except (ValueError, KeyError, ModelInputError):
+            sc = None
+        try:
+            mb = max_bid.run(d.track, v.inputs, [], kill=d.kill_criteria)
+        except ValueError:
+            mb = None
+        memo = devils_advocate.build(d.track, v.inputs, ctx["metrics"], {
+            "kill": ctx["kill"], "redteam": rt, "scenarios": sc, "max_bid": mb, "key_numbers": ctx["key_numbers"],
+            "queue": queue, "stale": ctx["stale_evidence"]})
+        return {**memo, "version_id": v.id, "run_id": v.run_id}
 
 
 def diff_versions(deal_id: int, a: int, b: int) -> JSON:

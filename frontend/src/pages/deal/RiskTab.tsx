@@ -1,7 +1,7 @@
 // 敏感性与红队：龙卷风图（最可能出错的 5 个假设）、实时滑块（DealCheck 式压力测试）、概率加权情景、反推最高出价。
 import { useEffect, useState } from "react";
 import { api, call } from "@/api/client";
-import type { Metrics, RedTeam, ScenarioIn } from "@/api/types";
+import type { DevilsMemo, Metrics, RedTeam, ScenarioIn } from "@/api/types";
 import { useApi } from "@/api/useApi";
 import { useApp } from "@/app-context";
 import { Tornado } from "@/components/Charts";
@@ -23,6 +23,7 @@ export function RiskTab() {
   };
   return (
     <>
+      <DevilsCard id={id} version={ov.deal.current_version_id ?? 0} />
       <section className="card risk" aria-label="红队面板">
         <div className="row" style={{ justifyContent: "space-between" }}>
           <h2 style={{ margin: 0 }}>红队面板：最可能出错的 5 个假设</h2>
@@ -142,3 +143,32 @@ function MaxBidCard() {
   );
 }
 
+
+const TAB_HREF: Record<string, string> = { overview: "", risk: "/risk", files: "/files", model: "/model" };
+
+/** 反方备忘录：上会前先读“这笔交易最可能怎么失败”。规则生成、不经 AI；每条带去处理的入口。 */
+function DevilsCard({ id, version }: { id: number; version: number }) {
+  const memo = useApi<DevilsMemo>(() => call(api.GET("/api/v2/deals/{deal_id}/devils-memo", { params: { path: { deal_id: id } } })), [id, version]);
+  if (memo.error) return <ErrorBox error={memo.error} onRetry={memo.reload} />;
+  if (!memo.data) return <section className="card"><Skeleton rows={3} /></section>;
+  const d = memo.data;
+  return (
+    <section className={`card devils${d.high ? " risk" : ""}`} aria-label="反方备忘录">
+      <div className="row" style={{ justifyContent: "space-between" }}>
+        <h2 style={{ margin: 0 }}>反方备忘录：这笔交易最可能怎么失败</h2>
+        <span className="chip" title={d.note}>不经 AI · 运行 {d.run_id.slice(0, 12)}</span>
+      </div>
+      {d.headline ? <p className="headline">{d.headline}</p> : <p className="muted">没有可由数据支持的反方论点（数据不足的论点不写）。</p>}
+      {d.points.length ? (
+        <ol className="devils-list">
+          {d.points.map((p) => (
+            <li key={p.key}>
+              <Status s={p.severity === "high" ? "risk" : "building"}>{p.severity === "high" ? "高" : "中"} · {p.title}</Status>
+              <span>{p.text}</span>
+              <a className="btn sm ghost" href={`#/deals/${id}${TAB_HREF[p.tab] ?? ""}`}>去看</a>
+            </li>))}
+        </ol>) : null}
+      <p className="sub" style={{ margin: "8px 0 0" }}>{d.note}</p>
+    </section>
+  );
+}

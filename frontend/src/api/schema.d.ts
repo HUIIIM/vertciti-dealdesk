@@ -346,6 +346,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v2/deals/{deal_id}/devils-memo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Devils Memo
+         * @description 反方备忘录：这笔交易最可能怎么失败（确定性规则，不经 AI）。
+         */
+        get: operations["devils_memo_api_v2_deals__deal_id__devils_memo_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v2/deals/{deal_id}/diff": {
         parameters: {
             query?: never;
@@ -694,6 +714,26 @@ export interface paths {
         head?: never;
         /** Patch Task */
         patch: operations["patch_task_api_v2_deals__deal_id__tasks__task_id__patch"];
+        trace?: never;
+    };
+    "/api/v2/deals/{deal_id}/verify-queue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Verify Queue
+         * @description 先核哪个：每处待核（矛盾 / 未复核关键数字）按对主回报指标的摆动排序。
+         */
+        get: operations["verify_queue_api_v2_deals__deal_id__verify_queue_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v2/deals/{deal_id}/versions": {
@@ -1426,6 +1466,23 @@ export interface components {
         } & {
             [key: string]: unknown;
         };
+        /** DevilsMemoOut */
+        DevilsMemoOut: {
+            /** Headline */
+            headline: string | null;
+            /** High */
+            high: number;
+            /** Note */
+            note: string;
+            /** Points */
+            points: components["schemas"]["MemoPointOut"][];
+            /** Run Id */
+            run_id: string;
+            /** Version Id */
+            version_id: number;
+        } & {
+            [key: string]: unknown;
+        };
         /** DiffOut */
         DiffOut: {
             a: components["schemas"]["DiffSideOut"];
@@ -1769,6 +1826,27 @@ export interface components {
             role_label: string;
             /** Username */
             username: string;
+        } & {
+            [key: string]: unknown;
+        };
+        /** MemoPointOut */
+        MemoPointOut: {
+            /** Key */
+            key: string;
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "high" | "medium";
+            /**
+             * Tab
+             * @enum {string}
+             */
+            tab: "overview" | "risk" | "files" | "model";
+            /** Text */
+            text: string;
+            /** Title */
+            title: string;
         } & {
             [key: string]: unknown;
         };
@@ -2433,6 +2511,32 @@ export interface components {
         } & {
             [key: string]: unknown;
         };
+        /** VerifyItemOut */
+        VerifyItemOut: {
+            /** Action */
+            action: string;
+            /** Conflict Id */
+            conflict_id: number | null;
+            /** Detail */
+            detail: string;
+            /** Field */
+            field: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "conflict" | "unverified";
+            /** Label */
+            label: string;
+            /** Primary A */
+            primary_a: number | null;
+            /** Primary B */
+            primary_b: number | null;
+            /** Swing Bps */
+            swing_bps: number | null;
+        } & {
+            [key: string]: unknown;
+        };
         /** VerifyOut */
         VerifyOut: {
             /** Deal Id */
@@ -2447,6 +2551,23 @@ export interface components {
             sha256: string;
             /** Version Id */
             version_id?: number | null;
+        } & {
+            [key: string]: unknown;
+        };
+        /** VerifyQueueOut */
+        VerifyQueueOut: {
+            /** Items */
+            items: components["schemas"]["VerifyItemOut"][];
+            /** Metric */
+            metric: string;
+            /** Metric Label */
+            metric_label: string;
+            /** Note */
+            note: string;
+            /** Top Share Pct */
+            top_share_pct: number | null;
+            /** Version Id */
+            version_id: number;
         } & {
             [key: string]: unknown;
         };
@@ -3650,6 +3771,37 @@ export interface operations {
             };
         };
     };
+    devils_memo_api_v2_deals__deal_id__devils_memo_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                deal_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DevilsMemoOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     diff_api_v2_deals__deal_id__diff_get: {
         parameters: {
             query: {
@@ -4305,6 +4457,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TaskOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    verify_queue_api_v2_deals__deal_id__verify_queue_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                deal_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VerifyQueueOut"];
                 };
             };
             /** @description Validation Error */

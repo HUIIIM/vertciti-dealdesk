@@ -191,6 +191,30 @@ table.t a.rowlink:hover { text-decoration: underline; }
   font-weight: 700; color: var(--text-2); border-bottom: 3px solid transparent; transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease); }
 .tabs a:hover { color: var(--text); }
 .tabs a[aria-selected="true"], .tabs a[aria-current="page"] { color: var(--text); border-bottom-color: var(--accent); }
+/* 反方备忘录：头条一句加粗；清单 = 徽标列固定 · 论点 · 去看 */
+.devils .headline { font-size: 17px; font-weight: 800; line-height: 1.45; margin: var(--s3) 0; padding-left: var(--s3);
+  border-left: 4px solid var(--risk); text-wrap: pretty; }
+.devils-list { list-style: none; margin: 0; padding: 0; }
+.devils-list li { display: grid; grid-template-columns: 168px minmax(0, 1fr) 64px; gap: var(--s3); align-items: start; padding: var(--s2) 0;
+  border-bottom: 1px solid var(--line-soft); }
+.devils-list li > .status { justify-self: stretch; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 640px) { .devils-list li { grid-template-columns: 1fr; gap: 4px; } .devils-list .btn { justify-self: start; } }
+/* 先核哪个：序号 · 什么 · 摆动条（从 0 起）· 基点 · 去处理 */
+.vfirst { margin: var(--s3) 0 var(--s2); padding-top: var(--s3); border-top: 1px solid var(--line-soft); }
+.vfirst ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.vfirst li { display: grid; grid-template-columns: 24px minmax(0, 1fr) 80px 56px 88px; gap: var(--s2); align-items: center; font-size: var(--fs-sm);
+  min-height: 36px; }
+.vfirst .rank { width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; background: var(--text); color: var(--surface);
+  font-weight: 800; font-size: var(--fs-xs); }
+.vfirst li:first-child .rank { background: var(--accent); color: #000; }
+.vfirst .what { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vfirst .bar { height: 8px; background: var(--surface-2); position: relative; }
+.vfirst .bar i { position: absolute; inset: 0 auto 0 0; background: var(--text-2); transform-origin: left center;
+  animation: growX var(--dur-grow) var(--ease) both; }
+.vfirst li:first-child .bar i { background: var(--accent); }
+.vfirst .bps { text-align: right; font-weight: 800; }
+.vfirst .btn { width: 100%; }
+@media (max-width: 640px) { .vfirst li { grid-template-columns: 24px minmax(0, 1fr) 56px; } .vfirst .bar, .vfirst .btn { display: none; } }
 /* 出价空间梯子：条从左向右生长，竖线 = 要价，橙色 = 卡住价格的约束 */
 .ladder { margin-top: var(--s4); border-top: 1px solid var(--line-soft); padding-top: var(--s3); }
 .ladder-head { display: flex; gap: var(--s3); align-items: baseline; flex-wrap: wrap; font-size: var(--fs-sm); margin-bottom: var(--s2); }

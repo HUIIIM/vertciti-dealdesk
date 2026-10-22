@@ -243,3 +243,46 @@ def test_price_check_residential_keeps_ltv():
     r = max_bid.price_check("residential", RES, RES["price"] * 0.9)
     expect = run_model("residential", max_bid.with_price("residential", RES, RES["price"] * 0.9))["metrics"]
     assert r["metrics"] == expect
+
+
+def test_verification_value_ranks_by_measured_swing_and_dedupes():
+    from app.domain.v2 import verification_value
+    from app.domain.v2.model import primary_value
+    rt = redteam.run("commercial", COM)
+    ks = provenance.key_number_status(rt["key_fields"], {})  # 一个来源都没有：全部关键数字未达标
+    con = {"id": 7, "field": "analysis.exit_cap_rate", "value_a": 5.0, "source_a": "OM", "value_b": 5.75, "source_b": "电话"}
+    out = verification_value.rank("commercial", COM, rt, ks, [con])
+    first = out["items"][0]
+    irr = lambda v: primary_value("commercial", run_model("commercial", set_path(COM, "analysis.exit_cap_rate", v)))  # noqa: E731
+    by_field = {x["field"]: x for x in out["items"]}
+    c = by_field["analysis.exit_cap_rate"]
+    assert c["kind"] == "conflict" and c["swing_bps"] == pytest.approx(abs(irr(5.0) - irr(5.75)) * 100)
+    assert [x["field"] for x in out["items"]].count("analysis.exit_cap_rate") == 1   # 矛盾与未复核同字段只算一次
+    labels = [x["label"] for x in out["items"]]
+    assert len(labels) == len(set(labels))  # 一个假设覆盖多个字段（如各租户租金）也只列一次
+    swings = [x["swing_bps"] for x in out["items"] if x["swing_bps"] is not None]
+    assert swings == sorted(swings, reverse=True) and first["swing_bps"] == max(swings)
+    assert {x["kind"] for x in out["items"]} == {"conflict", "unverified"} and 0 < out["top_share_pct"] <= 100
+
+
+def test_devils_memo_is_deterministic_and_never_invents():
+    from app.domain.v2 import devils_advocate
+    kill_def = [{"metric": "irr_pct", "op": "<", "threshold": 12}, {"metric": "dscr", "op": "<", "threshold": 1.25}]
+    m = run_model("commercial", COM)["metrics"]
+    rt = redteam.run("commercial", COM)
+    args = {"kill": kill_criteria.evaluate(kill_def, m), "redteam": rt, "scenarios": scenarios.run("commercial", COM),
+            "max_bid": max_bid.run("commercial", COM, [], kill=kill_def),
+            "key_numbers": provenance.key_number_status(rt["key_fields"], {}), "queue": None}
+    a = devils_advocate.build("commercial", COM, m, args)
+    b = devils_advocate.build("commercial", COM, m, args)
+    assert a == b  # 同输入同备忘录：可复现
+    keys = [p["key"] for p in a["points"]]
+    assert {"kill:irr_pct", "price:gap", "swing:top", "verify:gap"} <= set(keys)
+    first = next(p for p in a["points"] if p["key"] == "kill:irr_pct")
+    assert f"{m['irr_pct']:.2f}%" in first["text"] and a["headline"].startswith(f"{a['high']} 条高危")
+    assert first["title"] in a["headline"]  # 头条点名最该先解决的
+    assert all(p["severity"] == "high" for p in a["points"][: a["high"]])  # 高危在前
+    assert not ({"near:dscr", "dscr:thin"} <= set(keys))  # 同一件事不说两遍
+    # 数据不足：不写论点，不拿 0 凑
+    empty = devils_advocate.build("commercial", {}, {}, {})
+    assert empty["points"] == [] and empty["headline"] is None

@@ -94,6 +94,11 @@ def test_full_lifecycle_with_gates(client):
     assert t["tally"]["result"] == "approved"
     pdf = c.get(f"/api/v2/deals/{did}/committee/pack.pdf")
     assert pdf.status_code == 200 and pdf.content[:4] == b"%PDF" and pdf.headers["x-run-id"] == v1["run_id"]
+    import io  # noqa: PLC0415
+
+    from pypdf import PdfReader  # noqa: PLC0415
+    text = "".join(pg.extract_text() or "" for pg in PdfReader(io.BytesIO(pdf.content)).pages)
+    assert "反方意见" in text and "不经 AI" in text  # 上会材料自带“最可能怎么失败”
     ok = c.post("/api/v2/committee/verify", files={"file": ("ic.pdf", pdf.content, "application/pdf")}).json()
     assert ok["genuine"] and ok["run_id"] == v1["run_id"]
     bad = c.post("/api/v2/committee/verify", files={"file": ("ic.pdf", pdf.content + b"x", "application/pdf")}).json()
@@ -157,6 +162,10 @@ def test_kill_criteria_trip_blocks_committee_and_max_bid(client):
     assert {r["metric"] for r in ov["kill"]["triggered"]} == {"dscr", "irr_pct"}
     mb = c.post(f"/api/v2/deals/{did}/max-bid", json={"targets": [{"metric": "irr_pct", "min": 8}]}).json()
     assert mb["max_bid"] == pytest.approx(37_979_400) and mb["binding"]["metric"] == "irr_pct"
+    memo = c.get(f"/api/v2/deals/{did}/devils-memo").json()
+    assert memo["high"] >= 1 and memo["headline"] and memo["run_id"]
+    vq = c.get(f"/api/v2/deals/{did}/verify-queue").json()
+    assert vq["items"] and vq["items"][0]["swing_bps"] >= vq["items"][-1]["swing_bps"] and vq["metric"] == "irr_pct"
     # 试算出价：在反推出的最高价处，IRR 下限型淘汰条件刚好不再触发
     pc = c.post(f"/api/v2/deals/{did}/price-check", json={"price": mb["max_bid"]}).json()
     assert pc["metrics"]["irr_pct"] >= 8 and "irr_pct" not in {r["metric"] for r in pc["kill"]["triggered"]}

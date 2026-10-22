@@ -180,8 +180,16 @@ def build_pdf(pack: JSON) -> bytes:
         rows.append(["期望值", "100%", fmt(sc["expected"], "pct"),
                      "—" if sc["loss_probability_pct"] is None else f"亏损概率 {sc['loss_probability_pct']:g}%"])
         story += [_section(st, "概率加权结果"), _table(rows, [50 * mm, 30 * mm, 50 * mm, 44 * mm])]
+    # 反方意见：上会前先看“最可能怎么失败”
+    dv = pack.get("devils") or {}
+    story += [PageBreak(), _section(st, "反方意见（系统按固定规则生成，不经 AI）")]
+    if dv.get("points"):
+        story += [Paragraph(_esc(f"{'■ 高' if p['severity'] == 'high' else '□ 中'} · {p['title']}：{p['text']}"), st["body"])
+                  for p in dv["points"]]
+    else:
+        story += [Paragraph(_esc("未发现可由数据支持的反方论点（数据不足的论点不写）"), st["body"])]
     # 风险清单
-    story += [PageBreak(), _section(st, "风险清单")]
+    story += [_section(st, "风险清单")]
     risks = pack["risks"] or ["未发现需要上会讨论的风险项"]
     story += [Paragraph(_esc(f"· {r}"), st["body"]) for r in risks]
     # 关键指标全表
@@ -252,6 +260,8 @@ def build_xlsx(pack: JSON) -> bytes:
               [[r["name"], r["probability"], r["primary"], r["loss"]] for r in pack["scenarios"]["scenarios"]])
     sheet("版本差异", ["路径", "类型", "上一版", "本版"],
           [[r["path"], r["kind"], str(r["before"]), str(r["after"])] for r in (pack.get("diff") or {}).get("inputs", [])])
+    sheet("反方意见", ["级别", "论点", "说明"],
+          [["高" if p["severity"] == "high" else "中", p["title"], p["text"]] for p in (pack.get("devils") or {}).get("points", [])])
     sheet("风险清单", ["风险"], [[r] for r in pack["risks"]])
     sheet("投票", ["投票人", "投票", "意见", "时间"],
           [[v["voter"], v["vote"], v.get("comment") or "", v["created_at"]] for v in pack["votes"]])

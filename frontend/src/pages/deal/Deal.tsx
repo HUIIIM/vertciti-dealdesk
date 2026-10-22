@@ -2,7 +2,7 @@
 // 草稿：在模型类标签页改假设 → 右侧实时重算（防抖 300ms，不保存）；⌘S 保存为新承销版本（必填“本版改了什么”）。
 import { createContext, lazy, Suspense, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { api, call, type OverviewOut, type PassportOut, type VersionOut } from "@/api/client";
-import type { KillEval, MaxBid, Metrics, PriceCheck } from "@/api/types";
+import type { KillEval, MaxBid, Metrics, PriceCheck, VerifyQueue } from "@/api/types";
 import { useApi } from "@/api/useApi";
 import { useApp } from "@/app-context";
 import { passportStatus, PassportDialog } from "@/components/Passport";
@@ -166,6 +166,7 @@ export function DealPage({ id, tab }: { id: number; tab: DealTab }) {
             <li><Status s={ver_.stale_evidence ? "risk" : ver_.review_due ? "building" : "verified"}>{ver_.stale_evidence ? `${ver_.stale_evidence} 条停用` : ver_.review_due ? `${ver_.review_due} 条待复核` : "新鲜"}</Status><span>证据新鲜度（14 天待复核 / 30 天停用）</span></li>
             <li><Status s={ver_.redteam_read ? "verified" : "planned"}>{ver_.redteam_read ? "已读" : "未读"}</Status><span>红队面板（当前版本）</span></li>
           </ul>
+          {o.version ? <VerifyFirst id={id} version={(o.version as { id: number }).id} stamp={JSON.stringify(ver_)} /> : null}
           {o.next_gate ? (<>
             <h3 style={{ marginTop: 16, fontSize: 15 }}>进入「{STAGES.find(([s]) => s === o.next_stage)?.[1]}」的关卡</h3>
             <ul className="checks">{(o.next_gate.checks ?? []).map((c) => <li key={c.key}><Status s={c.status}>{c.status_label}</Status><span>{c.label}{c.detail ? <div className="d">{c.detail}</div> : null}</span></li>)}</ul>
@@ -333,4 +334,33 @@ function passText(k: { metric: string; op: string; threshold: number }, catalog:
   const meta = catalog.metrics[k.metric];
   const flip: Record<string, string> = { "<": "≥", "<=": ">", ">": "≤", ">=": "<" };
   return `${meta?.label ?? k.metric} ${flip[k.op] ?? k.op} ${fmt(k.threshold, (meta?.unit ?? "x") as Unit)}`;
+}
+
+/**
+ * 先核哪个（vertciti 独有）：待核的矛盾与关键数字按“能让主回报指标摆动多少基点”排序，只列前 3。
+ * 条从 0 起画（基点是绝对量），所以长度可以直接比。
+ */
+function VerifyFirst({ id, version, stamp }: { id: number; version: number; stamp: string }) {
+  const q = useApi<VerifyQueue>(() => call(api.GET("/api/v2/deals/{deal_id}/verify-queue", { params: { path: { deal_id: id } } })),
+    [id, version, stamp]);
+  if (!q.data || !q.data.items.length) return null;
+  const top = q.data.items.slice(0, 3);
+  const max = Math.max(1, ...top.map((x) => x.swing_bps ?? 0));
+  return (
+    <section className="vfirst" aria-label="先核哪个">
+      <div className="ladder-head"><strong>先核哪个</strong>
+        <span className="muted">按对{q.data.metric_label}的摆动排序{q.data.top_share_pct != null && q.data.items.length > 1 ? ` · 第一处占全部不确定性的 ${Math.round(q.data.top_share_pct)}%` : ""}</span></div>
+      <ol>
+        {top.map((x, i) => (
+          <li key={`${x.kind}-${x.field}`}>
+            <span className="rank num">{i + 1}</span>
+            <span className="what"><strong title={x.field}>{x.label}</strong>
+              <span className="muted"> · {x.kind === "conflict" ? "矛盾" : "未达标"}：{x.detail}</span></span>
+            <span className="bar"><i style={{ width: `${((x.swing_bps ?? 0) / max) * 100}%`, animationDelay: `${120 + i * 90}ms` }} /></span>
+            <span className="bps num">{x.swing_bps == null ? "—" : `${Math.round(x.swing_bps)} bp`}</span>
+            <a className="btn sm" href={`#/deals/${id}/files`}>{x.action}</a>
+          </li>))}
+      </ol>
+    </section>
+  );
 }
