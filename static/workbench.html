@@ -55,6 +55,7 @@ header.top .sub { color: var(--muted); font-size: 12.5px; margin-top: 6px; }
 @media (max-width: 700px) { .wb .dim-grid { grid-template-columns: 1fr; } }
 .wb .dim { border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; background: var(--bg1); }
 .wb .dim h4 { margin: 0 0 6px; font-size: 14px; }
+.wb ul.ev { margin: 0; padding-left: 16px; } .wb ul.ev li { margin: 4px 0; } .wb ul.ev .btn { padding: 2px 8px; min-height: 0; font-size: 12px; margin-left: 6px; }
 .wb .dim input { width: 100%; margin: 4px 0; padding: 8px 10px; font-size: 13px; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; color: var(--ink); }
 /* 文件拖放区：深色自定义 */
 #dropzone { border: 1.5px dashed var(--teal-line); border-radius: 10px; background: var(--teal-dim); padding: 28px 20px; text-align: center; cursor: pointer; transition: border-color .15s, background .15s; margin-bottom: 14px; }
@@ -247,6 +248,11 @@ header.top .sub { color: var(--muted); font-size: 12.5px; margin-top: 6px; }
     <select id="r-market"></select>
   </label>
   <div class="dim-grid" id="research-dims" style="margin-top:10px"></div>
+  <div style="margin-top:10px">
+    <button class="btn ghost" type="button" onclick="WB.pullEvidence()">从 EchoWatch 拉候选证据</button>
+    <span class="src">按所选市场检索近 30 天带出处的公开提及；只给候选，点「采用」才填入。</span>
+  </div>
+  <div class="dim-grid" id="evidence-out" style="margin-top:10px"></div>
   <div style="margin-top:10px">
     <label class="f">补充说明<textarea id="r-extra" rows="2" style="padding:7px 9px;border:1px solid #ccc;border-radius:6px"></textarea></label>
   </div>

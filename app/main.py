@@ -691,6 +691,13 @@ def wb_research(req: _WbResearchReq):
     return workbench.research_payload(r, req.valuation, req.forecast)
 
 
+@app.get("/api/wb/research/evidence")
+def wb_research_evidence(market_key: str = "tampa"):
+    """EchoWatch 候选证据：每维度几条带链接的公开提及，供人工「采用」，不自动写入."""
+    from . import echowatch_bridge
+    return echowatch_bridge.fetch_evidence(market_key)
+
+
 @app.post("/api/wb/research/report", response_class=HTMLResponse)
 def wb_research_report(req: _WbResearchReq):
     r = _validate(WbResearch, req.research, "研究")

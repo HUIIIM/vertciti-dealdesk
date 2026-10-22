@@ -348,6 +348,35 @@ function researchPayload() {
   for (const [k] of DIMS) { r[k + '_note'] = $('#r-' + k + '-note').value; r[k + '_source'] = $('#r-' + k + '-src').value; }
   return r;
 }
+/* EchoWatch 候选证据：只展示，人点「采用」才写入该维度（内容＝标题，来源＝链接＋出处＋日期）。 */
+WB.evidence = {};
+WB.pullEvidence = async function () {
+  const out = $('#evidence-out');
+  out.innerHTML = '<p class="src">正在向 EchoWatch 拉取…</p>';
+  try {
+    const r = await fetch('/api/wb/research/evidence?market_key=' + encodeURIComponent($('#r-market').value));
+    const d = await r.json();
+    if (!d.ok) { out.innerHTML = `<p class="src">${esc(d.reason || '没有可用证据')}。未拉到的维度请手填，不要猜。</p>`; return; }
+    WB.evidence = {};
+    out.innerHTML = d.dims.map(dim => {
+      const rows = dim.items.map((it, i) => {
+        WB.evidence[dim.dim + ':' + i] = it;
+        const day = (it.published_at || '').slice(0, 10);
+        return `<li><a href="${esc(it.url)}" target="_blank" rel="noopener">${esc(it.title || it.url)}</a>
+          <span class="src">${esc(it.source)}${day ? ' · ' + esc(day) : ''}</span>
+          <button class="btn ghost" type="button" onclick="WB.adoptEvidence('${dim.dim}', ${i})">采用</button></li>`;
+      }).join('');
+      const body = rows ? `<ul class="ev">${rows}</ul>` : `<p class="src">${esc(dim.error || '无匹配提及')}</p>`;
+      return `<div class="dim"><h4>${esc(dim.label)} <span class="src">检索：${esc(dim.query)}</span></h4>${body}</div>`;
+    }).join('') + `<p class="src">来源：${esc(d.source)}，近 ${esc(d.window)}。候选证据是公开提及，不等于已核实数据；采用前请点开原文确认。</p>`;
+  } catch (e) { out.innerHTML = `<p class="neg">拉取失败：${esc(e.message)}</p>`; }
+};
+WB.adoptEvidence = function (dim, i) {
+  const it = WB.evidence[dim + ':' + i]; if (!it) return;
+  const day = (it.published_at || '').slice(0, 10);
+  $('#r-' + dim + '-note').value = it.title;
+  $('#r-' + dim + '-src').value = `${it.url}（EchoWatch · ${it.source}${day ? ' · ' + day : ''}）`;
+};
 WB.research = async function () {
   try {
     const d = await post('/api/wb/research', {research: researchPayload(), valuation: WB.lastValuation, forecast: WB.lastForecast});
