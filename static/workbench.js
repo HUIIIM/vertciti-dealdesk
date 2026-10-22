@@ -350,7 +350,7 @@ function researchPayload() {
 }
 WB.research = async function () {
   try {
-    const d = await post('/api/wb/research', {research: researchPayload(), valuation: WB.lastValuation, forecast: WB.lastForecast});
+    const d = await post('/api/wb/research', {research: researchPayload(), valuation: WB.lastValuation, forecast: WB.lastForecast, lang: window.DD_LANG || 'zh'});
     const c = d.completeness;
     const items = c.items.map(i => `<tr><td>${esc(i.dim)}</td><td>${i.filled ? '已填' : '未填'}</td><td>${i.sourced ? '✅ 已核实' : '⚪ 待核实'}</td></tr>`).join('');
     $('#research-out').innerHTML = `<h4>调查完整度：已填 ${c.filled}/${c.total}，已核实 ${c.sourced}/${c.total}</h4>
@@ -373,7 +373,7 @@ WB.researchReport = async function () {
 /* ---------- 一键打分 ---------- */
 WB.score = async function () {
   try {
-    const d = await post('/api/wb/score', {track: $('#s-track').value, property: propPayload()});
+    const d = await post('/api/wb/score', {track: $('#s-track').value, property: propPayload(), lang: window.DD_LANG || 'zh'});
     const s = d.score;
     $('#score-out').innerHTML = `<h4>打分结果 <span class="src">${esc(d.note)}</span></h4>
       <div class="kv"><div class="cell">总分<b>${s.total}</b></div><div class="cell">等级<b>${esc(s.grade)}</b></div>
@@ -848,7 +848,7 @@ WB.init = async function () {
     if (b) b.remove();
   });
   try {
-    const r = await fetch('/api/wb/markets'); WB.markets = await r.json();
+    const r = await fetch('/api/wb/markets?lang=' + (window.DD_LANG || 'zh')); WB.markets = await r.json();
     const opts = WB.markets.markets.map(m => `<option value="${m.key}">${esc(m.label)}（${esc(m.geo)}）</option>`).join('');
     $('#hpi-market').innerHTML = opts; $('#r-market').innerHTML = opts;
     $('#hpi-market').value = 'phoenix'; $('#r-market').value = 'tampa';

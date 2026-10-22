@@ -596,6 +596,7 @@ class _WbScoreReq(BaseModel):
     model_config = ConfigDict(extra="ignore")
     track: str = "residential"
     property: dict = {}
+    lang: str = "zh"
 
 
 class _WbResearchReq(BaseModel):
@@ -603,12 +604,13 @@ class _WbResearchReq(BaseModel):
     research: dict = {}
     valuation: dict | None = None
     forecast: dict | None = None
+    lang: str = "zh"
 
 
 @app.get("/api/wb/markets")
-def wb_markets():
-    """嵌入的公开房价指数数据：市场列表 + 口径说明 + 公开数据源链接."""
-    return {
+def wb_markets(lang: str = "zh"):
+    """嵌入的公开房价指数数据：市场列表 + 口径说明 + 公开数据源链接（lang=en 走 hpi_en 译文）."""
+    out = {
         "markets": hpi.market_list(),
         "series": {k: (v.get("series") or []) for k, v in hpi.MARKETS.items()},
         "methodology": hpi.METHODOLOGY,
@@ -616,6 +618,10 @@ def wb_markets():
         "release": hpi.FHFA_RELEASE,
         "release_date": hpi.FHFA_RELEASE_DATE,
     }
+    if lang == "en":
+        from .data import hpi_en
+        out = hpi_en.translate(out)
+    return out
 
 
 @app.post("/api/wb/metrics")
@@ -681,14 +687,20 @@ def wb_score(req: _WbScoreReq):
         raise HTTPException(400, f"unknown track: {req.track}")
     prop = _validate(WbProperty, req.property, "房产")
     mapped = workbench.to_scoring_input(prop, req.track)
-    return {"score": score_input(req.track, mapped), "mapped_input": mapped,
-            "note": "打分口径：住宅 buyer-box v2.3 / 商业 buyer-box-commercial v1.3（现有引擎）"}
+    lang = "en" if req.lang == "en" else "zh"
+    note = ("Scoring basis: residential buyer-box v2.3 / commercial buyer-box-commercial v1.3 (existing engine)"
+            if lang == "en" else "打分口径：住宅 buyer-box v2.3 / 商业 buyer-box-commercial v1.3（现有引擎）")
+    return {"score": score_input(req.track, mapped, lang), "mapped_input": mapped, "note": note}
 
 
 @app.post("/api/wb/research")
 def wb_research(req: _WbResearchReq):
     r = _validate(WbResearch, req.research, "研究")
-    return workbench.research_payload(r, req.valuation, req.forecast)
+    out = workbench.research_payload(r, req.valuation, req.forecast)
+    if req.lang == "en":
+        from .data import hpi_en
+        out["market"] = hpi_en.translate(out["market"])
+    return out
 
 
 @app.post("/api/wb/research/report", response_class=HTMLResponse)
