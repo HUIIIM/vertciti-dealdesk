@@ -1415,7 +1415,10 @@ export interface components {
         } & {
             [key: string]: unknown;
         };
-        /** DealPatch */
+        /**
+         * DealPatch
+         * @description 只改传了的字段。name / kill_criteria / tags 显式传 null 是错误（清空淘汰条件请传 []，不能“误清空”）。
+         */
         DealPatch: {
             /** Address */
             address?: string | null;
@@ -2216,6 +2219,11 @@ export interface components {
             };
             /** Name */
             name: string;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
             /** Primary */
             primary: number | null;
             /** Probability */
@@ -2506,6 +2514,11 @@ export interface components {
         /** VarianceRowOut */
         VarianceRowOut: {
             cash_flow: components["schemas"]["VarianceCellOut"];
+            /**
+             * Months
+             * @default 12
+             */
+            months: number;
             noi: components["schemas"]["VarianceCellOut"];
             /** Occupancy Pct */
             occupancy_pct: number | null;

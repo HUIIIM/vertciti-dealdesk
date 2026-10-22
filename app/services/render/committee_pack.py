@@ -36,6 +36,8 @@ def fmt(v: Any, unit: str) -> str:
         return f"({s})" if v < 0 else s
     if unit == "pct":
         return f"({abs(v):.2f}%)" if v < 0 else f"{v:.2f}%"
+    if unit == "pts":  # 评分：分数，不是倍数
+        return f"{v:g} pts"
     return f"({abs(v):.2f}×)" if v < 0 else f"{v:.2f}×"
 
 

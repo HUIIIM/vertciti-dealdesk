@@ -16,7 +16,7 @@ from app.services.persistence.engine import session_scope
 from app.services.persistence.schema import Conflict as ConflictRow
 from app.services.persistence.schema import FieldProvenance
 from app.services.v2.deals import _event, deal_or_404
-from app.services.v2.errors import InvalidInputError, NotFoundError
+from app.services.v2.errors import ConflictError, InvalidInputError, NotFoundError
 from app.services.v2.serialize import row
 
 JSON = dict[str, Any]
@@ -110,7 +110,7 @@ def review(deal_id: int, field: str, note: str = "") -> JSON:
             p.review_status = "reviewed"
         p.reviewed_by, p.reviewed_at = current_actor().username, datetime.now(timezone.utc)
         if note:
-            p.note = (p.note + "\n" if p.note else "") + T("复核：{0}", note)
+            p.note = (p.note + "\n" if p.note else "") + f"✓ {note}"  # 存库内容与界面语言无关
         audit.record(s, "field_provenance", p.id, "update", {"review_status": before},
                      {"review_status": p.review_status, "reviewed_by": p.reviewed_by})
         return _passport_dict(p)
@@ -162,9 +162,12 @@ def resolve_conflict(deal_id: int, conflict_id: int, value: Any, note: str) -> J
     if not note.strip():
         raise InvalidInputError(T("裁决须写理由（为什么采用这个值）"))
     with session_scope() as s:
+        deal_or_404(s, deal_id)
         c = s.get(ConflictRow, conflict_id)
         if c is None or c.deal_id != deal_id:
             raise NotFoundError(T("矛盾 {0} 不存在", conflict_id))
+        if c.status != "open":  # 裁决一经作出即定案：改判要另起一条来源登记，不能覆盖原裁决
+            raise ConflictError(T("矛盾 {0} 已裁决，不能重复裁决", conflict_id))
         before = row(c)
         c.status, c.resolved_value, c.resolution_note = "resolved", value, note.strip()
         c.resolved_by, c.resolved_at = current_actor().username, datetime.now(timezone.utc)

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.core.i18n import T
+from app.core.i18n import T, label
 from app.domain.v2 import kill_criteria
 from app.domain.v2.model import METRICS, PRICE_PATH, ModelInputError, run_model
 from app.domain.v2.paths import get_path, set_path
@@ -40,7 +40,7 @@ def _ok(track: str, inputs: JSON, price: float, metric: str, op: str, target: fl
 
 
 def solve_one(track: str, inputs: JSON, *, metric: str, op: str, target: float, hi: float, asking: float) -> JSON:
-    """满足 metric op target 的最高价格（op 为 >= 或 >）。
+    """满足 metric op target 的最高价格（op 任意；要求“价格越低越容易满足”，上限型约束同样成立）。
 
     先在 [搜索上限, 要价, 要价×0.9 … ×0.05] 网格上自上而下找第一个满足点，再在它与上一个
     不满足点之间二分。极端低价下指标可能算不出（如 IRR 不收敛），不拿它当端点。
@@ -71,6 +71,21 @@ def solve_one(track: str, inputs: JSON, *, metric: str, op: str, target: float, 
     return {"price": float(int(lo // STEP) * STEP), "status": "ok", "reason": ""}
 
 
+NEGATE = {"<": ">=", "<=": ">", ">": "<=", ">=": "<"}
+
+
+def _still_triggered(track: str, inputs: JSON, price: float, crit: list[JSON]) -> JSON | None:
+    try:
+        m = run_model(track, with_price(track, inputs, price))["metrics"]
+    except ModelInputError:
+        return None
+    for c in kill_criteria.evaluate(crit, m)["items"]:
+        if c["state"] == "triggered":
+            return {"source": "kill_criteria", "metric": c["metric"], "label": kill_criteria.describe(c), "price": None,
+                    "status": "infeasible", "reason": T("在 ${0:,.0f} 仍触发：{1}", price, c["text"])}
+    return None
+
+
 def run(track: str, inputs: JSON, targets: list[JSON], *, kill: list[JSON] | None = None,
         search_multiple: float = 3.0) -> JSON:
     """targets: [{"metric": "irr_pct", "min": 12}, {"metric": "dscr", "min": 1.25}]。"""
@@ -83,14 +98,15 @@ def run(track: str, inputs: JSON, targets: list[JSON], *, kill: list[JSON] | Non
         if t.get("metric") not in METRICS or not isinstance(t.get("min"), (int, float)):
             raise ValueError(T("目标格式应为 {{metric, min}}：{0!r}", t))
         r = solve_one(track, inputs, metric=t["metric"], op=">=", target=float(t["min"]), hi=hi, asking=float(asking))
-        cons.append({"source": "target", "metric": t["metric"], "label": f"{METRICS[t['metric']].label} ≥ {t['min']:g}",
+        name = T("{0} ≥ {1:g}", label(METRICS[t["metric"]].label), t["min"])
+        cons.append({"source": "target", "metric": t["metric"], "label": name,
                      **r})
-    # 淘汰条件 “metric < X 即放弃” 等价于约束 metric >= X（只取下限型条件）
-    for c in kill_criteria.validate(kill or []):
-        if c["op"] in ("<", "<="):
-            op = ">=" if c["op"] == "<" else ">"
-            r = solve_one(track, inputs, metric=c["metric"], op=op, target=c["threshold"], hi=hi, asking=float(asking))
-            cons.append({"source": "kill_criteria", "metric": c["metric"], "label": kill_criteria.describe(c), **r})
+    # 淘汰条件“metric op X 即放弃”= 约束“metric 取反 X”：下限型（< / <=）与上限型（> / >=，如现金需求、LTV）都算
+    crit = kill_criteria.validate(kill or [])
+    for c in crit:
+        r = solve_one(track, inputs, metric=c["metric"], op=NEGATE[c["op"]], target=c["threshold"], hi=hi,
+                      asking=float(asking))
+        cons.append({"source": "kill_criteria", "metric": c["metric"], "label": kill_criteria.describe(c), **r})
     priced = [c for c in cons if c["status"] in ("ok", "above_range") and c["price"] is not None]
     blocked = [c for c in cons if c["status"] in ("infeasible", "unknown")]
     if blocked or not priced:
@@ -99,6 +115,11 @@ def run(track: str, inputs: JSON, targets: list[JSON], *, kill: list[JSON] | Non
     else:
         binding = min(priced, key=lambda c: c["price"])
         best = binding["price"]
+        # 兜底：在给出的价位上复核全部淘汰条件（防指标随价格不单调时二分给出越线的价）；仍触发就不给数
+        bad = _still_triggered(track, inputs, best, crit)
+        if bad is not None:
+            cons.append(bad)
+            best, binding = None, bad
     return {"asking": float(asking), "max_bid": best, "binding": binding, "constraints": cons,
             "headroom_pct": None if best is None else (best / float(asking) - 1) * 100,
             "note": T("可出价 = 各约束允许最高价中的最低者；任一约束无法满足或无法计算则不给数。")}

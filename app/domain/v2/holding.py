@@ -42,11 +42,34 @@ def underwritten_series(track: str, outputs: JSON) -> dict[int, JSON]:
     return {1: {"noi": m.get("noi"), "cash_flow": m.get("annual_cash_flow")}}
 
 
+def annualize(actuals: list[JSON]) -> list[JSON]:
+    """把实际数统一成年度。
+
+    录了年度（YYYY）的直接用；只有月度（YYYY-MM）的按年合计——12 个月 NOI / 现金流都齐才算该年的数，
+    不齐即未知（绝不拿半年当一年）；出租率取已录月份的平均。
+    """
+    yearly = {a["period"]: a for a in actuals if len(a["period"]) == 4}
+    months: dict[str, list[JSON]] = {}
+    for a in actuals:
+        if len(a["period"]) == 7 and a["period"][:4] not in yearly:
+            months.setdefault(a["period"][:4], []).append(a)
+    out = [dict(a, months=12) for a in yearly.values()]
+    for y, ms in months.items():
+        def total(k: str, ms: list[JSON] = ms) -> float | None:
+            vals = [m.get(k) for m in ms]
+            nums = [float(v) for v in vals if v is not None]
+            return sum(nums) if len(ms) == 12 and len(nums) == 12 else None
+        occ = [m["occupancy_pct"] for m in ms if m.get("occupancy_pct") is not None]
+        out.append({"period": y, "noi": total("noi"), "cash_flow": total("cash_flow"),
+                    "occupancy_pct": sum(occ) / len(occ) if occ else None, "months": len(ms)})
+    return sorted(out, key=lambda r: r["period"])
+
+
 def variance(track: str, outputs: JSON, actuals: list[JSON]) -> list[JSON]:
-    """actuals: [{"period": "2027", "noi": ..., "cash_flow": ..., "occupancy_pct": ...}]，按年对齐第 1、2… 年。"""
+    """actuals：年度或月度实际数；先 annualize()，再按年对齐承销的第 1、2… 年。"""
     uw = underwritten_series(track, outputs)
     rows = []
-    for i, a in enumerate(sorted(actuals, key=lambda r: r["period"]), start=1):
+    for i, a in enumerate(annualize(actuals), start=1):
         u = uw.get(i, {})
         row: JSON = {"period": a["period"], "year": i}
         for k in ("noi", "cash_flow"):
@@ -55,6 +78,7 @@ def variance(track: str, outputs: JSON, actuals: list[JSON]) -> list[JSON]:
                       "variance": None if av is None or uv is None else av - uv,
                       "variance_pct": None if av is None or not uv else (av - uv) / abs(uv) * 100}
         row["occupancy_pct"] = a.get("occupancy_pct")
+        row["months"] = a.get("months", 12)
         rows.append(row)
     return rows
 
@@ -75,7 +99,7 @@ def _calibrate_noi(track: str, inputs: JSON, target: float) -> JSON:
 def attribution(track: str, inputs: JSON, actuals: list[JSON]) -> JSON:
     if track != "commercial":
         return {"available": False, "reason": T("事后归因目前支持商业赛道（IRR）；住宅请看偏差表")}
-    acts = sorted([a for a in actuals if a.get("noi") is not None], key=lambda r: r["period"])
+    acts = [a for a in annualize(actuals) if a.get("noi") is not None]
     if not acts:
         return {"available": False, "reason": T("还没有录入实际 NOI")}
     base = primary_value(track, run_model(track, inputs))
@@ -97,10 +121,17 @@ def attribution(track: str, inputs: JSON, actuals: list[JSON]) -> JSON:
     uw_noi = _pro_noi(run_model(track, inputs))
     step("noi_level", T("其他经营差异（第 1 年 NOI 校准到实际）"), uw_noi, acts[0]["noi"],
          _calibrate_noi(track, cur, float(acts[0]["noi"])))
-    if len(acts) >= 2 and acts[0]["noi"] > 0:
-        cagr = ((acts[-1]["noi"] / acts[0]["noi"]) ** (1 / (len(acts) - 1)) - 1) * 100
-        step("noi_growth", T("NOI 年增长（实际年复合）"), get_path(cur, "analysis.noi_growth"), cagr,
-             set_path(cur, "analysis.noi_growth", cagr))
+    if len(acts) >= 2:
+        first, last = acts[0]["noi"], acts[-1]["noi"]
+        if first > 0 and last > 0:
+            cagr = ((last / first) ** (1 / (len(acts) - 1)) - 1) * 100
+            step("noi_growth", T("NOI 年增长（实际年复合）"), get_path(cur, "analysis.noi_growth"), cagr,
+                 set_path(cur, "analysis.noi_growth", cagr))
+        else:  # NOI 出现 ≤ 0：年复合增长率无定义（负数开方），这一步与整条归因的终点都是未知
+            rows.append({"key": "noi_growth", "label": T("NOI 年增长（实际年复合）"),
+                         "underwritten": get_path(cur, "analysis.noi_growth"), "actual": None,
+                         "contribution_pct_points": None})
+            prev = None
     return {"available": True, "metric": "irr_pct", "underwritten": base, "actual_implied": prev,
             "total_pct_points": None if prev is None or base is None else prev - base, "steps": rows,
             "note": T("顺序替换法：出租率 → 其他经营差异 → NOI 增长；退出 cap 未发生前沿用承销值。")}

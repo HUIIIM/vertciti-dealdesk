@@ -726,4 +726,5 @@ export const EN: Record<string, string> = {
   "：": ": ",
   "：{0}": ": {0}",
   "；": "; ",
+  "部分步骤算不出（如 NOI ≤ 0 时年复合增长无定义），不画瀑布图；下面列出能算出的部分。": "Some steps cannot be computed (e.g. compound growth is undefined when NOI ≤ 0), so no waterfall is drawn; the parts that can be computed are listed below.",
 };

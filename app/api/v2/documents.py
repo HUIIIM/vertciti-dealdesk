@@ -33,7 +33,7 @@ def list_documents(deal_id: int) -> list[dict[str, Any]]:
 @router.post("/deals/{deal_id}/documents", response_model=DocOut, status_code=201,
              dependencies=[need("document.write")])
 async def upload_document(deal_id: int, request: Request, file: UploadFile = File(...),
-                          category: str = Form("other")) -> dict[str, Any]:
+                          category: str = Form("other", max_length=40)) -> dict[str, Any]:
     """上传 OM / 租金表 / T12 / 尽调文件（≤ 20MB，存 SHA-256 便于核对原件）。"""
     _check_upload_size(request, workflow.MAX_DOC_BYTES, T("文件"))
     data = await file.read(workflow.MAX_DOC_BYTES + 1)

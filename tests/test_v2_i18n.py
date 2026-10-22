@@ -10,7 +10,7 @@ import string
 import pytest
 from fastapi.testclient import TestClient
 
-from app.core.i18n import T, reset_lang, set_lang
+from app.core.i18n import T, label, reset_lang, set_lang
 from app.core.i18n_en import EN
 from app.domain import uw_commercial
 from app.main import app
@@ -59,8 +59,10 @@ def test_constant_labels_are_translated():
 def test_T_formats_and_translates_label_args():
     tok = set_lang("en")
     try:
+        # 固定标签在生成处用 label() 转好；T() 不翻译参数（参数可能是用户数据）
         assert T("「{0}」只要错 {1:g}%，{2}就落在 {3:.2f}%–{4:.2f}% 之间（摆动 {5:.0f} bp）。这个数从哪来、谁核过，决定了这笔交易。",
-                 "租金水平", 10, "IRR", 1.5, 15.0, 747).startswith("If “Rent level” is off by just 10%")
+                 label("租金水平"), 10, "IRR", 1.5, 15.0, 747).startswith("If “Rent level” is off by just 10%")
+        assert T("{0} · {1}：{2}", "租金水平", "OM", "x") == "租金水平 · OM: x"  # 用户数据原样
     finally:
         reset_lang(tok)
     assert T("第 {0} 版", 3) == "第 3 版"  # 中文请求：原样格式化

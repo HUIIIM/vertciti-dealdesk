@@ -12,12 +12,18 @@ from app.core.i18n import T
 
 
 def tally(votes: list[dict[str, Any]], roles: dict[str, str]) -> dict[str, Any]:
+    """计票，结果与票的先后顺序无关。
+
+    任一董事长反对即否决；否则反对多于赞成不通过；至少一位董事长赞成、且赞成不少于反对才通过；其余待董事长表决。
+    """
     counts = {"approve": 0, "reject": 0, "abstain": 0}
-    chairman_vote = None
+    chair = set()
     for v in votes:
         counts[v["vote"]] = counts.get(v["vote"], 0) + 1
         if roles.get(v["voter"]) == "chairman":
-            chairman_vote = v["vote"]
+            chair.add(v["vote"])
+    chairman_vote = "reject" if "reject" in chair else "approve" if "approve" in chair else (
+        "abstain" if "abstain" in chair else None)
     if chairman_vote == "reject":
         result, why = "rejected", T("董事长否决")
     elif counts["reject"] > counts["approve"]:

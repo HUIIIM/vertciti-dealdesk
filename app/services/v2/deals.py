@@ -1,6 +1,7 @@
 """交易、承销版本、可复现运行。"""
 from __future__ import annotations
 
+import re
 from datetime import datetime, timezone
 from typing import Any
 
@@ -8,7 +9,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.context import current_actor
-from app.core.i18n import T
+from app.core.i18n import T, label
 from app.domain.v2 import kill_criteria, reproducible
 from app.domain.v2.lifecycle import ORDER, STAGE_LABEL
 from app.domain.v2.model import PRICE_PATH, TRACKS, ModelInputError, run_model
@@ -36,7 +37,7 @@ def deal_or_404(s: Session, deal_id: int) -> Deal:
 
 def _deal_dict(d: Deal) -> JSON:
     out = row(d)
-    out["stage_label"] = STAGE_LABEL.get(d.stage, d.stage)
+    out["stage_label"] = label(STAGE_LABEL.get(d.stage, d.stage))
     return out
 
 
@@ -113,7 +114,7 @@ def save_version(deal_id: int, inputs: JSON, label: str = "") -> JSON:
             raise InvalidInputError(str(e)) from e
         run = _store_run(s, RUN_KIND + ":" + d.track, inputs, outputs)
         n = (s.scalar(select(func.max(DealVersion.version_no)).where(DealVersion.deal_id == d.id)) or 0) + 1
-        v = DealVersion(deal_id=d.id, version_no=n, label=label or T("第 {0} 版", n), inputs=inputs, outputs=outputs,
+        v = DealVersion(deal_id=d.id, version_no=n, label=label.strip(), inputs=inputs, outputs=outputs,
                         run_id=run.run_id, created_by=current_actor().username)
         s.add(v)
         s.flush()
@@ -126,8 +127,17 @@ def save_version(deal_id: int, inputs: JSON, label: str = "") -> JSON:
         return version_dict(v)
 
 
+_DEFAULT_LABEL = re.compile(r"^第 \d+ 版$")  # 早期版本把默认名存进了库：读取时同样视为“没写说明”
+
+
+def version_label(v: DealVersion) -> str:
+    """版本说明：用户写了就原样；没写则按当前语言生成“第 N 版 / Version N”（存库内容与语言无关）。"""
+    return v.label if v.label and not _DEFAULT_LABEL.match(v.label) else T("第 {0} 版", v.version_no)
+
+
 def version_dict(v: DealVersion, *, with_detail: bool = False) -> JSON:
     out = row(v)
+    out["label"] = version_label(v)
     if not with_detail:
         out["outputs"] = {"track": v.outputs.get("track"), "metrics": v.outputs.get("metrics", {})}
     return out
@@ -143,6 +153,7 @@ def list_versions(deal_id: int) -> list[JSON]:
 
 def get_version(deal_id: int, version_id: int, *, with_detail: bool = True) -> JSON:
     with session_scope() as s:
+        deal_or_404(s, deal_id)
         v = s.get(DealVersion, version_id)
         if v is None or v.deal_id != deal_id:
             raise NotFoundError(T("版本 {0} 不存在", version_id))

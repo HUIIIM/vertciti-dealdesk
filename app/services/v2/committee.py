@@ -10,13 +10,12 @@ from sqlalchemy.orm import Session
 
 from app.core import security
 from app.core.context import current_actor
-from app.core.i18n import T
+from app.core.i18n import T, label
 from app.domain.v2 import (
     devils_advocate,
     diffing,
     max_bid,
     provenance,
-    redteam,
     reproducible,
     scenarios,
     verification_value,
@@ -29,8 +28,8 @@ from app.services.persistence.schema import CommitteePack, CommitteeVote, DealVe
 from app.services.persistence.schema import Conflict as ConflictRow
 from app.services.render import committee_pack
 from app.services.v2 import evidence
-from app.services.v2.analysis import _context, _require_version
-from app.services.v2.deals import _deal_dict, _event, deal_or_404, version_dict
+from app.services.v2.analysis import _context, _require_version, kill_changes_after_model, redteam_of
+from app.services.v2.deals import _deal_dict, _event, deal_or_404, version_dict, version_label
 from app.services.v2.errors import InvalidInputError
 from app.services.v2.serialize import row
 
@@ -96,19 +95,18 @@ def pack_data(s: Session, deal_id: int) -> JSON:
                      .order_by(DealVersion.version_no.desc()).limit(1)).first()
     diff = None
     if prev is not None:
-        diff = {"a": {"version_no": prev.version_no, "label": prev.label}, "b": {"version_no": v.version_no},
+        diff = {"a": {"version_no": prev.version_no, "label": version_label(prev)}, "b": {"version_no": v.version_no},
                 **diffing.compare_versions(version_dict(prev, with_detail=True), version_dict(v, with_detail=True))}
     try:
-        rt = redteam.run(d.track, v.inputs)
+        rt = redteam_of(d, v)
     except ModelInputError:
         rt = {"top": [], "all": [], "metric_label": "", "note": T("数据不足"), "shock_pct": 10, "base": None}
     try:
         sc = scenarios.run(d.track, v.inputs)
     except (ModelInputError, ValueError):
         sc = None
-    targets = [{"metric": c["metric"], "min": c["threshold"]} for c in d.kill_criteria if c["op"] in ("<", "<=")]
-    try:
-        mb = max_bid.run(d.track, v.inputs, targets) if targets else None
+    try:  # 与交易页同一口径：全部淘汰条件（下限型 + 上限型）都是约束
+        mb = max_bid.run(d.track, v.inputs, [], kill=d.kill_criteria) if d.kill_criteria else None
     except ValueError:
         mb = None
     risks: list[str] = []
@@ -133,17 +131,18 @@ def pack_data(s: Session, deal_id: int) -> JSON:
              "source_b": c.source_b} for c in s.scalars(select(ConflictRow).where(
                  ConflictRow.deal_id == d.id, ConflictRow.status == "open").order_by(ConflictRow.id)).all()]
     queue = verification_value.rank(d.track, v.inputs, rt, provenance.key_number_status(
-        rt.get("key_fields", []), evidence.latest_passports(s, d.id)), cons) if rt.get("all") else None
+        rt.get("key_fields", []), evidence.latest_passports(s, d.id), four_eyes=security.auth_enabled()),
+        cons) if rt.get("all") else None
     devils = devils_advocate.build(d.track, v.inputs, ctx["metrics"], {
         "kill": ctx["kill"], "redteam": rt or None, "scenarios": sc, "max_bid": mb, "key_numbers": ctx["key_numbers"],
-        "queue": queue, "stale": ctx["stale_evidence"]})
+        "queue": queue, "stale": ctx["stale_evidence"], "kill_changes": kill_changes_after_model(s, d.id)})
     st = status_in(s, d.id)
     decisions = [row(x) for x in s.scalars(select(Decision).where(Decision.deal_id == d.id)
                                            .order_by(Decision.id.desc()).limit(10)).all()]
     data: JSON = {
         "deal": _deal_dict(d), "version": version_dict(v), "run_id": v.run_id,
         "engine_version": reproducible.engine_version(), "metrics": ctx["metrics"],
-        "metric_catalog": {k: {"label": m.label, "unit": m.unit} for k, m in METRICS.items()},
+        "metric_catalog": {k: {"label": label(m.label), "unit": m.unit} for k, m in METRICS.items()},
         "card_keys": CARD_KEYS[d.track], "kill": ctx["kill"], "max_bid": mb, "redteam": rt, "scenarios": sc,
         "diff": diff, "risks": risks, "devils": devils, "committee": st["tally"], "votes": st["votes"],
         "decisions": decisions,
@@ -165,10 +164,15 @@ def generate_pack(deal_id: int, kind: str) -> tuple[bytes, JSON]:
         data = pack_data(s, deal_id)
         blob = committee_pack.build_pdf(data) if kind == "pdf" else committee_pack.build_xlsx(data)
         sha = hashlib.sha256(blob).hexdigest()
-        rec = CommitteePack(deal_id=deal_id, version_id=data["version"]["id"], run_id=data["run_id"], kind=kind,
-                            sha256=sha, size=len(blob), created_by=current_actor().username)
-        s.add(rec)
-        _event(s, deal_id, "committee_pack", {"kind": kind, "sha256": sha, "run_id": data["run_id"]})
+        # 同一内容的包（双击、两人同时生成）字节相同：复用已登记的那条，不重复登记、不报“冲突”
+        if s.scalar(select(CommitteePack.id).where(CommitteePack.sha256 == sha)) is None:
+            rec = CommitteePack(deal_id=deal_id, version_id=data["version"]["id"], run_id=data["run_id"], kind=kind,
+                                sha256=sha, size=len(blob), created_by=current_actor().username)
+            s.add(rec)
+            s.flush()
+            _event(s, deal_id, "committee_pack", {"kind": kind, "sha256": sha, "run_id": data["run_id"]})
+            audit.record(s, "committee_pack", rec.id, "create", None, {"kind": kind, "sha256": sha,
+                                                                        "run_id": data["run_id"]})
         meta = {"sha256": sha, "run_id": data["run_id"], "data_sha256": data["data_sha256"], "size": len(blob),
                 "deal_name": data["deal"]["name"], "version_no": data["version"]["version_no"]}
         return blob, meta

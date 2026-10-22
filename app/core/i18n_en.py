@@ -278,6 +278,19 @@ EN: dict[str, str] = {
     "用户名 {0} 已存在": "Username {0} already exists",
     "数据冲突：这条记录刚被别人改过或已存在，请刷新后重试": "Conflict: this record was just changed by someone else or already exists; refresh and retry",
     "请求太大：超过 {0} MB 上限": "Request too large: over the {0} MB limit",
+    "看过模型后改过淘汰条件": "Kill criteria changed after seeing the model",
+    "第一版承销保存后，淘汰条件又被改过 {0} 次（时间线里有改前改后）：确认不是为了让交易过关。":
+        "Kill criteria were changed {0} time(s) after the first underwriting version was saved (the timeline "
+        "has before and after): make sure it wasn't to get the deal through.",
+    "需另一人复核（四眼原则）": "Needs review by someone else (four-eyes rule)",
+    "「{0}」没有输入值，无法按情景调整": "“{0}” has no input value, so the scenario can't adjust it",
+    "路径不存在：{0}": "Path doesn't exist: {0}",
+    "在 ${0:,.0f} 仍触发：{1}": "Still triggered at ${0:,.0f}: {1}",
+    "矛盾 {0} 已裁决，不能重复裁决": "Conflict {0} is already resolved and can't be resolved again",
+    "令牌错误次数过多，请稍后再试": "Too many invalid tokens; try again later",
+    "需要“分析”及以上角色": "Requires Analyst or above",
+    "服务器内部错误": "Internal server error",
+    "{0} ≥ {1:g}": "{0} ≥ {1:g}",
     "需要登录：请提供有效的访问令牌": "Sign-in required: provide a valid access token",
     "权限不足：{0} 需要{1}及以上角色（当前：{2}）": "Not allowed: {0} needs {1} or above (you are: {2})",
 }

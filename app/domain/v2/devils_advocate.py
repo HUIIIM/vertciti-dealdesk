@@ -6,6 +6,7 @@
 """
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 from app.core.i18n import T
@@ -26,12 +27,22 @@ def _pt(key: str, severity: str, title: str, text: str, tab: str) -> JSON:
     return {"key": key, "severity": severity, "title": title, "text": text, "tab": tab}
 
 
+def _fmt_for(unit: str) -> Callable[[float], str]:
+    """按指标单位写数：倍数 ×、百分比 %、金额 $（负数带减号）、分数 pts。"""
+    if unit == "x":
+        return lambda x: f"{x:.2f}×"
+    if unit == "pct":
+        return lambda x: f"{x:.2f}%"
+    if unit == "usd":
+        return lambda x: f"-${abs(x):,.0f}" if x < 0 else f"${x:,.0f}"
+    return lambda x: f"{x:g} pts" if unit == "pts" else f"{x:g}"
+
+
 def _kill_points(kill: JSON) -> list[JSON]:
     out = []
     for k in kill.get("items", []):
         v, th = _num(k.get("value")), float(k["threshold"])
-        unit = METRICS[k["metric"]].unit
-        f = (lambda x: f"{x:.2f}×") if unit == "x" else (lambda x: f"{x:.2f}%")
+        f = _fmt_for(METRICS[k["metric"]].unit)
         if k["state"] == "triggered" and v is not None:
             out.append(_pt(f"kill:{k['metric']}", "high", T("已触发淘汰条件"),
                            T("{0}：当前 {1}，越线 {2}。", k["text"], f(v), f(abs(v - th))), "overview"))
@@ -126,6 +137,14 @@ def _structure_points(track: str, inputs: JSON, metrics: JSON) -> list[JSON]:
     return out
 
 
+def _governance_points(kill_changes: int) -> list[JSON]:
+    if not kill_changes:
+        return []
+    return [_pt("kill:moved", "medium", T("看过模型后改过淘汰条件"),
+                T("第一版承销保存后，淘汰条件又被改过 {0} 次（时间线里有改前改后）：确认不是为了让交易过关。",
+                  kill_changes), "overview")]
+
+
 def _headline(points: list[JSON]) -> str | None:
     """一句话摘要（不重复清单原文）：几条高危、几条中危，上会前至少先解决哪几件。"""
     if not points:
@@ -143,7 +162,7 @@ def build(track: str, inputs: JSON, metrics: JSON, facts: JSON) -> JSON:
     points = [*_kill_points(facts.get("kill") or {}), *_price_point(facts.get("max_bid")),
               *_swing_point(facts.get("redteam")), *_downside_point(facts.get("scenarios")),
               *_verify_points(facts.get("key_numbers"), facts.get("queue"), int(facts.get("stale") or 0)),
-              *_structure_points(track, inputs, metrics)]
+              *_structure_points(track, inputs, metrics), *_governance_points(int(facts.get("kill_changes") or 0))]
     if any(p["key"] == "near:dscr" for p in points):  # 同一件事（DSCR 贴近 1.25×）只说一次
         points = [p for p in points if p["key"] != "dscr:thin"]
     order = {"high": 0, "medium": 1}

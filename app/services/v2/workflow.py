@@ -56,6 +56,7 @@ def add_task(deal_id: int, title: str, stage: str = "", assignee: str = "", due:
                  created_by=current_actor().username)
         s.add(t)
         s.flush()
+        audit.record(s, "task", t.id, "create", None, row(t))
         return row(t)
 
 
@@ -66,6 +67,7 @@ def update_task(deal_id: int, task_id: int, changes: JSON) -> JSON:
     if "status" in changes and changes["status"] not in ("open", "done"):
         raise InvalidInputError(T("任务状态只能是 open / done"))
     with session_scope() as s:
+        deal_or_404(s, deal_id)  # 已归档交易上的任务不能再改
         t = s.get(Task, task_id)
         if t is None or t.deal_id != deal_id:
             raise NotFoundError(T("任务 {0} 不存在", task_id))
@@ -106,6 +108,7 @@ def decide_approval(deal_id: int, approval_id: int, *, approve: bool, note: str 
     """付款类只能董事长批准；任何人不能批自己发起的申请（分权）。"""
     actor = current_actor()
     with session_scope() as s:
+        deal_or_404(s, deal_id)  # 已归档交易不能再批付款
         a = s.get(Approval, approval_id)
         if a is None or a.deal_id != deal_id:
             raise NotFoundError(T("审批 {0} 不存在", approval_id))
@@ -118,7 +121,7 @@ def decide_approval(deal_id: int, approval_id: int, *, approve: bool, note: str 
         a.status = "approved" if approve else "rejected"
         a.decided_by, a.decided_at = actor.username, datetime.now(timezone.utc)
         if note:
-            a.note = (a.note + "\n" if a.note else "") + T("决定：{0}", note)
+            a.note = (a.note + "\n" if a.note else "") + f"→ {note}"  # 存库内容与界面语言无关
         _event(s, deal_id, "approval_decided", {"approval_id": a.id, "status": a.status})
         audit.record(s, "approval", a.id, "decide", before, row(a))
         return row(a)
@@ -139,12 +142,14 @@ def upload_document(deal_id: int, filename: str, content_type: str, data: bytes,
         raise InvalidInputError(T("文件超过 {0}MB 上限", MAX_DOC_BYTES // 1024 // 1024))
     with session_scope() as s:
         deal_or_404(s, deal_id)
-        doc = Document(deal_id=deal_id, filename=filename[:300] or "file", content_type=content_type or
-                       "application/octet-stream", size=len(data), sha256=hashlib.sha256(data).hexdigest(),
-                       category=category, content=data, created_by=current_actor().username)
+        doc = Document(deal_id=deal_id, filename=filename[:300] or "file",
+                       content_type=(content_type or "application/octet-stream")[:120], size=len(data),
+                       sha256=hashlib.sha256(data).hexdigest(), category=category[:40] or "other", content=data,
+                       created_by=current_actor().username)
         s.add(doc)
         s.flush()
         _event(s, deal_id, "document_uploaded", {"document_id": doc.id, "filename": doc.filename})
+        audit.record(s, "document", doc.id, "create", None, row(doc, exclude=("content",)))
         return row(doc, exclude=("content",))
 
 

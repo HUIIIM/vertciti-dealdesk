@@ -531,6 +531,7 @@
     "properties": {
      "category": {
       "default": "other",
+      "maxLength": 40,
       "title": "Category",
       "type": "string"
      },
@@ -1264,6 +1265,7 @@
    },
    "DealPatch": {
     "additionalProperties": false,
+    "description": "只改传了的字段。name / kill_criteria / tags 显式传 null 是错误（清空淘汰条件请传 []，不能“误清空”）。",
     "properties": {
      "address": {
       "anyOf": [
@@ -3297,6 +3299,11 @@
       "title": "Name",
       "type": "string"
      },
+     "note": {
+      "default": "",
+      "title": "Note",
+      "type": "string"
+     },
      "primary": {
       "anyOf": [
        {
@@ -3572,6 +3579,7 @@
     "properties": {
      "assignee": {
       "default": "",
+      "maxLength": 80,
       "title": "Assignee",
       "type": "string"
      },
@@ -3583,6 +3591,7 @@
      },
      "stage": {
       "default": "",
+      "maxLength": 40,
       "title": "Stage",
       "type": "string"
      },
@@ -3658,6 +3667,7 @@
      "assignee": {
       "anyOf": [
        {
+        "maxLength": 80,
         "type": "string"
        },
        {
@@ -3696,6 +3706,8 @@
      "title": {
       "anyOf": [
        {
+        "maxLength": 300,
+        "minLength": 1,
         "type": "string"
        },
        {
@@ -4019,6 +4031,11 @@
     "properties": {
      "cash_flow": {
       "$ref": "#/components/schemas/VarianceCellOut"
+     },
+     "months": {
+      "default": 12,
+      "title": "Months",
+      "type": "integer"
      },
      "noi": {
       "$ref": "#/components/schemas/VarianceCellOut"

@@ -70,11 +70,14 @@ def save_view(name: str, config: JSON) -> JSON:
     with session_scope() as s:
         v = s.scalar(select(SavedView).where(SavedView.name == name.strip()))
         if v is None:
+            before = None
             v = SavedView(name=name.strip(), config=config, created_by=current_actor().username)
             s.add(v)
         else:
+            before = row(v)
             v.config = config
         s.flush()
+        audit.record(s, "saved_view", v.id, "update" if before else "create", before, row(v))
         return row(v)
 
 
@@ -84,6 +87,7 @@ def delete_view(view_id: int) -> None:
         v = s.get(SavedView, view_id)
         if v is None:
             raise NotFoundError(T("视图不存在"))
+        audit.record(s, "saved_view", v.id, "delete", row(v), None)
         s.delete(v)
 
 

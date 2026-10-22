@@ -14,7 +14,7 @@ from collections import defaultdict, deque
 from collections.abc import Awaitable, Callable, MutableMapping
 from typing import Any
 
-from app.core.i18n import T
+from app.core.i18n import T, lang_from_header, reset_lang, set_lang
 
 Scope = MutableMapping[str, Any]
 Message = MutableMapping[str, Any]
@@ -128,8 +128,9 @@ class BodySizeLimit:
             await self.app(scope, receive, send)
             return
         cl = dict(scope.get("headers") or []).get(b"content-length")
+        lang = lang_from_header(dict(scope.get("headers") or []).get(b"x-dd-lang", b"").decode("latin-1"))
         if cl is not None and cl.isdigit() and int(cl) > self.limit:
-            await self._reject(send)
+            await self._reject(send, lang)
             return
         seen = 0
         started = False
@@ -153,11 +154,15 @@ class BodySizeLimit:
             await self.app(scope, limited_receive, tracking_send)
         except _TooLargeError:
             if not started:
-                await self._reject(send)
+                await self._reject(send, lang)
 
-    async def _reject(self, send: Send) -> None:
-        body = json.dumps({"detail": T("请求太大：超过 {0} MB 上限", self.limit // 1024 // 1024)},
-                          ensure_ascii=False).encode("utf-8")
+    async def _reject(self, send: Send, lang: str) -> None:
+        tok = set_lang(lang)  # 本中间件在语言上下文之外：按请求头自己定语言
+        try:
+            detail = T("请求太大：超过 {0} MB 上限", self.limit // 1024 // 1024)
+        finally:
+            reset_lang(tok)
+        body = json.dumps({"detail": detail}, ensure_ascii=False).encode("utf-8")
         await send({"type": "http.response.start", "status": 413,
                     "headers": [(b"content-type", b"application/json; charset=utf-8"),
                                 (b"content-length", str(len(body)).encode())]})

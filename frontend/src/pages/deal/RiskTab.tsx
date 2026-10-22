@@ -62,11 +62,13 @@ function Sliders({ rt }: { rt: RedTeam }) {
   useEffect(() => {
     let x = base;
     for (const r of rt.top) { const s = shocks[r.key] ?? 0; if (s) for (const p of r.paths) x = updateWild(x, p, (v) => scaleNum(v, 1 + s / 100)); }
+    let alive = true;  // 拖得快时旧请求可能晚到：只认最新一次的结果
     const t = window.setTimeout(() => {
       call(api.POST("/api/v2/model/{track}", { params: { path: { track } }, body: x as never }))
-        .then((r) => { setRes((r as { metrics: Metrics }).metrics); setErr(null); }).catch((e: Error) => setErr(e.message));
+        .then((r) => { if (alive) { setRes((r as { metrics: Metrics }).metrics); setErr(null); } })
+        .catch((e: Error) => { if (alive) setErr(e.message); });
     }, 200);
-    return () => window.clearTimeout(t);
+    return () => { alive = false; window.clearTimeout(t); };
   }, [JSON.stringify(shocks), version?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const v = res?.[rt.metric] ?? null;
   return (
@@ -88,11 +90,11 @@ function Sliders({ rt }: { rt: RedTeam }) {
 }
 
 function ScenariosCard() {
-  const { id, track } = useDeal();
+  const { id, track, ov } = useDeal();
   const { catalog } = useApp();
   const aLabel = (k: string | null | undefined) => catalog.assumptions[track]?.find((a) => a.key === k)?.label ?? k ?? "";
   const [sc, setSc] = useState<ScenarioIn[]>(() => catalog.scenario_defaults[track] ?? []);
-  const out = useApi(() => call(api.POST("/api/v2/deals/{deal_id}/scenarios", { params: { path: { deal_id: id } }, body: { scenarios: sc as never } })), [id, JSON.stringify(sc)]);
+  const out = useApi(() => call(api.POST("/api/v2/deals/{deal_id}/scenarios", { params: { path: { deal_id: id } }, body: { scenarios: sc as never } })), [id, ov.deal.current_version_id, JSON.stringify(sc)]);
   const total = sc.reduce((a, s) => a + s.probability, 0);
   return (
     <section className="card" aria-label={T("概率加权结果")}>

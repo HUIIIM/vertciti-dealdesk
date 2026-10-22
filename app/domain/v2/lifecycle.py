@@ -9,7 +9,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-from app.core.i18n import T
+from app.core.i18n import T, label
 
 STAGES: tuple[tuple[str, str], ...] = (
     ("sourcing", "发现"), ("screening", "初筛"), ("underwriting", "承销"), ("committee", "投委会"),
@@ -34,7 +34,7 @@ class Check:
 
     def as_dict(self) -> dict[str, Any]:
         return {"key": self.key, "label": self.label, "status": self.status,
-                "status_label": STATUS_WORDS[self.status], "detail": self.detail, "ok": self.ok}
+                "status_label": label(STATUS_WORDS[self.status]), "detail": self.detail, "ok": self.ok}
 
 
 def _ok(flag: object, fallback: str = "building") -> str:
@@ -126,7 +126,8 @@ def evaluate(current: str, target: str, ctx: dict[str, Any]) -> dict[str, Any]:
     if current == TERMINAL[0]:
         if target == ORDER[0]:  # 重启：回到“发现”，按回退处理（须写原因，记入时间线）
             return {"allowed": True, "direction": "back", "checks": [], "reason": T("重启已放弃的交易（会记入日志）")}
-        return {"allowed": False, "reason": T("交易已放弃；如需重启请回到「{0}」", STAGE_LABEL[ORDER[0]]), "checks": []}
+        first = label(STAGE_LABEL[ORDER[0]])
+        return {"allowed": False, "reason": T("交易已放弃；如需重启请回到「{0}」", first), "checks": []}
     if target != TERMINAL[0]:
         ci, ti = ORDER.index(current), ORDER.index(target)
         if ti <= ci:
@@ -134,7 +135,7 @@ def evaluate(current: str, target: str, ctx: dict[str, Any]) -> dict[str, Any]:
         if ti != ci + 1:
             return {"allowed": False, "reason": T(
                 "不能跳级：下一阶段是「{0}」",
-                STAGE_LABEL[ORDER[ci + 1]]), "checks": []}
+                label(STAGE_LABEL[ORDER[ci + 1]])), "checks": []}
     checks = _checks_for(target, ctx)
     allowed = all(ch.ok for ch in checks)
     return {"allowed": allowed, "direction": "forward", "checks": [ch.as_dict() for ch in checks],

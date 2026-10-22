@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.core.i18n import T
+from app.core.i18n import T, label
 
 CONFIDENCE = ("low", "medium", "high")
 CONFIDENCE_LABEL = {"low": "低", "medium": "中", "high": "高"}
@@ -37,8 +37,11 @@ def diff_pct(a: Any, b: Any) -> float | None:
 
 
 def key_number_status(key_fields: list[str], passports: dict[str, dict[str, Any]],
-                      floor: str = "medium") -> dict[str, Any]:
-    """关键数字（由红队面板的敏感性客观定义）是否都已复核且可信度 ≥ floor。"""
+                      floor: str = "medium", *, four_eyes: bool = False) -> dict[str, Any]:
+    """关键数字（由红队面板的敏感性客观定义）是否都已复核且可信度 ≥ floor。
+
+    four_eyes（多人模式开启）：复核人必须不是录入人——“人工改写”也不例外，否则一个人录两次就能自己过关。
+    """
     rows = []
     for f in key_fields:
         p = passports.get(f)
@@ -46,12 +49,15 @@ def key_number_status(key_fields: list[str], passports: dict[str, dict[str, Any]
             rows.append({"field": f, "ok": False, "code": "no_source", "reason": T("没有来源记录（数字护照为空）")})
             continue
         if not confidence_at_least(p.get("confidence", "low"), floor):
-            got = CONFIDENCE_LABEL.get(p.get("confidence", "low"))
+            got = label(CONFIDENCE_LABEL.get(p.get("confidence", "low"), ""))
             rows.append({"field": f, "ok": False, "code": "low_confidence",
-                         "reason": T("可信度{0}，低于{1}", got, CONFIDENCE_LABEL[floor])})
+                         "reason": T("可信度{0}，低于{1}", got, label(CONFIDENCE_LABEL[floor]))})
             continue
         if p.get("review_status", "pending") == "pending":
             rows.append({"field": f, "ok": False, "code": "unreviewed", "reason": T("尚未复核")})
+            continue
+        if four_eyes and (not p.get("reviewed_by") or p.get("reviewed_by") == p.get("created_by")):
+            rows.append({"field": f, "ok": False, "code": "unreviewed", "reason": T("需另一人复核（四眼原则）")})
             continue
         rows.append({"field": f, "ok": True, "code": "ok", "reason": ""})
     done = sum(1 for r in rows if r["ok"])

@@ -1,9 +1,10 @@
 """v2 API 契约（Pydantic）：请求严格校验（extra=forbid），响应给出主干字段类型，供生成 TypeScript 客户端。"""
 from __future__ import annotations
 
-from typing import Annotated, Any, Literal
+import json
+from typing import Annotated, Any, Literal, TypeVar
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 Track = Literal["residential", "commercial"]
 Stage = Literal["sourcing", "screening", "underwriting", "committee", "diligence", "closing", "holding", "passed"]
@@ -14,6 +15,17 @@ class In(BaseModel):
 
 
 Tag = Annotated[str, Field(min_length=1, max_length=40)]
+MAX_TENANTS = 2000
+MAX_INPUT_BYTES = 2 * 1024 * 1024
+M = TypeVar("M", bound=BaseModel)
+
+
+def _reject_nulls(model: M, fields: tuple[str, ...]) -> M:
+    """PATCH 语义：没传 = 不改；显式传 null 给不可为空的字段 = 输入错误（而不是悄悄清空或写库时报冲突）。"""
+    bad = [f for f in fields if f in model.model_fields_set and getattr(model, f) is None]
+    if bad:
+        raise ValueError(f"{', '.join(bad)}: null is not allowed")
+    return model
 
 
 class Out(BaseModel):
@@ -38,16 +50,32 @@ class DealCreate(In):
 
 
 class DealPatch(In):
+    """只改传了的字段。name / kill_criteria / tags 显式传 null 是错误（清空淘汰条件请传 []，不能“误清空”）。"""
+
     name: str | None = Field(default=None, min_length=1, max_length=200)
     address: str | None = Field(default=None, max_length=300)
     asking_price: float | None = Field(default=None, ge=0)
     kill_criteria: list[KillCriterion] | None = Field(default=None, max_length=20)
     tags: list[Tag] | None = Field(default=None, max_length=20)
 
+    @model_validator(mode="after")
+    def _no_explicit_null(self) -> DealPatch:
+        return _reject_nulls(self, ("name", "kill_criteria", "tags"))
+
 
 class VersionCreate(In):
     inputs: dict[str, Any]
     label: str = Field(default="", max_length=200, description="本版改了什么 / 为什么（进投委会包“改动说明”）")
+
+    @model_validator(mode="after")
+    def _bounded(self) -> VersionCreate:
+        # 每次打开交易页都会按当前版本跑红队（数十次模型）：输入规模必须有界，防只读用户拖垮服务
+        tenants = self.inputs.get("tenants")
+        if isinstance(tenants, list) and len(tenants) > MAX_TENANTS:
+            raise ValueError(f"tenants: at most {MAX_TENANTS}")
+        if len(json.dumps(self.inputs, default=str)) > MAX_INPUT_BYTES:
+            raise ValueError(f"inputs: at most {MAX_INPUT_BYTES // 1024} KB")
+        return self
 
 
 class StageAdvance(In):
@@ -114,16 +142,20 @@ class DecisionIn(In):
 
 class TaskIn(In):
     title: str = Field(min_length=1, max_length=300)
-    stage: str = ""
-    assignee: str = ""
+    stage: str = Field(default="", max_length=40)
+    assignee: str = Field(default="", max_length=80)
     due: str = Field(default="", pattern=r"^$|^\d{4}-\d{2}-\d{2}$")
 
 
 class TaskPatch(In):
-    title: str | None = None
+    title: str | None = Field(default=None, min_length=1, max_length=300)
     status: Literal["open", "done"] | None = None
-    assignee: str | None = None
+    assignee: str | None = Field(default=None, max_length=80)
     due: str | None = Field(default=None, pattern=r"^$|^\d{4}-\d{2}-\d{2}$")
+
+    @model_validator(mode="after")
+    def _no_explicit_null(self) -> TaskPatch:
+        return _reject_nulls(self, ("title", "status", "assignee", "due"))
 
 
 class ApprovalIn(In):
@@ -357,6 +389,7 @@ class ScenarioRowOut(Out):
     metrics: dict[str, float | None]
     primary: float | None
     loss: bool | None
+    note: str = ""  # 算不出时说明原因（如要调整的假设没有输入值）
 
 
 class ScenariosOut(Out):
@@ -589,6 +622,7 @@ class VarianceCellOut(Out):
 
 
 class VarianceRowOut(Out):
+    months: int = 12  # 这一年由几个月的实际数合成（不足 12 个月时 NOI / 现金流为未知）
     period: str
     year: int
     noi: VarianceCellOut

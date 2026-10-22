@@ -116,7 +116,7 @@ export function DealPage({ id, tab }: { id: number; tab: DealTab }) {
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirty]);
 
-  const mb = useMaxBid(id, Boolean(ov.data?.version), ov.data?.kill as unknown as KillEval | undefined);
+  const mb = useMaxBid(id, (ov.data?.version as { id: number } | null | undefined)?.id ?? null, ov.data?.kill as unknown as KillEval | undefined);
   if (ov.error) return <ErrorBox error={ov.error} onRetry={ov.reload} />;
   if (!ov.data || !draft) return <Skeleton rows={6} h={28} />;
   const o = ov.data;
@@ -201,7 +201,7 @@ export function DealPage({ id, tab }: { id: number; tab: DealTab }) {
           <button className="btn primary" type="button" disabled={saving} onClick={async () => { await doSave(); setAskSave(false); }}>{saving ? T("保存中…") : T("保存")}</button></>}>
           <label className="field">{T("本版改了什么、为什么")}<span className="hint">{T("写进投委会包“自上一版起改了什么”")}</span>
             <input className="input" value={label} onChange={(e) => setLabel(e.target.value)} placeholder={T("如：退出 cap 按可比上调 50bp")} maxLength={200}
-              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void doSave().then(() => setAskSave(false)); } }} /></label>
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); if (!saving) void doSave().then(() => setAskSave(false)); } }} /></label>
         </Dialog>) : null}
       {passport ? (passport.path.startsWith("metric:") ? (
         <MetricExplain metric={passport.path.slice(7)} label={passport.label} onClose={() => setPassport(null)} />
@@ -213,11 +213,12 @@ export function DealPage({ id, tab }: { id: number; tab: DealTab }) {
 }
 
 /** 最高出价：结论卡的行内大字与“出价空间”梯子共用一次请求。 */
-function useMaxBid(id: number, hasVersion: boolean, kill: KillEval | undefined) {
-  const targets = (kill?.items ?? []).filter((k) => k.op === "<" || k.op === "<=").map((k) => ({ metric: k.metric, min: k.threshold }));
-  return useApi<MaxBid | null>(() => (hasVersion && targets.length ? call(api.POST("/api/v2/deals/{deal_id}/max-bid", {
+function useMaxBid(id: number, versionId: number | null, kill: KillEval | undefined) {
+  // 依赖带版本号：保存新版本后必须按新版本重算（否则结论卡与出价空间停在旧版本的数）
+  const crit = (kill?.items ?? []).map((k) => [k.metric, k.op, k.threshold]);
+  return useApi<MaxBid | null>(() => (versionId !== null && crit.length ? call(api.POST("/api/v2/deals/{deal_id}/max-bid", {
     params: { path: { deal_id: id } }, body: { targets: [], include_kill_criteria: true } })) : Promise.resolve(null)),
-  [id, hasVersion, JSON.stringify(targets)]);
+  [id, versionId, JSON.stringify(crit)]);
 }
 
 function MaxBidInline({ mb, hasVersion, dirty }: { mb: ReturnType<typeof useMaxBid>; hasVersion: boolean; dirty: boolean }) {

@@ -9,7 +9,7 @@ import operator
 from collections.abc import Callable
 from typing import Any
 
-from app.core.i18n import T
+from app.core.i18n import T, label
 from app.domain.v2.model import METRICS
 
 OPS: dict[str, Callable[[float, float], bool]] = {
@@ -48,7 +48,7 @@ def describe(c: dict[str, Any]) -> str:
     met = METRICS[c["metric"]]
     unit = "%" if met.unit == "pct" else ("×" if met.unit == "x" else "")
     th = f"${c['threshold']:,.0f}" if met.unit == "usd" else f"{c['threshold']:g}{unit}"
-    return T("{0}{1} {2} 即放弃", met.label, OP_TEXT[c["op"]], th)
+    return T("{0}{1} {2} 即放弃", label(met.label), label(OP_TEXT[c["op"]]), th)
 
 
 def evaluate(criteria: list[dict[str, Any]], metrics: dict[str, Any]) -> dict[str, Any]:

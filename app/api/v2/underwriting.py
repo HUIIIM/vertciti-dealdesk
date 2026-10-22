@@ -21,6 +21,7 @@ from app.api.v2.schemas import (
     Track,
     VerifyQueueOut,
 )
+from app.core.i18n import label
 from app.domain.v2 import kill_criteria, scenarios
 from app.domain.v2.assumptions import BY_TRACK
 from app.domain.v2.model import METRICS, PRIMARY_METRIC, ModelInputError, run_model
@@ -44,10 +45,11 @@ def preview(track: Track, inputs: dict[str, Any]) -> dict[str, Any]:
 def catalog() -> dict[str, Any]:
     """指标、假设、默认淘汰条件、默认情景目录（前端表单与说明文字的唯一来源）。"""
     return {
-        "metrics": {k: {"label": m.label, "label_en": m.label_en, "unit": m.unit, "better": m.better}
+        "metrics": {k: {"label": label(m.label), "label_en": m.label_en, "unit": m.unit, "better": m.better}
                     for k, m in METRICS.items()},
         "primary_metric": PRIMARY_METRIC,
-        "assumptions": {t: [{"key": a.key, "label": a.label, "paths": list(a.paths), "source_hint": a.source_hint}
+        "assumptions": {t: [{"key": a.key, "label": label(a.label), "paths": list(a.paths),
+                             "source_hint": label(a.source_hint)}
                             for a in v] for t, v in BY_TRACK.items()},
         "kill_criteria_defaults": {"commercial": kill_criteria.DEFAULT_COMMERCIAL,
                                    "residential": kill_criteria.DEFAULT_RESIDENTIAL},

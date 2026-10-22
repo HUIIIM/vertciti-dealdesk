@@ -19,7 +19,9 @@ export function HoldingTab() {
   const [row, setRow] = useState<{ period: string; noi: number | null; occupancy_pct: number | null; cash_flow: number | null }>({ period: String(new Date().getFullYear()), noi: null, occupancy_pct: null, cash_flow: null });
   if (!hasV) return <Empty title={T("还没有承销版本")} />;
   const save = async () => {
-    try { await call(api.PUT("/api/v2/deals/{deal_id}/actuals", { params: { path: { deal_id: id } }, body: row })); toast.ok(T("已录入 {0}", [row.period])); await h.reload(); }
+    // 只发填了的字段：没填 ≠ 清空（否则补录出租率会把已存的 NOI 抹掉）
+    const body = Object.fromEntries(Object.entries(row).filter(([, v]) => v !== null)) as typeof row;
+    try { await call(api.PUT("/api/v2/deals/{deal_id}/actuals", { params: { path: { deal_id: id } }, body })); toast.ok(T("已录入 {0}", [row.period])); await h.reload(); }
     catch (e) { toast.err(e instanceof ApiError ? e : new Error(String(e))); }
   };
   const a = h.data?.attribution;
@@ -32,7 +34,10 @@ export function HoldingTab() {
           <h2>{T("事后归因复盘：当时错在哪条假设")}</h2>
           <p className="sub">{T("对照基准：第")}{" "}{h.data.basis.version_no} {" "}{T("版 ·")}{" "}{h.data.basis.run_id}{h.data.basis.from_buy_decision ? T("（BUY 决策时冻结）") : T("（当前版，尚无 BUY 决策）")}</p>
           {a?.available && a.steps ? (<>
-            <Waterfall label="IRR" start={a.underwritten ?? 0} end={a.actual_implied ?? 0} steps={a.steps.map((s) => ({ label: s.label, v: s.contribution_pct_points ?? 0 }))} />
+            {/* 未知保持未知：任何一段算不出就不画图（绝不拿 0 补成一根“看起来合理”的柱子） */}
+            {a.underwritten != null && a.actual_implied != null && a.steps.every((s) => s.contribution_pct_points != null)
+              ? <Waterfall label="IRR" start={a.underwritten} end={a.actual_implied} steps={a.steps.map((s) => ({ label: s.label, v: s.contribution_pct_points! }))} />
+              : <p className="muted">{T("部分步骤算不出（如 NOI ≤ 0 时年复合增长无定义），不画瀑布图；下面列出能算出的部分。")}</p>}
             <p>{T("承销 IRR")}{" "}{fmt(a.underwritten, "pct")} {" "}{T("→ 按实际推算")}{" "}{fmt(a.actual_implied, "pct")}{T("，合计偏差")}{" "}<strong className={(a.total_pct_points ?? 0) < 0 ? "neg" : undefined}>{fmt(a.total_pct_points, "pct")}</strong>{T("（百分点）。")}</p>
             <p className="muted" style={{ fontSize: 13 }}>{a.note}</p></>) : <p className="muted">{a?.reason}</p>}
         </section>

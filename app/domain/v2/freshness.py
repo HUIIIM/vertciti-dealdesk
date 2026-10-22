@@ -4,6 +4,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
+from app.core.i18n import label
+
 REVIEW_AFTER_DAYS = 14
 STALE_AFTER_DAYS = 30
 LABEL = {"fresh": "已验证", "review": "待复核", "stale": "已停用·需重拉", "unknown": "时间未知"}
@@ -11,7 +13,7 @@ LABEL = {"fresh": "已验证", "review": "待复核", "stale": "已停用·需�
 
 def classify(evidence_at: datetime | None, now: datetime | None = None, *, market_data: bool = True) -> dict[str, Any]:
     if evidence_at is None:
-        return {"state": "unknown", "age_days": None, "label": LABEL["unknown"]}
+        return {"state": "unknown", "age_days": None, "label": label(LABEL["unknown"])}
     now = now or datetime.now(timezone.utc)
     if evidence_at.tzinfo is None:
         evidence_at = evidence_at.replace(tzinfo=timezone.utc)
@@ -22,4 +24,4 @@ def classify(evidence_at: datetime | None, now: datetime | None = None, *, marke
         state = "review"
     else:
         state = "stale"
-    return {"state": state, "age_days": round(age, 1), "label": LABEL[state]}
+    return {"state": state, "age_days": round(age, 1), "label": label(LABEL[state])}

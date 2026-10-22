@@ -38,8 +38,10 @@ export function App() {
   const [creating, setCreating] = useState(false);
   const [dealsVersion, setDealsVersion] = useState(0);
   const refreshDeals = useCallback(() => setDealsVersion((v) => v + 1), []);
+  const canWrite = effectivePermissions(boot.data?.me.permissions ?? [], phone).includes("deal.write");
   const commands = useMemo<Command[]>(() => [
-    { id: "new", group: T("命令"), label: T("新建交易"), hint: "N", run: () => setCreating(true) },
+    // 没有写权限（只读角色 / 手机端）不出现“新建交易”：入口与服务端权限一致
+    ...(canWrite ? [{ id: "new", group: T("命令"), label: T("新建交易"), hint: "N", run: () => setCreating(true) }] : []),
     { id: "pipeline", group: T("跳转"), label: T("流水线"), hint: "G P", run: () => navigate({ name: "pipeline" }) },
     { id: "compare", group: T("跳转"), label: T("比较页"), hint: "G C", run: () => navigate({ name: "compare", ids: [] }) },
     { id: "settings", group: T("跳转"), label: T("设置 · 模板"), hint: "G S", run: () => navigate({ name: "settings", section: "templates" }) },
@@ -48,7 +50,7 @@ export function App() {
     { id: "theme", group: T("外观"), label: theme === "dark" ? T("切换到浅色") : T("切换到深色（长时间建模）"), run: () => setTheme(theme === "dark" ? "light" : "dark") },
     { id: "help", group: T("帮助"), label: T("显示全部快捷键"), hint: "?", run: () => setHelp(true) },
     { id: "v1", group: T("跳转"), label: T("v1 单页决策（旧版入口）"), run: () => { window.location.href = "/"; } },
-  ], [density, theme, setDensity, setTheme]);
+  ], [density, theme, setDensity, setTheme, canWrite]);
   const overlay = cmdk || help || creating;
   useHotkeys([
     { combo: "mod+k", label: T("命令栏"), group: T("全局"), allowInInput: true, run: () => setCmdk((v) => !v) },

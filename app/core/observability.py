@@ -29,7 +29,7 @@ from starlette.responses import JSONResponse, Response
 from app.core import security
 from app.core.context import current_actor, current_request_id, reset_actor, set_actor, set_request_id
 from app.core.hardening import AUTH_THROTTLE, client_ip, headers_for
-from app.core.i18n import lang_from_header, reset_lang, set_lang
+from app.core.i18n import T, lang_from_header, reset_lang, set_lang
 
 log = logging.getLogger("dealdesk")
 access_log = logging.getLogger("dealdesk.access")
@@ -94,11 +94,11 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
         path, method = request.url.path, request.method
         try:
             if wait:
-                resp: Response = JSONResponse({"detail": "令牌错误次数过多，请稍后再试", "request_id": rid},
+                resp: Response = JSONResponse({"detail": T("令牌错误次数过多，请稍后再试"), "request_id": rid},
                                               status_code=429, headers={"Retry-After": str(int(wait) + 1)})
             elif (security.protect_v1() and method in ("POST", "PUT", "DELETE") and _V1_PROTECTED.match(path)
                     and not security.can(actor, "deal.write")):
-                resp = JSONResponse({"detail": "需要“分析”及以上角色", "request_id": rid},
+                resp = JSONResponse({"detail": T("需要“分析”及以上角色"), "request_id": rid},
                                     status_code=401 if actor is security.ANONYMOUS else 403)
             else:
                 resp = await call_next(request)
@@ -109,7 +109,7 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
             log.exception("unhandled exception",
                           extra={"extra_fields": {"path": path, "method": method}})
             _report(err)
-            resp = JSONResponse({"detail": "服务器内部错误", "request_id": rid}, status_code=500)
+            resp = JSONResponse({"detail": T("服务器内部错误"), "request_id": rid}, status_code=500)
         resp.headers["X-Request-ID"] = rid
         for k, v in headers_for(path).items():
             resp.headers.setdefault(k, v)
