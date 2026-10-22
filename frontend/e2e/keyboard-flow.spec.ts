@@ -145,3 +145,21 @@ test("字体与官网一致：Nunito Sans 自托管加载成功，正文实际�
   expect(r.check).toBe(true);
   expect(r.family.startsWith('"Nunito Sans"')).toBe(true);
 });
+
+test("出价空间：键盘拖动试算价，实时给出该价下的回报与每条淘汰条件", async ({ page, request }) => {
+  const tpl = await (await request.get("/api/uw/template")).json();
+  const d = await (await request.post("/api/v2/deals", { data: { name: "试算出价", track: "commercial", address: "2 Bid St",
+    kill_criteria: [{ metric: "dscr", op: "<", threshold: 1.25 }, { metric: "irr_pct", op: "<", threshold: 12 }] } })).json();
+  await request.post(`/api/v2/deals/${d.id}/versions`, { data: { inputs: tpl.example_39_main, label: "样例" } });
+  await page.goto(`/app/#/deals/${d.id}`);
+  const slider = page.getByRole("slider", { name: "试算出价" });
+  await expect(slider).toBeVisible();
+  await slider.focus();
+  for (let i = 0; i < 12; i++) await page.keyboard.press("ArrowLeft");   // 往下压价
+  const out = page.locator(".trial-out");
+  await expect(out).toContainText(/相对要价 -\d/);
+  await expect(out).toContainText("IRR");
+  await expect(out.locator(".status")).toHaveCount(2);                   // 两条淘汰条件逐条给结论
+  await out.getByRole("button", { name: "回到要价" }).click();
+  await expect(out).toHaveCount(0);
+});

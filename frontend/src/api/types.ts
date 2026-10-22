@@ -14,6 +14,7 @@ export type ScenarioRow = S["ScenarioRowOut"];
 export type Scenarios = S["ScenariosOut"];
 export type Constraint = S["ConstraintOut"];
 export type MaxBid = S["MaxBidOut"];
+export type PriceCheck = S["PriceCheckOut"];
 export type DiffRow = S["DiffRowOut"];
 export type Diff = S["DiffOut"];
 export type Vote = S["VoteOut"];

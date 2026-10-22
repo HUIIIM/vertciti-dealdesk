@@ -73,6 +73,16 @@ def max_bid_for(deal_id: int, targets: list[JSON], *, include_kill: bool = True)
             raise InvalidInputError(str(e)) from e
 
 
+def price_check_for(deal_id: int, price: float) -> JSON:
+    with session_scope() as s:
+        d = deal_or_404(s, deal_id)
+        v = _require_version(s, d)
+        try:
+            return max_bid.price_check(d.track, v.inputs, price, kill=d.kill_criteria)
+        except ValueError as e:
+            raise InvalidInputError(str(e)) from e
+
+
 def diff_versions(deal_id: int, a: int, b: int) -> JSON:
     with session_scope() as s:
         va, vb = s.get(DealVersion, a), s.get(DealVersion, b)

@@ -157,6 +157,10 @@ def test_kill_criteria_trip_blocks_committee_and_max_bid(client):
     assert {r["metric"] for r in ov["kill"]["triggered"]} == {"dscr", "irr_pct"}
     mb = c.post(f"/api/v2/deals/{did}/max-bid", json={"targets": [{"metric": "irr_pct", "min": 8}]}).json()
     assert mb["max_bid"] == pytest.approx(37_979_400) and mb["binding"]["metric"] == "irr_pct"
+    # 试算出价：在反推出的最高价处，IRR 下限型淘汰条件刚好不再触发
+    pc = c.post(f"/api/v2/deals/{did}/price-check", json={"price": mb["max_bid"]}).json()
+    assert pc["metrics"]["irr_pct"] >= 8 and "irr_pct" not in {r["metric"] for r in pc["kill"]["triggered"]}
+    assert c.post(f"/api/v2/deals/{did}/price-check", json={"price": 0}).status_code == 422
     sc = c.post(f"/api/v2/deals/{did}/scenarios", json={}).json()
     assert sc["loss_probability_pct"] == 25.0
     r = c.post(f"/api/v2/deals/{did}/scenarios", json={"scenarios": [{"name": "x", "probability": 10, "changes": []}]})

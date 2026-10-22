@@ -374,6 +374,18 @@ class ConstraintOut(Out):
     reason: str
 
 
+class PriceCheckIn(In):
+    price: float = Field(gt=0, le=1e10, description="试算出价（美元）")
+
+
+class PriceCheckOut(Out):
+    price: float
+    asking: float | None
+    vs_asking_pct: float | None
+    metrics: dict[str, float | None]
+    kill: KillEvalOut
+
+
 class MaxBidOut(Out):
     asking: float
     max_bid: float | None

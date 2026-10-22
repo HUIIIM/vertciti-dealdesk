@@ -226,3 +226,20 @@ def test_attribution_steps_sum_to_total():
     v = holding.variance("commercial", run_model("commercial", COM), acts)
     assert v[0]["noi"]["underwritten"] == pytest.approx(2_000_000) and v[0]["noi"]["variance"] == -200_000
     assert not holding.attribution("residential", RES, acts)["available"]
+
+
+def test_price_check_matches_model_at_asking_and_moves_with_price():
+    asking = COM["analysis"]["purchase_price"]
+    at = max_bid.price_check("commercial", COM, asking, kill=[{"metric": "irr_pct", "op": "<", "threshold": 12}])
+    assert at["metrics"] == run_model("commercial", COM)["metrics"] and at["vs_asking_pct"] == 0
+    assert at["kill"]["triggered"]  # 要价下 IRR 8.94% < 12% → 触发
+    lower = max_bid.price_check("commercial", COM, asking * 0.8)
+    assert lower["metrics"]["irr_pct"] > at["metrics"]["irr_pct"] and lower["vs_asking_pct"] == pytest.approx(-20)
+    with pytest.raises(ValueError, match="大于 0"):
+        max_bid.price_check("commercial", COM, 0)
+
+
+def test_price_check_residential_keeps_ltv():
+    r = max_bid.price_check("residential", RES, RES["price"] * 0.9)
+    expect = run_model("residential", max_bid.with_price("residential", RES, RES["price"] * 0.9))["metrics"]
+    assert r["metrics"] == expect

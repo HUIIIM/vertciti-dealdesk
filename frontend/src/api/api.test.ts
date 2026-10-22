@@ -35,3 +35,16 @@ describe("API 客户端", () => {
     expect(v).toBe(3);
   });
 });
+
+describe("报错永远是中文", () => {
+  it("框架英文短语与 Pydantic 校验类型转中文", async () => {
+    const { detailText } = await import("./client");
+    expect(detailText("Method Not Allowed")).toMatch(/接口不存在/);
+    expect(detailText("Internal Server Error")).toBe("服务器内部错误");
+    expect(detailText([{ loc: ["body", "price"], msg: "Input should be greater than 0", type: "greater_than", ctx: { gt: 0 } }]))
+      .toBe("price：必须大于 0");
+    expect(detailText([{ loc: ["body", "verdict"], type: "literal_error", ctx: { expected: "'BUY', 'HOLD' or 'PASS'" } }]))
+      .toBe("verdict：取值只能是 BUY, HOLD or PASS");
+    expect(detailText("交易 9 不存在")).toBe("交易 9 不存在");  // 业务层中文原样
+  });
+});

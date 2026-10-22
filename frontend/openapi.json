@@ -2678,6 +2678,80 @@
     "title": "PortfolioOut",
     "type": "object"
    },
+   "PriceCheckIn": {
+    "additionalProperties": false,
+    "properties": {
+     "price": {
+      "description": "试算出价（美元）",
+      "exclusiveMinimum": 0.0,
+      "maximum": 10000000000.0,
+      "title": "Price",
+      "type": "number"
+     }
+    },
+    "required": [
+     "price"
+    ],
+    "title": "PriceCheckIn",
+    "type": "object"
+   },
+   "PriceCheckOut": {
+    "additionalProperties": true,
+    "properties": {
+     "asking": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Asking"
+     },
+     "kill": {
+      "$ref": "#/components/schemas/KillEvalOut"
+     },
+     "metrics": {
+      "additionalProperties": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "title": "Metrics",
+      "type": "object"
+     },
+     "price": {
+      "title": "Price",
+      "type": "number"
+     },
+     "vs_asking_pct": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Vs Asking Pct"
+     }
+    },
+    "required": [
+     "price",
+     "asking",
+     "vs_asking_pct",
+     "metrics",
+     "kill"
+    ],
+    "title": "PriceCheckOut",
+    "type": "object"
+   },
    "ProjectCreate": {
     "additionalProperties": false,
     "properties": {
@@ -6365,6 +6439,59 @@
     "summary": "Passports",
     "tags": [
      "v2 · documents"
+    ]
+   }
+  },
+  "/api/v2/deals/{deal_id}/price-check": {
+   "post": {
+    "description": "试算出价：拖动“出价空间”时按该价重跑当前版本，返回指标与淘汰条件逐条结果（不保存）。",
+    "operationId": "price_check_api_v2_deals__deal_id__price_check_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "deal_id",
+      "required": true,
+      "schema": {
+       "title": "Deal Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PriceCheckIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PriceCheckOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Price Check",
+    "tags": [
+     "v2 · underwriting"
     ]
    }
   },

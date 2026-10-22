@@ -11,6 +11,8 @@ from app.api.v2.schemas import (
     MaxBidIn,
     MaxBidOut,
     ModelOut,
+    PriceCheckIn,
+    PriceCheckOut,
     RedTeamOut,
     RedTeamReadOut,
     ScenariosIn,
@@ -68,6 +70,12 @@ def run_scenarios(deal_id: int, body: ScenariosIn) -> dict[str, Any]:
     """基准 / 乐观 / 悲观加概率：期望回报与亏损概率。不传 scenarios 用默认三情景。"""
     custom = [s.model_dump(exclude_none=True) for s in body.scenarios] if body.scenarios else None
     return analysis.scenarios_for(deal_id, custom)
+
+
+@router.post("/deals/{deal_id}/price-check", response_model=PriceCheckOut, dependencies=[need("deal.read")])
+def price_check(deal_id: int, body: PriceCheckIn) -> dict[str, Any]:
+    """试算出价：拖动“出价空间”时按该价重跑当前版本，返回指标与淘汰条件逐条结果（不保存）。"""
+    return analysis.price_check_for(deal_id, body.price)
 
 
 @router.post("/deals/{deal_id}/max-bid", response_model=MaxBidOut, dependencies=[need("deal.read")])

@@ -2,7 +2,7 @@
 // 草稿：在模型类标签页改假设 → 右侧实时重算（防抖 300ms，不保存）；⌘S 保存为新承销版本（必填“本版改了什么”）。
 import { createContext, lazy, Suspense, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { api, call, type OverviewOut, type PassportOut, type VersionOut } from "@/api/client";
-import type { KillEval, MaxBid, Metrics } from "@/api/types";
+import type { KillEval, MaxBid, Metrics, PriceCheck } from "@/api/types";
 import { useApi } from "@/api/useApi";
 import { useApp } from "@/app-context";
 import { passportStatus, PassportDialog } from "@/components/Passport";
@@ -151,7 +151,7 @@ export function DealPage({ id, tab }: { id: number; tab: DealTab }) {
               {kill.items.map((k, i) => <li key={i}><Status s={k.state === "triggered" ? "risk" : k.state === "unknown" ? "building" : "verified"}>
                 {k.state === "triggered" ? "触发" : k.state === "unknown" ? "未知" : "未触发"}</Status><span>{k.text}<span className="muted"> · 当前 {fmt(k.value, (catalog.metrics[k.metric]?.unit ?? "x") as Unit)}</span></span></li>)}
             </ul>) : <div className="banner warn" style={{ marginTop: 12 }}>还没写淘汰条件：进入承销前必须先写“什么情况下放弃”。</div>}
-          {mb.data && o.version ? <PriceLadder mb={mb.data} /> : null}
+          {mb.data && o.version ? <PriceLadder mb={mb.data} dealId={id} track={track} /> : null}
           <ol className="stepper" aria-label="阶段" style={{ marginTop: "auto", paddingTop: 16 }}>
             {STAGES.map(([s, l], i) => <li key={s} className={i < stageIdx ? "done" : i === stageIdx ? "current" : ""} aria-current={i === stageIdx ? "step" : undefined}>{l}</li>)}
           </ol>
@@ -236,13 +236,28 @@ function MaxBidInline({ mb, hasVersion, dirty }: { mb: ReturnType<typeof useMaxB
  * 坐标轴为放大的价格区间（不从 0 开始），所以用点与差额段而不用从 0 起的长条——避免夸大差异。
  * 一眼看出哪条约束卡住价格（橙色）、离要价还差多少；无法满足的约束写明，不画假条。
  */
-export function PriceLadder({ mb }: { mb: MaxBid }) {
+export function PriceLadder({ mb, dealId, track }: { mb: MaxBid; dealId: number; track: Track }) {
+  const { catalog } = useApp();
+  const [trial, setTrial] = useState<number | null>(null);
+  const [check, setCheck] = useState<{ price: number; out: PriceCheck | null; err: string | null } | null>(null);
+  // 拖动防抖 180ms：停手才算，避免每个像素都打一次后端；setState 只在异步回调里
+  useEffect(() => {
+    if (trial === null) return;
+    const t = window.setTimeout(() => {
+      call(api.POST("/api/v2/deals/{deal_id}/price-check", { params: { path: { deal_id: dealId } }, body: { price: trial } }))
+        .then((out) => setCheck({ price: trial, out, err: null }))
+        .catch((e: unknown) => setCheck({ price: trial, out: null, err: e instanceof Error ? e.message : String(e) }));
+    }, 180);
+    return () => window.clearTimeout(t);
+  }, [trial, dealId]);
   const priced = mb.constraints.map((c) => c.price).filter((v): v is number => typeof v === "number");
   if (!priced.length) return null;
   const vals = [mb.asking, ...priced];
   const lo = Math.min(...vals) * 0.85, hi = Math.max(...vals) * 1.04;
   const pos = (v: number) => Math.max(0, Math.min(100, ((v - lo) / (hi - lo)) * 100));
   const ask = pos(mb.asking);
+  const step = Math.max(1000, Math.round(mb.asking / 400 / 1000) * 1000);
+  const shown = check && trial !== null && check.price === trial ? check : null;
   return (
     <section className="ladder" aria-label="出价空间">
       <div className="ladder-head"><strong>出价空间</strong><span className="muted">方块 = 该约束允许的最高价 · 竖线 = 要价 {fmtShort(mb.asking)} · 橙色 = 卡住价格的约束</span></div>
@@ -259,10 +274,33 @@ export function PriceLadder({ mb }: { mb: MaxBid }) {
                 <s className={`mk${bind ? " bind" : ""}`} style={{ left: `${pos(c.price)}%`, animationDelay: `${150 + i * 90}ms` }} />
               </>) : <em className="lx">无法满足</em>}
               <b className="ask" style={{ left: `${ask}%` }} aria-hidden="true" />
+              {trial !== null ? <b className="trial" style={{ left: `${pos(trial)}%` }} aria-hidden="true" /> : null}
             </span>
             <span className={`lv num${bind ? " bind" : ""}`}>{typeof c.price === "number" ? fmtShort(c.price) : "—"}{c.status === "above_range" ? "+" : ""}</span>
           </div>);
       })}
+      <div className="lrow try">
+        <label className="ll" htmlFor={`trial-${dealId}`}>试算出价</label>
+        <input id={`trial-${dealId}`} type="range" min={Math.round(lo)} max={Math.round(hi)} step={step} value={trial ?? mb.asking}
+          aria-valuetext={fmt(trial ?? mb.asking, "usd")} onChange={(e) => setTrial(Number(e.target.value))} />
+        <span className="lv num">{fmtShort(trial ?? mb.asking)}</span>
+      </div>
+      {trial !== null ? (
+        <div className="trial-out" aria-live="polite">
+          <span className="row" style={{ gap: 4 }}>
+            <strong className="num">{fmt(trial, "usd")}</strong>
+            <span className="muted">{shown?.out?.vs_asking_pct != null ? `相对要价 ${shown.out.vs_asking_pct >= 0 ? "+" : ""}${shown.out.vs_asking_pct.toFixed(1)}%` : ""}</span>
+            {!shown ? <span className="muted"><span className="live-dot" aria-hidden="true" />计算中</span> : null}
+          </span>
+          {shown?.err ? <span className="neg">{shown.err}</span> : null}
+          {shown?.out ? (<>
+            <span className="row" style={{ gap: 12 }}>{CARD_METRICS[track].map((k) => { const meta = catalog.metrics[k]!;
+              return <span key={k}><span className="muted">{meta.label}</span> <strong className="num">{fmt(shown.out!.metrics[k] ?? null, meta.unit as Unit)}</strong></span>; })}</span>
+            <span className="row" style={{ gap: 6 }}>{shown.out.kill.items.map((k, i) => <Status key={i} s={k.state === "triggered" ? "risk" : k.state === "unknown" ? "building" : "verified"}>
+              {k.state === "triggered" ? "触发" : k.state === "unknown" ? "未知" : "通过"} · {passText(k, catalog)}</Status>)}</span>
+          </>) : null}
+          <button className="btn sm ghost" type="button" onClick={() => { setTrial(null); setCheck(null); }}>回到要价</button>
+        </div>) : null}
     </section>
   );
 }
@@ -288,4 +326,11 @@ function MetricExplain({ metric, label, onClose }: { metric: string; label: stri
 function TweenUsd({ value }: { value: number | null | undefined }) {
   const shown = useTween(value, 900);
   return <span className="v" title={fmt(value, "usd")} aria-label={fmt(value, "usd")}>{fmt(shown === null || shown === undefined ? shown : Math.round(shown / 100) * 100, "usd")}</span>;
+}
+
+/** 淘汰条件写成“要满足的样子”：DSCR < 1.25 即放弃 → DSCR ≥ 1.25×（试算结果里读起来不反）。 */
+function passText(k: { metric: string; op: string; threshold: number }, catalog: { metrics: Record<string, { label: string; unit: string } | undefined> }): string {
+  const meta = catalog.metrics[k.metric];
+  const flip: Record<string, string> = { "<": "≥", "<=": ">", ">": "≤", ">=": "<" };
+  return `${meta?.label ?? k.metric} ${flip[k.op] ?? k.op} ${fmt(k.threshold, (meta?.unit ?? "x") as Unit)}`;
 }

@@ -208,6 +208,12 @@ table.t a.rowlink:hover { text-decoration: underline; }
 .lrow .lx { position: absolute; inset: 0; display: flex; align-items: center; padding-left: 6px; color: var(--risk); font-style: normal; font-weight: 800; }
 .lrow .ask { position: absolute; top: -4px; bottom: -4px; width: 2px; margin-left: -1px; background: var(--text); }
 .lrow .lv { text-align: right; font-weight: 700; } .lrow .lv.bind { color: var(--accent-text); }
+.lrow .trial { position: absolute; top: -6px; bottom: -6px; width: 0; margin-left: -1px; border-left: 2px dashed var(--accent); }
+.lrow.try { margin-top: var(--s2); }
+.lrow.try input[type="range"] { width: 100%; accent-color: var(--orange); min-height: 32px; margin: 0; }
+.trial-out { display: grid; gap: 6px; margin-top: var(--s2); padding: var(--s3); background: var(--surface-2); border-left: 3px solid var(--accent);
+  font-size: var(--fs-sm); animation: megaIn 250ms var(--ease) both; }
+.trial-out .btn { justify-self: start; }
 .checks { list-style: none; margin: 0; padding: 0; }
 .checks li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--s3); padding: var(--s2) 0; border-bottom: 1px solid var(--line-soft); align-items: start; }
 /* 以状态徽标 / 标签开头的清单：徽标列固定宽度，徽标同宽、文字左缘对齐 */

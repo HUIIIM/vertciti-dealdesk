@@ -101,3 +101,20 @@ def run(track: str, inputs: JSON, targets: list[JSON], *, kill: list[JSON] | Non
     return {"asking": float(asking), "max_bid": best, "binding": binding, "constraints": cons,
             "headroom_pct": None if best is None else (best / float(asking) - 1) * 100,
             "note": "可出价 = 各约束允许最高价中的最低者；任一约束无法满足或无法计算则不给数。"}
+
+
+def price_check(track: str, inputs: JSON, price: float, *, kill: list[JSON] | None = None) -> JSON:
+    """试算出价：按给定价格（住宅同比例调整首付与贷款）重跑模型，返回各指标与淘汰条件逐条结果。
+
+    与 run() 同一套改价规则，前端拖动“出价空间”时调用；不保存任何东西。
+    """
+    if price <= 0:
+        raise ValueError("试算价格必须大于 0")
+    asking = get_path(inputs, PRICE_PATH[track])  # type: ignore[index]
+    try:
+        metrics = run_model(track, with_price(track, inputs, price))["metrics"]
+    except ModelInputError as e:
+        raise ValueError(str(e)) from e
+    ask = float(asking) if isinstance(asking, (int, float)) and asking > 0 else None
+    return {"price": float(price), "asking": ask, "vs_asking_pct": None if ask is None else (price / ask - 1) * 100,
+            "metrics": metrics, "kill": kill_criteria.evaluate(kill or [], metrics)}

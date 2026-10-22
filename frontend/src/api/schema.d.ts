@@ -541,6 +541,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v2/deals/{deal_id}/price-check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Price Check
+         * @description 试算出价：拖动“出价空间”时按该价重跑当前版本，返回指标与淘汰条件逐条结果（不保存）。
+         */
+        post: operations["price_check_api_v2_deals__deal_id__price_check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v2/deals/{deal_id}/redteam": {
         parameters: {
             query?: never;
@@ -1917,6 +1937,30 @@ export interface components {
             total_price: number;
             /** Weighted Coc Pct */
             weighted_coc_pct: number | null;
+        } & {
+            [key: string]: unknown;
+        };
+        /** PriceCheckIn */
+        PriceCheckIn: {
+            /**
+             * Price
+             * @description 试算出价（美元）
+             */
+            price: number;
+        };
+        /** PriceCheckOut */
+        PriceCheckOut: {
+            /** Asking */
+            asking: number | null;
+            kill: components["schemas"]["KillEvalOut"];
+            /** Metrics */
+            metrics: {
+                [key: string]: number | null;
+            };
+            /** Price */
+            price: number;
+            /** Vs Asking Pct */
+            vs_asking_pct: number | null;
         } & {
             [key: string]: unknown;
         };
@@ -3957,6 +4001,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PassportOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    price_check_api_v2_deals__deal_id__price_check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                deal_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceCheckIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceCheckOut"];
                 };
             };
             /** @description Validation Error */
