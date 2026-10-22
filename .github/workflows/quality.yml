@@ -39,7 +39,8 @@ jobs:
       - name: Dependency vulnerabilities (pip-audit)
         run: pip-audit -r requirements.txt
       - name: v1 前端 JS 语法
-        run: for f in static/*.js; do node --check "$f"; done
+        # v1 前端已下线，static/ 下可能没有 .js：nullglob 让空匹配直接跳过而不是报“找不到 static/*.js”
+        run: shopt -s nullglob; for f in static/*.js; do node --check "$f"; done
 
   postgres:
     # 生产库形态：同一套持久化 / v2 测试跑在 Postgres 16 上，每个测试一个独立库
