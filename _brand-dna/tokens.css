@@ -1,0 +1,32 @@
+:root{
+  --vc-ink:#000000;
+  --vc-paper:#FFFFFF;
+  --vc-orange:#FF4713;
+  --vc-yellow:#FFCE00;
+  --vc-green:#1D8348;
+  --vc-graphite:#3F3F3F;
+  --vc-stone:#6B6B6B;
+  --vc-line:#DEDEDE;
+  --vc-mist:#F5F5F5;
+  --vc-font:"Nunito Sans","PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",sans-serif;
+  --vc-size-display:88px;
+  --vc-size-h1:72px;
+  --vc-size-h2:44px;
+  --vc-size-h3:22px;
+  --vc-size-lede:20px;
+  --vc-size-body:16px;
+  --vc-size-meta:13px;
+  --vc-size-eyebrow:13px;
+  --vc-space-1:4px;
+  --vc-space-2:8px;
+  --vc-space-3:12px;
+  --vc-space-4:16px;
+  --vc-space-6:24px;
+  --vc-space-8:32px;
+  --vc-space-12:48px;
+  --vc-space-16:64px;
+  --vc-space-section:104px;
+  --vc-space-container:1200px;
+  --vc-ease:cubic-bezier(.2,.7,.2,1);
+  --vc-dur-micro:200ms;--vc-dur-reveal:700ms;
+}

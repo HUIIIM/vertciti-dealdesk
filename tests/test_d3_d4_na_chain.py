@@ -4,9 +4,8 @@
 - D4：`_irr` 无解 → None（终裁⑤既有，本文件做显式回归）。
 - 调用方算术链一律做 None 守卫；前端/报表 None → "—"，绝不渲染 0.00/0%。
 """
-import pytest
 
-from app import commercial_plus, uw_commercial
+from app import commercial_plus
 from app.uw_commercial import _div, _irr, compute_all, default_inputs
 
 

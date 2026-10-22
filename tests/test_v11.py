@@ -14,7 +14,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from app import scoring_commercial as com  # noqa: E402
 from app import scoring_residential as res  # noqa: E402
-from app.finance import monthly_payment  # noqa: E402
 
 
 def base_residential(**over):

@@ -1,0 +1,10 @@
+# 开发 / CI 测试依赖（不进生产 bundle；生产依赖见 requirements.txt）
+-r requirements.txt
+pytest>=8,<10
+pytest-cov>=5,<8
+hypothesis>=6.100,<7
+ruff==0.17.1  # 精确锁定：lint 规则不随新版漂移
+mypy==2.4.0
+pip-audit>=2.7,<3
+# PyMuPDF 仅测试用：6 个测试文件生成 / 断言 PDF（生产代码用 pypdf）
+PyMuPDF==1.28.2

@@ -219,17 +219,3 @@ def test_res_xlsx_clean_200():
     assert r.status_code == 200, r.text[:300]
 
 
-# ---------- 3) 住宅页静态接线 ----------
-
-def test_dashboard_has_gate_panel_and_export_wiring():
-    base = os.path.join(os.path.dirname(__file__), "..", "static")
-    html = open(os.path.join(base, "d.html"), encoding="utf-8").read()
-    js = open(os.path.join(base, "d.js"), encoding="utf-8").read()
-    css = open(os.path.join(base, "d.css"), encoding="utf-8").read()
-    assert 'id="gatePanel"' in html
-    assert "gateCheckForExport" in js
-    assert "buildGatePayload" in js and "renderGate" in js
-    assert "gate_fields" in js, "导出必须把门字段送服务端硬拦"
-    # 三个导出入口都过门
-    assert js.count("gateCheckForExport(") >= 4  # 定义 1 + 备忘录/商业PDF/Excel 调用 3
-    assert ".gate-panel" in css and ".gate-yellow" in css

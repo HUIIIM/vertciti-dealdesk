@@ -16,7 +16,7 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from app import excel_uw, pdf_uw, scoring_commercial, uw_commercial, workbench  # noqa: E402
+from app import excel_uw, pdf_uw, scoring_commercial, uw_commercial  # noqa: E402
 from app.finance import monthly_payment  # noqa: E402
 from app.main import _parse_rr_date  # noqa: E402
 from app.workbench import WbComp, valuate_comps  # noqa: E402

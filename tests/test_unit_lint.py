@@ -24,14 +24,13 @@ from app.uw_commercial import (
 )
 
 APP = Path(__file__).resolve().parent.parent / "app"
-STATIC = Path(__file__).resolve().parent.parent / "static"
 
 
 # ---------------------------------------------------------------- LINT-01
 class TestLint01PctMultiply:
     """百分制字段进乘法/除法无 normalize 判 FAIL.
 
-    规则（ast 扫描 app/uw_commercial.py）：
+    规则（ast 扫描 app/domain/uw_commercial.py）：
     (a) 原始输入形态 —— .get("vacancy_pct") / ["down_pct"] / .market_cap_rate 等
         直接参与 * / 运算，必须被 normalize_pct(...) 包裹；
     (b) 以 _pct 结尾的局部变量名或裸名 rate / noi_growth / exit_cap 参与 * / 运算，
@@ -58,7 +57,7 @@ class TestLint01PctMultiply:
         return None
 
     def test_no_raw_pct_in_arithmetic(self):
-        src = (APP / "uw_commercial.py").read_text()
+        src = (APP / "domain" / "uw_commercial.py").read_text()
         tree = ast.parse(src)
         for node in ast.walk(tree):
             for child in ast.iter_child_nodes(node):
@@ -178,7 +177,7 @@ class TestLint04HonestFormatters:
 
     def test_no_noi_or_zero_fallback_in_sources(self):
         bad = []
-        for p in (APP / "workbench.py", STATIC / "d.js", APP / "main.py"):
+        for p in sorted(APP.rglob("*.py")):  # v2 分层后扫全部后端源码（v1 前端已下线）
             src = p.read_text()
             for i, line in enumerate(src.splitlines(), 1):
                 if re.search(r"noi_annual\s*\|\|\s*0", line):
@@ -217,7 +216,7 @@ class TestLint06NoMagicNumbers:
     必须经命名常量。"""
 
     def test_no_bare_magic(self):
-        src = (APP / "uw_commercial.py").read_text()
+        src = (APP / "domain" / "uw_commercial.py").read_text()
         tree = ast.parse(src)
         const_names = {"EXIT_FEE_PCT", "DEFAULT_NOI_GROWTH_PCT", "DEFAULT_EXIT_CAP_PCT",
                        "DEFAULT_HOLD_YEARS"}

@@ -7,3 +7,10 @@ __pycache__/
 .DS_Store
 private/
 vercel-deploy/
+frontend/node_modules/
+frontend/test-results/
+frontend/playwright-report/
+e2e.db
+.coverage
+frontend/coverage/
+backups/

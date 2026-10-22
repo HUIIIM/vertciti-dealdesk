@@ -1,0 +1,4618 @@
+{
+ "GET /api/v2/catalog": [
+  200,
+  {
+   "assumptions": {
+    "commercial": [
+     {
+      "key": "rent_level",
+      "label": "租金水平",
+      "paths": [
+       "tenants.*.monthly_rent",
+       "tenants.*.underwritten_annual"
+      ],
+      "source_hint": "document"
+     },
+     {
+      "key": "vacancy",
+      "label": "空置率（预测）",
+      "paths": [
+       "proforma.vacancy_pct"
+      ],
+      "source_hint": "analyst"
+     },
+     {
+      "key": "other_income",
+      "label": "其他收入",
+      "paths": [
+       "proforma.other_income"
+      ],
+      "source_hint": "document"
+     },
+     {
+      "key": "exit_cap",
+      "label": "退出 Cap Rate",
+      "paths": [
+       "analysis.exit_cap_rate"
+      ],
+      "source_hint": "benchmark"
+     },
+     {
+      "key": "noi_growth",
+      "label": "NOI 年增长",
+      "paths": [
+       "analysis.noi_growth"
+      ],
+      "source_hint": "analyst"
+     },
+     {
+      "key": "rate",
+      "label": "贷款利率",
+      "paths": [
+       "analysis.rate"
+      ],
+      "source_hint": "benchmark"
+     },
+     {
+      "key": "property_tax",
+      "label": "房产税",
+      "paths": [
+       "proforma.property_tax"
+      ],
+      "source_hint": "historical"
+     },
+     {
+      "key": "insurance",
+      "label": "保险",
+      "paths": [
+       "proforma.insurance"
+      ],
+      "source_hint": "historical"
+     },
+     {
+      "key": "repairs",
+      "label": "维修保养",
+      "paths": [
+       "proforma.repairs_maintenance"
+      ],
+      "source_hint": "historical"
+     },
+     {
+      "key": "management_fee",
+      "label": "管理费",
+      "paths": [
+       "proforma.management_fee"
+      ],
+      "source_hint": "historical"
+     },
+     {
+      "key": "building_repairs",
+      "label": "交割即修",
+      "paths": [
+       "analysis.building_repairs"
+      ],
+      "source_hint": "analyst"
+     },
+     {
+      "key": "closing_costs",
+      "label": "交割费用",
+      "paths": [
+       "analysis.closing_costs"
+      ],
+      "source_hint": "analyst"
+     }
+    ],
+    "residential": [
+     {
+      "key": "rent_level",
+      "label": "月租金",
+      "paths": [
+       "monthly_rent"
+      ],
+      "source_hint": "comps"
+     },
+     {
+      "key": "vacancy",
+      "label": "空置率",
+      "paths": [
+       "vacancy_pct"
+      ],
+      "source_hint": "benchmark"
+     },
+     {
+      "key": "rate",
+      "label": "贷款利率",
+      "paths": [
+       "rate"
+      ],
+      "source_hint": "document"
+     },
+     {
+      "key": "taxes",
+      "label": "房产税",
+      "paths": [
+       "taxes_annual"
+      ],
+      "source_hint": "historical"
+     },
+     {
+      "key": "insurance",
+      "label": "保险",
+      "paths": [
+       "insurance_annual"
+      ],
+      "source_hint": "historical"
+     },
+     {
+      "key": "maintenance",
+      "label": "维修比例",
+      "paths": [
+       "maint_pct"
+      ],
+      "source_hint": "analyst"
+     },
+     {
+      "key": "capex",
+      "label": "资本支出比例",
+      "paths": [
+       "capex_pct"
+      ],
+      "source_hint": "analyst"
+     },
+     {
+      "key": "management",
+      "label": "管理费比例",
+      "paths": [
+       "mgmt_pct"
+      ],
+      "source_hint": "analyst"
+     },
+     {
+      "key": "other_income",
+      "label": "其他收入",
+      "paths": [
+       "other_income_monthly"
+      ],
+      "source_hint": "analyst"
+     },
+     {
+      "key": "hoa",
+      "label": "HOA",
+      "paths": [
+       "hoa_monthly"
+      ],
+      "source_hint": "document"
+     },
+     {
+      "key": "closing_costs",
+      "label": "交割费用",
+      "paths": [
+       "closing_costs"
+      ],
+      "source_hint": "analyst"
+     },
+     {
+      "key": "initial_repairs",
+      "label": "初始维修",
+      "paths": [
+       "initial_repairs"
+      ],
+      "source_hint": "analyst"
+     }
+    ]
+   },
+   "kill_criteria_defaults": {
+    "commercial": [
+     {
+      "metric": "dscr",
+      "op": "<",
+      "threshold": 1.25
+     },
+     {
+      "metric": "irr_pct",
+      "op": "<",
+      "threshold": 12.0
+     }
+    ],
+    "residential": [
+     {
+      "metric": "dscr",
+      "op": "<",
+      "threshold": 1.2
+     },
+     {
+      "metric": "annual_cash_flow",
+      "op": "<",
+      "threshold": 0.0
+     }
+    ]
+   },
+   "metrics": {
+    "annual_cash_flow": {
+     "better": "higher",
+     "label": "年净现金流",
+     "label_en": "Annual cash flow",
+     "unit": "usd"
+    },
+    "breakeven_occupancy_pct": {
+     "better": "lower",
+     "label": "盈亏平衡出租率",
+     "label_en": "Breakeven occupancy",
+     "unit": "pct"
+    },
+    "cap_rate_pct": {
+     "better": "higher",
+     "label": "Cap Rate",
+     "label_en": "Cap rate",
+     "unit": "pct"
+    },
+    "cash_to_close": {
+     "better": "lower",
+     "label": "全口径现金需求",
+     "label_en": "Cash to close",
+     "unit": "usd"
+    },
+    "coc_pct": {
+     "better": "higher",
+     "label": "现金回报",
+     "label_en": "Cash-on-cash",
+     "unit": "pct"
+    },
+    "dscr": {
+     "better": "higher",
+     "label": "DSCR",
+     "label_en": "DSCR",
+     "unit": "x"
+    },
+    "equity_multiple": {
+     "better": "higher",
+     "label": "权益倍数",
+     "label_en": "Equity multiple",
+     "unit": "x"
+    },
+    "irr_pct": {
+     "better": "higher",
+     "label": "IRR",
+     "label_en": "IRR",
+     "unit": "pct"
+    },
+    "ltv_pct": {
+     "better": "lower",
+     "label": "LTV",
+     "label_en": "LTV",
+     "unit": "pct"
+    },
+    "noi": {
+     "better": "higher",
+     "label": "NOI（年）",
+     "label_en": "NOI (annual)",
+     "unit": "usd"
+    },
+    "price": {
+     "better": "lower",
+     "label": "收购价",
+     "label_en": "Purchase price",
+     "unit": "usd"
+    },
+    "score": {
+     "better": "higher",
+     "label": "deal 评分",
+     "label_en": "Deal score",
+     "unit": "x"
+    }
+   },
+   "primary_metric": {
+    "commercial": "irr_pct",
+    "residential": "coc_pct"
+   },
+   "scenario_defaults": {
+    "commercial": [
+     {
+      "changes": [],
+      "name": "基准",
+      "probability": 50.0
+     },
+     {
+      "changes": [
+       {
+        "add": null,
+        "assumption": "rent_level",
+        "path": null,
+        "pct": 5.0,
+        "set": null
+       },
+       {
+        "add": -0.25,
+        "assumption": "exit_cap",
+        "path": null,
+        "pct": null,
+        "set": null
+       }
+      ],
+      "name": "乐观",
+      "probability": 25.0
+     },
+     {
+      "changes": [
+       {
+        "add": null,
+        "assumption": "rent_level",
+        "path": null,
+        "pct": -10.0,
+        "set": null
+       },
+       {
+        "add": 5.0,
+        "assumption": "vacancy",
+        "path": null,
+        "pct": null,
+        "set": null
+       },
+       {
+        "add": 0.75,
+        "assumption": "exit_cap",
+        "path": null,
+        "pct": null,
+        "set": null
+       }
+      ],
+      "name": "悲观",
+      "probability": 25.0
+     }
+    ],
+    "residential": [
+     {
+      "changes": [],
+      "name": "基准",
+      "probability": 50.0
+     },
+     {
+      "changes": [
+       {
+        "add": null,
+        "assumption": "rent_level",
+        "path": null,
+        "pct": 5.0,
+        "set": null
+       }
+      ],
+      "name": "乐观",
+      "probability": 25.0
+     },
+     {
+      "changes": [
+       {
+        "add": null,
+        "assumption": "rent_level",
+        "path": null,
+        "pct": -10.0,
+        "set": null
+       },
+       {
+        "add": 5.0,
+        "assumption": "vacancy",
+        "path": null,
+        "pct": null,
+        "set": null
+       }
+      ],
+      "name": "悲观",
+      "probability": 25.0
+     }
+    ]
+   }
+  }
+ ],
+ "GET /api/v2/compare?ids=1,2": [
+  200,
+  {
+   "best": {
+    "annual_cash_flow": 1,
+    "cap_rate_pct": 2,
+    "cash_to_close": 2,
+    "coc_pct": 2,
+    "dscr": 2,
+    "ltv_pct": 1,
+    "noi": 1,
+    "price": 2
+   },
+   "deals": [
+    {
+     "deal": {
+      "address": "39-09 Main St, Flushing, NY 11354",
+      "archived": false,
+      "asking_price": 42000000.0,
+      "created_at": "2026-10-22T00:53:14.532297",
+      "created_by": "local",
+      "current_version_id": 2,
+      "id": 1,
+      "kill_criteria": [
+       {
+        "metric": "dscr",
+        "op": "<",
+        "threshold": 1.25
+       },
+       {
+        "metric": "irr_pct",
+        "op": "<",
+        "threshold": 12.0
+       }
+      ],
+      "name": "39-09 Main St",
+      "stage": "underwriting",
+      "stage_label": "承销",
+      "status": "planned",
+      "tags": [],
+      "track": "commercial",
+      "updated_at": "2026-10-22T00:53:14.647463"
+     },
+     "kill": {
+      "clear": false,
+      "defined": true,
+      "items": [
+       {
+        "metric": "dscr",
+        "op": "<",
+        "state": "ok",
+        "text": "DSCR低于 1.25× 即放弃",
+        "threshold": 1.25,
+        "value": 1.3227513227513228
+       },
+       {
+        "metric": "irr_pct",
+        "op": "<",
+        "state": "triggered",
+        "text": "IRR低于 12% 即放弃",
+        "threshold": 12.0,
+        "value": 8.938831655906643
+       }
+      ],
+      "triggered": [
+       {
+        "metric": "irr_pct",
+        "op": "<",
+        "state": "triggered",
+        "text": "IRR低于 12% 即放弃",
+        "threshold": 12.0,
+        "value": 8.938831655906643
+       }
+      ],
+      "unknown": []
+     },
+     "metrics": {
+      "annual_cash_flow": 488000.0,
+      "breakeven_occupancy_pct": 78.773822904089,
+      "cap_rate_pct": 5.555555555555555,
+      "cash_to_close": 12084000.0,
+      "coc_pct": 4.038397881496193,
+      "dscr": 1.3227513227513228,
+      "equity_multiple": 1.491715702690689,
+      "irr_pct": 8.938831655906643,
+      "ltv_pct": 70.0,
+      "noi": 2000000.0,
+      "price": 36000000.0,
+      "score": null
+     },
+     "version": {
+      "created_at": "2026-10-22T00:53:14.644665",
+      "created_by": "local",
+      "deal_id": 1,
+      "id": 2,
+      "inputs": {
+       "analysis": {
+        "abatements": 0,
+        "amort_type": "IO",
+        "amort_years": 30,
+        "building_repairs": 0,
+        "capital_reserve": 0,
+        "closing_costs": 864000,
+        "down_pct": 30,
+        "exit_cap_rate": 5.25,
+        "hold_years": 5,
+        "inplace_noi_cf": null,
+        "lender_fees": 420000,
+        "market_cap_rate": 4,
+        "noi_growth": 2,
+        "projected_noi": null,
+        "purchase_price": 36000000,
+        "rate": 6,
+        "underwritten_noi": null
+       },
+       "historical": {
+        "cam": 0,
+        "cam_recovery": 0,
+        "capex": 0,
+        "general_admin": 0,
+        "insurance": 0,
+        "janitor": 0,
+        "landscape": 0,
+        "leasing_commissions": 0,
+        "management_fee": 0,
+        "other_income": 299048,
+        "parking_income": 0,
+        "payroll": 0,
+        "property_tax": 299048,
+        "repairs_maintenance": 0,
+        "security": 0,
+        "service_contracts": 0,
+        "tenant_improvements": 0,
+        "utilities": 0,
+        "vacancy_pct": 0
+       },
+       "proforma": {
+        "cam": 0,
+        "cam_recovery": 0,
+        "capex": 0,
+        "general_admin": 0,
+        "insurance": 0,
+        "janitor": 0,
+        "landscape": 0,
+        "leasing_commissions": 0,
+        "management_fee": 0,
+        "other_income": 299048,
+        "parking_income": 0,
+        "payroll": 0,
+        "property_tax": 299048,
+        "repairs_maintenance": 0,
+        "security": 0,
+        "service_contracts": 0,
+        "tenant_improvements": 0,
+        "utilities": 0,
+        "vacancy_pct": 0
+       },
+       "property": {
+        "address": "39-09 Main St",
+        "buildings": "",
+        "city": "Flushing",
+        "county": "",
+        "floors": "",
+        "land_acres": 0.11,
+        "name": "39-09 Main St",
+        "net_rentable_sf": 17042,
+        "occupancy_as_of": "",
+        "parking_spaces": 0,
+        "property_type": "Retail",
+        "state": "NY",
+        "year_built": "",
+        "year_renovated": "",
+        "zip": "11354"
+       },
+       "tenants": [
+        {
+         "monthly_rent": 83333.34,
+         "sf": 17042,
+         "suite": "1",
+         "tenant": "Carat & Co",
+         "underwritten_annual": 2000000
+        }
+       ],
+       "vacant_sf": 0
+      },
+      "label": "按反推价 3600 万重算；退出 cap 上调 25bp",
+      "outputs": {
+       "metrics": {
+        "annual_cash_flow": 488000.0,
+        "breakeven_occupancy_pct": 78.773822904089,
+        "cap_rate_pct": 5.555555555555555,
+        "cash_to_close": 12084000.0,
+        "coc_pct": 4.038397881496193,
+        "dscr": 1.3227513227513228,
+        "equity_multiple": 1.491715702690689,
+        "irr_pct": 8.938831655906643,
+        "ltv_pct": 70.0,
+        "noi": 2000000.0,
+        "price": 36000000.0,
+        "score": null
+       },
+       "track": "commercial"
+      },
+      "run_id": "R4455aaec32deb8c2bb48",
+      "updated_at": "2026-10-22T00:53:14.644668",
+      "version_no": 2
+     }
+    },
+    {
+     "deal": {
+      "address": "88-12 Elmhurst Ave, Queens, NY",
+      "archived": false,
+      "asking_price": 159900.0,
+      "created_at": "2026-10-22T00:53:14.930379",
+      "created_by": "local",
+      "current_version_id": 3,
+      "id": 2,
+      "kill_criteria": [
+       {
+        "metric": "dscr",
+        "op": "<",
+        "threshold": 1.2
+       }
+      ],
+      "name": "Queens 两家庭",
+      "stage": "sourcing",
+      "stage_label": "发现",
+      "status": "planned",
+      "tags": [],
+      "track": "residential",
+      "updated_at": "2026-10-22T00:53:14.941000"
+     },
+     "kill": {
+      "clear": true,
+      "defined": true,
+      "items": [
+       {
+        "metric": "dscr",
+        "op": "<",
+        "state": "ok",
+        "text": "DSCR低于 1.2× 即放弃",
+        "threshold": 1.2,
+        "value": 1.595
+       }
+      ],
+      "triggered": [],
+      "unknown": []
+     },
+     "metrics": {
+      "annual_cash_flow": 5010.12,
+      "breakeven_occupancy_pct": null,
+      "cap_rate_pct": 8.4,
+      "cash_to_close": 13148.32,
+      "coc_pct": 67.36999999999999,
+      "dscr": 1.595,
+      "equity_multiple": null,
+      "irr_pct": null,
+      "ltv_pct": 96.59974984365228,
+      "noi": 13432.800000000001,
+      "price": 159900.0,
+      "score": 91.1
+     },
+     "version": {
+      "created_at": "2026-10-22T00:53:14.940268",
+      "created_by": "local",
+      "deal_id": 2,
+      "id": 3,
+      "inputs": {
+       "balloon_years": null,
+       "capex_pct": 8,
+       "closing_costs": 2000,
+       "down_payment": 5437,
+       "due_on_sale_plan": "可 refi 出来",
+       "exit_backup": "DSCR refi",
+       "exit_primary": "长期持有收租",
+       "fraud_flag": false,
+       "has_discount_hedge": false,
+       "hoa_arrears_severe": false,
+       "hoa_monthly": 0,
+       "initial_repairs": 0,
+       "insurance_annual": 1200,
+       "insurance_available": true,
+       "is_assumption": false,
+       "loan_balance": 154463,
+       "maint_pct": 8,
+       "market_appreciation": 2,
+       "market_employment": 3,
+       "market_inventory": 2,
+       "market_pop": 3,
+       "mgmt_pct": 10,
+       "monthly_rent": 2050,
+       "other_income_monthly": 0,
+       "other_liens": 0,
+       "price": 159900,
+       "rate": 3.07,
+       "rate_type": "fixed",
+       "rent_source": "comps_verified",
+       "reserves_months_piti": 6,
+       "risk_flags": [],
+       "seller_delinquent_days": 0,
+       "seller_signed_auth_release": true,
+       "structure": "subject_to",
+       "taxes_annual": 1800,
+       "term_years_remaining": 27,
+       "title_defect": false,
+       "units": 1,
+       "utilities_owner_monthly": 0,
+       "vacancy_pct": 8
+      },
+      "label": "首版",
+      "outputs": {
+       "metrics": {
+        "annual_cash_flow": 5010.12,
+        "breakeven_occupancy_pct": null,
+        "cap_rate_pct": 8.4,
+        "cash_to_close": 13148.32,
+        "coc_pct": 67.36999999999999,
+        "dscr": 1.595,
+        "equity_multiple": null,
+        "irr_pct": null,
+        "ltv_pct": 96.59974984365228,
+        "noi": 13432.800000000001,
+        "price": 159900.0,
+        "score": 91.1
+       },
+       "track": "residential"
+      },
+      "run_id": "R33d8cfbb2785de513c97",
+      "updated_at": "2026-10-22T00:53:14.940270",
+      "version_no": 1
+     }
+    }
+   ]
+  }
+ ],
+ "GET /api/v2/deals": [
+  200,
+  [
+   {
+    "address": "NY",
+    "archived": false,
+    "asking_price": 3400000.0,
+    "created_at": "2026-10-22T00:53:14.952465",
+    "created_by": "local",
+    "current_version_id": null,
+    "id": 4,
+    "kill": null,
+    "kill_criteria": [
+     {
+      "metric": "dscr",
+      "op": "<",
+      "threshold": 1.25
+     }
+    ],
+    "metrics": {},
+    "name": "Bushwick 零售带",
+    "stage": "screening",
+    "stage_index": 1,
+    "stage_label": "初筛",
+    "status": "planned",
+    "tags": [],
+    "track": "commercial",
+    "updated_at": "2026-10-22T00:53:14.961608"
+   },
+   {
+    "address": "NY",
+    "archived": false,
+    "asking_price": 2500000.0,
+    "created_at": "2026-10-22T00:53:14.946052",
+    "created_by": "local",
+    "current_version_id": null,
+    "id": 3,
+    "kill": null,
+    "kill_criteria": [
+     {
+      "metric": "dscr",
+      "op": "<",
+      "threshold": 1.25
+     }
+    ],
+    "metrics": {},
+    "name": "Astoria 复式",
+    "stage": "sourcing",
+    "stage_index": 0,
+    "stage_label": "发现",
+    "status": "planned",
+    "tags": [],
+    "track": "commercial",
+    "updated_at": "2026-10-22T00:53:14.946055"
+   },
+   {
+    "address": "88-12 Elmhurst Ave, Queens, NY",
+    "archived": false,
+    "asking_price": 159900.0,
+    "created_at": "2026-10-22T00:53:14.930379",
+    "created_by": "local",
+    "current_version_id": 3,
+    "id": 2,
+    "kill": {
+     "clear": true,
+     "defined": true,
+     "items": [
+      {
+       "metric": "dscr",
+       "op": "<",
+       "state": "ok",
+       "text": "DSCR低于 1.2× 即放弃",
+       "threshold": 1.2,
+       "value": 1.595
+      }
+     ],
+     "triggered": [],
+     "unknown": []
+    },
+    "kill_criteria": [
+     {
+      "metric": "dscr",
+      "op": "<",
+      "threshold": 1.2
+     }
+    ],
+    "metrics": {
+     "annual_cash_flow": 5010.12,
+     "breakeven_occupancy_pct": null,
+     "cap_rate_pct": 8.4,
+     "cash_to_close": 13148.32,
+     "coc_pct": 67.36999999999999,
+     "dscr": 1.595,
+     "equity_multiple": null,
+     "irr_pct": null,
+     "ltv_pct": 96.59974984365228,
+     "noi": 13432.800000000001,
+     "price": 159900.0,
+     "score": 91.1
+    },
+    "name": "Queens 两家庭",
+    "stage": "sourcing",
+    "stage_index": 0,
+    "stage_label": "发现",
+    "status": "planned",
+    "tags": [],
+    "track": "residential",
+    "updated_at": "2026-10-22T00:53:14.941000"
+   },
+   {
+    "address": "39-09 Main St, Flushing, NY 11354",
+    "archived": false,
+    "asking_price": 42000000.0,
+    "created_at": "2026-10-22T00:53:14.532297",
+    "created_by": "local",
+    "current_version_id": 2,
+    "id": 1,
+    "kill": {
+     "clear": false,
+     "defined": true,
+     "items": [
+      {
+       "metric": "dscr",
+       "op": "<",
+       "state": "ok",
+       "text": "DSCR低于 1.25× 即放弃",
+       "threshold": 1.25,
+       "value": 1.3227513227513228
+      },
+      {
+       "metric": "irr_pct",
+       "op": "<",
+       "state": "triggered",
+       "text": "IRR低于 12% 即放弃",
+       "threshold": 12.0,
+       "value": 8.938831655906643
+      }
+     ],
+     "triggered": [
+      {
+       "metric": "irr_pct",
+       "op": "<",
+       "state": "triggered",
+       "text": "IRR低于 12% 即放弃",
+       "threshold": 12.0,
+       "value": 8.938831655906643
+      }
+     ],
+     "unknown": []
+    },
+    "kill_criteria": [
+     {
+      "metric": "dscr",
+      "op": "<",
+      "threshold": 1.25
+     },
+     {
+      "metric": "irr_pct",
+      "op": "<",
+      "threshold": 12.0
+     }
+    ],
+    "metrics": {
+     "annual_cash_flow": 488000.0,
+     "breakeven_occupancy_pct": 78.773822904089,
+     "cap_rate_pct": 5.555555555555555,
+     "cash_to_close": 12084000.0,
+     "coc_pct": 4.038397881496193,
+     "dscr": 1.3227513227513228,
+     "equity_multiple": 1.491715702690689,
+     "irr_pct": 8.938831655906643,
+     "ltv_pct": 70.0,
+     "noi": 2000000.0,
+     "price": 36000000.0,
+     "score": null
+    },
+    "name": "39-09 Main St",
+    "stage": "underwriting",
+    "stage_index": 2,
+    "stage_label": "承销",
+    "status": "planned",
+    "tags": [],
+    "track": "commercial",
+    "updated_at": "2026-10-22T00:53:14.647463"
+   }
+  ]
+ ],
+ "GET /api/v2/deals/1": [
+  200,
+  {
+   "committee": {
+    "abstain": 0,
+    "approve": 0,
+    "chairman_vote": null,
+    "reject": 0,
+    "result": "pending",
+    "votes": 0,
+    "why": "待董事长表决"
+   },
+   "deal": {
+    "address": "39-09 Main St, Flushing, NY 11354",
+    "archived": false,
+    "asking_price": 42000000.0,
+    "created_at": "2026-10-22T00:53:14.532297",
+    "created_by": "local",
+    "current_version_id": 2,
+    "id": 1,
+    "kill_criteria": [
+     {
+      "metric": "dscr",
+      "op": "<",
+      "threshold": 1.25
+     },
+     {
+      "metric": "irr_pct",
+      "op": "<",
+      "threshold": 12.0
+     }
+    ],
+    "name": "39-09 Main St",
+    "stage": "underwriting",
+    "stage_label": "承销",
+    "status": "planned",
+    "tags": [],
+    "track": "commercial",
+    "updated_at": "2026-10-22T00:53:14.647463"
+   },
+   "kill": {
+    "clear": false,
+    "defined": true,
+    "items": [
+     {
+      "metric": "dscr",
+      "op": "<",
+      "state": "ok",
+      "text": "DSCR低于 1.25× 即放弃",
+      "threshold": 1.25,
+      "value": 1.3227513227513228
+     },
+     {
+      "metric": "irr_pct",
+      "op": "<",
+      "state": "triggered",
+      "text": "IRR低于 12% 即放弃",
+      "threshold": 12.0,
+      "value": 8.938831655906643
+     }
+    ],
+    "triggered": [
+     {
+      "metric": "irr_pct",
+      "op": "<",
+      "state": "triggered",
+      "text": "IRR低于 12% 即放弃",
+      "threshold": 12.0,
+      "value": 8.938831655906643
+     }
+    ],
+    "unknown": []
+   },
+   "last_verdict": null,
+   "metric_catalog": {
+    "annual_cash_flow": {
+     "better": "higher",
+     "label": "年净现金流",
+     "label_en": "Annual cash flow",
+     "unit": "usd"
+    },
+    "breakeven_occupancy_pct": {
+     "better": "lower",
+     "label": "盈亏平衡出租率",
+     "label_en": "Breakeven occupancy",
+     "unit": "pct"
+    },
+    "cap_rate_pct": {
+     "better": "higher",
+     "label": "Cap Rate",
+     "label_en": "Cap rate",
+     "unit": "pct"
+    },
+    "cash_to_close": {
+     "better": "lower",
+     "label": "全口径现金需求",
+     "label_en": "Cash to close",
+     "unit": "usd"
+    },
+    "coc_pct": {
+     "better": "higher",
+     "label": "现金回报",
+     "label_en": "Cash-on-cash",
+     "unit": "pct"
+    },
+    "dscr": {
+     "better": "higher",
+     "label": "DSCR",
+     "label_en": "DSCR",
+     "unit": "x"
+    },
+    "equity_multiple": {
+     "better": "higher",
+     "label": "权益倍数",
+     "label_en": "Equity multiple",
+     "unit": "x"
+    },
+    "irr_pct": {
+     "better": "higher",
+     "label": "IRR",
+     "label_en": "IRR",
+     "unit": "pct"
+    },
+    "ltv_pct": {
+     "better": "lower",
+     "label": "LTV",
+     "label_en": "LTV",
+     "unit": "pct"
+    },
+    "noi": {
+     "better": "higher",
+     "label": "NOI（年）",
+     "label_en": "NOI (annual)",
+     "unit": "usd"
+    },
+    "price": {
+     "better": "lower",
+     "label": "收购价",
+     "label_en": "Purchase price",
+     "unit": "usd"
+    },
+    "score": {
+     "better": "higher",
+     "label": "deal 评分",
+     "label_en": "Deal score",
+     "unit": "x"
+    }
+   },
+   "metrics": {
+    "annual_cash_flow": 488000.0,
+    "breakeven_occupancy_pct": 78.773822904089,
+    "cap_rate_pct": 5.555555555555555,
+    "cash_to_close": 12084000.0,
+    "coc_pct": 4.038397881496193,
+    "dscr": 1.3227513227513228,
+    "equity_multiple": 1.491715702690689,
+    "irr_pct": 8.938831655906643,
+    "ltv_pct": 70.0,
+    "noi": 2000000.0,
+    "price": 36000000.0,
+    "score": null
+   },
+   "next_gate": {
+    "allowed": false,
+    "checks": [
+     {
+      "detail": "已触发：IRR低于 12% 即放弃",
+      "key": "kill_clear",
+      "label": "淘汰条件未触发",
+      "ok": false,
+      "status": "risk",
+      "status_label": "风险"
+     },
+     {
+      "detail": "2/6 已达标",
+      "key": "key_numbers",
+      "label": "关键数字已复核且可信度 ≥ 中",
+      "ok": false,
+      "status": "building",
+      "status_label": "建设中"
+     },
+     {
+      "detail": "未裁决 1 条",
+      "key": "conflicts",
+      "label": "跨来源矛盾已裁决",
+      "ok": false,
+      "status": "risk",
+      "status_label": "风险"
+     },
+     {
+      "detail": "",
+      "key": "freshness",
+      "label": "无过期证据（>30 天停用）",
+      "ok": true,
+      "status": "verified",
+      "status_label": "已验证"
+     },
+     {
+      "detail": "",
+      "key": "redteam",
+      "label": "红队面板已读（当前版本）",
+      "ok": false,
+      "status": "planned",
+      "status_label": "计划中"
+     }
+    ],
+    "direction": "forward",
+    "reason": "关卡未通过：淘汰条件未触发；关键数字已复核且可信度 ≥ 中；跨来源矛盾已裁决；红队面板已读（当前版本）"
+   },
+   "next_stage": "committee",
+   "stages": [
+    {
+     "key": "sourcing",
+     "label": "发现"
+    },
+    {
+     "key": "screening",
+     "label": "初筛"
+    },
+    {
+     "key": "underwriting",
+     "label": "承销"
+    },
+    {
+     "key": "committee",
+     "label": "投委会"
+    },
+    {
+     "key": "diligence",
+     "label": "尽调"
+    },
+    {
+     "key": "closing",
+     "label": "交割"
+    },
+    {
+     "key": "holding",
+     "label": "持有"
+    }
+   ],
+   "verification": {
+    "key_items": [
+     {
+      "field": "analysis.exit_cap_rate",
+      "ok": true,
+      "reason": ""
+     },
+     {
+      "field": "analysis.rate",
+      "ok": true,
+      "reason": ""
+     },
+     {
+      "field": "proforma.other_income",
+      "ok": false,
+      "reason": "没有来源记录（数字护照为空）"
+     },
+     {
+      "field": "proforma.property_tax",
+      "ok": false,
+      "reason": "没有来源记录（数字护照为空）"
+     },
+     {
+      "field": "tenants.*.monthly_rent",
+      "ok": false,
+      "reason": "尚未复核"
+     },
+     {
+      "field": "tenants.*.underwritten_annual",
+      "ok": false,
+      "reason": "没有来源记录（数字护照为空）"
+     }
+    ],
+    "key_reviewed": 2,
+    "key_total": 6,
+    "open_conflicts": 1,
+    "redteam_read": false,
+    "review_due": 0,
+    "stale_evidence": 0
+   },
+   "version": {
+    "created_at": "2026-10-22T00:53:14.644665",
+    "created_by": "local",
+    "deal_id": 1,
+    "id": 2,
+    "inputs": {
+     "analysis": {
+      "abatements": 0,
+      "amort_type": "IO",
+      "amort_years": 30,
+      "building_repairs": 0,
+      "capital_reserve": 0,
+      "closing_costs": 864000,
+      "down_pct": 30,
+      "exit_cap_rate": 5.25,
+      "hold_years": 5,
+      "inplace_noi_cf": null,
+      "lender_fees": 420000,
+      "market_cap_rate": 4,
+      "noi_growth": 2,
+      "projected_noi": null,
+      "purchase_price": 36000000,
+      "rate": 6,
+      "underwritten_noi": null
+     },
+     "historical": {
+      "cam": 0,
+      "cam_recovery": 0,
+      "capex": 0,
+      "general_admin": 0,
+      "insurance": 0,
+      "janitor": 0,
+      "landscape": 0,
+      "leasing_commissions": 0,
+      "management_fee": 0,
+      "other_income": 299048,
+      "parking_income": 0,
+      "payroll": 0,
+      "property_tax": 299048,
+      "repairs_maintenance": 0,
+      "security": 0,
+      "service_contracts": 0,
+      "tenant_improvements": 0,
+      "utilities": 0,
+      "vacancy_pct": 0
+     },
+     "proforma": {
+      "cam": 0,
+      "cam_recovery": 0,
+      "capex": 0,
+      "general_admin": 0,
+      "insurance": 0,
+      "janitor": 0,
+      "landscape": 0,
+      "leasing_commissions": 0,
+      "management_fee": 0,
+      "other_income": 299048,
+      "parking_income": 0,
+      "payroll": 0,
+      "property_tax": 299048,
+      "repairs_maintenance": 0,
+      "security": 0,
+      "service_contracts": 0,
+      "tenant_improvements": 0,
+      "utilities": 0,
+      "vacancy_pct": 0
+     },
+     "property": {
+      "address": "39-09 Main St",
+      "buildings": "",
+      "city": "Flushing",
+      "county": "",
+      "floors": "",
+      "land_acres": 0.11,
+      "name": "39-09 Main St",
+      "net_rentable_sf": 17042,
+      "occupancy_as_of": "",
+      "parking_spaces": 0,
+      "property_type": "Retail",
+      "state": "NY",
+      "year_built": "",
+      "year_renovated": "",
+      "zip": "11354"
+     },
+     "tenants": [
+      {
+       "monthly_rent": 83333.34,
+       "sf": 17042,
+       "suite": "1",
+       "tenant": "Carat & Co",
+       "underwritten_annual": 2000000
+      }
+     ],
+     "vacant_sf": 0
+    },
+    "label": "按反推价 3600 万重算；退出 cap 上调 25bp",
+    "outputs": {
+     "metrics": {
+      "annual_cash_flow": 488000.0,
+      "breakeven_occupancy_pct": 78.773822904089,
+      "cap_rate_pct": 5.555555555555555,
+      "cash_to_close": 12084000.0,
+      "coc_pct": 4.038397881496193,
+      "dscr": 1.3227513227513228,
+      "equity_multiple": 1.491715702690689,
+      "irr_pct": 8.938831655906643,
+      "ltv_pct": 70.0,
+      "noi": 2000000.0,
+      "price": 36000000.0,
+      "score": null
+     },
+     "track": "commercial"
+    },
+    "run_id": "R4455aaec32deb8c2bb48",
+    "updated_at": "2026-10-22T00:53:14.644668",
+    "version_no": 2
+   }
+  }
+ ],
+ "GET /api/v2/deals/1/approvals": [
+  200,
+  []
+ ],
+ "GET /api/v2/deals/1/committee": [
+  200,
+  {
+   "rules": "董事长一票否决；董事长赞成且赞成票不少于反对票即通过。",
+   "tally": {
+    "abstain": 0,
+    "approve": 0,
+    "chairman_vote": null,
+    "reject": 0,
+    "result": "pending",
+    "votes": 0,
+    "why": "待董事长表决"
+   },
+   "version_id": 2,
+   "votes": []
+  }
+ ],
+ "GET /api/v2/deals/1/committee/packs": [
+  200,
+  []
+ ],
+ "GET /api/v2/deals/1/conflicts": [
+  200,
+  [
+   {
+    "created_at": "2026-10-22T00:53:14.635923",
+    "created_by": "local",
+    "deal_id": 1,
+    "diff_pct": 13.043478260869565,
+    "field": "analysis.exit_cap_rate",
+    "id": 1,
+    "resolution_note": "",
+    "resolved_at": null,
+    "resolved_by": null,
+    "resolved_value": null,
+    "source_a": "OM",
+    "source_b": "经纪人电话",
+    "status": "open",
+    "updated_at": "2026-10-22T00:53:14.635925",
+    "value_a": 5,
+    "value_b": 5.75
+   }
+  ]
+ ],
+ "GET /api/v2/deals/1/decisions": [
+  200,
+  []
+ ],
+ "GET /api/v2/deals/1/diff": [
+  200,
+  {
+   "a": {
+    "id": 1,
+    "label": "首版：按 OM 口径",
+    "run_id": "R9c575c8c68cc9ad1e960",
+    "version_no": 1
+   },
+   "b": {
+    "id": 2,
+    "label": "按反推价 3600 万重算；退出 cap 上调 25bp",
+    "run_id": "R4455aaec32deb8c2bb48",
+    "version_no": 2
+   },
+   "changed_inputs": 2,
+   "changed_metrics": 9,
+   "inputs": [
+    {
+     "after": 5.25,
+     "before": 5,
+     "delta": 0.25,
+     "delta_pct": 5.0,
+     "kind": "changed",
+     "path": "analysis.exit_cap_rate"
+    },
+    {
+     "after": 36000000,
+     "before": 42000000,
+     "delta": -6000000.0,
+     "delta_pct": -14.285714285714285,
+     "kind": "changed",
+     "path": "analysis.purchase_price"
+    }
+   ],
+   "metrics": [
+    {
+     "after": 488000.0,
+     "before": 236000.00000000023,
+     "delta": 251999.99999999977,
+     "delta_pct": 106.77966101694895,
+     "kind": "changed",
+     "path": "annual_cash_flow"
+    },
+    {
+     "after": 78.773822904089,
+     "before": 89.7348815683709,
+     "delta": -10.961058664281893,
+     "delta_pct": -12.214936346609464,
+     "kind": "changed",
+     "path": "breakeven_occupancy_pct"
+    },
+    {
+     "after": 5.555555555555555,
+     "before": 4.761904761904762,
+     "delta": 0.7936507936507935,
+     "delta_pct": 16.666666666666664,
+     "kind": "changed",
+     "path": "cap_rate_pct"
+    },
+    {
+     "after": 12084000.0,
+     "before": 13884000.000000004,
+     "delta": -1800000.0000000037,
+     "delta_pct": -12.964563526361303,
+     "kind": "changed",
+     "path": "cash_to_close"
+    },
+    {
+     "after": 4.038397881496193,
+     "before": 1.6997983290118133,
+     "delta": 2.33859955248438,
+     "delta_pct": 137.58100079107248,
+     "kind": "changed",
+     "path": "coc_pct"
+    },
+    {
+     "after": 1.3227513227513228,
+     "before": 1.1337868480725626,
+     "delta": 0.1889644746787602,
+     "delta_pct": 16.666666666666647,
+     "kind": "changed",
+     "path": "dscr"
+    },
+    {
+     "after": 1.491715702690689,
+     "before": 1.0504741546297898,
+     "delta": 0.4412415480608993,
+     "delta_pct": 42.004036569219785,
+     "kind": "changed",
+     "path": "equity_multiple"
+    },
+    {
+     "after": 8.938831655906643,
+     "before": 1.029449701669749,
+     "delta": 7.909381954236894,
+     "delta_pct": 768.3116466407263,
+     "kind": "changed",
+     "path": "irr_pct"
+    },
+    {
+     "after": 36000000.0,
+     "before": 42000000.0,
+     "delta": -6000000.0,
+     "delta_pct": -14.285714285714285,
+     "kind": "changed",
+     "path": "price"
+    }
+   ]
+  }
+ ],
+ "GET /api/v2/deals/1/documents": [
+  200,
+  []
+ ],
+ "GET /api/v2/deals/1/events?limit=300": [
+  200,
+  [
+   {
+    "created_at": "2026-10-22T00:53:14.647662",
+    "created_by": "local",
+    "deal_id": 1,
+    "id": 6,
+    "kind": "version_saved",
+    "payload": {
+     "run_id": "R4455aaec32deb8c2bb48",
+     "version_id": 2,
+     "version_no": 2
+    }
+   },
+   {
+    "created_at": "2026-10-22T00:53:14.636714",
+    "created_by": "local",
+    "deal_id": 1,
+    "id": 5,
+    "kind": "conflict_opened",
+    "payload": {
+     "conflict_id": 1,
+     "field": "analysis.exit_cap_rate"
+    }
+   },
+   {
+    "created_at": "2026-10-22T00:53:14.588463",
+    "created_by": "local",
+    "deal_id": 1,
+    "id": 4,
+    "kind": "stage_changed",
+    "payload": {
+     "checks": [
+      {
+       "detail": "建交易时先填“什么情况下放弃”",
+       "key": "kill_defined",
+       "label": "淘汰条件已先写好（防止越算越想买）",
+       "ok": true,
+       "status": "verified",
+       "status_label": "已验证"
+      },
+      {
+       "detail": "",
+       "key": "version",
+       "label": "至少有一版承销",
+       "ok": true,
+       "status": "verified",
+       "status_label": "已验证"
+      }
+     ],
+     "from": "screening",
+     "reason": "",
+     "to": "underwriting"
+    }
+   },
+   {
+    "created_at": "2026-10-22T00:53:14.575438",
+    "created_by": "local",
+    "deal_id": 1,
+    "id": 3,
+    "kind": "stage_changed",
+    "payload": {
+     "checks": [
+      {
+       "detail": "",
+       "key": "basics",
+       "label": "名称、地址、赛道已填",
+       "ok": true,
+       "status": "verified",
+       "status_label": "已验证"
+      },
+      {
+       "detail": "",
+       "key": "asking",
+       "label": "要价已填",
+       "ok": true,
+       "status": "verified",
+       "status_label": "已验证"
+      }
+     ],
+     "from": "sourcing",
+     "reason": "",
+     "to": "screening"
+    }
+   },
+   {
+    "created_at": "2026-10-22T00:53:14.551657",
+    "created_by": "local",
+    "deal_id": 1,
+    "id": 2,
+    "kind": "version_saved",
+    "payload": {
+     "run_id": "R9c575c8c68cc9ad1e960",
+     "version_id": 1,
+     "version_no": 1
+    }
+   },
+   {
+    "created_at": "2026-10-22T00:53:14.534921",
+    "created_by": "local",
+    "deal_id": 1,
+    "id": 1,
+    "kind": "created",
+    "payload": {
+     "kill_criteria": [
+      {
+       "metric": "dscr",
+       "op": "<",
+       "threshold": 1.25
+      },
+      {
+       "metric": "irr_pct",
+       "op": "<",
+       "threshold": 12.0
+      }
+     ]
+    }
+   }
+  ]
+ ],
+ "GET /api/v2/deals/1/holding": [
+  200,
+  {
+   "actuals": [],
+   "attribution": {
+    "actual_implied": null,
+    "available": false,
+    "metric": null,
+    "note": null,
+    "reason": "还没有录入实际 NOI",
+    "steps": null,
+    "total_pct_points": null,
+    "underwritten": null
+   },
+   "basis": {
+    "from_buy_decision": false,
+    "run_id": "R4455aaec32deb8c2bb48",
+    "version_id": 2,
+    "version_no": 2
+   },
+   "variance": []
+  }
+ ],
+ "GET /api/v2/deals/1/passport": [
+  200,
+  {
+   "conflicts": [
+    {
+     "created_at": "2026-10-22T00:53:14.635923",
+     "created_by": "local",
+     "deal_id": 1,
+     "diff_pct": 13.043478260869565,
+     "field": "analysis.exit_cap_rate",
+     "id": 1,
+     "resolution_note": "",
+     "resolved_at": null,
+     "resolved_by": null,
+     "resolved_value": null,
+     "source_a": "OM",
+     "source_b": "经纪人电话",
+     "status": "open",
+     "updated_at": "2026-10-22T00:53:14.635925",
+     "value_a": 5,
+     "value_b": 5.75
+    }
+   ],
+   "current": {
+    "assumption_source": "document",
+    "assumption_source_label": "文件抽取",
+    "confidence": "medium",
+    "confidence_label": "中",
+    "created_at": "2026-10-22T00:53:14.634846",
+    "created_by": "local",
+    "deal_id": 1,
+    "document_id": null,
+    "evidence_at": null,
+    "field": "analysis.exit_cap_rate",
+    "freshness": {
+     "age_days": null,
+     "label": "时间未知",
+     "state": "unknown"
+    },
+    "id": 4,
+    "market_data": false,
+    "method": "manual",
+    "method_label": "人工录入",
+    "note": "",
+    "page": null,
+    "review_label": "人工改写",
+    "review_status": "overridden",
+    "reviewed_at": null,
+    "reviewed_by": null,
+    "source": "经纪人电话",
+    "value": 5.75
+   },
+   "field": "analysis.exit_cap_rate",
+   "history": [
+    {
+     "assumption_source": "document",
+     "assumption_source_label": "文件抽取",
+     "confidence": "medium",
+     "confidence_label": "中",
+     "created_at": "2026-10-22T00:53:14.634846",
+     "created_by": "local",
+     "deal_id": 1,
+     "document_id": null,
+     "evidence_at": null,
+     "field": "analysis.exit_cap_rate",
+     "freshness": {
+      "age_days": null,
+      "label": "时间未知",
+      "state": "unknown"
+     },
+     "id": 4,
+     "market_data": false,
+     "method": "manual",
+     "method_label": "人工录入",
+     "note": "",
+     "page": null,
+     "review_label": "人工改写",
+     "review_status": "overridden",
+     "reviewed_at": null,
+     "reviewed_by": null,
+     "source": "经纪人电话",
+     "value": 5.75
+    },
+    {
+     "assumption_source": "document",
+     "assumption_source_label": "文件抽取",
+     "confidence": "high",
+     "confidence_label": "高",
+     "created_at": "2026-10-22T00:53:14.607750",
+     "created_by": "local",
+     "deal_id": 1,
+     "document_id": null,
+     "evidence_at": null,
+     "field": "analysis.exit_cap_rate",
+     "freshness": {
+      "age_days": null,
+      "label": "时间未知",
+      "state": "unknown"
+     },
+     "id": 1,
+     "market_data": false,
+     "method": "pdf",
+     "method_label": "PDF 抽取",
+     "note": "",
+     "page": 14,
+     "review_label": "待复核",
+     "review_status": "pending",
+     "reviewed_at": null,
+     "reviewed_by": null,
+     "source": "OM",
+     "value": 5
+    }
+   ]
+  }
+ ],
+ "GET /api/v2/deals/1/passports": [
+  200,
+  [
+   {
+    "assumption_source": "document",
+    "assumption_source_label": "文件抽取",
+    "confidence": "medium",
+    "confidence_label": "中",
+    "created_at": "2026-10-22T00:53:14.634846",
+    "created_by": "local",
+    "deal_id": 1,
+    "document_id": null,
+    "evidence_at": null,
+    "field": "analysis.exit_cap_rate",
+    "freshness": {
+     "age_days": null,
+     "label": "时间未知",
+     "state": "unknown"
+    },
+    "id": 4,
+    "market_data": false,
+    "method": "manual",
+    "method_label": "人工录入",
+    "note": "",
+    "page": null,
+    "review_label": "人工改写",
+    "review_status": "overridden",
+    "reviewed_at": null,
+    "reviewed_by": null,
+    "source": "经纪人电话",
+    "value": 5.75
+   },
+   {
+    "assumption_source": "document",
+    "assumption_source_label": "文件抽取",
+    "confidence": "high",
+    "confidence_label": "高",
+    "created_at": "2026-10-22T00:53:14.621102",
+    "created_by": "local",
+    "deal_id": 1,
+    "document_id": null,
+    "evidence_at": null,
+    "field": "analysis.rate",
+    "freshness": {
+     "age_days": null,
+     "label": "时间未知",
+     "state": "unknown"
+    },
+    "id": 3,
+    "market_data": false,
+    "method": "pdf",
+    "method_label": "PDF 抽取",
+    "note": "",
+    "page": 1,
+    "review_label": "已复核",
+    "review_status": "reviewed",
+    "reviewed_at": "2026-10-22T00:53:14.628407",
+    "reviewed_by": "local",
+    "source": "贷款意向书",
+    "value": 6
+   },
+   {
+    "assumption_source": "document",
+    "assumption_source_label": "文件抽取",
+    "confidence": "high",
+    "confidence_label": "高",
+    "created_at": "2026-10-22T00:53:14.614722",
+    "created_by": "local",
+    "deal_id": 1,
+    "document_id": null,
+    "evidence_at": null,
+    "field": "tenants.*.monthly_rent",
+    "freshness": {
+     "age_days": null,
+     "label": "时间未知",
+     "state": "unknown"
+    },
+    "id": 2,
+    "market_data": false,
+    "method": "pdf",
+    "method_label": "PDF 抽取",
+    "note": "",
+    "page": 3,
+    "review_label": "待复核",
+    "review_status": "pending",
+    "reviewed_at": null,
+    "reviewed_by": null,
+    "source": "租金表",
+    "value": 83333.34
+   }
+  ]
+ ],
+ "GET /api/v2/deals/1/redteam": [
+  200,
+  {
+   "all": [
+    {
+     "key": "rent_level",
+     "label": "租金水平",
+     "material": true,
+     "minus": {
+      "delta_pct_points": -7.473810110737755,
+      "value": 1.4650215451688875
+     },
+     "paths": [
+      "tenants.*.monthly_rent",
+      "tenants.*.underwritten_annual"
+     ],
+     "plus": {
+      "delta_pct_points": 6.133778777171516,
+      "value": 15.07261043307816
+     },
+     "source_hint": "document",
+     "swing_bps": 747.3810110737755
+    },
+    {
+     "key": "exit_cap",
+     "label": "退出 Cap Rate",
+     "material": true,
+     "minus": {
+      "delta_pct_points": 5.157591080806023,
+      "value": 14.096422736712666
+     },
+     "paths": [
+      "analysis.exit_cap_rate"
+     ],
+     "plus": {
+      "delta_pct_points": -5.135359809938533,
+      "value": 3.8034718459681094
+     },
+     "source_hint": "benchmark",
+     "swing_bps": 515.7591080806023
+    },
+    {
+     "key": "rate",
+     "label": "贷款利率",
+     "material": true,
+     "minus": {
+      "delta_pct_points": 1.1474088544175967,
+      "value": 10.08624051032424
+     },
+     "paths": [
+      "analysis.rate"
+     ],
+     "plus": {
+      "delta_pct_points": -1.145194746876177,
+      "value": 7.793636909030466
+     },
+     "source_hint": "benchmark",
+     "swing_bps": 114.74088544175967
+    },
+    {
+     "key": "other_income",
+     "label": "其他收入",
+     "material": true,
+     "minus": {
+      "delta_pct_points": -1.015804376288898,
+      "value": 7.923027279617745
+     },
+     "paths": [
+      "proforma.other_income"
+     ],
+     "plus": {
+      "delta_pct_points": 0.9867579003861806,
+      "value": 9.925589556292824
+     },
+     "source_hint": "document",
+     "swing_bps": 101.5804376288898
+    },
+    {
+     "key": "property_tax",
+     "label": "房产税",
+     "material": true,
+     "minus": {
+      "delta_pct_points": 0.9867579003862037,
+      "value": 9.925589556292847
+     },
+     "paths": [
+      "proforma.property_tax"
+     ],
+     "plus": {
+      "delta_pct_points": -1.015804376288898,
+      "value": 7.923027279617745
+     },
+     "source_hint": "historical",
+     "swing_bps": 101.5804376288898
+    },
+    {
+     "key": "noi_growth",
+     "label": "NOI 年增长",
+     "material": false,
+     "minus": {
+      "delta_pct_points": -0.5633467606996909,
+      "value": 8.375484895206952
+     },
+     "paths": [
+      "analysis.noi_growth"
+     ],
+     "plus": {
+      "delta_pct_points": 0.5561767319372635,
+      "value": 9.495008387843907
+     },
+     "source_hint": "analyst",
+     "swing_bps": 56.33467606996909
+    },
+    {
+     "key": "closing_costs",
+     "label": "交割费用",
+     "material": false,
+     "minus": {
+      "delta_pct_points": 0.16889891938223123,
+      "value": 9.107730575288874
+     },
+     "paths": [
+      "analysis.closing_costs"
+     ],
+     "plus": {
+      "delta_pct_points": -0.16738280616763745,
+      "value": 8.771448849739006
+     },
+     "source_hint": "analyst",
+     "swing_bps": 16.889891938223123
+    }
+   ],
+   "base": 8.938831655906643,
+   "key_assumptions": [
+    "rent_level",
+    "exit_cap",
+    "rate",
+    "other_income",
+    "property_tax"
+   ],
+   "key_fields": [
+    "analysis.exit_cap_rate",
+    "analysis.rate",
+    "proforma.other_income",
+    "proforma.property_tax",
+    "tenants.*.monthly_rent",
+    "tenants.*.underwritten_annual"
+   ],
+   "material_bps": 100.0,
+   "metric": "irr_pct",
+   "metric_label": "IRR",
+   "note": "每个假设单独上下浮动 10%，其余不变；主指标为IRR。波动 ≥ 100 个基点的假设定为关键数字。",
+   "read": false,
+   "shock_pct": 10.0,
+   "skipped": [
+    {
+     "key": "vacancy",
+     "label": "空置率（预测）",
+     "reason": "当前输入为空或 0，无法扰动"
+    },
+    {
+     "key": "insurance",
+     "label": "保险",
+     "reason": "当前输入为空或 0，无法扰动"
+    },
+    {
+     "key": "repairs",
+     "label": "维修保养",
+     "reason": "当前输入为空或 0，无法扰动"
+    },
+    {
+     "key": "management_fee",
+     "label": "管理费",
+     "reason": "当前输入为空或 0，无法扰动"
+    },
+    {
+     "key": "building_repairs",
+     "label": "交割即修",
+     "reason": "当前输入为空或 0，无法扰动"
+    }
+   ],
+   "top": [
+    {
+     "key": "rent_level",
+     "label": "租金水平",
+     "material": true,
+     "minus": {
+      "delta_pct_points": -7.473810110737755,
+      "value": 1.4650215451688875
+     },
+     "paths": [
+      "tenants.*.monthly_rent",
+      "tenants.*.underwritten_annual"
+     ],
+     "plus": {
+      "delta_pct_points": 6.133778777171516,
+      "value": 15.07261043307816
+     },
+     "source_hint": "document",
+     "swing_bps": 747.3810110737755
+    },
+    {
+     "key": "exit_cap",
+     "label": "退出 Cap Rate",
+     "material": true,
+     "minus": {
+      "delta_pct_points": 5.157591080806023,
+      "value": 14.096422736712666
+     },
+     "paths": [
+      "analysis.exit_cap_rate"
+     ],
+     "plus": {
+      "delta_pct_points": -5.135359809938533,
+      "value": 3.8034718459681094
+     },
+     "source_hint": "benchmark",
+     "swing_bps": 515.7591080806023
+    },
+    {
+     "key": "rate",
+     "label": "贷款利率",
+     "material": true,
+     "minus": {
+      "delta_pct_points": 1.1474088544175967,
+      "value": 10.08624051032424
+     },
+     "paths": [
+      "analysis.rate"
+     ],
+     "plus": {
+      "delta_pct_points": -1.145194746876177,
+      "value": 7.793636909030466
+     },
+     "source_hint": "benchmark",
+     "swing_bps": 114.74088544175967
+    },
+    {
+     "key": "other_income",
+     "label": "其他收入",
+     "material": true,
+     "minus": {
+      "delta_pct_points": -1.015804376288898,
+      "value": 7.923027279617745
+     },
+     "paths": [
+      "proforma.other_income"
+     ],
+     "plus": {
+      "delta_pct_points": 0.9867579003861806,
+      "value": 9.925589556292824
+     },
+     "source_hint": "document",
+     "swing_bps": 101.5804376288898
+    },
+    {
+     "key": "property_tax",
+     "label": "房产税",
+     "material": true,
+     "minus": {
+      "delta_pct_points": 0.9867579003862037,
+      "value": 9.925589556292847
+     },
+     "paths": [
+      "proforma.property_tax"
+     ],
+     "plus": {
+      "delta_pct_points": -1.015804376288898,
+      "value": 7.923027279617745
+     },
+     "source_hint": "historical",
+     "swing_bps": 101.5804376288898
+    }
+   ],
+   "version_id": 2
+  }
+ ],
+ "GET /api/v2/deals/1/tasks": [
+  200,
+  []
+ ],
+ "GET /api/v2/deals/1/versions": [
+  200,
+  [
+   {
+    "created_at": "2026-10-22T00:53:14.644665",
+    "created_by": "local",
+    "deal_id": 1,
+    "id": 2,
+    "inputs": {
+     "analysis": {
+      "abatements": 0,
+      "amort_type": "IO",
+      "amort_years": 30,
+      "building_repairs": 0,
+      "capital_reserve": 0,
+      "closing_costs": 864000,
+      "down_pct": 30,
+      "exit_cap_rate": 5.25,
+      "hold_years": 5,
+      "inplace_noi_cf": null,
+      "lender_fees": 420000,
+      "market_cap_rate": 4,
+      "noi_growth": 2,
+      "projected_noi": null,
+      "purchase_price": 36000000,
+      "rate": 6,
+      "underwritten_noi": null
+     },
+     "historical": {
+      "cam": 0,
+      "cam_recovery": 0,
+      "capex": 0,
+      "general_admin": 0,
+      "insurance": 0,
+      "janitor": 0,
+      "landscape": 0,
+      "leasing_commissions": 0,
+      "management_fee": 0,
+      "other_income": 299048,
+      "parking_income": 0,
+      "payroll": 0,
+      "property_tax": 299048,
+      "repairs_maintenance": 0,
+      "security": 0,
+      "service_contracts": 0,
+      "tenant_improvements": 0,
+      "utilities": 0,
+      "vacancy_pct": 0
+     },
+     "proforma": {
+      "cam": 0,
+      "cam_recovery": 0,
+      "capex": 0,
+      "general_admin": 0,
+      "insurance": 0,
+      "janitor": 0,
+      "landscape": 0,
+      "leasing_commissions": 0,
+      "management_fee": 0,
+      "other_income": 299048,
+      "parking_income": 0,
+      "payroll": 0,
+      "property_tax": 299048,
+      "repairs_maintenance": 0,
+      "security": 0,
+      "service_contracts": 0,
+      "tenant_improvements": 0,
+      "utilities": 0,
+      "vacancy_pct": 0
+     },
+     "property": {
+      "address": "39-09 Main St",
+      "buildings": "",
+      "city": "Flushing",
+      "county": "",
+      "floors": "",
+      "land_acres": 0.11,
+      "name": "39-09 Main St",
+      "net_rentable_sf": 17042,
+      "occupancy_as_of": "",
+      "parking_spaces": 0,
+      "property_type": "Retail",
+      "state": "NY",
+      "year_built": "",
+      "year_renovated": "",
+      "zip": "11354"
+     },
+     "tenants": [
+      {
+       "monthly_rent": 83333.34,
+       "sf": 17042,
+       "suite": "1",
+       "tenant": "Carat & Co",
+       "underwritten_annual": 2000000
+      }
+     ],
+     "vacant_sf": 0
+    },
+    "label": "按反推价 3600 万重算；退出 cap 上调 25bp",
+    "outputs": {
+     "metrics": {
+      "annual_cash_flow": 488000.0,
+      "breakeven_occupancy_pct": 78.773822904089,
+      "cap_rate_pct": 5.555555555555555,
+      "cash_to_close": 12084000.0,
+      "coc_pct": 4.038397881496193,
+      "dscr": 1.3227513227513228,
+      "equity_multiple": 1.491715702690689,
+      "irr_pct": 8.938831655906643,
+      "ltv_pct": 70.0,
+      "noi": 2000000.0,
+      "price": 36000000.0,
+      "score": null
+     },
+     "track": "commercial"
+    },
+    "run_id": "R4455aaec32deb8c2bb48",
+    "updated_at": "2026-10-22T00:53:14.644668",
+    "version_no": 2
+   },
+   {
+    "created_at": "2026-10-22T00:53:14.550184",
+    "created_by": "local",
+    "deal_id": 1,
+    "id": 1,
+    "inputs": {
+     "analysis": {
+      "abatements": 0,
+      "amort_type": "IO",
+      "amort_years": 30,
+      "building_repairs": 0,
+      "capital_reserve": 0,
+      "closing_costs": 864000,
+      "down_pct": 30,
+      "exit_cap_rate": 5,
+      "hold_years": 5,
+      "inplace_noi_cf": null,
+      "lender_fees": 420000,
+      "market_cap_rate": 4,
+      "noi_growth": 2,
+      "projected_noi": null,
+      "purchase_price": 42000000,
+      "rate": 6,
+      "underwritten_noi": null
+     },
+     "historical": {
+      "cam": 0,
+      "cam_recovery": 0,
+      "capex": 0,
+      "general_admin": 0,
+      "insurance": 0,
+      "janitor": 0,
+      "landscape": 0,
+      "leasing_commissions": 0,
+      "management_fee": 0,
+      "other_income": 299048,
+      "parking_income": 0,
+      "payroll": 0,
+      "property_tax": 299048,
+      "repairs_maintenance": 0,
+      "security": 0,
+      "service_contracts": 0,
+      "tenant_improvements": 0,
+      "utilities": 0,
+      "vacancy_pct": 0
+     },
+     "proforma": {
+      "cam": 0,
+      "cam_recovery": 0,
+      "capex": 0,
+      "general_admin": 0,
+      "insurance": 0,
+      "janitor": 0,
+      "landscape": 0,
+      "leasing_commissions": 0,
+      "management_fee": 0,
+      "other_income": 299048,
+      "parking_income": 0,
+      "payroll": 0,
+      "property_tax": 299048,
+      "repairs_maintenance": 0,
+      "security": 0,
+      "service_contracts": 0,
+      "tenant_improvements": 0,
+      "utilities": 0,
+      "vacancy_pct": 0
+     },
+     "property": {
+      "address": "39-09 Main St",
+      "buildings": "",
+      "city": "Flushing",
+      "county": "",
+      "floors": "",
+      "land_acres": 0.11,
+      "name": "39-09 Main St",
+      "net_rentable_sf": 17042,
+      "occupancy_as_of": "",
+      "parking_spaces": 0,
+      "property_type": "Retail",
+      "state": "NY",
+      "year_built": "",
+      "year_renovated": "",
+      "zip": "11354"
+     },
+     "tenants": [
+      {
+       "monthly_rent": 83333.34,
+       "sf": 17042,
+       "suite": "1",
+       "tenant": "Carat & Co",
+       "underwritten_annual": 2000000
+      }
+     ],
+     "vacant_sf": 0
+    },
+    "label": "首版：按 OM 口径",
+    "outputs": {
+     "metrics": {
+      "annual_cash_flow": 236000.00000000023,
+      "breakeven_occupancy_pct": 89.7348815683709,
+      "cap_rate_pct": 4.761904761904762,
+      "cash_to_close": 13884000.000000004,
+      "coc_pct": 1.6997983290118133,
+      "dscr": 1.1337868480725626,
+      "equity_multiple": 1.0504741546297898,
+      "irr_pct": 1.029449701669749,
+      "ltv_pct": 70.0,
+      "noi": 2000000.0,
+      "price": 42000000.0,
+      "score": null
+     },
+     "track": "commercial"
+    },
+    "run_id": "R9c575c8c68cc9ad1e960",
+    "updated_at": "2026-10-22T00:53:14.550186",
+    "version_no": 1
+   }
+  ]
+ ],
+ "GET /api/v2/deals/1/versions/2": [
+  200,
+  {
+   "created_at": "2026-10-22T00:53:14.644665",
+   "created_by": "local",
+   "deal_id": 1,
+   "id": 2,
+   "inputs": {
+    "analysis": {
+     "abatements": 0,
+     "amort_type": "IO",
+     "amort_years": 30,
+     "building_repairs": 0,
+     "capital_reserve": 0,
+     "closing_costs": 864000,
+     "down_pct": 30,
+     "exit_cap_rate": 5.25,
+     "hold_years": 5,
+     "inplace_noi_cf": null,
+     "lender_fees": 420000,
+     "market_cap_rate": 4,
+     "noi_growth": 2,
+     "projected_noi": null,
+     "purchase_price": 36000000,
+     "rate": 6,
+     "underwritten_noi": null
+    },
+    "historical": {
+     "cam": 0,
+     "cam_recovery": 0,
+     "capex": 0,
+     "general_admin": 0,
+     "insurance": 0,
+     "janitor": 0,
+     "landscape": 0,
+     "leasing_commissions": 0,
+     "management_fee": 0,
+     "other_income": 299048,
+     "parking_income": 0,
+     "payroll": 0,
+     "property_tax": 299048,
+     "repairs_maintenance": 0,
+     "security": 0,
+     "service_contracts": 0,
+     "tenant_improvements": 0,
+     "utilities": 0,
+     "vacancy_pct": 0
+    },
+    "proforma": {
+     "cam": 0,
+     "cam_recovery": 0,
+     "capex": 0,
+     "general_admin": 0,
+     "insurance": 0,
+     "janitor": 0,
+     "landscape": 0,
+     "leasing_commissions": 0,
+     "management_fee": 0,
+     "other_income": 299048,
+     "parking_income": 0,
+     "payroll": 0,
+     "property_tax": 299048,
+     "repairs_maintenance": 0,
+     "security": 0,
+     "service_contracts": 0,
+     "tenant_improvements": 0,
+     "utilities": 0,
+     "vacancy_pct": 0
+    },
+    "property": {
+     "address": "39-09 Main St",
+     "buildings": "",
+     "city": "Flushing",
+     "county": "",
+     "floors": "",
+     "land_acres": 0.11,
+     "name": "39-09 Main St",
+     "net_rentable_sf": 17042,
+     "occupancy_as_of": "",
+     "parking_spaces": 0,
+     "property_type": "Retail",
+     "state": "NY",
+     "year_built": "",
+     "year_renovated": "",
+     "zip": "11354"
+    },
+    "tenants": [
+     {
+      "monthly_rent": 83333.34,
+      "sf": 17042,
+      "suite": "1",
+      "tenant": "Carat & Co",
+      "underwritten_annual": 2000000
+     }
+    ],
+    "vacant_sf": 0
+   },
+   "label": "按反推价 3600 万重算；退出 cap 上调 25bp",
+   "outputs": {
+    "detail": {
+     "compute": {
+      "analysis": {
+       "acquisition_fees": 1284000.0,
+       "amort_type": "IO",
+       "amort_years": 30.0,
+       "annual_debt_service": 1512000.0,
+       "breakeven_occupancy": 0.78773822904089,
+       "building_repairs": 0.0,
+       "capital_reserve": 0.0,
+       "closing_costs": 864000.0,
+       "down_pct": 0.3,
+       "exit": {
+        "cash_flows": [
+         -12084000.0,
+         488000.0,
+         528000.0,
+         568800.0,
+         610416.0000000005,
+         15830676.551314287
+        ],
+        "equity_multiple": 1.491715702690689,
+        "exit_cap_rate": 0.0525,
+        "exit_cap_source": "用户输入",
+        "hold_years": 5,
+        "hold_years_is_default": false,
+        "irr": 0.08938831655906643,
+        "noi_growth": 0.02,
+        "remaining_loan": 25200000.0,
+        "sale_price": 42060221.074285716,
+        "sale_proceeds": 15177812.231314287
+       },
+       "exit_fee_pct": 0.04,
+       "exit_fees": 2000000.0,
+       "financed": -25200000.0,
+       "inplace": {
+        "abatements": 0.0,
+        "cash_flow_gross": 1299048.08,
+        "cash_on_cash": -0.042370069513406154,
+        "debt_service": 1512000.0,
+        "dscr": 0.6613757142857143,
+        "net_cash_flow": -511999.9199999999,
+        "noi": 1000000.0800000001
+       },
+       "inplace_cap": 0.027777780000000002,
+       "inplace_noi": 1000000.0800000001,
+       "inplace_noi_cf": 1000000.0800000001,
+       "lender_fees": 420000.0,
+       "loan_bal": 25200000.0,
+       "market_cap_rate": 0.04,
+       "net_gains": 10716000.0,
+       "net_liquidity": 12084000.0,
+       "noi_sources": {
+        "inplace_noi_cf": "cashflow",
+        "projected_noi": "cashflow",
+        "underwritten_noi": "cashflow"
+       },
+       "projected": {
+        "abatements": 0.0,
+        "cash_flow_gross": 2299048.0,
+        "cash_on_cash": 0.04038397881496193,
+        "debt_service": 1512000.0,
+        "dscr": 1.3227513227513228,
+        "net_cash_flow": 488000.0,
+        "noi": 2000000.0
+       },
+       "projected_noi": 2000000.0,
+       "projected_resale": 50000000.0,
+       "purchase_price": 36000000.0,
+       "rate": 0.06,
+       "roi": 0.8867924528301887,
+       "total_uses": 37284000.0
+      },
+      "data_gaps": {
+       "tier_a": [],
+       "tier_s": []
+      },
+      "historical": {
+       "base_rents": 1000000.08,
+       "cam_recovery": 0.0,
+       "cap_rate": 0.027777780000000002,
+       "capex": 0.0,
+       "cash_flow_avail": 1000000.0800000001,
+       "cash_flow_gross": 1299048.08,
+       "egi": 1299048.08,
+       "exp_pct": {
+        "cam": 0.0,
+        "general_admin": 0.0,
+        "insurance": 0.0,
+        "janitor": 0.0,
+        "landscape": 0.0,
+        "management_fee": 0.0,
+        "payroll": 0.0,
+        "property_tax": 1.0,
+        "repairs_maintenance": 0.0,
+        "security": 0.0,
+        "service_contracts": 0.0,
+        "utilities": 0.0
+       },
+       "expenses": {
+        "cam": 0.0,
+        "general_admin": 0.0,
+        "insurance": 0.0,
+        "janitor": 0.0,
+        "landscape": 0.0,
+        "management_fee": 0.0,
+        "payroll": 0.0,
+        "property_tax": 299048.0,
+        "repairs_maintenance": 0.0,
+        "security": 0.0,
+        "service_contracts": 0.0,
+        "utilities": 0.0
+       },
+       "income_sources": {
+        "cam_recovery": "none",
+        "parking_income": "none"
+       },
+       "leasing_commissions": 0.0,
+       "noi": 1000000.0800000001,
+       "other_income": 299048.0,
+       "parking_income": 0.0,
+       "per_sf": {
+        "base_rents": 58.67856354887924,
+        "cash_flow_avail": 58.67856354887925,
+        "egi": 76.22626921722802,
+        "noi": 58.67856354887925,
+        "total_expenses": 17.547705668348787
+       },
+       "replacement_reserve": 0.0,
+       "rev_pct": {
+        "base_rents": 0.7697945098383117,
+        "cam_recovery": 0.0,
+        "other_income": 0.23020549016168823,
+        "parking_income": 0.0
+       },
+       "tenant_improvements": 0.0,
+       "total_expenses": 299048.0,
+       "total_potential": 1299048.08,
+       "vacancy_loss": 0.0,
+       "vacancy_pct": 0.0
+      },
+      "per_sf": {
+       "expense_per_sf": 17.547705668348787,
+       "noi_per_sf": 117.35711770918907,
+       "price_per_sf": 2112.4281187654033,
+       "rent_per_sf_hist": 58.67856354887924,
+       "rent_per_sf_pro": 117.35711770918907
+      },
+      "proforma": {
+       "base_rents": 2000000.0,
+       "cam_recovery": 0.0,
+       "cap_rate": 0.05555555555555555,
+       "capex": 0.0,
+       "cash_flow_avail": 2000000.0,
+       "cash_flow_gross": 2299048.0,
+       "egi": 2299048.0,
+       "exp_pct": {
+        "cam": 0.0,
+        "general_admin": 0.0,
+        "insurance": 0.0,
+        "janitor": 0.0,
+        "landscape": 0.0,
+        "management_fee": 0.0,
+        "payroll": 0.0,
+        "property_tax": 1.0,
+        "repairs_maintenance": 0.0,
+        "security": 0.0,
+        "service_contracts": 0.0,
+        "utilities": 0.0
+       },
+       "expenses": {
+        "cam": 0.0,
+        "general_admin": 0.0,
+        "insurance": 0.0,
+        "janitor": 0.0,
+        "landscape": 0.0,
+        "management_fee": 0.0,
+        "payroll": 0.0,
+        "property_tax": 299048.0,
+        "repairs_maintenance": 0.0,
+        "security": 0.0,
+        "service_contracts": 0.0,
+        "utilities": 0.0
+       },
+       "income_sources": {
+        "cam_recovery": "none",
+        "parking_income": "none"
+       },
+       "leasing_commissions": 0.0,
+       "noi": 2000000.0,
+       "other_income": 299048.0,
+       "parking_income": 0.0,
+       "per_sf": {
+        "base_rents": 117.35711770918907,
+        "cash_flow_avail": 117.35711770918907,
+        "egi": 134.90482337753784,
+        "noi": 117.35711770918907,
+        "total_expenses": 17.547705668348787
+       },
+       "replacement_reserve": 0.0,
+       "rev_pct": {
+        "base_rents": 0.8699252908160248,
+        "cam_recovery": 0.0,
+        "other_income": 0.1300747091839753,
+        "parking_income": 0.0
+       },
+       "tenant_improvements": 0.0,
+       "total_expenses": 299048.0,
+       "total_potential": 2299048.0,
+       "vacancy_loss": 0.0,
+       "vacancy_pct": 0.0
+      },
+      "property": {
+       "address": "39-09 Main St",
+       "buildings": "",
+       "city": "Flushing",
+       "county": "",
+       "floors": "",
+       "land_acres": 0.11,
+       "name": "39-09 Main St",
+       "net_rentable_sf": 17042,
+       "occupancy_as_of": "",
+       "parking_per_1000sf": 0.0,
+       "parking_spaces": 0,
+       "property_type": "Retail",
+       "state": "NY",
+       "year_built": "",
+       "year_renovated": "",
+       "zip": "11354"
+      },
+      "rent_roll": {
+       "occupancy": 1.0,
+       "tenants": [
+        {
+         "annual_cam": 0.0,
+         "annual_parking": 0.0,
+         "annual_per_sf": 58.67856354887924,
+         "annual_rent": 1000000.08,
+         "escalation": "",
+         "expense_structure": "",
+         "lease_end": "",
+         "lease_start": "",
+         "monthly_cam": 0.0,
+         "monthly_parking": 0.0,
+         "monthly_per_sf": 4.889880295739936,
+         "monthly_rent": 83333.34,
+         "pct_of_total_lease": 1.0,
+         "pct_of_total_uw": 1.0,
+         "sf": 17042.0,
+         "suite": "1",
+         "tenant": "Carat & Co",
+         "underwritten_annual": 2000000.0,
+         "uw_per_sf": 117.35711770918907
+        }
+       ],
+       "total_annual_cam": 0.0,
+       "total_annual_lease": 1000000.08,
+       "total_annual_parking": 0.0,
+       "total_annual_uw": 2000000.0,
+       "total_monthly": 83333.34,
+       "total_sf_existing": 17042.0,
+       "total_sf_property": 17042.0,
+       "vacant_sf": 0.0
+      },
+      "tier_s_ok": true
+     }
+    },
+    "metrics": {
+     "annual_cash_flow": 488000.0,
+     "breakeven_occupancy_pct": 78.773822904089,
+     "cap_rate_pct": 5.555555555555555,
+     "cash_to_close": 12084000.0,
+     "coc_pct": 4.038397881496193,
+     "dscr": 1.3227513227513228,
+     "equity_multiple": 1.491715702690689,
+     "irr_pct": 8.938831655906643,
+     "ltv_pct": 70.0,
+     "noi": 2000000.0,
+     "price": 36000000.0,
+     "score": null
+    },
+    "track": "commercial"
+   },
+   "run_id": "R4455aaec32deb8c2bb48",
+   "updated_at": "2026-10-22T00:53:14.644668",
+   "version_no": 2
+  }
+ ],
+ "GET /api/v2/deals/2": [
+  200,
+  {
+   "committee": {
+    "abstain": 0,
+    "approve": 0,
+    "chairman_vote": null,
+    "reject": 0,
+    "result": "pending",
+    "votes": 0,
+    "why": "待董事长表决"
+   },
+   "deal": {
+    "address": "88-12 Elmhurst Ave, Queens, NY",
+    "archived": false,
+    "asking_price": 159900.0,
+    "created_at": "2026-10-22T00:53:14.930379",
+    "created_by": "local",
+    "current_version_id": 3,
+    "id": 2,
+    "kill_criteria": [
+     {
+      "metric": "dscr",
+      "op": "<",
+      "threshold": 1.2
+     }
+    ],
+    "name": "Queens 两家庭",
+    "stage": "sourcing",
+    "stage_label": "发现",
+    "status": "planned",
+    "tags": [],
+    "track": "residential",
+    "updated_at": "2026-10-22T00:53:14.941000"
+   },
+   "kill": {
+    "clear": true,
+    "defined": true,
+    "items": [
+     {
+      "metric": "dscr",
+      "op": "<",
+      "state": "ok",
+      "text": "DSCR低于 1.2× 即放弃",
+      "threshold": 1.2,
+      "value": 1.595
+     }
+    ],
+    "triggered": [],
+    "unknown": []
+   },
+   "last_verdict": null,
+   "metric_catalog": {
+    "annual_cash_flow": {
+     "better": "higher",
+     "label": "年净现金流",
+     "label_en": "Annual cash flow",
+     "unit": "usd"
+    },
+    "breakeven_occupancy_pct": {
+     "better": "lower",
+     "label": "盈亏平衡出租率",
+     "label_en": "Breakeven occupancy",
+     "unit": "pct"
+    },
+    "cap_rate_pct": {
+     "better": "higher",
+     "label": "Cap Rate",
+     "label_en": "Cap rate",
+     "unit": "pct"
+    },
+    "cash_to_close": {
+     "better": "lower",
+     "label": "全口径现金需求",
+     "label_en": "Cash to close",
+     "unit": "usd"
+    },
+    "coc_pct": {
+     "better": "higher",
+     "label": "现金回报",
+     "label_en": "Cash-on-cash",
+     "unit": "pct"
+    },
+    "dscr": {
+     "better": "higher",
+     "label": "DSCR",
+     "label_en": "DSCR",
+     "unit": "x"
+    },
+    "equity_multiple": {
+     "better": "higher",
+     "label": "权益倍数",
+     "label_en": "Equity multiple",
+     "unit": "x"
+    },
+    "irr_pct": {
+     "better": "higher",
+     "label": "IRR",
+     "label_en": "IRR",
+     "unit": "pct"
+    },
+    "ltv_pct": {
+     "better": "lower",
+     "label": "LTV",
+     "label_en": "LTV",
+     "unit": "pct"
+    },
+    "noi": {
+     "better": "higher",
+     "label": "NOI（年）",
+     "label_en": "NOI (annual)",
+     "unit": "usd"
+    },
+    "price": {
+     "better": "lower",
+     "label": "收购价",
+     "label_en": "Purchase price",
+     "unit": "usd"
+    },
+    "score": {
+     "better": "higher",
+     "label": "deal 评分",
+     "label_en": "Deal score",
+     "unit": "x"
+    }
+   },
+   "metrics": {
+    "annual_cash_flow": 5010.12,
+    "breakeven_occupancy_pct": null,
+    "cap_rate_pct": 8.4,
+    "cash_to_close": 13148.32,
+    "coc_pct": 67.36999999999999,
+    "dscr": 1.595,
+    "equity_multiple": null,
+    "irr_pct": null,
+    "ltv_pct": 96.59974984365228,
+    "noi": 13432.800000000001,
+    "price": 159900.0,
+    "score": 91.1
+   },
+   "next_gate": {
+    "allowed": true,
+    "checks": [
+     {
+      "detail": "",
+      "key": "basics",
+      "label": "名称、地址、赛道已填",
+      "ok": true,
+      "status": "verified",
+      "status_label": "已验证"
+     },
+     {
+      "detail": "",
+      "key": "asking",
+      "label": "要价已填",
+      "ok": true,
+      "status": "verified",
+      "status_label": "已验证"
+     }
+    ],
+    "direction": "forward",
+    "reason": ""
+   },
+   "next_stage": "screening",
+   "stages": [
+    {
+     "key": "sourcing",
+     "label": "发现"
+    },
+    {
+     "key": "screening",
+     "label": "初筛"
+    },
+    {
+     "key": "underwriting",
+     "label": "承销"
+    },
+    {
+     "key": "committee",
+     "label": "投委会"
+    },
+    {
+     "key": "diligence",
+     "label": "尽调"
+    },
+    {
+     "key": "closing",
+     "label": "交割"
+    },
+    {
+     "key": "holding",
+     "label": "持有"
+    }
+   ],
+   "verification": {
+    "key_items": [
+     {
+      "field": "capex_pct",
+      "ok": false,
+      "reason": "没有来源记录（数字护照为空）"
+     },
+     {
+      "field": "closing_costs",
+      "ok": false,
+      "reason": "没有来源记录（数字护照为空）"
+     },
+     {
+      "field": "insurance_annual",
+      "ok": false,
+      "reason": "没有来源记录（数字护照为空）"
+     },
+     {
+      "field": "maint_pct",
+      "ok": false,
+      "reason": "没有来源记录（数字护照为空）"
+     },
+     {
+      "field": "mgmt_pct",
+      "ok": false,
+      "reason": "没有来源记录（数字护照为空）"
+     },
+     {
+      "field": "monthly_rent",
+      "ok": false,
+      "reason": "没有来源记录（数字护照为空）"
+     },
+     {
+      "field": "rate",
+      "ok": false,
+      "reason": "没有来源记录（数字护照为空）"
+     },
+     {
+      "field": "taxes_annual",
+      "ok": false,
+      "reason": "没有来源记录（数字护照为空）"
+     },
+     {
+      "field": "vacancy_pct",
+      "ok": false,
+      "reason": "没有来源记录（数字护照为空）"
+     }
+    ],
+    "key_reviewed": 0,
+    "key_total": 9,
+    "open_conflicts": 0,
+    "redteam_read": false,
+    "review_due": 0,
+    "stale_evidence": 0
+   },
+   "version": {
+    "created_at": "2026-10-22T00:53:14.940268",
+    "created_by": "local",
+    "deal_id": 2,
+    "id": 3,
+    "inputs": {
+     "balloon_years": null,
+     "capex_pct": 8,
+     "closing_costs": 2000,
+     "down_payment": 5437,
+     "due_on_sale_plan": "可 refi 出来",
+     "exit_backup": "DSCR refi",
+     "exit_primary": "长期持有收租",
+     "fraud_flag": false,
+     "has_discount_hedge": false,
+     "hoa_arrears_severe": false,
+     "hoa_monthly": 0,
+     "initial_repairs": 0,
+     "insurance_annual": 1200,
+     "insurance_available": true,
+     "is_assumption": false,
+     "loan_balance": 154463,
+     "maint_pct": 8,
+     "market_appreciation": 2,
+     "market_employment": 3,
+     "market_inventory": 2,
+     "market_pop": 3,
+     "mgmt_pct": 10,
+     "monthly_rent": 2050,
+     "other_income_monthly": 0,
+     "other_liens": 0,
+     "price": 159900,
+     "rate": 3.07,
+     "rate_type": "fixed",
+     "rent_source": "comps_verified",
+     "reserves_months_piti": 6,
+     "risk_flags": [],
+     "seller_delinquent_days": 0,
+     "seller_signed_auth_release": true,
+     "structure": "subject_to",
+     "taxes_annual": 1800,
+     "term_years_remaining": 27,
+     "title_defect": false,
+     "units": 1,
+     "utilities_owner_monthly": 0,
+     "vacancy_pct": 8
+    },
+    "label": "首版",
+    "outputs": {
+     "metrics": {
+      "annual_cash_flow": 5010.12,
+      "breakeven_occupancy_pct": null,
+      "cap_rate_pct": 8.4,
+      "cash_to_close": 13148.32,
+      "coc_pct": 67.36999999999999,
+      "dscr": 1.595,
+      "equity_multiple": null,
+      "irr_pct": null,
+      "ltv_pct": 96.59974984365228,
+      "noi": 13432.800000000001,
+      "price": 159900.0,
+      "score": 91.1
+     },
+     "track": "residential"
+    },
+    "run_id": "R33d8cfbb2785de513c97",
+    "updated_at": "2026-10-22T00:53:14.940270",
+    "version_no": 1
+   }
+  }
+ ],
+ "GET /api/v2/deals/2/approvals": [
+  200,
+  []
+ ],
+ "GET /api/v2/deals/2/committee": [
+  200,
+  {
+   "rules": "董事长一票否决；董事长赞成且赞成票不少于反对票即通过。",
+   "tally": {
+    "abstain": 0,
+    "approve": 0,
+    "chairman_vote": null,
+    "reject": 0,
+    "result": "pending",
+    "votes": 0,
+    "why": "待董事长表决"
+   },
+   "version_id": 3,
+   "votes": []
+  }
+ ],
+ "GET /api/v2/deals/2/committee/packs": [
+  200,
+  []
+ ],
+ "GET /api/v2/deals/2/conflicts": [
+  200,
+  []
+ ],
+ "GET /api/v2/deals/2/decisions": [
+  200,
+  []
+ ],
+ "GET /api/v2/deals/2/documents": [
+  200,
+  []
+ ],
+ "GET /api/v2/deals/2/events?limit=300": [
+  200,
+  [
+   {
+    "created_at": "2026-10-22T00:53:14.941128",
+    "created_by": "local",
+    "deal_id": 2,
+    "id": 8,
+    "kind": "version_saved",
+    "payload": {
+     "run_id": "R33d8cfbb2785de513c97",
+     "version_id": 3,
+     "version_no": 1
+    }
+   },
+   {
+    "created_at": "2026-10-22T00:53:14.931676",
+    "created_by": "local",
+    "deal_id": 2,
+    "id": 7,
+    "kind": "created",
+    "payload": {
+     "kill_criteria": [
+      {
+       "metric": "dscr",
+       "op": "<",
+       "threshold": 1.2
+      }
+     ]
+    }
+   }
+  ]
+ ],
+ "GET /api/v2/deals/2/holding": [
+  200,
+  {
+   "actuals": [],
+   "attribution": {
+    "actual_implied": null,
+    "available": false,
+    "metric": null,
+    "note": null,
+    "reason": "事后归因目前支持商业赛道（IRR）；住宅请看偏差表",
+    "steps": null,
+    "total_pct_points": null,
+    "underwritten": null
+   },
+   "basis": {
+    "from_buy_decision": false,
+    "run_id": "R33d8cfbb2785de513c97",
+    "version_id": 3,
+    "version_no": 1
+   },
+   "variance": []
+  }
+ ],
+ "GET /api/v2/deals/2/passports": [
+  200,
+  []
+ ],
+ "GET /api/v2/deals/2/redteam": [
+  200,
+  {
+   "all": [
+    {
+     "key": "rent_level",
+     "label": "月租金",
+     "material": true,
+     "minus": {
+      "delta_pct_points": -22.099999999999994,
+      "value": 45.269999999999996
+     },
+     "paths": [
+      "monthly_rent"
+     ],
+     "plus": {
+      "delta_pct_points": 22.090000000000003,
+      "value": 89.46
+     },
+     "source_hint": "comps",
+     "swing_bps": 2209.9999999999995
+    },
+    {
+     "key": "rate",
+     "label": "贷款利率",
+     "material": true,
+     "minus": {
+      "delta_pct_points": 4.010000000000005,
+      "value": 71.38
+     },
+     "paths": [
+      "rate"
+     ],
+     "plus": {
+      "delta_pct_points": -4.099999999999987,
+      "value": 63.27
+     },
+     "source_hint": "document",
+     "swing_bps": 409.99999999999875
+    },
+    {
+     "key": "management",
+     "label": "管理费比例",
+     "material": true,
+     "minus": {
+      "delta_pct_points": 3.0400000000000063,
+      "value": 70.41
+     },
+     "paths": [
+      "mgmt_pct"
+     ],
+     "plus": {
+      "delta_pct_points": -3.049999999999997,
+      "value": 64.32
+     },
+     "source_hint": "analyst",
+     "swing_bps": 304.9999999999997
+    },
+    {
+     "key": "maintenance",
+     "label": "维修比例",
+     "material": true,
+     "minus": {
+      "delta_pct_points": 2.6400000000000006,
+      "value": 70.00999999999999
+     },
+     "paths": [
+      "maint_pct"
+     ],
+     "plus": {
+      "delta_pct_points": -2.6499999999999915,
+      "value": 64.72
+     },
+     "source_hint": "analyst",
+     "swing_bps": 264.99999999999915
+    },
+    {
+     "key": "capex",
+     "label": "资本支出比例",
+     "material": true,
+     "minus": {
+      "delta_pct_points": 2.6400000000000006,
+      "value": 70.00999999999999
+     },
+     "paths": [
+      "capex_pct"
+     ],
+     "plus": {
+      "delta_pct_points": -2.6499999999999915,
+      "value": 64.72
+     },
+     "source_hint": "analyst",
+     "swing_bps": 264.99999999999915
+    },
+    {
+     "key": "taxes",
+     "label": "房产税",
+     "material": true,
+     "minus": {
+      "delta_pct_points": 2.4200000000000017,
+      "value": 69.78999999999999
+     },
+     "paths": [
+      "taxes_annual"
+     ],
+     "plus": {
+      "delta_pct_points": -2.4199999999999875,
+      "value": 64.95
+     },
+     "source_hint": "historical",
+     "swing_bps": 242.00000000000017
+    },
+    {
+     "key": "vacancy",
+     "label": "空置率",
+     "material": true,
+     "minus": {
+      "delta_pct_points": 2.3800000000000097,
+      "value": 69.75
+     },
+     "paths": [
+      "vacancy_pct"
+     ],
+     "plus": {
+      "delta_pct_points": -2.3799999999999812,
+      "value": 64.99000000000001
+     },
+     "source_hint": "benchmark",
+     "swing_bps": 238.00000000000097
+    },
+    {
+     "key": "closing_costs",
+     "label": "交割费用",
+     "material": true,
+     "minus": {
+      "delta_pct_points": 1.8600000000000136,
+      "value": 69.23
+     },
+     "paths": [
+      "closing_costs"
+     ],
+     "plus": {
+      "delta_pct_points": -1.7699999999999818,
+      "value": 65.60000000000001
+     },
+     "source_hint": "analyst",
+     "swing_bps": 186.00000000000136
+    },
+    {
+     "key": "insurance",
+     "label": "保险",
+     "material": true,
+     "minus": {
+      "delta_pct_points": 1.6099999999999994,
+      "value": 68.97999999999999
+     },
+     "paths": [
+      "insurance_annual"
+     ],
+     "plus": {
+      "delta_pct_points": -1.6199999999999903,
+      "value": 65.75
+     },
+     "source_hint": "historical",
+     "swing_bps": 161.99999999999903
+    }
+   ],
+   "base": 67.36999999999999,
+   "key_assumptions": [
+    "rent_level",
+    "rate",
+    "management",
+    "maintenance",
+    "capex",
+    "taxes",
+    "vacancy",
+    "closing_costs",
+    "insurance"
+   ],
+   "key_fields": [
+    "capex_pct",
+    "closing_costs",
+    "insurance_annual",
+    "maint_pct",
+    "mgmt_pct",
+    "monthly_rent",
+    "rate",
+    "taxes_annual",
+    "vacancy_pct"
+   ],
+   "material_bps": 100.0,
+   "metric": "coc_pct",
+   "metric_label": "现金回报",
+   "note": "每个假设单独上下浮动 10%，其余不变；主指标为现金回报。波动 ≥ 100 个基点的假设定为关键数字。",
+   "read": false,
+   "shock_pct": 10.0,
+   "skipped": [
+    {
+     "key": "other_income",
+     "label": "其他收入",
+     "reason": "当前输入为空或 0，无法扰动"
+    },
+    {
+     "key": "hoa",
+     "label": "HOA",
+     "reason": "当前输入为空或 0，无法扰动"
+    },
+    {
+     "key": "initial_repairs",
+     "label": "初始维修",
+     "reason": "当前输入为空或 0，无法扰动"
+    }
+   ],
+   "top": [
+    {
+     "key": "rent_level",
+     "label": "月租金",
+     "material": true,
+     "minus": {
+      "delta_pct_points": -22.099999999999994,
+      "value": 45.269999999999996
+     },
+     "paths": [
+      "monthly_rent"
+     ],
+     "plus": {
+      "delta_pct_points": 22.090000000000003,
+      "value": 89.46
+     },
+     "source_hint": "comps",
+     "swing_bps": 2209.9999999999995
+    },
+    {
+     "key": "rate",
+     "label": "贷款利率",
+     "material": true,
+     "minus": {
+      "delta_pct_points": 4.010000000000005,
+      "value": 71.38
+     },
+     "paths": [
+      "rate"
+     ],
+     "plus": {
+      "delta_pct_points": -4.099999999999987,
+      "value": 63.27
+     },
+     "source_hint": "document",
+     "swing_bps": 409.99999999999875
+    },
+    {
+     "key": "management",
+     "label": "管理费比例",
+     "material": true,
+     "minus": {
+      "delta_pct_points": 3.0400000000000063,
+      "value": 70.41
+     },
+     "paths": [
+      "mgmt_pct"
+     ],
+     "plus": {
+      "delta_pct_points": -3.049999999999997,
+      "value": 64.32
+     },
+     "source_hint": "analyst",
+     "swing_bps": 304.9999999999997
+    },
+    {
+     "key": "maintenance",
+     "label": "维修比例",
+     "material": true,
+     "minus": {
+      "delta_pct_points": 2.6400000000000006,
+      "value": 70.00999999999999
+     },
+     "paths": [
+      "maint_pct"
+     ],
+     "plus": {
+      "delta_pct_points": -2.6499999999999915,
+      "value": 64.72
+     },
+     "source_hint": "analyst",
+     "swing_bps": 264.99999999999915
+    },
+    {
+     "key": "capex",
+     "label": "资本支出比例",
+     "material": true,
+     "minus": {
+      "delta_pct_points": 2.6400000000000006,
+      "value": 70.00999999999999
+     },
+     "paths": [
+      "capex_pct"
+     ],
+     "plus": {
+      "delta_pct_points": -2.6499999999999915,
+      "value": 64.72
+     },
+     "source_hint": "analyst",
+     "swing_bps": 264.99999999999915
+    }
+   ],
+   "version_id": 3
+  }
+ ],
+ "GET /api/v2/deals/2/tasks": [
+  200,
+  []
+ ],
+ "GET /api/v2/deals/2/versions": [
+  200,
+  [
+   {
+    "created_at": "2026-10-22T00:53:14.940268",
+    "created_by": "local",
+    "deal_id": 2,
+    "id": 3,
+    "inputs": {
+     "balloon_years": null,
+     "capex_pct": 8,
+     "closing_costs": 2000,
+     "down_payment": 5437,
+     "due_on_sale_plan": "可 refi 出来",
+     "exit_backup": "DSCR refi",
+     "exit_primary": "长期持有收租",
+     "fraud_flag": false,
+     "has_discount_hedge": false,
+     "hoa_arrears_severe": false,
+     "hoa_monthly": 0,
+     "initial_repairs": 0,
+     "insurance_annual": 1200,
+     "insurance_available": true,
+     "is_assumption": false,
+     "loan_balance": 154463,
+     "maint_pct": 8,
+     "market_appreciation": 2,
+     "market_employment": 3,
+     "market_inventory": 2,
+     "market_pop": 3,
+     "mgmt_pct": 10,
+     "monthly_rent": 2050,
+     "other_income_monthly": 0,
+     "other_liens": 0,
+     "price": 159900,
+     "rate": 3.07,
+     "rate_type": "fixed",
+     "rent_source": "comps_verified",
+     "reserves_months_piti": 6,
+     "risk_flags": [],
+     "seller_delinquent_days": 0,
+     "seller_signed_auth_release": true,
+     "structure": "subject_to",
+     "taxes_annual": 1800,
+     "term_years_remaining": 27,
+     "title_defect": false,
+     "units": 1,
+     "utilities_owner_monthly": 0,
+     "vacancy_pct": 8
+    },
+    "label": "首版",
+    "outputs": {
+     "metrics": {
+      "annual_cash_flow": 5010.12,
+      "breakeven_occupancy_pct": null,
+      "cap_rate_pct": 8.4,
+      "cash_to_close": 13148.32,
+      "coc_pct": 67.36999999999999,
+      "dscr": 1.595,
+      "equity_multiple": null,
+      "irr_pct": null,
+      "ltv_pct": 96.59974984365228,
+      "noi": 13432.800000000001,
+      "price": 159900.0,
+      "score": 91.1
+     },
+     "track": "residential"
+    },
+    "run_id": "R33d8cfbb2785de513c97",
+    "updated_at": "2026-10-22T00:53:14.940270",
+    "version_no": 1
+   }
+  ]
+ ],
+ "GET /api/v2/deals/2/versions/3": [
+  200,
+  {
+   "created_at": "2026-10-22T00:53:14.940268",
+   "created_by": "local",
+   "deal_id": 2,
+   "id": 3,
+   "inputs": {
+    "balloon_years": null,
+    "capex_pct": 8,
+    "closing_costs": 2000,
+    "down_payment": 5437,
+    "due_on_sale_plan": "可 refi 出来",
+    "exit_backup": "DSCR refi",
+    "exit_primary": "长期持有收租",
+    "fraud_flag": false,
+    "has_discount_hedge": false,
+    "hoa_arrears_severe": false,
+    "hoa_monthly": 0,
+    "initial_repairs": 0,
+    "insurance_annual": 1200,
+    "insurance_available": true,
+    "is_assumption": false,
+    "loan_balance": 154463,
+    "maint_pct": 8,
+    "market_appreciation": 2,
+    "market_employment": 3,
+    "market_inventory": 2,
+    "market_pop": 3,
+    "mgmt_pct": 10,
+    "monthly_rent": 2050,
+    "other_income_monthly": 0,
+    "other_liens": 0,
+    "price": 159900,
+    "rate": 3.07,
+    "rate_type": "fixed",
+    "rent_source": "comps_verified",
+    "reserves_months_piti": 6,
+    "risk_flags": [],
+    "seller_delinquent_days": 0,
+    "seller_signed_auth_release": true,
+    "structure": "subject_to",
+    "taxes_annual": 1800,
+    "term_years_remaining": 27,
+    "title_defect": false,
+    "units": 1,
+    "utilities_owner_monthly": 0,
+    "vacancy_pct": 8
+   },
+   "label": "首版",
+   "outputs": {
+    "detail": {
+     "score": {
+      "checks": [
+       {
+        "label": "储备金 ≥6 个月 PITI",
+        "note": "当前 6.0 个月",
+        "ok": true
+       },
+       {
+        "label": "整套现金流 ≥$300/月",
+        "note": "当前 $418/月",
+        "ok": true
+       },
+       {
+        "label": "CoC ≥12%（A 档 ≥15%）",
+        "note": "当前 67.4%",
+        "ok": true
+       },
+       {
+        "label": "DSCR ≥1.25",
+        "note": "当前 1.59",
+        "ok": true
+       },
+       {
+        "label": "租金有 comps 支撑",
+        "note": "实测 comps",
+        "ok": true
+       },
+       {
+        "label": "净值（负净值挂风险旗，不再单独否决）",
+        "note": "交割净值 $5,437",
+        "ok": true
+       },
+       {
+        "label": "subject-to 首付浮动制（≤10% 正常区间，>10% 需 RE-0 特批）",
+        "note": "当前 3.4%（deal 越好、可承受首付越高）",
+        "ok": true
+       },
+       {
+        "label": "全口径现金需求 cash-to-close（一级字段）",
+        "note": "$13,148 = 首付＋交割费＋初期维修＋储备金；金额硬上限待确认",
+        "ok": true
+       }
+      ],
+      "dimensions": [
+       {
+        "detail": "整套现金流 $418/月，CoC 67.4%，DSCR 1.59",
+        "key": "cashflow",
+        "label": "现金流指标",
+        "points": 26.3,
+        "weight": 30
+       },
+       {
+        "detail": "固定利率 3.07%，剩余 27 年",
+        "key": "loan_terms",
+        "label": "贷款条款质量",
+        "points": 24.8,
+        "weight": 25
+       },
+       {
+        "detail": "首付 3.4%（浮动制：基础 100 分＋现金流强度上浮 10 分；≤10% 为正常区间，deal 越好、可承受首付越高）",
+        "key": "down_payment",
+        "label": "首付比例",
+        "points": 15.0,
+        "weight": 15
+       },
+       {
+        "detail": "人口流入/就业/库存/历史增值四项打分",
+        "key": "market",
+        "label": "市场与升值空间",
+        "points": 10,
+        "weight": 15
+       },
+       {
+        "detail": "无实质风险旗",
+        "key": "risk",
+        "label": "风险（逆向扣分）",
+        "points": 15,
+        "weight": 15
+       }
+      ],
+      "downgrades": [],
+      "grade": "A",
+      "metrics": {
+       "cap_rate": 0.084,
+       "cash_flow_monthly": 417.51,
+       "cash_flow_per_door": 417.51,
+       "cash_invested": 7437.0,
+       "cash_on_cash": 0.6737,
+       "cash_to_close": 13148.32,
+       "down_pct": 0.034,
+       "dscr": 1.595,
+       "egi": 1886.0,
+       "equity": 5437.0,
+       "monthly_pi": 701.89,
+       "noi_monthly": 1119.4,
+       "opex": 766.6,
+       "piti": 951.89,
+       "reserves_cash": 5711.32,
+       "total_cash_required": 13148.32
+      },
+      "structure_label": "Subject-to（承接现有贷款）",
+      "total": 91.1,
+      "vetoes": []
+     },
+     "validated_input": {
+      "balloon_years": null,
+      "capex_pct": 8.0,
+      "closing_costs": 2000.0,
+      "down_payment": 5437.0,
+      "due_on_sale_plan": "可 refi 出来",
+      "exit_backup": "DSCR refi",
+      "exit_primary": "长期持有收租",
+      "fraud_flag": false,
+      "has_discount_hedge": false,
+      "hoa_arrears_severe": false,
+      "hoa_monthly": 0.0,
+      "initial_repairs": 0.0,
+      "insurance_annual": 1200.0,
+      "insurance_available": true,
+      "is_assumption": false,
+      "loan_balance": 154463.0,
+      "maint_pct": 8.0,
+      "market_appreciation": 2,
+      "market_employment": 3,
+      "market_inventory": 2,
+      "market_pop": 3,
+      "mgmt_pct": 10.0,
+      "monthly_rent": 2050.0,
+      "other_income_monthly": 0.0,
+      "other_liens": 0.0,
+      "price": 159900.0,
+      "rate": 3.07,
+      "rate_type": "fixed",
+      "rent_source": "comps_verified",
+      "reserves_months_piti": 6.0,
+      "risk_flags": [],
+      "seller_delinquent_days": 0,
+      "seller_signed_auth_release": true,
+      "structure": "subject_to",
+      "taxes_annual": 1800.0,
+      "term_years_remaining": 27.0,
+      "title_defect": false,
+      "units": 1,
+      "utilities_owner_monthly": 0.0,
+      "vacancy_pct": 8.0
+     }
+    },
+    "metrics": {
+     "annual_cash_flow": 5010.12,
+     "breakeven_occupancy_pct": null,
+     "cap_rate_pct": 8.4,
+     "cash_to_close": 13148.32,
+     "coc_pct": 67.36999999999999,
+     "dscr": 1.595,
+     "equity_multiple": null,
+     "irr_pct": null,
+     "ltv_pct": 96.59974984365228,
+     "noi": 13432.800000000001,
+     "price": 159900.0,
+     "score": 91.1
+    },
+    "track": "residential"
+   },
+   "run_id": "R33d8cfbb2785de513c97",
+   "updated_at": "2026-10-22T00:53:14.940270",
+   "version_no": 1
+  }
+ ],
+ "GET /api/v2/health": [
+  200,
+  {
+   "auth": "off",
+   "db": {
+    "error": "",
+    "kind": "sqlite",
+    "ok": true,
+    "revision": "0002"
+   },
+   "engine_version": "2.0.0+c178aea81d45",
+   "ok": true,
+   "service": "dealdesk",
+   "uptime_s": 357.1,
+   "version": "2.0.0"
+  }
+ ],
+ "GET /api/v2/me": [
+  200,
+  {
+   "auth": false,
+   "display_name": "本机用户",
+   "permissions": [
+    "approval.decide",
+    "approval.request",
+    "audit.read",
+    "committee.package",
+    "committee.vote",
+    "deal.advance",
+    "deal.archive",
+    "deal.read",
+    "deal.write",
+    "decision.write",
+    "document.write",
+    "holding.write",
+    "payment.approve",
+    "settings.write",
+    "task.write",
+    "users.manage"
+   ],
+   "role": "chairman",
+   "role_label": "董事长",
+   "username": "local"
+  }
+ ],
+ "GET /api/v2/portfolio": [
+  200,
+  {
+   "count": 0,
+   "deals": [],
+   "total_price": 0.0,
+   "weighted_coc_pct": null
+  }
+ ],
+ "GET /api/v2/settings/data-sources": [
+  200,
+  [
+   {
+    "configured": false,
+    "detail": "OAuth token 1 小时有效；状态与重授权见 /api/tophap/status",
+    "key": "tophap",
+    "label": "TopHap 公共记录（MCP）"
+   },
+   {
+    "configured": false,
+    "detail": "未设 RENTCAST_API_KEY 时跳过",
+    "key": "rentcast",
+    "label": "RentCast 租金"
+   },
+   {
+    "configured": true,
+    "detail": "公开接口，免 key",
+    "key": "census",
+    "label": "Census 人口与就业"
+   },
+   {
+    "configured": true,
+    "detail": "失败诚实降级为手动录入",
+    "key": "web",
+    "label": "公开网页（遵守 robots.txt）"
+   },
+   {
+    "configured": true,
+    "detail": "SQLite（本机开发）",
+    "key": "database",
+    "label": "数据库"
+   }
+  ]
+ ],
+ "GET /api/v2/settings/templates?kind=kill_criteria": [
+  200,
+  [
+   {
+    "builtin": true,
+    "id": null,
+    "kind": "kill_criteria",
+    "name": "商业默认",
+    "payload": {
+     "criteria": [
+      {
+       "metric": "dscr",
+       "op": "<",
+       "threshold": 1.25
+      },
+      {
+       "metric": "irr_pct",
+       "op": "<",
+       "threshold": 12.0
+      }
+     ],
+     "track": "commercial"
+    }
+   },
+   {
+    "builtin": true,
+    "id": null,
+    "kind": "kill_criteria",
+    "name": "住宅默认",
+    "payload": {
+     "criteria": [
+      {
+       "metric": "dscr",
+       "op": "<",
+       "threshold": 1.2
+      },
+      {
+       "metric": "annual_cash_flow",
+       "op": "<",
+       "threshold": 0.0
+      }
+     ],
+     "track": "residential"
+    }
+   }
+  ]
+ ],
+ "GET /api/v2/settings/views": [
+  200,
+  []
+ ],
+ "POST /api/v2/deals/1/max-bid": [
+  200,
+  {
+   "asking": 36000000.0,
+   "binding": {
+    "label": "IRR低于 12% 即放弃",
+    "metric": "irr_pct",
+    "price": 34289000.0,
+    "reason": "",
+    "source": "kill_criteria",
+    "status": "ok"
+   },
+   "constraints": [
+    {
+     "label": "DSCR低于 1.25× 即放弃",
+     "metric": "dscr",
+     "price": 38095200.0,
+     "reason": "",
+     "source": "kill_criteria",
+     "status": "ok"
+    },
+    {
+     "label": "IRR低于 12% 即放弃",
+     "metric": "irr_pct",
+     "price": 34289000.0,
+     "reason": "",
+     "source": "kill_criteria",
+     "status": "ok"
+    }
+   ],
+   "headroom_pct": -4.752777777777773,
+   "max_bid": 34289000.0,
+   "note": "可出价 = 各约束允许最高价中的最低者；任一约束无法满足或无法计算则不给数。"
+  }
+ ],
+ "POST /api/v2/deals/1/scenarios": [
+  200,
+  {
+   "expected": 4.624271965316384,
+   "loss_probability_pct": 25.0,
+   "metric": "irr_pct",
+   "metric_label": "IRR",
+   "note": "期望值 = Σ 概率 × 情景值；任一情景算不出则期望值显示为未知，不拿部分情景凑数。",
+   "scenarios": [
+    {
+     "changes": [],
+     "loss": false,
+     "metrics": {
+      "annual_cash_flow": 488000.0,
+      "breakeven_occupancy_pct": 78.773822904089,
+      "cap_rate_pct": 5.555555555555555,
+      "cash_to_close": 12084000.0,
+      "coc_pct": 4.038397881496193,
+      "dscr": 1.3227513227513228,
+      "equity_multiple": 1.491715702690689,
+      "irr_pct": 8.938831655906643,
+      "ltv_pct": 70.0,
+      "noi": 2000000.0,
+      "price": 36000000.0,
+      "score": null
+     },
+     "name": "基准",
+     "primary": 8.938831655906643,
+     "probability": 50.0
+    },
+    {
+     "changes": [
+      {
+       "assumption": "rent_level",
+       "pct": 5
+      },
+      {
+       "add": -0.25,
+       "assumption": "exit_cap"
+      }
+     ],
+     "loss": false,
+     "metrics": {
+      "annual_cash_flow": 588000.0,
+      "breakeven_occupancy_pct": 75.49027781019805,
+      "cap_rate_pct": 5.833333333333333,
+      "cash_to_close": 12084000.0,
+      "coc_pct": 4.865938430983118,
+      "dscr": 1.3888888888888888,
+      "equity_multiple": 1.8772775836663353,
+      "irr_pct": 14.452989756095025,
+      "ltv_pct": 70.0,
+      "noi": 2100000.0,
+      "price": 36000000.0,
+      "score": null
+     },
+     "name": "乐观",
+     "primary": 14.452989756095025,
+     "probability": 25.0
+    },
+    {
+     "changes": [
+      {
+       "assumption": "rent_level",
+       "pct": -10
+      },
+      {
+       "add": 5,
+       "assumption": "vacancy"
+      },
+      {
+       "add": 0.75,
+       "assumption": "exit_cap"
+      }
+     ],
+     "loss": true,
+     "metrics": {
+      "annual_cash_flow": 183047.6000000001,
+      "breakeven_occupancy_pct": 86.27949432314077,
+      "cap_rate_pct": 4.708465555555556,
+      "cash_to_close": 12084000.0,
+      "coc_pct": 1.514793114862629,
+      "dscr": 1.1210632275132275,
+      "equity_multiple": 0.4969056632104715,
+      "irr_pct": -13.833565206642778,
+      "ltv_pct": 70.0,
+      "noi": 1695047.6,
+      "price": 36000000.0,
+      "score": null
+     },
+     "name": "悲观",
+     "primary": -13.833565206642778,
+     "probability": 25.0
+    }
+   ]
+  }
+ ],
+ "POST /api/v2/deals/2/max-bid": [
+  200,
+  {
+   "asking": 159900.0,
+   "binding": {
+    "label": "DSCR低于 1.2× 即放弃",
+    "metric": "dscr",
+    "price": 212600.0,
+    "reason": "",
+    "source": "kill_criteria",
+    "status": "ok"
+   },
+   "constraints": [
+    {
+     "label": "DSCR低于 1.2× 即放弃",
+     "metric": "dscr",
+     "price": 212600.0,
+     "reason": "",
+     "source": "kill_criteria",
+     "status": "ok"
+    }
+   ],
+   "headroom_pct": 32.95809881175735,
+   "max_bid": 212600.0,
+   "note": "可出价 = 各约束允许最高价中的最低者；任一约束无法满足或无法计算则不给数。"
+  }
+ ],
+ "POST /api/v2/deals/2/scenarios": [
+  200,
+  {
+   "expected": 61.25999999999999,
+   "loss_probability_pct": 0.0,
+   "metric": "coc_pct",
+   "metric_label": "现金回报",
+   "note": "期望值 = Σ 概率 × 情景值；任一情景算不出则期望值显示为未知，不拿部分情景凑数。",
+   "scenarios": [
+    {
+     "changes": [],
+     "loss": false,
+     "metrics": {
+      "annual_cash_flow": 5010.12,
+      "breakeven_occupancy_pct": null,
+      "cap_rate_pct": 8.4,
+      "cash_to_close": 13148.32,
+      "coc_pct": 67.36999999999999,
+      "dscr": 1.595,
+      "equity_multiple": null,
+      "irr_pct": null,
+      "ltv_pct": 96.59974984365228,
+      "noi": 13432.800000000001,
+      "price": 159900.0,
+      "score": 91.1
+     },
+     "name": "基准",
+     "primary": 67.36999999999999,
+     "probability": 50.0
+    },
+    {
+     "changes": [
+      {
+       "assumption": "rent_level",
+       "pct": 5
+      }
+     ],
+     "loss": false,
+     "metrics": {
+      "annual_cash_flow": 5831.76,
+      "breakeven_occupancy_pct": null,
+      "cap_rate_pct": 8.91,
+      "cash_to_close": 13148.32,
+      "coc_pct": 78.42,
+      "dscr": 1.692,
+      "equity_multiple": null,
+      "irr_pct": null,
+      "ltv_pct": 96.59974984365228,
+      "noi": 14254.439999999999,
+      "price": 159900.0,
+      "score": 94.2
+     },
+     "name": "乐观",
+     "primary": 78.42,
+     "probability": 25.0
+    },
+    {
+     "changes": [
+      {
+       "assumption": "rent_level",
+       "pct": -10
+      },
+      {
+       "add": 5,
+       "assumption": "vacancy"
+      }
+     ],
+     "loss": false,
+     "metrics": {
+      "annual_cash_flow": 2370.6000000000004,
+      "breakeven_occupancy_pct": null,
+      "cap_rate_pct": 6.75,
+      "cash_to_close": 13148.32,
+      "coc_pct": 31.879999999999995,
+      "dscr": 1.281,
+      "equity_multiple": null,
+      "irr_pct": null,
+      "ltv_pct": 96.59974984365228,
+      "noi": 10793.28,
+      "price": 159900.0,
+      "score": 80.1
+     },
+     "name": "悲观",
+     "primary": 31.879999999999995,
+     "probability": 25.0
+    }
+   ]
+  }
+ ],
+ "POST /api/v2/model/commercial": [
+  200,
+  {
+   "detail": {
+    "compute": {
+     "analysis": {
+      "acquisition_fees": 1284000.0,
+      "amort_type": "IO",
+      "amort_years": 30.0,
+      "annual_debt_service": 1512000.0,
+      "breakeven_occupancy": 0.78773822904089,
+      "building_repairs": 0.0,
+      "capital_reserve": 0.0,
+      "closing_costs": 864000.0,
+      "down_pct": 0.3,
+      "exit": {
+       "cash_flows": [
+        -12084000.0,
+        488000.0,
+        528000.0,
+        568800.0,
+        610416.0000000005,
+        15830676.551314287
+       ],
+       "equity_multiple": 1.491715702690689,
+       "exit_cap_rate": 0.0525,
+       "exit_cap_source": "用户输入",
+       "hold_years": 5,
+       "hold_years_is_default": false,
+       "irr": 0.08938831655906643,
+       "noi_growth": 0.02,
+       "remaining_loan": 25200000.0,
+       "sale_price": 42060221.074285716,
+       "sale_proceeds": 15177812.231314287
+      },
+      "exit_fee_pct": 0.04,
+      "exit_fees": 2000000.0,
+      "financed": -25200000.0,
+      "inplace": {
+       "abatements": 0.0,
+       "cash_flow_gross": 1299048.08,
+       "cash_on_cash": -0.042370069513406154,
+       "debt_service": 1512000.0,
+       "dscr": 0.6613757142857143,
+       "net_cash_flow": -511999.9199999999,
+       "noi": 1000000.0800000001
+      },
+      "inplace_cap": 0.027777780000000002,
+      "inplace_noi": 1000000.0800000001,
+      "inplace_noi_cf": 1000000.0800000001,
+      "lender_fees": 420000.0,
+      "loan_bal": 25200000.0,
+      "market_cap_rate": 0.04,
+      "net_gains": 10716000.0,
+      "net_liquidity": 12084000.0,
+      "noi_sources": {
+       "inplace_noi_cf": "cashflow",
+       "projected_noi": "cashflow",
+       "underwritten_noi": "cashflow"
+      },
+      "projected": {
+       "abatements": 0.0,
+       "cash_flow_gross": 2299048.0,
+       "cash_on_cash": 0.04038397881496193,
+       "debt_service": 1512000.0,
+       "dscr": 1.3227513227513228,
+       "net_cash_flow": 488000.0,
+       "noi": 2000000.0
+      },
+      "projected_noi": 2000000.0,
+      "projected_resale": 50000000.0,
+      "purchase_price": 36000000.0,
+      "rate": 0.06,
+      "roi": 0.8867924528301887,
+      "total_uses": 37284000.0
+     },
+     "data_gaps": {
+      "tier_a": [],
+      "tier_s": []
+     },
+     "historical": {
+      "base_rents": 1000000.08,
+      "cam_recovery": 0.0,
+      "cap_rate": 0.027777780000000002,
+      "capex": 0.0,
+      "cash_flow_avail": 1000000.0800000001,
+      "cash_flow_gross": 1299048.08,
+      "egi": 1299048.08,
+      "exp_pct": {
+       "cam": 0.0,
+       "general_admin": 0.0,
+       "insurance": 0.0,
+       "janitor": 0.0,
+       "landscape": 0.0,
+       "management_fee": 0.0,
+       "payroll": 0.0,
+       "property_tax": 1.0,
+       "repairs_maintenance": 0.0,
+       "security": 0.0,
+       "service_contracts": 0.0,
+       "utilities": 0.0
+      },
+      "expenses": {
+       "cam": 0.0,
+       "general_admin": 0.0,
+       "insurance": 0.0,
+       "janitor": 0.0,
+       "landscape": 0.0,
+       "management_fee": 0.0,
+       "payroll": 0.0,
+       "property_tax": 299048.0,
+       "repairs_maintenance": 0.0,
+       "security": 0.0,
+       "service_contracts": 0.0,
+       "utilities": 0.0
+      },
+      "income_sources": {
+       "cam_recovery": "none",
+       "parking_income": "none"
+      },
+      "leasing_commissions": 0.0,
+      "noi": 1000000.0800000001,
+      "other_income": 299048.0,
+      "parking_income": 0.0,
+      "per_sf": {
+       "base_rents": 58.67856354887924,
+       "cash_flow_avail": 58.67856354887925,
+       "egi": 76.22626921722802,
+       "noi": 58.67856354887925,
+       "total_expenses": 17.547705668348787
+      },
+      "replacement_reserve": 0.0,
+      "rev_pct": {
+       "base_rents": 0.7697945098383117,
+       "cam_recovery": 0.0,
+       "other_income": 0.23020549016168823,
+       "parking_income": 0.0
+      },
+      "tenant_improvements": 0.0,
+      "total_expenses": 299048.0,
+      "total_potential": 1299048.08,
+      "vacancy_loss": 0.0,
+      "vacancy_pct": 0.0
+     },
+     "per_sf": {
+      "expense_per_sf": 17.547705668348787,
+      "noi_per_sf": 117.35711770918907,
+      "price_per_sf": 2112.4281187654033,
+      "rent_per_sf_hist": 58.67856354887924,
+      "rent_per_sf_pro": 117.35711770918907
+     },
+     "proforma": {
+      "base_rents": 2000000.0,
+      "cam_recovery": 0.0,
+      "cap_rate": 0.05555555555555555,
+      "capex": 0.0,
+      "cash_flow_avail": 2000000.0,
+      "cash_flow_gross": 2299048.0,
+      "egi": 2299048.0,
+      "exp_pct": {
+       "cam": 0.0,
+       "general_admin": 0.0,
+       "insurance": 0.0,
+       "janitor": 0.0,
+       "landscape": 0.0,
+       "management_fee": 0.0,
+       "payroll": 0.0,
+       "property_tax": 1.0,
+       "repairs_maintenance": 0.0,
+       "security": 0.0,
+       "service_contracts": 0.0,
+       "utilities": 0.0
+      },
+      "expenses": {
+       "cam": 0.0,
+       "general_admin": 0.0,
+       "insurance": 0.0,
+       "janitor": 0.0,
+       "landscape": 0.0,
+       "management_fee": 0.0,
+       "payroll": 0.0,
+       "property_tax": 299048.0,
+       "repairs_maintenance": 0.0,
+       "security": 0.0,
+       "service_contracts": 0.0,
+       "utilities": 0.0
+      },
+      "income_sources": {
+       "cam_recovery": "none",
+       "parking_income": "none"
+      },
+      "leasing_commissions": 0.0,
+      "noi": 2000000.0,
+      "other_income": 299048.0,
+      "parking_income": 0.0,
+      "per_sf": {
+       "base_rents": 117.35711770918907,
+       "cash_flow_avail": 117.35711770918907,
+       "egi": 134.90482337753784,
+       "noi": 117.35711770918907,
+       "total_expenses": 17.547705668348787
+      },
+      "replacement_reserve": 0.0,
+      "rev_pct": {
+       "base_rents": 0.8699252908160248,
+       "cam_recovery": 0.0,
+       "other_income": 0.1300747091839753,
+       "parking_income": 0.0
+      },
+      "tenant_improvements": 0.0,
+      "total_expenses": 299048.0,
+      "total_potential": 2299048.0,
+      "vacancy_loss": 0.0,
+      "vacancy_pct": 0.0
+     },
+     "property": {
+      "address": "39-09 Main St",
+      "buildings": "",
+      "city": "Flushing",
+      "county": "",
+      "floors": "",
+      "land_acres": 0.11,
+      "name": "39-09 Main St",
+      "net_rentable_sf": 17042,
+      "occupancy_as_of": "",
+      "parking_per_1000sf": 0.0,
+      "parking_spaces": 0,
+      "property_type": "Retail",
+      "state": "NY",
+      "year_built": "",
+      "year_renovated": "",
+      "zip": "11354"
+     },
+     "rent_roll": {
+      "occupancy": 1.0,
+      "tenants": [
+       {
+        "annual_cam": 0.0,
+        "annual_parking": 0.0,
+        "annual_per_sf": 58.67856354887924,
+        "annual_rent": 1000000.08,
+        "escalation": "",
+        "expense_structure": "",
+        "lease_end": "",
+        "lease_start": "",
+        "monthly_cam": 0.0,
+        "monthly_parking": 0.0,
+        "monthly_per_sf": 4.889880295739936,
+        "monthly_rent": 83333.34,
+        "pct_of_total_lease": 1.0,
+        "pct_of_total_uw": 1.0,
+        "sf": 17042.0,
+        "suite": "1",
+        "tenant": "Carat & Co",
+        "underwritten_annual": 2000000.0,
+        "uw_per_sf": 117.35711770918907
+       }
+      ],
+      "total_annual_cam": 0.0,
+      "total_annual_lease": 1000000.08,
+      "total_annual_parking": 0.0,
+      "total_annual_uw": 2000000.0,
+      "total_monthly": 83333.34,
+      "total_sf_existing": 17042.0,
+      "total_sf_property": 17042.0,
+      "vacant_sf": 0.0
+     },
+     "tier_s_ok": true
+    }
+   },
+   "metrics": {
+    "annual_cash_flow": 488000.0,
+    "breakeven_occupancy_pct": 78.773822904089,
+    "cap_rate_pct": 5.555555555555555,
+    "cash_to_close": 12084000.0,
+    "coc_pct": 4.038397881496193,
+    "dscr": 1.3227513227513228,
+    "equity_multiple": 1.491715702690689,
+    "irr_pct": 8.938831655906643,
+    "ltv_pct": 70.0,
+    "noi": 2000000.0,
+    "price": 36000000.0,
+    "score": null
+   },
+   "track": "commercial"
+  }
+ ],
+ "POST /api/v2/model/residential": [
+  200,
+  {
+   "detail": {
+    "score": {
+     "checks": [
+      {
+       "label": "储备金 ≥6 个月 PITI",
+       "note": "当前 6.0 个月",
+       "ok": true
+      },
+      {
+       "label": "整套现金流 ≥$300/月",
+       "note": "当前 $418/月",
+       "ok": true
+      },
+      {
+       "label": "CoC ≥12%（A 档 ≥15%）",
+       "note": "当前 67.4%",
+       "ok": true
+      },
+      {
+       "label": "DSCR ≥1.25",
+       "note": "当前 1.59",
+       "ok": true
+      },
+      {
+       "label": "租金有 comps 支撑",
+       "note": "实测 comps",
+       "ok": true
+      },
+      {
+       "label": "净值（负净值挂风险旗，不再单独否决）",
+       "note": "交割净值 $5,437",
+       "ok": true
+      },
+      {
+       "label": "subject-to 首付浮动制（≤10% 正常区间，>10% 需 RE-0 特批）",
+       "note": "当前 3.4%（deal 越好、可承受首付越高）",
+       "ok": true
+      },
+      {
+       "label": "全口径现金需求 cash-to-close（一级字段）",
+       "note": "$13,148 = 首付＋交割费＋初期维修＋储备金；金额硬上限待确认",
+       "ok": true
+      }
+     ],
+     "dimensions": [
+      {
+       "detail": "整套现金流 $418/月，CoC 67.4%，DSCR 1.59",
+       "key": "cashflow",
+       "label": "现金流指标",
+       "points": 26.3,
+       "weight": 30
+      },
+      {
+       "detail": "固定利率 3.07%，剩余 27 年",
+       "key": "loan_terms",
+       "label": "贷款条款质量",
+       "points": 24.8,
+       "weight": 25
+      },
+      {
+       "detail": "首付 3.4%（浮动制：基础 100 分＋现金流强度上浮 10 分；≤10% 为正常区间，deal 越好、可承受首付越高）",
+       "key": "down_payment",
+       "label": "首付比例",
+       "points": 15.0,
+       "weight": 15
+      },
+      {
+       "detail": "人口流入/就业/库存/历史增值四项打分",
+       "key": "market",
+       "label": "市场与升值空间",
+       "points": 10,
+       "weight": 15
+      },
+      {
+       "detail": "无实质风险旗",
+       "key": "risk",
+       "label": "风险（逆向扣分）",
+       "points": 15,
+       "weight": 15
+      }
+     ],
+     "downgrades": [],
+     "grade": "A",
+     "metrics": {
+      "cap_rate": 0.084,
+      "cash_flow_monthly": 417.51,
+      "cash_flow_per_door": 417.51,
+      "cash_invested": 7437.0,
+      "cash_on_cash": 0.6737,
+      "cash_to_close": 13148.32,
+      "down_pct": 0.034,
+      "dscr": 1.595,
+      "egi": 1886.0,
+      "equity": 5437.0,
+      "monthly_pi": 701.89,
+      "noi_monthly": 1119.4,
+      "opex": 766.6,
+      "piti": 951.89,
+      "reserves_cash": 5711.32,
+      "total_cash_required": 13148.32
+     },
+     "structure_label": "Subject-to（承接现有贷款）",
+     "total": 91.1,
+     "vetoes": []
+    },
+    "validated_input": {
+     "balloon_years": null,
+     "capex_pct": 8.0,
+     "closing_costs": 2000.0,
+     "down_payment": 5437.0,
+     "due_on_sale_plan": "可 refi 出来",
+     "exit_backup": "DSCR refi",
+     "exit_primary": "长期持有收租",
+     "fraud_flag": false,
+     "has_discount_hedge": false,
+     "hoa_arrears_severe": false,
+     "hoa_monthly": 0.0,
+     "initial_repairs": 0.0,
+     "insurance_annual": 1200.0,
+     "insurance_available": true,
+     "is_assumption": false,
+     "loan_balance": 154463.0,
+     "maint_pct": 8.0,
+     "market_appreciation": 2,
+     "market_employment": 3,
+     "market_inventory": 2,
+     "market_pop": 3,
+     "mgmt_pct": 10.0,
+     "monthly_rent": 2050.0,
+     "other_income_monthly": 0.0,
+     "other_liens": 0.0,
+     "price": 159900.0,
+     "rate": 3.07,
+     "rate_type": "fixed",
+     "rent_source": "comps_verified",
+     "reserves_months_piti": 6.0,
+     "risk_flags": [],
+     "seller_delinquent_days": 0,
+     "seller_signed_auth_release": true,
+     "structure": "subject_to",
+     "taxes_annual": 1800.0,
+     "term_years_remaining": 27.0,
+     "title_defect": false,
+     "units": 1,
+     "utilities_owner_monthly": 0.0,
+     "vacancy_pct": 8.0
+    }
+   },
+   "metrics": {
+    "annual_cash_flow": 5010.12,
+    "breakeven_occupancy_pct": null,
+    "cap_rate_pct": 8.4,
+    "cash_to_close": 13148.32,
+    "coc_pct": 67.36999999999999,
+    "dscr": 1.595,
+    "equity_multiple": null,
+    "irr_pct": null,
+    "ltv_pct": 96.59974984365228,
+    "noi": 13432.800000000001,
+    "price": 159900.0,
+    "score": 91.1
+   },
+   "track": "residential"
+  }
+ ]
+}

@@ -1,0 +1,5 @@
+Nunito Sans — Copyright 2016 The Nunito Sans Project Authors (https://github.com/Fonthausen/NunitoSans)
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+Full license text: https://openfontlicense.org/open-font-license-official-text/
+Files are byte-identical to those served by https://vertciti.com/assets/site/fonts/ (Google Fonts build, v3.101).

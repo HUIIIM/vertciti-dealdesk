@@ -8,7 +8,6 @@ A5 IRR 不收敛 → None（禁 0.0 冒充）；/api/com/sensitivity 的 irr 格
 A6 comps noi 缺失 → null（N/A 链），禁 || 0 回退。
 """
 
-import re
 
 import pytest
 from fastapi.testclient import TestClient

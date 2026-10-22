@@ -1,7 +1,7 @@
 """EchoWatch → 市场调查候选证据：未配置/命中/失败三种情况都如实返回，绝不编造."""
 import httpx
 
-from app import echowatch_bridge as eb
+from app.services import echowatch_bridge as eb
 
 
 def _client(handler):
@@ -63,3 +63,17 @@ def test_route(monkeypatch):
     monkeypatch.delenv("ECHOWATCH_URL", raising=False)
     r = TestClient(app).get("/api/wb/research/evidence?market_key=phoenix")
     assert r.status_code == 200 and r.json()["ok"] is False
+    assert TestClient(app).get("/api/wb/research/evidence?area=" + "x" * 121).status_code == 422
+
+
+def test_area_overrides_market(monkeypatch):
+    monkeypatch.setenv("ECHOWATCH_URL", "https://ew.test")
+    monkeypatch.setenv("ECHOWATCH_TOKEN", "ew_x")
+    qs = []
+
+    def handler(req):
+        qs.append(req.url.params["q"])
+        return httpx.Response(200, json={"data": []})
+
+    eb.fetch_evidence("tampa", client=_client(handler), area="Flushing NY")
+    assert qs[0] == "Flushing NY construction" and all(q.startswith("Flushing NY ") for q in qs)

@@ -1,0 +1,8464 @@
+{
+ "components": {
+  "schemas": {
+   "ActualIn": {
+    "additionalProperties": false,
+    "properties": {
+     "capex": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Capex"
+     },
+     "cash_flow": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Cash Flow"
+     },
+     "debt_service": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Debt Service"
+     },
+     "noi": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Noi"
+     },
+     "occupancy_pct": {
+      "anyOf": [
+       {
+        "maximum": 100.0,
+        "minimum": 0.0,
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Occupancy Pct"
+     },
+     "period": {
+      "pattern": "^\\d{4}(-\\d{2})?$",
+      "title": "Period",
+      "type": "string"
+     }
+    },
+    "required": [
+     "period"
+    ],
+    "title": "ActualIn",
+    "type": "object"
+   },
+   "ActualOut": {
+    "additionalProperties": true,
+    "properties": {
+     "capex": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Capex"
+     },
+     "cash_flow": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Cash Flow"
+     },
+     "debt_service": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Debt Service"
+     },
+     "noi": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Noi"
+     },
+     "occupancy_pct": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Occupancy Pct"
+     },
+     "period": {
+      "title": "Period",
+      "type": "string"
+     }
+    },
+    "required": [
+     "period"
+    ],
+    "title": "ActualOut",
+    "type": "object"
+   },
+   "ApprovalDecide": {
+    "additionalProperties": false,
+    "properties": {
+     "approve": {
+      "title": "Approve",
+      "type": "boolean"
+     },
+     "note": {
+      "default": "",
+      "maxLength": 2000,
+      "title": "Note",
+      "type": "string"
+     }
+    },
+    "required": [
+     "approve"
+    ],
+    "title": "ApprovalDecide",
+    "type": "object"
+   },
+   "ApprovalIn": {
+    "additionalProperties": false,
+    "properties": {
+     "amount": {
+      "anyOf": [
+       {
+        "exclusiveMinimum": 0.0,
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Amount"
+     },
+     "kind": {
+      "enum": [
+       "payment",
+       "general",
+       "stage_override"
+      ],
+      "title": "Kind",
+      "type": "string"
+     },
+     "note": {
+      "default": "",
+      "maxLength": 2000,
+      "title": "Note",
+      "type": "string"
+     },
+     "title": {
+      "maxLength": 300,
+      "minLength": 1,
+      "title": "Title",
+      "type": "string"
+     }
+    },
+    "required": [
+     "kind",
+     "title"
+    ],
+    "title": "ApprovalIn",
+    "type": "object"
+   },
+   "ApprovalOut": {
+    "additionalProperties": true,
+    "properties": {
+     "amount": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Amount"
+     },
+     "created_by": {
+      "title": "Created By",
+      "type": "string"
+     },
+     "deal_id": {
+      "title": "Deal Id",
+      "type": "integer"
+     },
+     "decided_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Decided At"
+     },
+     "decided_by": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Decided By"
+     },
+     "id": {
+      "title": "Id",
+      "type": "integer"
+     },
+     "kind": {
+      "enum": [
+       "payment",
+       "general",
+       "stage_override"
+      ],
+      "title": "Kind",
+      "type": "string"
+     },
+     "note": {
+      "title": "Note",
+      "type": "string"
+     },
+     "status": {
+      "enum": [
+       "pending",
+       "approved",
+       "rejected"
+      ],
+      "title": "Status",
+      "type": "string"
+     },
+     "title": {
+      "title": "Title",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "deal_id",
+     "kind",
+     "title",
+     "amount",
+     "status",
+     "created_by",
+     "decided_by",
+     "decided_at",
+     "note"
+    ],
+    "title": "ApprovalOut",
+    "type": "object"
+   },
+   "AssumptionOut": {
+    "additionalProperties": true,
+    "properties": {
+     "key": {
+      "title": "Key",
+      "type": "string"
+     },
+     "label": {
+      "title": "Label",
+      "type": "string"
+     },
+     "paths": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Paths",
+      "type": "array"
+     },
+     "source_hint": {
+      "title": "Source Hint",
+      "type": "string"
+     }
+    },
+    "required": [
+     "key",
+     "label",
+     "paths",
+     "source_hint"
+    ],
+    "title": "AssumptionOut",
+    "type": "object"
+   },
+   "AttributionOut": {
+    "additionalProperties": true,
+    "properties": {
+     "actual_implied": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Actual Implied"
+     },
+     "available": {
+      "title": "Available",
+      "type": "boolean"
+     },
+     "metric": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Metric"
+     },
+     "note": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Note"
+     },
+     "reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reason"
+     },
+     "steps": {
+      "anyOf": [
+       {
+        "items": {
+         "$ref": "#/components/schemas/AttributionStepOut"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Steps"
+     },
+     "total_pct_points": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Total Pct Points"
+     },
+     "underwritten": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Underwritten"
+     }
+    },
+    "required": [
+     "available"
+    ],
+    "title": "AttributionOut",
+    "type": "object"
+   },
+   "AttributionStepOut": {
+    "additionalProperties": true,
+    "properties": {
+     "actual": {
+      "title": "Actual"
+     },
+     "contribution_pct_points": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Contribution Pct Points"
+     },
+     "key": {
+      "title": "Key",
+      "type": "string"
+     },
+     "label": {
+      "title": "Label",
+      "type": "string"
+     },
+     "underwritten": {
+      "title": "Underwritten"
+     }
+    },
+    "required": [
+     "key",
+     "label",
+     "contribution_pct_points"
+    ],
+    "title": "AttributionStepOut",
+    "type": "object"
+   },
+   "AuditOut": {
+    "additionalProperties": true,
+    "properties": {
+     "action": {
+      "title": "Action",
+      "type": "string"
+     },
+     "actor": {
+      "title": "Actor",
+      "type": "string"
+     },
+     "after": {
+      "title": "After"
+     },
+     "at": {
+      "title": "At",
+      "type": "string"
+     },
+     "before": {
+      "title": "Before"
+     },
+     "entity": {
+      "title": "Entity",
+      "type": "string"
+     },
+     "entity_id": {
+      "title": "Entity Id",
+      "type": "string"
+     },
+     "id": {
+      "title": "Id",
+      "type": "integer"
+     },
+     "request_id": {
+      "title": "Request Id",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "entity",
+     "entity_id",
+     "action",
+     "actor",
+     "request_id",
+     "at"
+    ],
+    "title": "AuditOut",
+    "type": "object"
+   },
+   "Body_rentroll_parse_api_uw_rentroll_parse_post": {
+    "properties": {
+     "file": {
+      "anyOf": [
+       {
+        "contentMediaType": "application/octet-stream",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "File"
+     }
+    },
+    "title": "Body_rentroll_parse_api_uw_rentroll_parse_post",
+    "type": "object"
+   },
+   "Body_upload_document_api_v2_deals__deal_id__documents_post": {
+    "properties": {
+     "category": {
+      "default": "other",
+      "maxLength": 40,
+      "title": "Category",
+      "type": "string"
+     },
+     "file": {
+      "contentMediaType": "application/octet-stream",
+      "title": "File",
+      "type": "string"
+     }
+    },
+    "required": [
+     "file"
+    ],
+    "title": "Body_upload_document_api_v2_deals__deal_id__documents_post",
+    "type": "object"
+   },
+   "Body_uw_commercial_intake_image_api_uw_commercial_intake_image_post": {
+    "properties": {
+     "file": {
+      "contentMediaType": "application/octet-stream",
+      "title": "File",
+      "type": "string"
+     }
+    },
+    "required": [
+     "file"
+    ],
+    "title": "Body_uw_commercial_intake_image_api_uw_commercial_intake_image_post",
+    "type": "object"
+   },
+   "Body_uw_commercial_intake_pdf_api_uw_commercial_intake_pdf_post": {
+    "properties": {
+     "file": {
+      "contentMediaType": "application/octet-stream",
+      "title": "File",
+      "type": "string"
+     }
+    },
+    "required": [
+     "file"
+    ],
+    "title": "Body_uw_commercial_intake_pdf_api_uw_commercial_intake_pdf_post",
+    "type": "object"
+   },
+   "Body_verify_api_v2_committee_verify_post": {
+    "properties": {
+     "file": {
+      "contentMediaType": "application/octet-stream",
+      "title": "File",
+      "type": "string"
+     }
+    },
+    "required": [
+     "file"
+    ],
+    "title": "Body_verify_api_v2_committee_verify_post",
+    "type": "object"
+   },
+   "Body_wb_intake_image_api_wb_intake_image_post": {
+    "properties": {
+     "file": {
+      "contentMediaType": "application/octet-stream",
+      "title": "File",
+      "type": "string"
+     }
+    },
+    "required": [
+     "file"
+    ],
+    "title": "Body_wb_intake_image_api_wb_intake_image_post",
+    "type": "object"
+   },
+   "Body_wb_intake_pdf_api_wb_intake_pdf_post": {
+    "properties": {
+     "file": {
+      "contentMediaType": "application/octet-stream",
+      "title": "File",
+      "type": "string"
+     }
+    },
+    "required": [
+     "file"
+    ],
+    "title": "Body_wb_intake_pdf_api_wb_intake_pdf_post",
+    "type": "object"
+   },
+   "CandidateOut": {
+    "additionalProperties": true,
+    "description": "提取 / 搜集到的一个候选值：path 为空表示只作参考（不是承销输入或值不可用）。",
+    "properties": {
+     "confidence": {
+      "enum": [
+       "high",
+       "medium",
+       "low"
+      ],
+      "title": "Confidence",
+      "type": "string"
+     },
+     "confidence_label": {
+      "title": "Confidence Label",
+      "type": "string"
+     },
+     "display": {
+      "title": "Display",
+      "type": "string"
+     },
+     "key": {
+      "title": "Key",
+      "type": "string"
+     },
+     "label": {
+      "title": "Label",
+      "type": "string"
+     },
+     "method": {
+      "enum": [
+       "pdf",
+       "api"
+      ],
+      "title": "Method",
+      "type": "string"
+     },
+     "note": {
+      "title": "Note",
+      "type": "string"
+     },
+     "page": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Page"
+     },
+     "path": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Path"
+     },
+     "seller_claimed": {
+      "title": "Seller Claimed",
+      "type": "boolean"
+     },
+     "source": {
+      "title": "Source",
+      "type": "string"
+     },
+     "source_url": {
+      "title": "Source Url",
+      "type": "string"
+     },
+     "value": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "integer"
+       },
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Value"
+     }
+    },
+    "required": [
+     "key",
+     "label",
+     "path",
+     "value",
+     "display",
+     "page",
+     "source",
+     "source_url",
+     "confidence",
+     "confidence_label",
+     "seller_claimed",
+     "note",
+     "method"
+    ],
+    "title": "CandidateOut",
+    "type": "object"
+   },
+   "CatalogOut": {
+    "additionalProperties": true,
+    "properties": {
+     "assumptions": {
+      "additionalProperties": {
+       "items": {
+        "$ref": "#/components/schemas/AssumptionOut"
+       },
+       "type": "array"
+      },
+      "title": "Assumptions",
+      "type": "object"
+     },
+     "kill_criteria_defaults": {
+      "additionalProperties": {
+       "items": {
+        "$ref": "#/components/schemas/KillCriterion"
+       },
+       "type": "array"
+      },
+      "title": "Kill Criteria Defaults",
+      "type": "object"
+     },
+     "metrics": {
+      "additionalProperties": {
+       "$ref": "#/components/schemas/MetricMetaOut"
+      },
+      "title": "Metrics",
+      "type": "object"
+     },
+     "primary_metric": {
+      "additionalProperties": {
+       "type": "string"
+      },
+      "title": "Primary Metric",
+      "type": "object"
+     },
+     "scenario_defaults": {
+      "additionalProperties": {
+       "items": {
+        "$ref": "#/components/schemas/Scenario"
+       },
+       "type": "array"
+      },
+      "title": "Scenario Defaults",
+      "type": "object"
+     }
+    },
+    "required": [
+     "metrics",
+     "primary_metric",
+     "assumptions",
+     "kill_criteria_defaults",
+     "scenario_defaults"
+    ],
+    "title": "CatalogOut",
+    "type": "object"
+   },
+   "CommitteeStatusOut": {
+    "additionalProperties": true,
+    "properties": {
+     "rules": {
+      "title": "Rules",
+      "type": "string"
+     },
+     "tally": {
+      "$ref": "#/components/schemas/TallyOut"
+     },
+     "version_id": {
+      "title": "Version Id",
+      "type": "integer"
+     },
+     "votes": {
+      "items": {
+       "$ref": "#/components/schemas/VoteOut"
+      },
+      "title": "Votes",
+      "type": "array"
+     }
+    },
+    "required": [
+     "version_id",
+     "votes",
+     "tally",
+     "rules"
+    ],
+    "title": "CommitteeStatusOut",
+    "type": "object"
+   },
+   "CompareDealOut": {
+    "additionalProperties": true,
+    "properties": {
+     "deal": {
+      "$ref": "#/components/schemas/DealOut"
+     },
+     "kill": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/KillEvalOut"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "metrics": {
+      "additionalProperties": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "title": "Metrics",
+      "type": "object"
+     },
+     "version": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Version"
+     }
+    },
+    "required": [
+     "deal",
+     "metrics",
+     "version",
+     "kill"
+    ],
+    "title": "CompareDealOut",
+    "type": "object"
+   },
+   "CompareOut": {
+    "additionalProperties": true,
+    "properties": {
+     "best": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "title": "Best",
+      "type": "object"
+     },
+     "deals": {
+      "items": {
+       "$ref": "#/components/schemas/CompareDealOut"
+      },
+      "title": "Deals",
+      "type": "array"
+     }
+    },
+    "required": [
+     "deals",
+     "best"
+    ],
+    "title": "CompareOut",
+    "type": "object"
+   },
+   "ConflictOut": {
+    "additionalProperties": true,
+    "properties": {
+     "deal_id": {
+      "title": "Deal Id",
+      "type": "integer"
+     },
+     "diff_pct": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Diff Pct"
+     },
+     "field": {
+      "title": "Field",
+      "type": "string"
+     },
+     "id": {
+      "title": "Id",
+      "type": "integer"
+     },
+     "resolution_note": {
+      "title": "Resolution Note",
+      "type": "string"
+     },
+     "resolved_by": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Resolved By"
+     },
+     "resolved_value": {
+      "title": "Resolved Value"
+     },
+     "source_a": {
+      "title": "Source A",
+      "type": "string"
+     },
+     "source_b": {
+      "title": "Source B",
+      "type": "string"
+     },
+     "status": {
+      "enum": [
+       "open",
+       "resolved"
+      ],
+      "title": "Status",
+      "type": "string"
+     },
+     "value_a": {
+      "title": "Value A"
+     },
+     "value_b": {
+      "title": "Value B"
+     }
+    },
+    "required": [
+     "id",
+     "deal_id",
+     "field",
+     "source_a",
+     "source_b",
+     "diff_pct",
+     "status",
+     "resolution_note",
+     "resolved_by"
+    ],
+    "title": "ConflictOut",
+    "type": "object"
+   },
+   "ConflictResolve": {
+    "additionalProperties": false,
+    "properties": {
+     "note": {
+      "maxLength": 2000,
+      "minLength": 1,
+      "title": "Note",
+      "type": "string"
+     },
+     "value": {
+      "title": "Value"
+     }
+    },
+    "required": [
+     "value",
+     "note"
+    ],
+    "title": "ConflictResolve",
+    "type": "object"
+   },
+   "ConstraintOut": {
+    "additionalProperties": true,
+    "properties": {
+     "label": {
+      "title": "Label",
+      "type": "string"
+     },
+     "metric": {
+      "title": "Metric",
+      "type": "string"
+     },
+     "price": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Price"
+     },
+     "reason": {
+      "title": "Reason",
+      "type": "string"
+     },
+     "source": {
+      "enum": [
+       "target",
+       "kill_criteria"
+      ],
+      "title": "Source",
+      "type": "string"
+     },
+     "status": {
+      "enum": [
+       "ok",
+       "above_range",
+       "infeasible",
+       "unknown"
+      ],
+      "title": "Status",
+      "type": "string"
+     }
+    },
+    "required": [
+     "source",
+     "metric",
+     "label",
+     "price",
+     "status",
+     "reason"
+    ],
+    "title": "ConstraintOut",
+    "type": "object"
+   },
+   "DataSourceOut": {
+    "additionalProperties": true,
+    "properties": {
+     "configured": {
+      "title": "Configured",
+      "type": "boolean"
+     },
+     "detail": {
+      "title": "Detail",
+      "type": "string"
+     },
+     "key": {
+      "title": "Key",
+      "type": "string"
+     },
+     "label": {
+      "title": "Label",
+      "type": "string"
+     }
+    },
+    "required": [
+     "key",
+     "label",
+     "configured",
+     "detail"
+    ],
+    "title": "DataSourceOut",
+    "type": "object"
+   },
+   "DealCreate": {
+    "additionalProperties": false,
+    "properties": {
+     "address": {
+      "default": "",
+      "maxLength": 300,
+      "title": "Address",
+      "type": "string"
+     },
+     "asking_price": {
+      "anyOf": [
+       {
+        "minimum": 0.0,
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Asking Price"
+     },
+     "kill_criteria": {
+      "description": "淘汰条件：先写“什么情况下放弃”，再开始承销",
+      "items": {
+       "$ref": "#/components/schemas/KillCriterion"
+      },
+      "maxItems": 20,
+      "title": "Kill Criteria",
+      "type": "array"
+     },
+     "name": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+     },
+     "tags": {
+      "items": {
+       "maxLength": 40,
+       "minLength": 1,
+       "type": "string"
+      },
+      "maxItems": 20,
+      "title": "Tags",
+      "type": "array"
+     },
+     "track": {
+      "enum": [
+       "residential",
+       "commercial"
+      ],
+      "title": "Track",
+      "type": "string"
+     }
+    },
+    "required": [
+     "name",
+     "track"
+    ],
+    "title": "DealCreate",
+    "type": "object"
+   },
+   "DealListItem": {
+    "additionalProperties": true,
+    "properties": {
+     "address": {
+      "title": "Address",
+      "type": "string"
+     },
+     "asking_price": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Asking Price"
+     },
+     "created_at": {
+      "title": "Created At",
+      "type": "string"
+     },
+     "created_by": {
+      "title": "Created By",
+      "type": "string"
+     },
+     "current_version_id": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Current Version Id"
+     },
+     "id": {
+      "title": "Id",
+      "type": "integer"
+     },
+     "kill": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Kill"
+     },
+     "kill_criteria": {
+      "items": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "title": "Kill Criteria",
+      "type": "array"
+     },
+     "metrics": {
+      "additionalProperties": true,
+      "title": "Metrics",
+      "type": "object"
+     },
+     "name": {
+      "title": "Name",
+      "type": "string"
+     },
+     "stage": {
+      "title": "Stage",
+      "type": "string"
+     },
+     "stage_index": {
+      "title": "Stage Index",
+      "type": "integer"
+     },
+     "stage_label": {
+      "title": "Stage Label",
+      "type": "string"
+     },
+     "status": {
+      "title": "Status",
+      "type": "string"
+     },
+     "tags": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Tags",
+      "type": "array"
+     },
+     "track": {
+      "enum": [
+       "residential",
+       "commercial"
+      ],
+      "title": "Track",
+      "type": "string"
+     },
+     "updated_at": {
+      "title": "Updated At",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "name",
+     "address",
+     "track",
+     "stage",
+     "stage_label",
+     "status",
+     "asking_price",
+     "current_version_id",
+     "kill_criteria",
+     "tags",
+     "created_at",
+     "updated_at",
+     "created_by",
+     "metrics",
+     "kill",
+     "stage_index"
+    ],
+    "title": "DealListItem",
+    "type": "object"
+   },
+   "DealOut": {
+    "additionalProperties": true,
+    "properties": {
+     "address": {
+      "title": "Address",
+      "type": "string"
+     },
+     "asking_price": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Asking Price"
+     },
+     "created_at": {
+      "title": "Created At",
+      "type": "string"
+     },
+     "created_by": {
+      "title": "Created By",
+      "type": "string"
+     },
+     "current_version_id": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Current Version Id"
+     },
+     "id": {
+      "title": "Id",
+      "type": "integer"
+     },
+     "kill_criteria": {
+      "items": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "title": "Kill Criteria",
+      "type": "array"
+     },
+     "name": {
+      "title": "Name",
+      "type": "string"
+     },
+     "stage": {
+      "title": "Stage",
+      "type": "string"
+     },
+     "stage_label": {
+      "title": "Stage Label",
+      "type": "string"
+     },
+     "status": {
+      "title": "Status",
+      "type": "string"
+     },
+     "tags": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Tags",
+      "type": "array"
+     },
+     "track": {
+      "enum": [
+       "residential",
+       "commercial"
+      ],
+      "title": "Track",
+      "type": "string"
+     },
+     "updated_at": {
+      "title": "Updated At",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "name",
+     "address",
+     "track",
+     "stage",
+     "stage_label",
+     "status",
+     "asking_price",
+     "current_version_id",
+     "kill_criteria",
+     "tags",
+     "created_at",
+     "updated_at",
+     "created_by"
+    ],
+    "title": "DealOut",
+    "type": "object"
+   },
+   "DealPatch": {
+    "additionalProperties": false,
+    "description": "只改传了的字段。name / kill_criteria / tags 显式传 null 是错误（清空淘汰条件请传 []，不能“误清空”）。",
+    "properties": {
+     "address": {
+      "anyOf": [
+       {
+        "maxLength": 300,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Address"
+     },
+     "asking_price": {
+      "anyOf": [
+       {
+        "minimum": 0.0,
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Asking Price"
+     },
+     "kill_criteria": {
+      "anyOf": [
+       {
+        "items": {
+         "$ref": "#/components/schemas/KillCriterion"
+        },
+        "maxItems": 20,
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Kill Criteria"
+     },
+     "name": {
+      "anyOf": [
+       {
+        "maxLength": 200,
+        "minLength": 1,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Name"
+     },
+     "tags": {
+      "anyOf": [
+       {
+        "items": {
+         "maxLength": 40,
+         "minLength": 1,
+         "type": "string"
+        },
+        "maxItems": 20,
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Tags"
+     }
+    },
+    "title": "DealPatch",
+    "type": "object"
+   },
+   "DecisionIn": {
+    "additionalProperties": false,
+    "properties": {
+     "rationale": {
+      "maxLength": 5000,
+      "minLength": 10,
+      "title": "Rationale",
+      "type": "string"
+     },
+     "verdict": {
+      "enum": [
+       "BUY",
+       "HOLD",
+       "PASS"
+      ],
+      "title": "Verdict",
+      "type": "string"
+     }
+    },
+    "required": [
+     "verdict",
+     "rationale"
+    ],
+    "title": "DecisionIn",
+    "type": "object"
+   },
+   "DecisionOut": {
+    "additionalProperties": true,
+    "properties": {
+     "created_at": {
+      "title": "Created At",
+      "type": "string"
+     },
+     "created_by": {
+      "title": "Created By",
+      "type": "string"
+     },
+     "deal_id": {
+      "title": "Deal Id",
+      "type": "integer"
+     },
+     "id": {
+      "title": "Id",
+      "type": "integer"
+     },
+     "rationale": {
+      "title": "Rationale",
+      "type": "string"
+     },
+     "run_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Run Id"
+     },
+     "snapshot": {
+      "additionalProperties": true,
+      "title": "Snapshot",
+      "type": "object"
+     },
+     "stage": {
+      "title": "Stage",
+      "type": "string"
+     },
+     "verdict": {
+      "enum": [
+       "BUY",
+       "HOLD",
+       "PASS"
+      ],
+      "title": "Verdict",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "deal_id",
+     "verdict",
+     "rationale",
+     "snapshot",
+     "run_id",
+     "stage",
+     "created_at",
+     "created_by"
+    ],
+    "title": "DecisionOut",
+    "type": "object"
+   },
+   "DevilsMemoOut": {
+    "additionalProperties": true,
+    "properties": {
+     "headline": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Headline"
+     },
+     "high": {
+      "title": "High",
+      "type": "integer"
+     },
+     "note": {
+      "title": "Note",
+      "type": "string"
+     },
+     "points": {
+      "items": {
+       "$ref": "#/components/schemas/MemoPointOut"
+      },
+      "title": "Points",
+      "type": "array"
+     },
+     "run_id": {
+      "title": "Run Id",
+      "type": "string"
+     },
+     "version_id": {
+      "title": "Version Id",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "headline",
+     "points",
+     "high",
+     "note",
+     "version_id",
+     "run_id"
+    ],
+    "title": "DevilsMemoOut",
+    "type": "object"
+   },
+   "DiffOut": {
+    "additionalProperties": true,
+    "properties": {
+     "a": {
+      "$ref": "#/components/schemas/DiffSideOut"
+     },
+     "b": {
+      "$ref": "#/components/schemas/DiffSideOut"
+     },
+     "changed_inputs": {
+      "title": "Changed Inputs",
+      "type": "integer"
+     },
+     "changed_metrics": {
+      "title": "Changed Metrics",
+      "type": "integer"
+     },
+     "inputs": {
+      "items": {
+       "$ref": "#/components/schemas/DiffRowOut"
+      },
+      "title": "Inputs",
+      "type": "array"
+     },
+     "metrics": {
+      "items": {
+       "$ref": "#/components/schemas/DiffRowOut"
+      },
+      "title": "Metrics",
+      "type": "array"
+     }
+    },
+    "required": [
+     "a",
+     "b",
+     "inputs",
+     "metrics",
+     "changed_inputs",
+     "changed_metrics"
+    ],
+    "title": "DiffOut",
+    "type": "object"
+   },
+   "DiffRowOut": {
+    "additionalProperties": true,
+    "properties": {
+     "after": {
+      "title": "After"
+     },
+     "before": {
+      "title": "Before"
+     },
+     "delta": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Delta"
+     },
+     "delta_pct": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Delta Pct"
+     },
+     "kind": {
+      "enum": [
+       "added",
+       "removed",
+       "changed"
+      ],
+      "title": "Kind",
+      "type": "string"
+     },
+     "path": {
+      "title": "Path",
+      "type": "string"
+     }
+    },
+    "required": [
+     "path",
+     "kind"
+    ],
+    "title": "DiffRowOut",
+    "type": "object"
+   },
+   "DiffSideOut": {
+    "additionalProperties": true,
+    "properties": {
+     "id": {
+      "title": "Id",
+      "type": "integer"
+     },
+     "label": {
+      "title": "Label",
+      "type": "string"
+     },
+     "run_id": {
+      "title": "Run Id",
+      "type": "string"
+     },
+     "version_no": {
+      "title": "Version No",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "id",
+     "version_no",
+     "label",
+     "run_id"
+    ],
+    "title": "DiffSideOut",
+    "type": "object"
+   },
+   "DocOut": {
+    "additionalProperties": true,
+    "properties": {
+     "category": {
+      "title": "Category",
+      "type": "string"
+     },
+     "content_type": {
+      "title": "Content Type",
+      "type": "string"
+     },
+     "created_at": {
+      "title": "Created At",
+      "type": "string"
+     },
+     "created_by": {
+      "title": "Created By",
+      "type": "string"
+     },
+     "deal_id": {
+      "title": "Deal Id",
+      "type": "integer"
+     },
+     "filename": {
+      "title": "Filename",
+      "type": "string"
+     },
+     "id": {
+      "title": "Id",
+      "type": "integer"
+     },
+     "sha256": {
+      "title": "Sha256",
+      "type": "string"
+     },
+     "size": {
+      "title": "Size",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "id",
+     "deal_id",
+     "filename",
+     "content_type",
+     "size",
+     "sha256",
+     "category",
+     "created_at",
+     "created_by"
+    ],
+    "title": "DocOut",
+    "type": "object"
+   },
+   "EventOut": {
+    "additionalProperties": true,
+    "properties": {
+     "created_at": {
+      "title": "Created At",
+      "type": "string"
+     },
+     "created_by": {
+      "title": "Created By",
+      "type": "string"
+     },
+     "deal_id": {
+      "title": "Deal Id",
+      "type": "integer"
+     },
+     "id": {
+      "title": "Id",
+      "type": "integer"
+     },
+     "kind": {
+      "title": "Kind",
+      "type": "string"
+     },
+     "payload": {
+      "additionalProperties": true,
+      "title": "Payload",
+      "type": "object"
+     }
+    },
+    "required": [
+     "id",
+     "deal_id",
+     "kind",
+     "payload",
+     "created_at",
+     "created_by"
+    ],
+    "title": "EventOut",
+    "type": "object"
+   },
+   "EvidenceIn": {
+    "additionalProperties": false,
+    "properties": {
+     "assumption_source": {
+      "default": "document",
+      "enum": [
+       "document",
+       "historical",
+       "benchmark",
+       "comps",
+       "analyst"
+      ],
+      "title": "Assumption Source",
+      "type": "string"
+     },
+     "confidence": {
+      "enum": [
+       "high",
+       "medium",
+       "low"
+      ],
+      "title": "Confidence",
+      "type": "string"
+     },
+     "document_id": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Document Id"
+     },
+     "evidence_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "证据日期（ISO 8601）；市场数据据此判断新鲜度",
+      "title": "Evidence At"
+     },
+     "field": {
+      "description": "输入路径，如 analysis.exit_cap_rate",
+      "maxLength": 160,
+      "minLength": 1,
+      "title": "Field",
+      "type": "string"
+     },
+     "market_data": {
+      "default": false,
+      "title": "Market Data",
+      "type": "boolean"
+     },
+     "method": {
+      "enum": [
+       "manual",
+       "ocr",
+       "api",
+       "pdf",
+       "calc",
+       "import"
+      ],
+      "title": "Method",
+      "type": "string"
+     },
+     "note": {
+      "default": "",
+      "maxLength": 2000,
+      "title": "Note",
+      "type": "string"
+     },
+     "page": {
+      "anyOf": [
+       {
+        "minimum": 1.0,
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Page"
+     },
+     "source": {
+      "maxLength": 300,
+      "minLength": 1,
+      "title": "Source",
+      "type": "string"
+     },
+     "value": {
+      "title": "Value"
+     }
+    },
+    "required": [
+     "field",
+     "source",
+     "method",
+     "confidence"
+    ],
+    "title": "EvidenceIn",
+    "type": "object"
+   },
+   "EvidenceOut": {
+    "additionalProperties": true,
+    "properties": {
+     "conflict": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Conflict"
+     },
+     "passport": {
+      "$ref": "#/components/schemas/PassportOut"
+     }
+    },
+    "required": [
+     "passport",
+     "conflict"
+    ],
+    "title": "EvidenceOut",
+    "type": "object"
+   },
+   "ExtractOut": {
+    "additionalProperties": true,
+    "properties": {
+     "candidates": {
+      "items": {
+       "$ref": "#/components/schemas/CandidateOut"
+      },
+      "title": "Candidates",
+      "type": "array"
+     },
+     "document_id": {
+      "title": "Document Id",
+      "type": "integer"
+     },
+     "filename": {
+      "title": "Filename",
+      "type": "string"
+     },
+     "notice": {
+      "title": "Notice",
+      "type": "string"
+     },
+     "tenants": {
+      "items": {
+       "$ref": "#/components/schemas/ExtractedTenantOut"
+      },
+      "title": "Tenants",
+      "type": "array"
+     },
+     "track": {
+      "enum": [
+       "residential",
+       "commercial"
+      ],
+      "title": "Track",
+      "type": "string"
+     }
+    },
+    "required": [
+     "document_id",
+     "filename",
+     "track",
+     "candidates",
+     "tenants",
+     "notice"
+    ],
+    "title": "ExtractOut",
+    "type": "object"
+   },
+   "ExtractedTenantOut": {
+    "additionalProperties": true,
+    "properties": {
+     "monthly_rent": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Monthly Rent"
+     },
+     "page": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Page"
+     },
+     "sf": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Sf"
+     },
+     "suite": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Suite"
+     },
+     "tenant": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Tenant"
+     }
+    },
+    "title": "ExtractedTenantOut",
+    "type": "object"
+   },
+   "GateCheck": {
+    "additionalProperties": true,
+    "properties": {
+     "detail": {
+      "title": "Detail",
+      "type": "string"
+     },
+     "key": {
+      "title": "Key",
+      "type": "string"
+     },
+     "label": {
+      "title": "Label",
+      "type": "string"
+     },
+     "ok": {
+      "title": "Ok",
+      "type": "boolean"
+     },
+     "status": {
+      "enum": [
+       "verified",
+       "building",
+       "planned",
+       "risk"
+      ],
+      "title": "Status",
+      "type": "string"
+     },
+     "status_label": {
+      "title": "Status Label",
+      "type": "string"
+     }
+    },
+    "required": [
+     "key",
+     "label",
+     "status",
+     "status_label",
+     "detail",
+     "ok"
+    ],
+    "title": "GateCheck",
+    "type": "object"
+   },
+   "GateOut": {
+    "additionalProperties": true,
+    "properties": {
+     "allowed": {
+      "title": "Allowed",
+      "type": "boolean"
+     },
+     "checks": {
+      "items": {
+       "$ref": "#/components/schemas/GateCheck"
+      },
+      "title": "Checks",
+      "type": "array"
+     },
+     "direction": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Direction"
+     },
+     "reason": {
+      "default": "",
+      "title": "Reason",
+      "type": "string"
+     }
+    },
+    "required": [
+     "allowed"
+    ],
+    "title": "GateOut",
+    "type": "object"
+   },
+   "Generic": {
+    "additionalProperties": true,
+    "description": "结构较深的分析结果（红队、情景、反推、对比、归因）：字段见各端点说明。",
+    "properties": {},
+    "title": "Generic",
+    "type": "object"
+   },
+   "HTTPValidationError": {
+    "properties": {
+     "detail": {
+      "items": {
+       "$ref": "#/components/schemas/ValidationError"
+      },
+      "title": "Detail",
+      "type": "array"
+     }
+    },
+    "title": "HTTPValidationError",
+    "type": "object"
+   },
+   "HealthDbOut": {
+    "additionalProperties": true,
+    "properties": {
+     "error": {
+      "title": "Error",
+      "type": "string"
+     },
+     "kind": {
+      "enum": [
+       "postgres",
+       "sqlite"
+      ],
+      "title": "Kind",
+      "type": "string"
+     },
+     "ok": {
+      "title": "Ok",
+      "type": "boolean"
+     },
+     "revision": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Revision"
+     }
+    },
+    "required": [
+     "ok",
+     "revision",
+     "kind",
+     "error"
+    ],
+    "title": "HealthDbOut",
+    "type": "object"
+   },
+   "HealthOut": {
+    "additionalProperties": true,
+    "properties": {
+     "auth": {
+      "enum": [
+       "on",
+       "off"
+      ],
+      "title": "Auth",
+      "type": "string"
+     },
+     "db": {
+      "$ref": "#/components/schemas/HealthDbOut"
+     },
+     "engine_version": {
+      "title": "Engine Version",
+      "type": "string"
+     },
+     "ok": {
+      "title": "Ok",
+      "type": "boolean"
+     },
+     "service": {
+      "title": "Service",
+      "type": "string"
+     },
+     "uptime_s": {
+      "title": "Uptime S",
+      "type": "number"
+     },
+     "version": {
+      "title": "Version",
+      "type": "string"
+     }
+    },
+    "required": [
+     "ok",
+     "service",
+     "version",
+     "engine_version",
+     "db",
+     "auth",
+     "uptime_s"
+    ],
+    "title": "HealthOut",
+    "type": "object"
+   },
+   "HoldingBasisOut": {
+    "additionalProperties": true,
+    "properties": {
+     "from_buy_decision": {
+      "title": "From Buy Decision",
+      "type": "boolean"
+     },
+     "run_id": {
+      "title": "Run Id",
+      "type": "string"
+     },
+     "version_id": {
+      "title": "Version Id",
+      "type": "integer"
+     },
+     "version_no": {
+      "title": "Version No",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "version_id",
+     "version_no",
+     "run_id",
+     "from_buy_decision"
+    ],
+    "title": "HoldingBasisOut",
+    "type": "object"
+   },
+   "HoldingOut": {
+    "additionalProperties": true,
+    "properties": {
+     "actuals": {
+      "items": {
+       "$ref": "#/components/schemas/ActualOut"
+      },
+      "title": "Actuals",
+      "type": "array"
+     },
+     "attribution": {
+      "$ref": "#/components/schemas/AttributionOut"
+     },
+     "basis": {
+      "$ref": "#/components/schemas/HoldingBasisOut"
+     },
+     "variance": {
+      "items": {
+       "$ref": "#/components/schemas/VarianceRowOut"
+      },
+      "title": "Variance",
+      "type": "array"
+     }
+    },
+    "required": [
+     "basis",
+     "actuals",
+     "variance",
+     "attribution"
+    ],
+    "title": "HoldingOut",
+    "type": "object"
+   },
+   "KillCriterion": {
+    "additionalProperties": false,
+    "properties": {
+     "metric": {
+      "title": "Metric",
+      "type": "string"
+     },
+     "op": {
+      "enum": [
+       "<",
+       "<=",
+       ">",
+       ">="
+      ],
+      "title": "Op",
+      "type": "string"
+     },
+     "threshold": {
+      "title": "Threshold",
+      "type": "number"
+     }
+    },
+    "required": [
+     "metric",
+     "op",
+     "threshold"
+    ],
+    "title": "KillCriterion",
+    "type": "object"
+   },
+   "KillEvalOut": {
+    "additionalProperties": true,
+    "properties": {
+     "clear": {
+      "title": "Clear",
+      "type": "boolean"
+     },
+     "defined": {
+      "title": "Defined",
+      "type": "boolean"
+     },
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/KillItemOut"
+      },
+      "title": "Items",
+      "type": "array"
+     },
+     "triggered": {
+      "items": {
+       "$ref": "#/components/schemas/KillItemOut"
+      },
+      "title": "Triggered",
+      "type": "array"
+     },
+     "unknown": {
+      "items": {
+       "$ref": "#/components/schemas/KillItemOut"
+      },
+      "title": "Unknown",
+      "type": "array"
+     }
+    },
+    "required": [
+     "items",
+     "triggered",
+     "unknown",
+     "defined",
+     "clear"
+    ],
+    "title": "KillEvalOut",
+    "type": "object"
+   },
+   "KillItemOut": {
+    "additionalProperties": true,
+    "properties": {
+     "metric": {
+      "title": "Metric",
+      "type": "string"
+     },
+     "op": {
+      "title": "Op",
+      "type": "string"
+     },
+     "state": {
+      "enum": [
+       "ok",
+       "triggered",
+       "unknown"
+      ],
+      "title": "State",
+      "type": "string"
+     },
+     "text": {
+      "title": "Text",
+      "type": "string"
+     },
+     "threshold": {
+      "title": "Threshold",
+      "type": "number"
+     },
+     "value": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Value"
+     }
+    },
+    "required": [
+     "metric",
+     "op",
+     "threshold",
+     "value",
+     "state",
+     "text"
+    ],
+    "title": "KillItemOut",
+    "type": "object"
+   },
+   "LegacyImportOut": {
+    "additionalProperties": true,
+    "properties": {
+     "deal": {
+      "$ref": "#/components/schemas/DealOut"
+     },
+     "version": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/VersionOut"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "warning": {
+      "title": "Warning",
+      "type": "string"
+     }
+    },
+    "required": [
+     "deal",
+     "version",
+     "warning"
+    ],
+    "title": "LegacyImportOut",
+    "type": "object"
+   },
+   "LegacyProjectOut": {
+    "additionalProperties": true,
+    "properties": {
+     "address": {
+      "title": "Address",
+      "type": "string"
+     },
+     "id": {
+      "title": "Id",
+      "type": "integer"
+     },
+     "imported_deal_id": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Imported Deal Id"
+     },
+     "kind": {
+      "enum": [
+       "project",
+       "uw"
+      ],
+      "title": "Kind",
+      "type": "string"
+     },
+     "name": {
+      "title": "Name",
+      "type": "string"
+     },
+     "track": {
+      "enum": [
+       "residential",
+       "commercial"
+      ],
+      "title": "Track",
+      "type": "string"
+     },
+     "updated_at": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Updated At"
+     }
+    },
+    "required": [
+     "kind",
+     "id",
+     "track",
+     "name",
+     "address",
+     "updated_at",
+     "imported_deal_id"
+    ],
+    "title": "LegacyProjectOut",
+    "type": "object"
+   },
+   "MaxBidIn": {
+    "additionalProperties": false,
+    "properties": {
+     "include_kill_criteria": {
+      "default": true,
+      "title": "Include Kill Criteria",
+      "type": "boolean"
+     },
+     "targets": {
+      "items": {
+       "$ref": "#/components/schemas/Target"
+      },
+      "maxItems": 10,
+      "title": "Targets",
+      "type": "array"
+     }
+    },
+    "title": "MaxBidIn",
+    "type": "object"
+   },
+   "MaxBidOut": {
+    "additionalProperties": true,
+    "properties": {
+     "asking": {
+      "title": "Asking",
+      "type": "number"
+     },
+     "binding": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/ConstraintOut"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "constraints": {
+      "items": {
+       "$ref": "#/components/schemas/ConstraintOut"
+      },
+      "title": "Constraints",
+      "type": "array"
+     },
+     "headroom_pct": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Headroom Pct"
+     },
+     "max_bid": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Max Bid"
+     },
+     "note": {
+      "title": "Note",
+      "type": "string"
+     }
+    },
+    "required": [
+     "asking",
+     "max_bid",
+     "binding",
+     "constraints",
+     "headroom_pct",
+     "note"
+    ],
+    "title": "MaxBidOut",
+    "type": "object"
+   },
+   "MeOut": {
+    "additionalProperties": true,
+    "properties": {
+     "auth": {
+      "title": "Auth",
+      "type": "boolean"
+     },
+     "display_name": {
+      "title": "Display Name",
+      "type": "string"
+     },
+     "permissions": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Permissions",
+      "type": "array"
+     },
+     "role": {
+      "title": "Role",
+      "type": "string"
+     },
+     "role_label": {
+      "title": "Role Label",
+      "type": "string"
+     },
+     "username": {
+      "title": "Username",
+      "type": "string"
+     }
+    },
+    "required": [
+     "username",
+     "role",
+     "role_label",
+     "display_name",
+     "auth",
+     "permissions"
+    ],
+    "title": "MeOut",
+    "type": "object"
+   },
+   "MemoPointOut": {
+    "additionalProperties": true,
+    "properties": {
+     "key": {
+      "title": "Key",
+      "type": "string"
+     },
+     "severity": {
+      "enum": [
+       "high",
+       "medium"
+      ],
+      "title": "Severity",
+      "type": "string"
+     },
+     "tab": {
+      "enum": [
+       "overview",
+       "risk",
+       "files",
+       "model"
+      ],
+      "title": "Tab",
+      "type": "string"
+     },
+     "text": {
+      "title": "Text",
+      "type": "string"
+     },
+     "title": {
+      "title": "Title",
+      "type": "string"
+     }
+    },
+    "required": [
+     "key",
+     "severity",
+     "title",
+     "text",
+     "tab"
+    ],
+    "title": "MemoPointOut",
+    "type": "object"
+   },
+   "MetricMetaOut": {
+    "additionalProperties": true,
+    "properties": {
+     "better": {
+      "enum": [
+       "higher",
+       "lower"
+      ],
+      "title": "Better",
+      "type": "string"
+     },
+     "label": {
+      "title": "Label",
+      "type": "string"
+     },
+     "label_en": {
+      "title": "Label En",
+      "type": "string"
+     },
+     "unit": {
+      "enum": [
+       "usd",
+       "pct",
+       "x",
+       "usd_month",
+       "pts"
+      ],
+      "title": "Unit",
+      "type": "string"
+     }
+    },
+    "required": [
+     "label",
+     "label_en",
+     "unit",
+     "better"
+    ],
+    "title": "MetricMetaOut",
+    "type": "object"
+   },
+   "ModelOut": {
+    "additionalProperties": true,
+    "properties": {
+     "detail": {
+      "additionalProperties": true,
+      "title": "Detail",
+      "type": "object"
+     },
+     "metrics": {
+      "additionalProperties": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "title": "Metrics",
+      "type": "object"
+     },
+     "track": {
+      "enum": [
+       "residential",
+       "commercial"
+      ],
+      "title": "Track",
+      "type": "string"
+     }
+    },
+    "required": [
+     "track",
+     "metrics",
+     "detail"
+    ],
+    "title": "ModelOut",
+    "type": "object"
+   },
+   "OverviewOut": {
+    "additionalProperties": true,
+    "properties": {
+     "committee": {
+      "additionalProperties": true,
+      "title": "Committee",
+      "type": "object"
+     },
+     "deal": {
+      "$ref": "#/components/schemas/DealOut"
+     },
+     "kill": {
+      "additionalProperties": true,
+      "title": "Kill",
+      "type": "object"
+     },
+     "last_verdict": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Verdict"
+     },
+     "metric_catalog": {
+      "additionalProperties": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "title": "Metric Catalog",
+      "type": "object"
+     },
+     "metrics": {
+      "additionalProperties": true,
+      "title": "Metrics",
+      "type": "object"
+     },
+     "next_gate": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/GateOut"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "next_stage": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Next Stage"
+     },
+     "stages": {
+      "items": {
+       "additionalProperties": {
+        "type": "string"
+       },
+       "type": "object"
+      },
+      "title": "Stages",
+      "type": "array"
+     },
+     "verification": {
+      "additionalProperties": true,
+      "title": "Verification",
+      "type": "object"
+     },
+     "version": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Version"
+     }
+    },
+    "required": [
+     "deal",
+     "version",
+     "metrics",
+     "metric_catalog",
+     "kill",
+     "verification",
+     "committee",
+     "last_verdict",
+     "next_stage",
+     "next_gate",
+     "stages"
+    ],
+    "title": "OverviewOut",
+    "type": "object"
+   },
+   "PackOut": {
+    "additionalProperties": true,
+    "properties": {
+     "created_at": {
+      "title": "Created At",
+      "type": "string"
+     },
+     "created_by": {
+      "title": "Created By",
+      "type": "string"
+     },
+     "deal_id": {
+      "title": "Deal Id",
+      "type": "integer"
+     },
+     "id": {
+      "title": "Id",
+      "type": "integer"
+     },
+     "kind": {
+      "enum": [
+       "pdf",
+       "xlsx"
+      ],
+      "title": "Kind",
+      "type": "string"
+     },
+     "run_id": {
+      "title": "Run Id",
+      "type": "string"
+     },
+     "sha256": {
+      "title": "Sha256",
+      "type": "string"
+     },
+     "size": {
+      "title": "Size",
+      "type": "integer"
+     },
+     "version_id": {
+      "title": "Version Id",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "id",
+     "deal_id",
+     "version_id",
+     "run_id",
+     "kind",
+     "sha256",
+     "size",
+     "created_at",
+     "created_by"
+    ],
+    "title": "PackOut",
+    "type": "object"
+   },
+   "PassportDetail": {
+    "additionalProperties": true,
+    "properties": {
+     "conflicts": {
+      "items": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "title": "Conflicts",
+      "type": "array"
+     },
+     "current": {
+      "$ref": "#/components/schemas/PassportOut"
+     },
+     "field": {
+      "title": "Field",
+      "type": "string"
+     },
+     "history": {
+      "items": {
+       "$ref": "#/components/schemas/PassportOut"
+      },
+      "title": "History",
+      "type": "array"
+     }
+    },
+    "required": [
+     "field",
+     "current",
+     "history",
+     "conflicts"
+    ],
+    "title": "PassportDetail",
+    "type": "object"
+   },
+   "PassportOut": {
+    "additionalProperties": true,
+    "properties": {
+     "assumption_source": {
+      "title": "Assumption Source",
+      "type": "string"
+     },
+     "confidence": {
+      "title": "Confidence",
+      "type": "string"
+     },
+     "confidence_label": {
+      "title": "Confidence Label",
+      "type": "string"
+     },
+     "created_at": {
+      "title": "Created At",
+      "type": "string"
+     },
+     "created_by": {
+      "title": "Created By",
+      "type": "string"
+     },
+     "field": {
+      "title": "Field",
+      "type": "string"
+     },
+     "freshness": {
+      "additionalProperties": true,
+      "title": "Freshness",
+      "type": "object"
+     },
+     "id": {
+      "title": "Id",
+      "type": "integer"
+     },
+     "method": {
+      "title": "Method",
+      "type": "string"
+     },
+     "method_label": {
+      "title": "Method Label",
+      "type": "string"
+     },
+     "page": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Page"
+     },
+     "review_label": {
+      "title": "Review Label",
+      "type": "string"
+     },
+     "review_status": {
+      "title": "Review Status",
+      "type": "string"
+     },
+     "source": {
+      "title": "Source",
+      "type": "string"
+     },
+     "value": {
+      "title": "Value"
+     }
+    },
+    "required": [
+     "id",
+     "field",
+     "value",
+     "source",
+     "page",
+     "method",
+     "method_label",
+     "confidence",
+     "confidence_label",
+     "review_status",
+     "review_label",
+     "assumption_source",
+     "freshness",
+     "created_at",
+     "created_by"
+    ],
+    "title": "PassportOut",
+    "type": "object"
+   },
+   "PortfolioOut": {
+    "additionalProperties": true,
+    "properties": {
+     "count": {
+      "title": "Count",
+      "type": "integer"
+     },
+     "deals": {
+      "items": {
+       "$ref": "#/components/schemas/DealListItem"
+      },
+      "title": "Deals",
+      "type": "array"
+     },
+     "total_price": {
+      "title": "Total Price",
+      "type": "number"
+     },
+     "weighted_coc_pct": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Weighted Coc Pct"
+     }
+    },
+    "required": [
+     "count",
+     "total_price",
+     "weighted_coc_pct",
+     "deals"
+    ],
+    "title": "PortfolioOut",
+    "type": "object"
+   },
+   "PriceCheckIn": {
+    "additionalProperties": false,
+    "properties": {
+     "price": {
+      "description": "试算出价（美元）",
+      "exclusiveMinimum": 0.0,
+      "maximum": 10000000000.0,
+      "title": "Price",
+      "type": "number"
+     }
+    },
+    "required": [
+     "price"
+    ],
+    "title": "PriceCheckIn",
+    "type": "object"
+   },
+   "PriceCheckOut": {
+    "additionalProperties": true,
+    "properties": {
+     "asking": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Asking"
+     },
+     "kill": {
+      "$ref": "#/components/schemas/KillEvalOut"
+     },
+     "metrics": {
+      "additionalProperties": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "title": "Metrics",
+      "type": "object"
+     },
+     "price": {
+      "title": "Price",
+      "type": "number"
+     },
+     "vs_asking_pct": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Vs Asking Pct"
+     }
+    },
+    "required": [
+     "price",
+     "asking",
+     "vs_asking_pct",
+     "metrics",
+     "kill"
+    ],
+    "title": "PriceCheckOut",
+    "type": "object"
+   },
+   "ProjectCreate": {
+    "additionalProperties": false,
+    "properties": {
+     "address": {
+      "default": "",
+      "title": "Address",
+      "type": "string"
+     },
+     "input": {
+      "additionalProperties": true,
+      "title": "Input",
+      "type": "object"
+     },
+     "lang": {
+      "default": "zh",
+      "title": "Lang",
+      "type": "string"
+     },
+     "name": {
+      "default": "",
+      "title": "Name",
+      "type": "string"
+     },
+     "track": {
+      "enum": [
+       "residential",
+       "commercial"
+      ],
+      "title": "Track",
+      "type": "string"
+     }
+    },
+    "required": [
+     "track",
+     "input"
+    ],
+    "title": "ProjectCreate",
+    "type": "object"
+   },
+   "RedTeamOut": {
+    "additionalProperties": true,
+    "properties": {
+     "all": {
+      "items": {
+       "$ref": "#/components/schemas/RedTeamRowOut"
+      },
+      "title": "All",
+      "type": "array"
+     },
+     "base": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Base"
+     },
+     "key_assumptions": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Key Assumptions",
+      "type": "array"
+     },
+     "key_fields": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Key Fields",
+      "type": "array"
+     },
+     "material_bps": {
+      "title": "Material Bps",
+      "type": "number"
+     },
+     "metric": {
+      "title": "Metric",
+      "type": "string"
+     },
+     "metric_label": {
+      "title": "Metric Label",
+      "type": "string"
+     },
+     "note": {
+      "title": "Note",
+      "type": "string"
+     },
+     "read": {
+      "title": "Read",
+      "type": "boolean"
+     },
+     "shock_pct": {
+      "title": "Shock Pct",
+      "type": "number"
+     },
+     "skipped": {
+      "items": {
+       "$ref": "#/components/schemas/SkippedOut"
+      },
+      "title": "Skipped",
+      "type": "array"
+     },
+     "top": {
+      "items": {
+       "$ref": "#/components/schemas/RedTeamRowOut"
+      },
+      "title": "Top",
+      "type": "array"
+     },
+     "version_id": {
+      "title": "Version Id",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "metric",
+     "metric_label",
+     "base",
+     "shock_pct",
+     "material_bps",
+     "top",
+     "all",
+     "skipped",
+     "key_assumptions",
+     "key_fields",
+     "note",
+     "version_id",
+     "read"
+    ],
+    "title": "RedTeamOut",
+    "type": "object"
+   },
+   "RedTeamReadOut": {
+    "additionalProperties": true,
+    "properties": {
+     "read": {
+      "title": "Read",
+      "type": "boolean"
+     },
+     "version_id": {
+      "title": "Version Id",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "version_id",
+     "read"
+    ],
+    "title": "RedTeamReadOut",
+    "type": "object"
+   },
+   "RedTeamRowOut": {
+    "additionalProperties": true,
+    "properties": {
+     "key": {
+      "title": "Key",
+      "type": "string"
+     },
+     "label": {
+      "title": "Label",
+      "type": "string"
+     },
+     "material": {
+      "title": "Material",
+      "type": "boolean"
+     },
+     "minus": {
+      "$ref": "#/components/schemas/ShockOut"
+     },
+     "paths": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Paths",
+      "type": "array"
+     },
+     "plus": {
+      "$ref": "#/components/schemas/ShockOut"
+     },
+     "source_hint": {
+      "title": "Source Hint",
+      "type": "string"
+     },
+     "swing_bps": {
+      "title": "Swing Bps",
+      "type": "number"
+     }
+    },
+    "required": [
+     "key",
+     "label",
+     "paths",
+     "source_hint",
+     "minus",
+     "plus",
+     "swing_bps",
+     "material"
+    ],
+    "title": "RedTeamRowOut",
+    "type": "object"
+   },
+   "ResearchIn": {
+    "additionalProperties": false,
+    "properties": {
+     "mode": {
+      "default": "address",
+      "enum": [
+       "address",
+       "url"
+      ],
+      "title": "Mode",
+      "type": "string"
+     },
+     "text": {
+      "maxLength": 500,
+      "minLength": 1,
+      "title": "Text",
+      "type": "string"
+     },
+     "track": {
+      "enum": [
+       "residential",
+       "commercial"
+      ],
+      "title": "Track",
+      "type": "string"
+     }
+    },
+    "required": [
+     "track",
+     "text"
+    ],
+    "title": "ResearchIn",
+    "type": "object"
+   },
+   "ResearchOut": {
+    "additionalProperties": true,
+    "properties": {
+     "address": {
+      "title": "Address",
+      "type": "string"
+     },
+     "candidates": {
+      "items": {
+       "$ref": "#/components/schemas/CandidateOut"
+      },
+      "title": "Candidates",
+      "type": "array"
+     },
+     "error": {
+      "title": "Error",
+      "type": "string"
+     },
+     "manual_needed": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Manual Needed",
+      "type": "array"
+     },
+     "mode": {
+      "title": "Mode",
+      "type": "string"
+     },
+     "track": {
+      "enum": [
+       "residential",
+       "commercial"
+      ],
+      "title": "Track",
+      "type": "string"
+     }
+    },
+    "required": [
+     "track",
+     "mode",
+     "address",
+     "candidates",
+     "manual_needed",
+     "error"
+    ],
+    "title": "ResearchOut",
+    "type": "object"
+   },
+   "ReviewIn": {
+    "additionalProperties": false,
+    "properties": {
+     "field": {
+      "maxLength": 160,
+      "minLength": 1,
+      "title": "Field",
+      "type": "string"
+     },
+     "note": {
+      "default": "",
+      "maxLength": 2000,
+      "title": "Note",
+      "type": "string"
+     }
+    },
+    "required": [
+     "field"
+    ],
+    "title": "ReviewIn",
+    "type": "object"
+   },
+   "RunOut": {
+    "additionalProperties": true,
+    "properties": {
+     "created_at": {
+      "title": "Created At",
+      "type": "string"
+     },
+     "engine_version": {
+      "title": "Engine Version",
+      "type": "string"
+     },
+     "inputs": {
+      "additionalProperties": true,
+      "title": "Inputs",
+      "type": "object"
+     },
+     "kind": {
+      "title": "Kind",
+      "type": "string"
+     },
+     "output_sha256": {
+      "title": "Output Sha256",
+      "type": "string"
+     },
+     "outputs": {
+      "additionalProperties": true,
+      "title": "Outputs",
+      "type": "object"
+     },
+     "run_id": {
+      "title": "Run Id",
+      "type": "string"
+     }
+    },
+    "required": [
+     "run_id",
+     "engine_version",
+     "kind",
+     "inputs",
+     "outputs",
+     "output_sha256",
+     "created_at"
+    ],
+    "title": "RunOut",
+    "type": "object"
+   },
+   "RunVerifyOut": {
+    "additionalProperties": true,
+    "properties": {
+     "current_engine": {
+      "title": "Current Engine",
+      "type": "string"
+     },
+     "identical": {
+      "title": "Identical",
+      "type": "boolean"
+     },
+     "recomputed_sha256": {
+      "title": "Recomputed Sha256",
+      "type": "string"
+     },
+     "run_id": {
+      "title": "Run Id",
+      "type": "string"
+     },
+     "same_engine": {
+      "title": "Same Engine",
+      "type": "boolean"
+     },
+     "stored_engine": {
+      "title": "Stored Engine",
+      "type": "string"
+     },
+     "stored_sha256": {
+      "title": "Stored Sha256",
+      "type": "string"
+     }
+    },
+    "required": [
+     "run_id",
+     "identical",
+     "same_engine",
+     "stored_engine",
+     "current_engine",
+     "stored_sha256",
+     "recomputed_sha256"
+    ],
+    "title": "RunVerifyOut",
+    "type": "object"
+   },
+   "Scenario": {
+    "additionalProperties": false,
+    "properties": {
+     "changes": {
+      "items": {
+       "$ref": "#/components/schemas/ScenarioChange"
+      },
+      "maxItems": 30,
+      "title": "Changes",
+      "type": "array"
+     },
+     "name": {
+      "maxLength": 80,
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+     },
+     "probability": {
+      "maximum": 100.0,
+      "minimum": 0.0,
+      "title": "Probability",
+      "type": "number"
+     }
+    },
+    "required": [
+     "name",
+     "probability"
+    ],
+    "title": "Scenario",
+    "type": "object"
+   },
+   "ScenarioChange": {
+    "additionalProperties": false,
+    "properties": {
+     "add": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Add"
+     },
+     "assumption": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Assumption"
+     },
+     "path": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Path"
+     },
+     "pct": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Pct"
+     },
+     "set": {
+      "title": "Set"
+     }
+    },
+    "title": "ScenarioChange",
+    "type": "object"
+   },
+   "ScenarioRowOut": {
+    "additionalProperties": true,
+    "properties": {
+     "changes": {
+      "items": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "title": "Changes",
+      "type": "array"
+     },
+     "loss": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Loss"
+     },
+     "metrics": {
+      "additionalProperties": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "title": "Metrics",
+      "type": "object"
+     },
+     "name": {
+      "title": "Name",
+      "type": "string"
+     },
+     "note": {
+      "default": "",
+      "title": "Note",
+      "type": "string"
+     },
+     "primary": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Primary"
+     },
+     "probability": {
+      "title": "Probability",
+      "type": "number"
+     }
+    },
+    "required": [
+     "name",
+     "probability",
+     "changes",
+     "metrics",
+     "primary",
+     "loss"
+    ],
+    "title": "ScenarioRowOut",
+    "type": "object"
+   },
+   "ScenariosIn": {
+    "additionalProperties": false,
+    "properties": {
+     "scenarios": {
+      "anyOf": [
+       {
+        "items": {
+         "$ref": "#/components/schemas/Scenario"
+        },
+        "maxItems": 10,
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Scenarios"
+     }
+    },
+    "title": "ScenariosIn",
+    "type": "object"
+   },
+   "ScenariosOut": {
+    "additionalProperties": true,
+    "properties": {
+     "expected": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Expected"
+     },
+     "loss_probability_pct": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Loss Probability Pct"
+     },
+     "metric": {
+      "title": "Metric",
+      "type": "string"
+     },
+     "metric_label": {
+      "title": "Metric Label",
+      "type": "string"
+     },
+     "note": {
+      "title": "Note",
+      "type": "string"
+     },
+     "scenarios": {
+      "items": {
+       "$ref": "#/components/schemas/ScenarioRowOut"
+      },
+      "title": "Scenarios",
+      "type": "array"
+     }
+    },
+    "required": [
+     "metric",
+     "metric_label",
+     "scenarios",
+     "expected",
+     "loss_probability_pct",
+     "note"
+    ],
+    "title": "ScenariosOut",
+    "type": "object"
+   },
+   "ShockOut": {
+    "additionalProperties": true,
+    "properties": {
+     "delta_pct_points": {
+      "title": "Delta Pct Points",
+      "type": "number"
+     },
+     "value": {
+      "title": "Value",
+      "type": "number"
+     }
+    },
+    "required": [
+     "value",
+     "delta_pct_points"
+    ],
+    "title": "ShockOut",
+    "type": "object"
+   },
+   "SkippedOut": {
+    "additionalProperties": true,
+    "properties": {
+     "key": {
+      "title": "Key",
+      "type": "string"
+     },
+     "label": {
+      "title": "Label",
+      "type": "string"
+     },
+     "reason": {
+      "title": "Reason",
+      "type": "string"
+     }
+    },
+    "required": [
+     "key",
+     "label",
+     "reason"
+    ],
+    "title": "SkippedOut",
+    "type": "object"
+   },
+   "StageAdvance": {
+    "additionalProperties": false,
+    "properties": {
+     "reason": {
+      "default": "",
+      "maxLength": 2000,
+      "title": "Reason",
+      "type": "string"
+     },
+     "target": {
+      "enum": [
+       "sourcing",
+       "screening",
+       "underwriting",
+       "committee",
+       "diligence",
+       "closing",
+       "holding",
+       "passed"
+      ],
+      "title": "Target",
+      "type": "string"
+     }
+    },
+    "required": [
+     "target"
+    ],
+    "title": "StageAdvance",
+    "type": "object"
+   },
+   "StageResultOut": {
+    "additionalProperties": true,
+    "properties": {
+     "deal": {
+      "$ref": "#/components/schemas/DealOut"
+     },
+     "gate": {
+      "$ref": "#/components/schemas/GateOut"
+     }
+    },
+    "required": [
+     "deal",
+     "gate"
+    ],
+    "title": "StageResultOut",
+    "type": "object"
+   },
+   "TallyOut": {
+    "additionalProperties": true,
+    "properties": {
+     "abstain": {
+      "title": "Abstain",
+      "type": "integer"
+     },
+     "approve": {
+      "title": "Approve",
+      "type": "integer"
+     },
+     "chairman_vote": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Chairman Vote"
+     },
+     "reject": {
+      "title": "Reject",
+      "type": "integer"
+     },
+     "result": {
+      "enum": [
+       "approved",
+       "rejected",
+       "pending"
+      ],
+      "title": "Result",
+      "type": "string"
+     },
+     "votes": {
+      "title": "Votes",
+      "type": "integer"
+     },
+     "why": {
+      "title": "Why",
+      "type": "string"
+     }
+    },
+    "required": [
+     "approve",
+     "reject",
+     "abstain",
+     "chairman_vote",
+     "result",
+     "why",
+     "votes"
+    ],
+    "title": "TallyOut",
+    "type": "object"
+   },
+   "Target": {
+    "additionalProperties": false,
+    "properties": {
+     "metric": {
+      "title": "Metric",
+      "type": "string"
+     },
+     "min": {
+      "title": "Min",
+      "type": "number"
+     }
+    },
+    "required": [
+     "metric",
+     "min"
+    ],
+    "title": "Target",
+    "type": "object"
+   },
+   "TaskIn": {
+    "additionalProperties": false,
+    "properties": {
+     "assignee": {
+      "default": "",
+      "maxLength": 80,
+      "title": "Assignee",
+      "type": "string"
+     },
+     "due": {
+      "default": "",
+      "pattern": "^$|^\\d{4}-\\d{2}-\\d{2}$",
+      "title": "Due",
+      "type": "string"
+     },
+     "stage": {
+      "default": "",
+      "maxLength": 40,
+      "title": "Stage",
+      "type": "string"
+     },
+     "title": {
+      "maxLength": 300,
+      "minLength": 1,
+      "title": "Title",
+      "type": "string"
+     }
+    },
+    "required": [
+     "title"
+    ],
+    "title": "TaskIn",
+    "type": "object"
+   },
+   "TaskOut": {
+    "additionalProperties": true,
+    "properties": {
+     "assignee": {
+      "title": "Assignee",
+      "type": "string"
+     },
+     "created_by": {
+      "title": "Created By",
+      "type": "string"
+     },
+     "deal_id": {
+      "title": "Deal Id",
+      "type": "integer"
+     },
+     "due": {
+      "title": "Due",
+      "type": "string"
+     },
+     "id": {
+      "title": "Id",
+      "type": "integer"
+     },
+     "stage": {
+      "title": "Stage",
+      "type": "string"
+     },
+     "status": {
+      "enum": [
+       "open",
+       "done"
+      ],
+      "title": "Status",
+      "type": "string"
+     },
+     "title": {
+      "title": "Title",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "deal_id",
+     "title",
+     "status",
+     "stage",
+     "assignee",
+     "due",
+     "created_by"
+    ],
+    "title": "TaskOut",
+    "type": "object"
+   },
+   "TaskPatch": {
+    "additionalProperties": false,
+    "properties": {
+     "assignee": {
+      "anyOf": [
+       {
+        "maxLength": 80,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Assignee"
+     },
+     "due": {
+      "anyOf": [
+       {
+        "pattern": "^$|^\\d{4}-\\d{2}-\\d{2}$",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Due"
+     },
+     "status": {
+      "anyOf": [
+       {
+        "enum": [
+         "open",
+         "done"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Status"
+     },
+     "title": {
+      "anyOf": [
+       {
+        "maxLength": 300,
+        "minLength": 1,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Title"
+     }
+    },
+    "title": "TaskPatch",
+    "type": "object"
+   },
+   "TemplateIn": {
+    "additionalProperties": false,
+    "properties": {
+     "kind": {
+      "enum": [
+       "assumptions",
+       "market",
+       "kill_criteria"
+      ],
+      "title": "Kind",
+      "type": "string"
+     },
+     "name": {
+      "maxLength": 120,
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+     },
+     "payload": {
+      "additionalProperties": true,
+      "title": "Payload",
+      "type": "object"
+     }
+    },
+    "required": [
+     "kind",
+     "name",
+     "payload"
+    ],
+    "title": "TemplateIn",
+    "type": "object"
+   },
+   "TemplateOut": {
+    "additionalProperties": true,
+    "properties": {
+     "builtin": {
+      "default": false,
+      "title": "Builtin",
+      "type": "boolean"
+     },
+     "id": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Id"
+     },
+     "kind": {
+      "title": "Kind",
+      "type": "string"
+     },
+     "label": {
+      "default": "",
+      "title": "Label",
+      "type": "string"
+     },
+     "name": {
+      "title": "Name",
+      "type": "string"
+     },
+     "payload": {
+      "additionalProperties": true,
+      "title": "Payload",
+      "type": "object"
+     }
+    },
+    "required": [
+     "id",
+     "kind",
+     "name",
+     "payload"
+    ],
+    "title": "TemplateOut",
+    "type": "object"
+   },
+   "UserCreatedOut": {
+    "additionalProperties": true,
+    "properties": {
+     "active": {
+      "title": "Active",
+      "type": "boolean"
+     },
+     "display_name": {
+      "title": "Display Name",
+      "type": "string"
+     },
+     "id": {
+      "title": "Id",
+      "type": "integer"
+     },
+     "note": {
+      "title": "Note",
+      "type": "string"
+     },
+     "role": {
+      "title": "Role",
+      "type": "string"
+     },
+     "token": {
+      "description": "访问令牌，只在创建时返回这一次",
+      "title": "Token",
+      "type": "string"
+     },
+     "username": {
+      "title": "Username",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "username",
+     "display_name",
+     "role",
+     "active",
+     "token",
+     "note"
+    ],
+    "title": "UserCreatedOut",
+    "type": "object"
+   },
+   "UserIn": {
+    "additionalProperties": false,
+    "properties": {
+     "display_name": {
+      "default": "",
+      "maxLength": 120,
+      "title": "Display Name",
+      "type": "string"
+     },
+     "role": {
+      "enum": [
+       "chairman",
+       "analyst",
+       "viewer"
+      ],
+      "title": "Role",
+      "type": "string"
+     },
+     "username": {
+      "maxLength": 80,
+      "minLength": 2,
+      "pattern": "^[A-Za-z0-9._-]+$",
+      "title": "Username",
+      "type": "string"
+     }
+    },
+    "required": [
+     "username",
+     "role"
+    ],
+    "title": "UserIn",
+    "type": "object"
+   },
+   "UserOut": {
+    "additionalProperties": true,
+    "properties": {
+     "active": {
+      "title": "Active",
+      "type": "boolean"
+     },
+     "display_name": {
+      "title": "Display Name",
+      "type": "string"
+     },
+     "id": {
+      "title": "Id",
+      "type": "integer"
+     },
+     "role": {
+      "title": "Role",
+      "type": "string"
+     },
+     "username": {
+      "title": "Username",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "username",
+     "display_name",
+     "role",
+     "active"
+    ],
+    "title": "UserOut",
+    "type": "object"
+   },
+   "UwProjectIn": {
+    "additionalProperties": true,
+    "properties": {
+     "input": {
+      "additionalProperties": true,
+      "default": {},
+      "title": "Input",
+      "type": "object"
+     },
+     "name": {
+      "default": "",
+      "title": "Name",
+      "type": "string"
+     }
+    },
+    "title": "UwProjectIn",
+    "type": "object"
+   },
+   "ValidationError": {
+    "properties": {
+     "ctx": {
+      "title": "Context",
+      "type": "object"
+     },
+     "input": {
+      "title": "Input"
+     },
+     "loc": {
+      "items": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "integer"
+        }
+       ]
+      },
+      "title": "Location",
+      "type": "array"
+     },
+     "msg": {
+      "title": "Message",
+      "type": "string"
+     },
+     "type": {
+      "title": "Error Type",
+      "type": "string"
+     }
+    },
+    "required": [
+     "loc",
+     "msg",
+     "type"
+    ],
+    "title": "ValidationError",
+    "type": "object"
+   },
+   "VarianceCellOut": {
+    "additionalProperties": true,
+    "properties": {
+     "actual": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Actual"
+     },
+     "underwritten": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Underwritten"
+     },
+     "variance": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Variance"
+     },
+     "variance_pct": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Variance Pct"
+     }
+    },
+    "required": [
+     "actual",
+     "underwritten",
+     "variance",
+     "variance_pct"
+    ],
+    "title": "VarianceCellOut",
+    "type": "object"
+   },
+   "VarianceRowOut": {
+    "additionalProperties": true,
+    "properties": {
+     "cash_flow": {
+      "$ref": "#/components/schemas/VarianceCellOut"
+     },
+     "months": {
+      "default": 12,
+      "title": "Months",
+      "type": "integer"
+     },
+     "noi": {
+      "$ref": "#/components/schemas/VarianceCellOut"
+     },
+     "occupancy_pct": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Occupancy Pct"
+     },
+     "period": {
+      "title": "Period",
+      "type": "string"
+     },
+     "year": {
+      "title": "Year",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "period",
+     "year",
+     "noi",
+     "cash_flow",
+     "occupancy_pct"
+    ],
+    "title": "VarianceRowOut",
+    "type": "object"
+   },
+   "VerifyItemOut": {
+    "additionalProperties": true,
+    "properties": {
+     "action": {
+      "title": "Action",
+      "type": "string"
+     },
+     "conflict_id": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Conflict Id"
+     },
+     "detail": {
+      "title": "Detail",
+      "type": "string"
+     },
+     "field": {
+      "title": "Field",
+      "type": "string"
+     },
+     "kind": {
+      "enum": [
+       "conflict",
+       "unverified"
+      ],
+      "title": "Kind",
+      "type": "string"
+     },
+     "label": {
+      "title": "Label",
+      "type": "string"
+     },
+     "primary_a": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Primary A"
+     },
+     "primary_b": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Primary B"
+     },
+     "swing_bps": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Swing Bps"
+     }
+    },
+    "required": [
+     "kind",
+     "field",
+     "label",
+     "conflict_id",
+     "swing_bps",
+     "detail",
+     "primary_a",
+     "primary_b",
+     "action"
+    ],
+    "title": "VerifyItemOut",
+    "type": "object"
+   },
+   "VerifyOut": {
+    "additionalProperties": true,
+    "properties": {
+     "deal_id": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Deal Id"
+     },
+     "genuine": {
+      "title": "Genuine",
+      "type": "boolean"
+     },
+     "message": {
+      "title": "Message",
+      "type": "string"
+     },
+     "run_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Run Id"
+     },
+     "sha256": {
+      "title": "Sha256",
+      "type": "string"
+     },
+     "version_id": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Version Id"
+     }
+    },
+    "required": [
+     "genuine",
+     "sha256",
+     "message"
+    ],
+    "title": "VerifyOut",
+    "type": "object"
+   },
+   "VerifyQueueOut": {
+    "additionalProperties": true,
+    "properties": {
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/VerifyItemOut"
+      },
+      "title": "Items",
+      "type": "array"
+     },
+     "metric": {
+      "title": "Metric",
+      "type": "string"
+     },
+     "metric_label": {
+      "title": "Metric Label",
+      "type": "string"
+     },
+     "note": {
+      "title": "Note",
+      "type": "string"
+     },
+     "top_share_pct": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Top Share Pct"
+     },
+     "version_id": {
+      "title": "Version Id",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "metric",
+     "metric_label",
+     "items",
+     "top_share_pct",
+     "note",
+     "version_id"
+    ],
+    "title": "VerifyQueueOut",
+    "type": "object"
+   },
+   "VersionCreate": {
+    "additionalProperties": false,
+    "properties": {
+     "inputs": {
+      "additionalProperties": true,
+      "title": "Inputs",
+      "type": "object"
+     },
+     "label": {
+      "default": "",
+      "description": "本版改了什么 / 为什么（进投委会包“改动说明”）",
+      "maxLength": 200,
+      "title": "Label",
+      "type": "string"
+     }
+    },
+    "required": [
+     "inputs"
+    ],
+    "title": "VersionCreate",
+    "type": "object"
+   },
+   "VersionOut": {
+    "additionalProperties": true,
+    "properties": {
+     "created_at": {
+      "title": "Created At",
+      "type": "string"
+     },
+     "created_by": {
+      "title": "Created By",
+      "type": "string"
+     },
+     "deal_id": {
+      "title": "Deal Id",
+      "type": "integer"
+     },
+     "id": {
+      "title": "Id",
+      "type": "integer"
+     },
+     "inputs": {
+      "additionalProperties": true,
+      "title": "Inputs",
+      "type": "object"
+     },
+     "label": {
+      "title": "Label",
+      "type": "string"
+     },
+     "outputs": {
+      "additionalProperties": true,
+      "title": "Outputs",
+      "type": "object"
+     },
+     "run_id": {
+      "title": "Run Id",
+      "type": "string"
+     },
+     "version_no": {
+      "title": "Version No",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "id",
+     "deal_id",
+     "version_no",
+     "label",
+     "inputs",
+     "outputs",
+     "run_id",
+     "created_at",
+     "created_by"
+    ],
+    "title": "VersionOut",
+    "type": "object"
+   },
+   "ViewIn": {
+    "additionalProperties": false,
+    "properties": {
+     "config": {
+      "additionalProperties": true,
+      "title": "Config",
+      "type": "object"
+     },
+     "name": {
+      "maxLength": 120,
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+     }
+    },
+    "required": [
+     "name",
+     "config"
+    ],
+    "title": "ViewIn",
+    "type": "object"
+   },
+   "ViewOut": {
+    "additionalProperties": true,
+    "properties": {
+     "config": {
+      "additionalProperties": true,
+      "title": "Config",
+      "type": "object"
+     },
+     "id": {
+      "title": "Id",
+      "type": "integer"
+     },
+     "name": {
+      "title": "Name",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "name",
+     "config"
+    ],
+    "title": "ViewOut",
+    "type": "object"
+   },
+   "VoteIn": {
+    "additionalProperties": false,
+    "properties": {
+     "comment": {
+      "default": "",
+      "maxLength": 5000,
+      "title": "Comment",
+      "type": "string"
+     },
+     "vote": {
+      "enum": [
+       "approve",
+       "reject",
+       "abstain"
+      ],
+      "title": "Vote",
+      "type": "string"
+     }
+    },
+    "required": [
+     "vote"
+    ],
+    "title": "VoteIn",
+    "type": "object"
+   },
+   "VoteOut": {
+    "additionalProperties": true,
+    "properties": {
+     "comment": {
+      "title": "Comment",
+      "type": "string"
+     },
+     "created_at": {
+      "title": "Created At",
+      "type": "string"
+     },
+     "id": {
+      "title": "Id",
+      "type": "integer"
+     },
+     "role": {
+      "title": "Role",
+      "type": "string"
+     },
+     "role_label": {
+      "title": "Role Label",
+      "type": "string"
+     },
+     "vote": {
+      "enum": [
+       "approve",
+       "reject",
+       "abstain"
+      ],
+      "title": "Vote",
+      "type": "string"
+     },
+     "voter": {
+      "title": "Voter",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "voter",
+     "vote",
+     "comment",
+     "role",
+     "role_label",
+     "created_at"
+    ],
+    "title": "VoteOut",
+    "type": "object"
+   },
+   "_ConditionReq": {
+    "properties": {
+     "basis": {
+      "default": "",
+      "title": "Basis",
+      "type": "string"
+     },
+     "comp_price": {
+      "default": 0,
+      "title": "Comp Price",
+      "type": "number"
+     },
+     "comp_tier": {
+      "default": "Average",
+      "title": "Comp Tier",
+      "type": "string"
+     },
+     "rate": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Rate"
+     },
+     "subject_tier": {
+      "default": "Average",
+      "title": "Subject Tier",
+      "type": "string"
+     }
+    },
+    "title": "_ConditionReq",
+    "type": "object"
+   },
+   "_ConfidenceReq": {
+    "properties": {
+     "comps": {
+      "default": [],
+      "items": {},
+      "title": "Comps",
+      "type": "array"
+     },
+     "evidence": {
+      "additionalProperties": true,
+      "default": {},
+      "title": "Evidence",
+      "type": "object"
+     },
+     "lang": {
+      "default": "zh",
+      "title": "Lang",
+      "type": "string"
+     },
+     "track": {
+      "default": "residential",
+      "title": "Track",
+      "type": "string"
+     }
+    },
+    "title": "_ConfidenceReq",
+    "type": "object"
+   },
+   "_MemoReq": {
+    "properties": {
+     "address": {
+      "default": "",
+      "title": "Address",
+      "type": "string"
+     },
+     "assumptions": {
+      "additionalProperties": true,
+      "default": {},
+      "title": "Assumptions",
+      "type": "object"
+     },
+     "comps": {
+      "default": [],
+      "items": {},
+      "title": "Comps",
+      "type": "array"
+     },
+     "dscr_trailing": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Dscr Trailing"
+     },
+     "effective_assumptions": {
+      "default": [],
+      "items": {},
+      "title": "Effective Assumptions",
+      "type": "array"
+     },
+     "gate_deal_type": {
+      "default": "",
+      "title": "Gate Deal Type",
+      "type": "string"
+     },
+     "gate_fields": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Gate Fields"
+     },
+     "has_rent_roll": {
+      "default": false,
+      "title": "Has Rent Roll",
+      "type": "boolean"
+     },
+     "input": {
+      "additionalProperties": true,
+      "default": {},
+      "title": "Input",
+      "type": "object"
+     },
+     "name": {
+      "default": "",
+      "title": "Name",
+      "type": "string"
+     },
+     "score": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Score"
+     },
+     "track": {
+      "default": "residential",
+      "title": "Track",
+      "type": "string"
+     },
+     "uw_input": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Uw Input"
+     },
+     "valuation_display": {
+      "default": "",
+      "title": "Valuation Display",
+      "type": "string"
+     },
+     "variant": {
+      "default": "classic",
+      "title": "Variant",
+      "type": "string"
+     },
+     "verdict": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Verdict"
+     },
+     "verdict_word": {
+      "default": "",
+      "title": "Verdict Word",
+      "type": "string"
+     },
+     "veto_count": {
+      "default": 0,
+      "title": "Veto Count",
+      "type": "integer"
+     }
+    },
+    "title": "_MemoReq",
+    "type": "object"
+   },
+   "_ResXlsxReq": {
+    "properties": {
+     "address": {
+      "default": "",
+      "title": "Address",
+      "type": "string"
+     },
+     "comps": {
+      "default": [],
+      "items": {},
+      "title": "Comps",
+      "type": "array"
+     },
+     "confidence": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Confidence"
+     },
+     "gate_deal_type": {
+      "default": "",
+      "title": "Gate Deal Type",
+      "type": "string"
+     },
+     "gate_fields": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Gate Fields"
+     },
+     "input": {
+      "additionalProperties": true,
+      "default": {},
+      "title": "Input",
+      "type": "object"
+     },
+     "score": {
+      "additionalProperties": true,
+      "default": {},
+      "title": "Score",
+      "type": "object"
+     },
+     "verdict": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Verdict"
+     }
+    },
+    "title": "_ResXlsxReq",
+    "type": "object"
+   },
+   "_VerdictReq": {
+    "properties": {
+     "confidence": {
+      "default": 0,
+      "title": "Confidence",
+      "type": "number"
+     },
+     "evidence": {
+      "additionalProperties": true,
+      "default": {},
+      "title": "Evidence",
+      "type": "object"
+     },
+     "lang": {
+      "default": "zh",
+      "title": "Lang",
+      "type": "string"
+     },
+     "score": {
+      "additionalProperties": true,
+      "default": {},
+      "title": "Score",
+      "type": "object"
+     },
+     "track": {
+      "default": "residential",
+      "title": "Track",
+      "type": "string"
+     }
+    },
+    "title": "_VerdictReq",
+    "type": "object"
+   },
+   "_WbCompsPullReq": {
+    "properties": {
+     "address": {
+      "default": "",
+      "title": "Address",
+      "type": "string"
+     }
+    },
+    "title": "_WbCompsPullReq",
+    "type": "object"
+   },
+   "_WbCsvReq": {
+    "properties": {
+     "csv": {
+      "default": "",
+      "title": "Csv",
+      "type": "string"
+     }
+    },
+    "title": "_WbCsvReq",
+    "type": "object"
+   },
+   "_WbForecastReq": {
+    "properties": {
+     "base_value": {
+      "default": 0,
+      "title": "Base Value",
+      "type": "number"
+     },
+     "scenarios": {
+      "default": [],
+      "items": {},
+      "title": "Scenarios",
+      "type": "array"
+     },
+     "years": {
+      "default": 3,
+      "title": "Years",
+      "type": "integer"
+     }
+    },
+    "title": "_WbForecastReq",
+    "type": "object"
+   },
+   "_WbIntakeReq": {
+    "properties": {
+     "mode": {
+      "default": "address",
+      "title": "Mode",
+      "type": "string"
+     },
+     "text": {
+      "default": "",
+      "title": "Text",
+      "type": "string"
+     }
+    },
+    "title": "_WbIntakeReq",
+    "type": "object"
+   },
+   "_WbResearchReq": {
+    "properties": {
+     "forecast": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Forecast"
+     },
+     "research": {
+      "additionalProperties": true,
+      "default": {},
+      "title": "Research",
+      "type": "object"
+     },
+     "valuation": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Valuation"
+     }
+    },
+    "title": "_WbResearchReq",
+    "type": "object"
+   },
+   "_WbScoreReq": {
+    "properties": {
+     "property": {
+      "additionalProperties": true,
+      "default": {},
+      "title": "Property",
+      "type": "object"
+     },
+     "track": {
+      "default": "residential",
+      "title": "Track",
+      "type": "string"
+     }
+    },
+    "title": "_WbScoreReq",
+    "type": "object"
+   },
+   "_WbSeriesReq": {
+    "properties": {
+     "points": {
+      "default": [],
+      "items": {},
+      "title": "Points",
+      "type": "array"
+     }
+    },
+    "title": "_WbSeriesReq",
+    "type": "object"
+   },
+   "_WbValuateReq": {
+    "properties": {
+     "comp_weight": {
+      "default": 0.5,
+      "title": "Comp Weight",
+      "type": "number"
+     },
+     "comps": {
+      "default": [],
+      "items": {},
+      "title": "Comps",
+      "type": "array"
+     },
+     "income_cap_rate_pct": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Income Cap Rate Pct"
+     },
+     "income_noi_annual": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Income Noi Annual"
+     },
+     "property": {
+      "additionalProperties": true,
+      "default": {},
+      "title": "Property",
+      "type": "object"
+     }
+    },
+    "title": "_WbValuateReq",
+    "type": "object"
+   }
+  }
+ },
+ "info": {
+  "description": "vertciti 房地产交易核保台",
+  "title": "DealDesk",
+  "version": "2.0.0"
+ },
+ "openapi": "3.1.0",
+ "paths": {
+  "/api/v2/admin/audit": {
+   "get": {
+    "operationId": "audit_api_v2_admin_audit_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "entity",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Entity"
+      }
+     },
+     {
+      "in": "query",
+      "name": "entity_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Entity Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "limit",
+      "required": false,
+      "schema": {
+       "default": 200,
+       "maximum": 1000,
+       "minimum": 1,
+       "title": "Limit",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/AuditOut"
+         },
+         "title": "Response Audit Api V2 Admin Audit Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Audit",
+    "tags": [
+     "v2 · admin"
+    ]
+   }
+  },
+  "/api/v2/admin/errors": {
+   "get": {
+    "operationId": "errors_api_v2_admin_errors_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "limit",
+      "required": false,
+      "schema": {
+       "default": 50,
+       "maximum": 100,
+       "minimum": 1,
+       "title": "Limit",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/Generic"
+         },
+         "title": "Response Errors Api V2 Admin Errors Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Errors",
+    "tags": [
+     "v2 · admin"
+    ]
+   }
+  },
+  "/api/v2/admin/users": {
+   "get": {
+    "operationId": "users_api_v2_admin_users_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/UserOut"
+         },
+         "title": "Response Users Api V2 Admin Users Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Users",
+    "tags": [
+     "v2 · admin"
+    ]
+   },
+   "post": {
+    "description": "创建用户并返回一次性访问令牌（只显示这一次）。",
+    "operationId": "create_user_api_v2_admin_users_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/UserIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/UserCreatedOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Create User",
+    "tags": [
+     "v2 · admin"
+    ]
+   }
+  },
+  "/api/v2/catalog": {
+   "get": {
+    "description": "指标、假设、默认淘汰条件、默认情景目录（前端表单与说明文字的唯一来源）。",
+    "operationId": "catalog_api_v2_catalog_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CatalogOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Catalog",
+    "tags": [
+     "v2 · underwriting"
+    ]
+   }
+  },
+  "/api/v2/committee/verify": {
+   "post": {
+    "description": "上传一份投委会包 PDF / Excel：与登记哈希比对，判断是否原件未改动。",
+    "operationId": "verify_api_v2_committee_verify_post",
+    "requestBody": {
+     "content": {
+      "multipart/form-data": {
+       "schema": {
+        "$ref": "#/components/schemas/Body_verify_api_v2_committee_verify_post"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/VerifyOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Verify",
+    "tags": [
+     "v2 · committee"
+    ]
+   }
+  },
+  "/api/v2/compare": {
+   "get": {
+    "operationId": "compare_api_v2_compare_get",
+    "parameters": [
+     {
+      "description": "2–4 个交易 id，逗号分隔",
+      "in": "query",
+      "name": "ids",
+      "required": true,
+      "schema": {
+       "description": "2–4 个交易 id，逗号分隔",
+       "title": "Ids",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CompareOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Compare",
+    "tags": [
+     "v2 · deals"
+    ]
+   }
+  },
+  "/api/v2/deals": {
+   "get": {
+    "description": "流水线：全部交易（含当前版本标准指标与淘汰条件状态），看板与表格两种视图共用。",
+    "operationId": "list_deals_api_v2_deals_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "stage",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "enum": [
+          "sourcing",
+          "screening",
+          "underwriting",
+          "committee",
+          "diligence",
+          "closing",
+          "holding",
+          "passed"
+         ],
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Stage"
+      }
+     },
+     {
+      "in": "query",
+      "name": "track",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "enum": [
+          "residential",
+          "commercial"
+         ],
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Track"
+      }
+     },
+     {
+      "in": "query",
+      "name": "q",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 100,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Q"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/DealListItem"
+         },
+         "title": "Response List Deals Api V2 Deals Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "List Deals",
+    "tags": [
+     "v2 · deals"
+    ]
+   },
+   "post": {
+    "operationId": "create_deal_api_v2_deals_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/DealCreate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DealOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Create Deal",
+    "tags": [
+     "v2 · deals"
+    ]
+   }
+  },
+  "/api/v2/deals/{deal_id}": {
+   "delete": {
+    "operationId": "archive_deal_api_v2_deals__deal_id__delete",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "deal_id",
+      "required": true,
+      "schema": {
+       "title": "Deal Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Archive Deal",
+    "tags": [
+     "v2 · deals"
+    ]
+   },
+   "get": {
+    "description": "交易页顶部：结论卡指标、淘汰条件、核对进度、投委会状态、下一阶段关卡预检。",
+    "operationId": "overview_api_v2_deals__deal_id__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "deal_id",
+      "required": true,
+      "schema": {
+       "title": "Deal Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/OverviewOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Overview",
+    "tags": [
+     "v2 · deals"
+    ]
+   },
+   "patch": {
+    "operationId": "patch_deal_api_v2_deals__deal_id__patch",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "deal_id",
+      "required": true,
+      "schema": {
+       "title": "Deal Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/DealPatch"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DealOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Patch Deal",
+    "tags": [
+     "v2 · deals"
+    ]
+   }
+  },
+  "/api/v2/deals/{deal_id}/actuals": {
+   "put": {
+    "operationId": "upsert_actual_api_v2_deals__deal_id__actuals_put",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "deal_id",
+      "required": true,
+      "schema": {
+       "title": "Deal Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ActualIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ActualOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Upsert Actual",
+    "tags": [
+     "v2 · portfolio"
+    ]
+   }
+  },
+  "/api/v2/deals/{deal_id}/approvals": {
+   "get": {
+    "operationId": "approvals_api_v2_deals__deal_id__approvals_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "deal_id",
+      "required": true,
+      "schema": {
+       "title": "Deal Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/ApprovalOut"
+         },
+         "title": "Response Approvals Api V2 Deals  Deal Id  Approvals Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Approvals",
+    "tags": [
+     "v2 · committee"
+    ]
+   },
+   "post": {
+    "operationId": "request_approval_api_v2_deals__deal_id__approvals_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "deal_id",
+      "required": true,
+      "schema": {
+       "title": "Deal Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ApprovalIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ApprovalOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Request Approval",
+    "tags": [
+     "v2 · committee"
+    ]
+   }
+  },
+  "/api/v2/deals/{deal_id}/approvals/{approval_id}/decide": {
+   "post": {
+    "description": "付款类只能董事长批准；不能审批自己发起的申请（权限在服务层按审批类型判定）。",
+    "operationId": "decide_approval_api_v2_deals__deal_id__approvals__approval_id__decide_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "deal_id",
+      "required": true,
+      "schema": {
+       "title": "Deal Id",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "path",
+      "name": "approval_id",
+      "required": true,
+      "schema": {
+       "title": "Approval Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ApprovalDecide"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ApprovalOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Decide Approval",
+    "tags": [
+     "v2 · committee"
+    ]
+   }
+  },
+  "/api/v2/deals/{deal_id}/committee": {
+   "get": {
+    "operationId": "status_api_v2_deals__deal_id__committee_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "deal_id",
+      "required": true,
+      "schema": {
+       "title": "Deal Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CommitteeStatusOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Status",
+    "tags": [
+     "v2 · committee"
+    ]
+   }
+  },
+  "/api/v2/deals/{deal_id}/committee/pack.{kind}": {
+   "get": {
+    "description": "投委会包：投资备忘录 + 关键图表 + 风险清单 + 投票记录。内容哈希登记在案，可校验原件。",
+    "operationId": "pack_api_v2_deals__deal_id__committee_pack__kind__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "deal_id",
+      "required": true,
+      "schema": {
+       "title": "Deal Id",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "path",
+      "name": "kind",
+      "required": true,
+      "schema": {
+       "title": "Kind",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       },
+       "application/pdf": {},
+       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {}
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Pack",
+    "tags": [
+     "v2 · committee"
+    ]
+   }
+  },
+  "/api/v2/deals/{deal_id}/committee/packs": {
+   "get": {
+    "operationId": "packs_api_v2_deals__deal_id__committee_packs_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "deal_id",
+      "required": true,
+      "schema": {
+       "title": "Deal Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/PackOut"
+         },
+         "title": "Response Packs Api V2 Deals  Deal Id  Committee Packs Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Packs",
+    "tags": [
+     "v2 · committee"
+    ]
+   }
+  },
+  "/api/v2/deals/{deal_id}/committee/vote": {
+   "post": {
+    "description": "每人每版一票（可改票，留审计）；董事长一票否决。",
+    "operationId": "vote_api_v2_deals__deal_id__committee_vote_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "deal_id",
+      "required": true,
+      "schema": {
+       "title": "Deal Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/VoteIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CommitteeStatusOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Vote",
+    "tags": [
+     "v2 · committee"
+    ]
+   }
+  },
+  "/api/v2/deals/{deal_id}/conflicts": {
+   "get": {
+    "operationId": "conflicts_api_v2_deals__deal_id__conflicts_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "deal_id",
+      "required": true,
+      "schema": {
+       "title": "Deal Id",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "status",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Status"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/ConflictOut"
+         },
+         "title": "Response Conflicts Api V2 Deals  Deal Id  Conflicts Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Conflicts",
+    "tags": [
+     "v2 · documents"
+    ]
+   }
+  },
+  "/api/v2/deals/{deal_id}/conflicts/{conflict_id}/resolve": {
+   "post": {
+    "description": "裁决矛盾：采用哪个值、为什么（必填）。",
+    "operationId": "resolve_api_v2_deals__deal_id__conflicts__conflict_id__resolve_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "deal_id",
+      "required": true,
+      "schema": {
+       "title": "Deal Id",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "path",
+      "name": "conflict_id",
+      "required": true,
+      "schema": {
+       "title": "Conflict Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ConflictResolve"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ConflictOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Resolve",
+    "tags": [
+     "v2 · documents"
+    ]
+   }
+  },
+  "/api/v2/deals/{deal_id}/decisions": {
+   "get": {
+    "operationId": "decisions_api_v2_deals__deal_id__decisions_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "deal_id",
+      "required": true,
+      "schema": {
+       "title": "Deal Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/DecisionOut"
+         },
+         "title": "Response Decisions Api V2 Deals  Deal Id  Decisions Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Decisions",
+    "tags": [
+     "v2 · committee"
+    ]
+   },
+   "post": {
+    "description": "记 BUY / HOLD / PASS：理由 + 当时的数字快照 + 运行编号（复盘看当时原样）。",
+    "operationId": "decide_api_v2_deals__deal_id__decisions_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "deal_id",
+      "required": true,
+      "schema": {
+       "title": "Deal Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/DecisionIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DecisionOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Decide",
+    "tags": [
+     "v2 · committee"
+    ]
+   }
+  },
+  "/api/v2/deals/{deal_id}/devils-memo": {
+   "get": {
+    "description": "反方备忘录：这笔交易最可能怎么失败（确定性规则，不经 AI）。",
+    "operationId": "devils_memo_api_v2_deals__deal_id__devils_memo_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "deal_id",
+      "required": true,
+      "schema": {
+       "title": "Deal Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DevilsMemoOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Devils Memo",
+    "tags": [
+     "v2 · underwriting"
+    ]
+   }
+  },
+  "/api/v2/deals/{deal_id}/diff": {
+   "get": {
+    "description": "任意两版并排：假设与结果的逐项差异。",
+    "operationId": "diff_api_v2_deals__deal_id__diff_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "deal_id",
+      "required": true,
+      "schema": {
+       "title": "Deal Id",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "a",
+      "required": true,
+      "schema": {
+       "title": "A",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "b",
+      "required": true,
+      "schema": {
+       "title": "B",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DiffOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Diff",
+    "tags": [
+     "v2 · deals"
+    ]
+   }
+  },
+  "/api/v2/deals/{deal_id}/documents": {
+   "get": {
+    "operationId": "list_documents_api_v2_deals__deal_id__documents_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "deal_id",
+      "required": true,
+      "schema": {
+       "title": "Deal Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/DocOut"
+         },
+         "title": "Response List Documents Api V2 Deals  Deal Id  Documents Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "List Documents",
+    "tags": [
+     "v2 · documents"
+    ]
+   },
+   "post": {
+    "description": "上传 OM / 租金表 / T12 / 尽调文件（≤ 20MB，存 SHA-256 便于核对原件）。",
+    "operationId": "upload_document_api_v2_deals__deal_id__documents_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "deal_id",
+      "required": true,
+      "schema": {
+       "title": "Deal Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "multipart/form-data": {
+       "schema": {
+        "$ref": "#/components/schemas/Body_upload_document_api_v2_deals__deal_id__documents_post"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DocOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Upload Document",
+    "tags": [
+     "v2 · documents"
+    ]
+   }
+  },
+  "/api/v2/deals/{deal_id}/documents/{doc_id}": {
+   "get": {
+    "operationId": "download_document_api_v2_deals__deal_id__documents__doc_id__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "deal_id",
+      "required": true,
+      "schema": {
+       "title": "Deal Id",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "path",
+      "name": "doc_id",
+      "required": true,
+      "schema": {
+       "title": "Doc Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       },
+       "application/octet-stream": {}
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Download Document",
+    "tags": [
+     "v2 · documents"
+    ]
+   }
+  },
+  "/api/v2/deals/{deal_id}/documents/{doc_id}/extract": {
+   "post": {
+    "description": "从已上传的 PDF（OM / flyer / 卖方材料）提取候选字段与租户行；不改承销，逐条采用后才写入。",
+    "operationId": "extract_api_v2_deals__deal_id__documents__doc_id__extract_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "deal_id",
+      "required": true,
+      "schema": {
+       "title": "Deal Id",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "path",
+      "name": "doc_id",
+      "required": true,
+      "schema": {
+       "title": "Doc Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ExtractOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Extract",
+    "tags": [
+     "v2 · intake & exports"
+    ]
+   }
+  },
+  "/api/v2/deals/{deal_id}/events": {
+   "get": {
+    "description": "日志标签页：阶段推进、版本、证据、矛盾、投票、决策、文件……按时间倒序。",
+    "operationId": "events_api_v2_deals__deal_id__events_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "deal_id",
+      "required": true,
+      "schema": {
+       "title": "Deal Id",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "limit",
+      "required": false,
+      "schema": {
+       "default": 200,
+       "maximum": 1000,
+       "minimum": 1,
+       "title": "Limit",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/EventOut"
+         },
+         "title": "Response Events Api V2 Deals  Deal Id  Events Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Events",
+    "tags": [
+     "v2 · deals"
+    ]
+   }
+  },
+  "/api/v2/deals/{deal_id}/evidence": {
+   "post": {
+    "description": "登记一个数字的来源；与其他来源数值不一致时自动开一条矛盾。",
+    "operationId": "add_evidence_api_v2_deals__deal_id__evidence_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "deal_id",
+      "required": true,
+      "schema": {
+       "title": "Deal Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/EvidenceIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/EvidenceOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Add Evidence",
+    "tags": [
+     "v2 · documents"
+    ]
+   }
+  },
+  "/api/v2/deals/{deal_id}/export/{kind}": {
+   "get": {
+    "description": "按当前承销版本导出。\n\nmemo 投资备忘录 PDF · model 核保明细 Excel · tearsheet 一页纸（商业）· report 经典核保报告（商业）。",
+    "operationId": "export_api_v2_deals__deal_id__export__kind__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "deal_id",
+      "required": true,
+      "schema": {
+       "title": "Deal Id",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "path",
+      "name": "kind",
+      "required": true,
+      "schema": {
+       "enum": [
+        "memo",
+        "model",
+        "tearsheet",
+        "report"
+       ],
+       "title": "Kind",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       },
+       "application/pdf": {},
+       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {}
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Export",
+    "tags": [
+     "v2 · intake & exports"
+    ]
+   }
+  },
+  "/api/v2/deals/{deal_id}/gate": {
+   "get": {
+    "operationId": "gate_api_v2_deals__deal_id__gate_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "deal_id",
+      "required": true,
+      "schema": {
+       "title": "Deal Id",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "target",
+      "required": true,
+      "schema": {
+       "enum": [
+        "sourcing",
+        "screening",
+        "underwriting",
+        "committee",
+        "diligence",
+        "closing",
+        "holding",
+        "passed"
+       ],
+       "title": "Target",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/GateOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Gate",
+    "tags": [
+     "v2 · deals"
+    ]
+   }
+  },
+  "/api/v2/deals/{deal_id}/holding": {
+   "get": {
+    "description": "偏差表 + 事后归因（对照 BUY 决策时冻结的那一版：当时错在哪条假设）。",
+    "operationId": "holding_report_api_v2_deals__deal_id__holding_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "deal_id",
+      "required": true,
+      "schema": {
+       "title": "Deal Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HoldingOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Holding Report",
+    "tags": [
+     "v2 · portfolio"
+    ]
+   }
+  },
+  "/api/v2/deals/{deal_id}/max-bid": {
+   "post": {
+    "description": "输入目标 IRR / DSCR 等，反算最高出价；同时满足淘汰条件，写明卡住价格的约束。",
+    "operationId": "max_bid_api_v2_deals__deal_id__max_bid_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "deal_id",
+      "required": true,
+      "schema": {
+       "title": "Deal Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/MaxBidIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/MaxBidOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Max Bid",
+    "tags": [
+     "v2 · underwriting"
+    ]
+   }
+  },
+  "/api/v2/deals/{deal_id}/passport": {
+   "get": {
+    "description": "点开任一数字：来源文件第几页、抽取方式、可信度、复核、新鲜度、谁在何时改过、相关矛盾。",
+    "operationId": "passport_api_v2_deals__deal_id__passport_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "deal_id",
+      "required": true,
+      "schema": {
+       "title": "Deal Id",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "field",
+      "required": true,
+      "schema": {
+       "title": "Field",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PassportDetail"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Passport",
+    "tags": [
+     "v2 · documents"
+    ]
+   }
+  },
+  "/api/v2/deals/{deal_id}/passports": {
+   "get": {
+    "description": "全部字段的当前数字护照（每字段最新一条）。",
+    "operationId": "passports_api_v2_deals__deal_id__passports_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "deal_id",
+      "required": true,
+      "schema": {
+       "title": "Deal Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/PassportOut"
+         },
+         "title": "Response Passports Api V2 Deals  Deal Id  Passports Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Passports",
+    "tags": [
+     "v2 · documents"
+    ]
+   }
+  },
+  "/api/v2/deals/{deal_id}/price-check": {
+   "post": {
+    "description": "试算出价：拖动“出价空间”时按该价重跑当前版本，返回指标与淘汰条件逐条结果（不保存）。",
+    "operationId": "price_check_api_v2_deals__deal_id__price_check_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "deal_id",
+      "required": true,
+      "schema": {
+       "title": "Deal Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PriceCheckIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PriceCheckOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Price Check",
+    "tags": [
+     "v2 · underwriting"
+    ]
+   }
+  },
+  "/api/v2/deals/{deal_id}/redteam": {
+   "get": {
+    "description": "最可能出错的 5 个假设 + 每个 ±10% 对主回报的影响（龙卷风图）；同时给出客观定义的关键数字。",
+    "operationId": "redteam_api_v2_deals__deal_id__redteam_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "deal_id",
+      "required": true,
+      "schema": {
+       "title": "Deal Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/RedTeamOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Redteam",
+    "tags": [
+     "v2 · underwriting"
+    ]
+   }
+  },
+  "/api/v2/deals/{deal_id}/redteam/read": {
+   "post": {
+    "description": "标记当前版本的红队面板已读（进投委会关卡之一）。",
+    "operationId": "redteam_read_api_v2_deals__deal_id__redteam_read_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "deal_id",
+      "required": true,
+      "schema": {
+       "title": "Deal Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/RedTeamReadOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Redteam Read",
+    "tags": [
+     "v2 · underwriting"
+    ]
+   }
+  },
+  "/api/v2/deals/{deal_id}/review": {
+   "post": {
+    "description": "把字段当前来源标为已复核（记复核人、时间）。",
+    "operationId": "review_api_v2_deals__deal_id__review_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "deal_id",
+      "required": true,
+      "schema": {
+       "title": "Deal Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ReviewIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PassportOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Review",
+    "tags": [
+     "v2 · documents"
+    ]
+   }
+  },
+  "/api/v2/deals/{deal_id}/scenarios": {
+   "post": {
+    "description": "基准 / 乐观 / 悲观加概率：期望回报与亏损概率。不传 scenarios 用默认三情景。",
+    "operationId": "run_scenarios_api_v2_deals__deal_id__scenarios_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "deal_id",
+      "required": true,
+      "schema": {
+       "title": "Deal Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ScenariosIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ScenariosOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Run Scenarios",
+    "tags": [
+     "v2 · underwriting"
+    ]
+   }
+  },
+  "/api/v2/deals/{deal_id}/stage": {
+   "post": {
+    "description": "推进 / 回退阶段。关卡未过 → 409，响应 gate 字段列出逐项检查。",
+    "operationId": "advance_api_v2_deals__deal_id__stage_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "deal_id",
+      "required": true,
+      "schema": {
+       "title": "Deal Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/StageAdvance"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/StageResultOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Advance",
+    "tags": [
+     "v2 · deals"
+    ]
+   }
+  },
+  "/api/v2/deals/{deal_id}/tasks": {
+   "get": {
+    "operationId": "tasks_api_v2_deals__deal_id__tasks_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "deal_id",
+      "required": true,
+      "schema": {
+       "title": "Deal Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/TaskOut"
+         },
+         "title": "Response Tasks Api V2 Deals  Deal Id  Tasks Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Tasks",
+    "tags": [
+     "v2 · committee"
+    ]
+   },
+   "post": {
+    "operationId": "add_task_api_v2_deals__deal_id__tasks_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "deal_id",
+      "required": true,
+      "schema": {
+       "title": "Deal Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/TaskIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/TaskOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Add Task",
+    "tags": [
+     "v2 · committee"
+    ]
+   }
+  },
+  "/api/v2/deals/{deal_id}/tasks/{task_id}": {
+   "patch": {
+    "operationId": "patch_task_api_v2_deals__deal_id__tasks__task_id__patch",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "deal_id",
+      "required": true,
+      "schema": {
+       "title": "Deal Id",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "path",
+      "name": "task_id",
+      "required": true,
+      "schema": {
+       "title": "Task Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/TaskPatch"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/TaskOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Patch Task",
+    "tags": [
+     "v2 · committee"
+    ]
+   }
+  },
+  "/api/v2/deals/{deal_id}/verify-queue": {
+   "get": {
+    "description": "先核哪个：每处待核（矛盾 / 未复核关键数字）按对主回报指标的摆动排序。",
+    "operationId": "verify_queue_api_v2_deals__deal_id__verify_queue_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "deal_id",
+      "required": true,
+      "schema": {
+       "title": "Deal Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/VerifyQueueOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Verify Queue",
+    "tags": [
+     "v2 · underwriting"
+    ]
+   }
+  },
+  "/api/v2/deals/{deal_id}/versions": {
+   "get": {
+    "operationId": "versions_api_v2_deals__deal_id__versions_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "deal_id",
+      "required": true,
+      "schema": {
+       "title": "Deal Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/VersionOut"
+         },
+         "title": "Response Versions Api V2 Deals  Deal Id  Versions Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Versions",
+    "tags": [
+     "v2 · deals"
+    ]
+   },
+   "post": {
+    "description": "保存一版承销：跑模型、生成可复现运行编号、设为当前版。",
+    "operationId": "save_version_api_v2_deals__deal_id__versions_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "deal_id",
+      "required": true,
+      "schema": {
+       "title": "Deal Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/VersionCreate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/VersionOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Save Version",
+    "tags": [
+     "v2 · deals"
+    ]
+   }
+  },
+  "/api/v2/deals/{deal_id}/versions/{version_id}": {
+   "get": {
+    "operationId": "get_version_api_v2_deals__deal_id__versions__version_id__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "deal_id",
+      "required": true,
+      "schema": {
+       "title": "Deal Id",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "path",
+      "name": "version_id",
+      "required": true,
+      "schema": {
+       "title": "Version Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/VersionOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Get Version",
+    "tags": [
+     "v2 · deals"
+    ]
+   }
+  },
+  "/api/v2/health": {
+   "get": {
+    "description": "存活 + 数据库连通 + 迁移版本 + 引擎版本（部署后第一动作）。",
+    "operationId": "health_api_v2_health_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HealthOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Health",
+    "tags": [
+     "v2 · admin"
+    ]
+   }
+  },
+  "/api/v2/legacy/projects": {
+   "get": {
+    "description": "老版（v1）保存过的项目，标出已导入到哪笔交易。",
+    "operationId": "legacy_projects_api_v2_legacy_projects_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/LegacyProjectOut"
+         },
+         "title": "Response Legacy Projects Api V2 Legacy Projects Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Legacy Projects",
+    "tags": [
+     "v2 · intake & exports"
+    ]
+   }
+  },
+  "/api/v2/legacy/projects/{kind}/{pid}/import": {
+   "post": {
+    "description": "把一个老版项目导入为新交易，输入原样带成第一版承销；同一项目不重复导入。",
+    "operationId": "legacy_import_api_v2_legacy_projects__kind___pid__import_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "kind",
+      "required": true,
+      "schema": {
+       "enum": [
+        "project",
+        "uw"
+       ],
+       "title": "Kind",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "pid",
+      "required": true,
+      "schema": {
+       "title": "Pid",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/LegacyImportOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Legacy Import",
+    "tags": [
+     "v2 · intake & exports"
+    ]
+   }
+  },
+  "/api/v2/me": {
+   "get": {
+    "operationId": "me_api_v2_me_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/MeOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Me",
+    "tags": [
+     "v2 · admin"
+    ]
+   }
+  },
+  "/api/v2/model/{track}": {
+   "post": {
+    "description": "不保存的试算（模型页左改假设、右侧实时更新）。",
+    "operationId": "preview_api_v2_model__track__post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "track",
+      "required": true,
+      "schema": {
+       "enum": [
+        "residential",
+        "commercial"
+       ],
+       "title": "Track",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "additionalProperties": true,
+        "title": "Inputs",
+        "type": "object"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ModelOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Preview",
+    "tags": [
+     "v2 · underwriting"
+    ]
+   }
+  },
+  "/api/v2/portfolio": {
+   "get": {
+    "description": "持有中交易汇总：笔数、合计收购价、加权现金回报。",
+    "operationId": "portfolio_api_v2_portfolio_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PortfolioOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Portfolio",
+    "tags": [
+     "v2 · portfolio"
+    ]
+   }
+  },
+  "/api/v2/research": {
+   "post": {
+    "description": "按地址或房源链接搜集公开信息（慢：多次公网抓取，约 30–90 秒）；每个字段带来源与可信度。",
+    "operationId": "research_api_v2_research_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ResearchIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ResearchOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Research",
+    "tags": [
+     "v2 · intake & exports"
+    ]
+   }
+  },
+  "/api/v2/runs/{run_id}": {
+   "get": {
+    "description": "按运行编号取回当时的输入与输出原样（半年后也一样）。",
+    "operationId": "get_run_api_v2_runs__run_id__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "run_id",
+      "required": true,
+      "schema": {
+       "title": "Run Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/RunOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Get Run",
+    "tags": [
+     "v2 · deals"
+    ]
+   }
+  },
+  "/api/v2/runs/{run_id}/verify": {
+   "post": {
+    "description": "用当前引擎重算并比对结果哈希：identical=true 即分毫不差。",
+    "operationId": "verify_run_api_v2_runs__run_id__verify_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "run_id",
+      "required": true,
+      "schema": {
+       "title": "Run Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/RunVerifyOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Verify Run",
+    "tags": [
+     "v2 · deals"
+    ]
+   }
+  },
+  "/api/v2/settings/data-sources": {
+   "get": {
+    "operationId": "data_sources_api_v2_settings_data_sources_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/DataSourceOut"
+         },
+         "title": "Response Data Sources Api V2 Settings Data Sources Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Data Sources",
+    "tags": [
+     "v2 · admin"
+    ]
+   }
+  },
+  "/api/v2/settings/templates": {
+   "get": {
+    "operationId": "templates_api_v2_settings_templates_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "kind",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Kind"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/TemplateOut"
+         },
+         "title": "Response Templates Api V2 Settings Templates Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Templates",
+    "tags": [
+     "v2 · admin"
+    ]
+   },
+   "put": {
+    "operationId": "save_template_api_v2_settings_templates_put",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/TemplateIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/TemplateOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Save Template",
+    "tags": [
+     "v2 · admin"
+    ]
+   }
+  },
+  "/api/v2/settings/views": {
+   "get": {
+    "operationId": "views_api_v2_settings_views_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/ViewOut"
+         },
+         "title": "Response Views Api V2 Settings Views Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Views",
+    "tags": [
+     "v2 · admin"
+    ]
+   },
+   "put": {
+    "operationId": "save_view_api_v2_settings_views_put",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ViewIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ViewOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Save View",
+    "tags": [
+     "v2 · admin"
+    ]
+   }
+  },
+  "/api/v2/settings/views/{view_id}": {
+   "delete": {
+    "operationId": "delete_view_api_v2_settings_views__view_id__delete",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "view_id",
+      "required": true,
+      "schema": {
+       "title": "View Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Delete View",
+    "tags": [
+     "v2 · admin"
+    ]
+   }
+  }
+ }
+}
