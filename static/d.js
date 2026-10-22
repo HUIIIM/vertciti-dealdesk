@@ -1003,6 +1003,77 @@ function renderZone1() {
    商业 = 退出 cap × 租金增长率 → IRR（复用 state.sens，/api/com/sensitivity 原生 5×5）；
    住宅 = 利率 × 空置率 → 月现金流（调 /api/sensitivity，tiers 必须为合法数组，P0-2 标量 422）。
    失败静默不出表，绝不编数字。 */
+/* NOI 调整桥 → 横向 waterfall（SVG，DNA：起点墨、扣减红、银行口径结果橙=指针，虚线连接）。
+   rows[0] 为起点（绝对值），末行为银行口径 NOI（绝对值），中间行为带符号调整。不编数：只画后端给的行。 */
+function wfChart(rows) {
+  if (!rows || rows.length < 2) return '';
+  const W = 760, rowH = 30, labW = 250, valW = 104, padT = 6;
+  const H = padT * 2 + rowH * rows.length;
+  const last = rows.length - 1;
+  let run = 0; const segs = [];
+  rows.forEach((r, i) => {
+    const a = Number(r.amount) || 0;
+    if (i === 0) { segs.push({from: 0, to: a, kind: 'start'}); run = a; }
+    else if (i === last) { segs.push({from: 0, to: a, kind: 'total'}); }
+    else { segs.push({from: run, to: run + a, kind: a < 0 ? 'neg' : 'pos'}); run += a; }
+  });
+  const vals = segs.flatMap(g => [g.from, g.to]);
+  const lo = Math.min(0, ...vals), hi = Math.max(0, ...vals) || 1;
+  const x = v => labW + (v - lo) / (hi - lo) * (W - labW - valW);
+  const col = {start: '#000000', neg: '#C62828', pos: '#3F3F3F', total: '#FF4713'};
+  let g = `<svg class="wf-chart" viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${esc(T('NOI 银行调整桥 waterfall'))}">`;
+  g += `<line x1="${x(0)}" y1="0" x2="${x(0)}" y2="${H}" stroke="#DEDEDE"/>`;
+  segs.forEach((sg, i) => {
+    const r = rows[i], y = padT + i * rowH;
+    const x0 = x(Math.min(sg.from, sg.to)), w = Math.max(2, Math.abs(x(sg.to) - x(sg.from)));
+    const lbl = String(r.item || '');
+    const short = lbl.length > 22 ? lbl.slice(0, 21) + '…' : lbl;
+    const isT = sg.kind === 'total';
+    g += `<g><title>${esc(lbl + ' · ' + fmt$(r.amount) + (r.basis ? ' — ' + r.basis : ''))}</title>`;
+    g += `<text x="${labW - 10}" y="${y + rowH / 2 + 4}" text-anchor="end" font-size="12" font-weight="${isT ? 800 : 400}" fill="${isT ? '#000' : '#3F3F3F'}">${esc(short)}</text>`;
+    g += `<rect x="${x0.toFixed(1)}" y="${y + 6}" width="${w.toFixed(1)}" height="${rowH - 12}" fill="${col[sg.kind]}"/>`;
+    g += `<text x="${W - 4}" y="${y + rowH / 2 + 4}" text-anchor="end" font-size="12" font-weight="${isT ? 800 : 600}" fill="${sg.kind === 'neg' ? '#C62828' : '#000'}" style="font-variant-numeric:tabular-nums">${fmt$(r.amount)}</text></g>`;
+    if (i < last) {
+      g += `<line x1="${x(sg.to).toFixed(1)}" y1="${y + rowH - 6}" x2="${x(sg.to).toFixed(1)}" y2="${y + rowH + 6}" stroke="#6B6B6B" stroke-dasharray="2 2"/>`;
+    }
+  });
+  return g + '</svg>';
+}
+
+/* 热力格底色：发散编码（DNA，无绿）——负值红、正值中性墨、零点白；深浅 = |值|/全表最大|值|。
+   文字保持墨/红，底色透明度封顶 0.28 以保证 AA 对比。 */
+function heatStyle(v, maxAbs) {
+  if (v == null || !maxAbs) return '';
+  const a = Math.min(0.28, 0.06 + 0.22 * Math.abs(v) / maxAbs).toFixed(3);
+  return v < 0 ? `background:rgba(198,40,40,${a})` : `background:rgba(63,63,63,${a})`;
+}
+function buildHeatTable(cornerLbl, colLbls, rowLbls, cells, getV, fmtV) {
+  let maxAbs = 0;
+  cells.forEach(r => r.forEach(c => { const v = getV(c); if (v != null) maxAbs = Math.max(maxAbs, Math.abs(v)); }));
+  let h = `<thead><tr><th>${cornerLbl}</th>` + colLbls.map(l => `<th>${l}</th>`).join('') + '</tr></thead><tbody>';
+  cells.forEach((row, i) => {
+    h += `<tr><th>${rowLbls[i]}</th>`;
+    row.forEach((cell, j) => {
+      const v = getV(cell);
+      const cls = v == null ? 'sm-na' : (v >= 0 ? 'sm-pos' : 'sm-neg');
+      const base = (i === 2 && j === 2) ? ';outline:3px solid var(--orange);outline-offset:-3px;font-weight:800' : '';
+      const tip = v == null ? T('无数据') : fmtV(v);
+      h += `<td class="${cls}" style="${heatStyle(v, maxAbs)}${base}" title="${esc(rowLbls[i] + ' × ' + colLbls[j] + ' = ' + tip)}">${fmtV(v)}</td>`;
+    });
+    h += '</tr>';
+  });
+  return h + '</tbody>';
+}
+function heatLegend() {
+  return `<span class="sm-legend"><i style="background:rgba(198,40,40,.24)"></i>${T('负值（越深越差）')}`
+    + `<i style="background:rgba(63,63,63,.24)"></i>${T('正值（越深越好）')}`
+    + `<i style="background:#fff;outline:3px solid var(--orange);outline-offset:-3px"></i>${T('当前假设')}</span>`;
+}
+
+/* B1-07：verdict hero 下 5×5 敏感性热力图。
+   商业 = 退出 cap × 租金增长率 → IRR（复用 state.sens，/api/com/sensitivity 原生 5×5）；
+   住宅 = 利率 × 空置率 → 月现金流（调 /api/sensitivity，tiers 必须为合法数组，P0-2 标量 422）。
+   失败静默不出表，绝不编数字。 */
 async function renderSensMatrix() {
   const wrap = $('#sensMatrixWrap'), tbl = $('#sensMatrix');
   if (!wrap || !tbl) return;
@@ -1012,21 +1083,10 @@ async function renderSensMatrix() {
       const s = state.sens;
       if (!s || !s.cells || s.cells.length !== 5) return;
       const offLbl = bps => (bps > 0 ? '+' : '') + bps + 'bps';
-      let h = '<thead><tr><th>' + T('租金增长 ＼ 退出 cap') + '</th>';
-      s.exit_caps.forEach(c => { h += `<th>${fmtPct(c, 2)}</th>`; });
-      h += '</tr></thead><tbody>';
-      s.cells.forEach((row, i) => {
-        h += `<tr><th>${offLbl(s.growth_offsets_bps[i])}</th>`;
-        row.forEach((cell, j) => {
-          const v = cell.irr;
-          const cls = v == null ? 'sm-na' : (v >= 0 ? 'sm-pos' : 'sm-neg');
-          const base = (i === 2 && j === 2) ? ' style="outline:2px solid var(--teal)"' : '';
-          h += `<td class="${cls}"${base}>${fmtPct(v, 1)}</td>`;
-        });
-        h += '</tr>';
-      });
-      tbl.innerHTML = h + '</tbody>';
-      $('#sensMatrixNote').textContent = T('格子 = IRR；中心格为当前基准假设。改价/改假设后点"重新计算"刷新。');
+      tbl.innerHTML = buildHeatTable(T('租金增长 ＼ 退出 cap'),
+        s.exit_caps.map(c => fmtPct(c, 2)), s.growth_offsets_bps.map(offLbl),
+        s.cells, c => c.irr, v => fmtPct(v, 1));
+      $('#sensMatrixNote').innerHTML = esc(T('格子 = IRR；橙框为当前基准假设。改价/改假设后点"重新计算"刷新。')) + ' ' + heatLegend();
     } else {
       const input = buildScoreInput();
       const tiers = {rate_bps: [-200, -100, 0, 100, 200],
@@ -1035,21 +1095,10 @@ async function renderSensMatrix() {
       const r = await api('POST', '/api/sensitivity', {track: 'residential', input, tiers});
       const m = r && r.matrix;
       if (!m || !m.cells || m.cells.length !== 5) return;
-      let h = '<thead><tr><th>' + T('空置 ＼ 利率') + '</th>';
-      m.x_labels.forEach(l => { h += `<th>${esc(l)}</th>`; });
-      h += '</tr></thead><tbody>';
-      m.cells.forEach((row, i) => {
-        h += `<tr><th>${esc(m.y_labels[i])}</th>`;
-        row.forEach((cell, j) => {
-          const v = cell.cash_flow_monthly;
-          const cls = v == null ? 'sm-na' : (v >= 0 ? 'sm-pos' : 'sm-neg');
-          const base = (i === 2 && j === 2) ? ' style="outline:2px solid var(--teal)"' : '';
-          h += `<td class="${cls}"${base}>${fmt$(v)}</td>`;
-        });
-        h += '</tr>';
-      });
-      tbl.innerHTML = h + '</tbody>';
-      $('#sensMatrixNote').textContent = T('格子 = 月现金流；中心格为当前基准假设。改价/改假设后点"重新计算"刷新。');
+      tbl.innerHTML = buildHeatTable(T('空置 ＼ 利率'),
+        m.x_labels.map(esc), m.y_labels.map(esc),
+        m.cells, c => c.cash_flow_monthly, v => fmt$(v));
+      $('#sensMatrixNote').innerHTML = esc(T('格子 = 月现金流；橙框为当前基准假设。改价/改假设后点"重新计算"刷新。')) + ' ' + heatLegend();
     }
     wrap.hidden = false;
   } catch (e) { /* 静默，不出表 */ }
@@ -1541,7 +1590,7 @@ function renderZone4() {
     <table class="data"><thead><tr><th>${T('单元')}</th><th>${T('租户')}</th><th class="num">${T('面积')}</th><th class="num">${T('月租金')}</th><th>${T('租期')}</th><th>${T('费用结构')}</th></tr></thead>
     <tbody>${rows || '<tr><td colspan="6">' + T('无租户行') + '</td></tr>'}</tbody></table>
     <p class="note">${T('WALT {0} · 前三租户集中度 {1}{2}', rr.walt_years != null ? rr.walt_years + T(' 年（租金加权）') : '—：' + esc(rr.walt_note), fmtPct(rr.top3_concentration), rr.top3_flag ? T('（>60% 单租户风险）') : '')}</p>
-    <p class="zsub">${T('NOI 银行调整桥 waterfall')}</p>${bridge}
+    <p class="zsub">${T('NOI 银行调整桥 waterfall')}</p>${wfChart(uw.noi_bank_bridge.rows)}${bridge}
     <p class="zsub">${T('未来 5 年到期租金（到期悬崖标红）')}</p>${ladder}
     <p class="zsub">${T('DSCR 双轨')}</p>
     <div class="formula">
