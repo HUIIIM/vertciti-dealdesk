@@ -93,6 +93,39 @@ class Debt(_In):
         return self
 
 
+class Mezz(_In):
+    """夹层贷款：交割时与优先贷款一起放款，只付息，退出（或再融资）时偿清。"""
+
+    ltv_pct: Pct | None = Field(default=None, gt=0, le=40, description="夹层占收购价的比例（在优先贷款之上）")
+    amount: float | None = Field(default=None, gt=0, description="夹层金额；与 ltv_pct 二选一")
+    rate_pct: Pct = Field(default=11, ge=0, le=30)
+    orig_fee_pct: Pct = Field(default=1, ge=0, le=10)
+
+    @model_validator(mode="after")
+    def _one_size(self) -> Mezz:
+        if (self.ltv_pct is None) == (self.amount is None):
+            raise ValueError("夹层：金额与 LTV 填且只填一个")
+        return self
+
+
+class Refinance(_In):
+    """再融资：在第 month 月按届时的物业价值重新贷款，偿清原优先贷款（与夹层），净额分给股权（负数 = 需补钱）。
+
+    新贷款额 = min(LTV × 价值, 按最低 DSCR 反推, 按最低债务收益率反推)；价值 = 再融资月起 12 个月 NOI ÷ 估值资本化率。
+    """
+
+    month: int = Field(ge=1, le=359, description="交割后第几个月再融资")
+    value_cap_pct: Pct = Field(gt=0, le=25, description="估值资本化率")
+    ltv_pct: Pct = Field(default=65, gt=0, le=90)
+    min_dscr: float | None = Field(default=1.25, gt=0, le=5, description="按最低 DSCR 限额；空 = 不限")
+    min_debt_yield_pct: Pct | None = Field(default=None, gt=0, le=30, description="按最低债务收益率限额；空 = 不限")
+    rate_pct: Pct = Field(default=6.0, ge=0, le=30)
+    io_months: int = Field(default=0, ge=0, le=360)
+    amort_years: int = Field(default=30, ge=1, le=40)
+    costs_pct: Pct = Field(default=1, ge=0, le=10, description="再融资费用：占新贷款")
+    repay_mezz: bool = Field(default=True, description="再融资时一并偿清夹层")
+
+
 class Tier(_In):
     irr_pct: Pct = Field(gt=0, le=100, description="LP 达到此 IRR 后进入下一档分配")
     lp_share_pct: Pct = Field(gt=0, le=100, description="本档（上一门槛到本门槛之间）LP 拿的现金比例")
@@ -180,6 +213,8 @@ class CreInputs(_In):
     general_vacancy_pct: Pct = Field(default=5, ge=0, le=50, description="一般空置：会扣除已建模的周转空置后再计")
     credit_loss_pct: Pct = Field(default=1, ge=0, le=20)
     debt: Debt | None = None
+    mezz: Mezz | None = None
+    refinance: Refinance | None = None
     exit_cap_pct: Pct = Field(gt=0, le=25)
     exit_noi_basis: Literal["forward", "stabilized"] = Field(
         default="forward",
@@ -205,6 +240,8 @@ class CreInputs(_In):
 
     @model_validator(mode="after")
     def _space(self) -> CreInputs:
+        if self.refinance is not None and self.refinance.month >= self.hold_years * 12:
+            raise ValueError(f"再融资月（第 {self.refinance.month} 月）必须早于出售（第 {self.hold_years * 12} 月）")
         if self.property_type == "multifamily":
             if not self.unit_mix:
                 raise ValueError("多户公寓需要户型表（unit_mix）")

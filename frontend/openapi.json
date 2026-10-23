@@ -2370,6 +2370,18 @@
       "title": "Monthly",
       "type": "object"
      },
+     "refinance": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Refinance"
+     },
      "rent_roll": {
       "items": {
        "additionalProperties": true,
