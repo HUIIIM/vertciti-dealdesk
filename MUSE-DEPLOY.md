@@ -1,7 +1,8 @@
-# 给 Muse：DealDesk v2 上线指令
+# 给 Muse：DealDesk 上线指令（当前：2.1.0 机构级引擎）
 
-> 目标：让 `dealdesk.vercel.app` 跑上 v2（新工作台在 `/app/`）。
-> 代码已在 GitHub：`v2` 分支，PR #3（https://github.com/HUIIIM/vertciti-dealdesk/pull/3）。**不用 bundle，也不要再开 PR。**
+> 目标：让生产从 2.0.0 升到 **2.1.0**（新增机构级赛道：逐租约 / 按户型逐月、夹层 / 再融资 / 施工贷、瀑布、带公式 Excel）。
+> 代码：PR #23 合入 `main` 后，从 `main` 部署（#23 已含 #21，合完关掉 #21）。**不用 bundle，也不要再开 PR。**
+> 本次**没有数据库迁移**（revision 仍是 0002）、**没有新增环境变量**；路由片段 `docs/deploy/vercel-v2.json` 未变。
 > 全程遵守仓库 `AGENTS.md`；任何一步失败就停下报告，不要硬推。
 
 ## 0. 前提
@@ -9,7 +10,7 @@
 
 ## 1. 取代码
 ```bash
-git fetch origin v2 && git checkout v2   # 以 PR #3 的最新提交为准
+git fetch origin main && git checkout main && git pull origin main   # #23 合入后的 main
 ```
 
 ## 2. 本机质量门（全部必须通过）
@@ -23,7 +24,7 @@ cd frontend && npx -y npm@11.21.0 ci && npm run typecheck && npm run lint && npm
 ```
 
 ## 3. PR
-PR #3 已开（Claude 维护，CI 红了会自动修）。等它 CI 绿、HUIIIM 合并后，从 `main` 部署。
+PR #23 由 Claude 维护（CI 红了会修）。等 HUIIIM 合并后，从 `main` 部署。README（#22）放在 #23 之后合，否则 README 里的 v2 截图会断链。
 
 ## 4. Vercel 生产环境变量（项目 `vertciti-dealdesk`，Production）
 | 变量 | 值 | 说明 |
@@ -59,7 +60,22 @@ bash tools/pre_deploy_diff_gate.sh          # 必须 exit 0
 3. 右上角切 EN/中文，界面跟着变。
 4. 新建一笔交易→刷新→还在（证明 Postgres 生效）。
 5. 手机宽度打开：只读、不报错。
-6. 截图 1–5 发回给 HUIIIM。
+6. `curl https://vertciti-dealdesk.vercel.app/api/v2/health` → `"version":"2.1.0"`（还是 2.0.0 就说明没发上去）；
+   `curl https://vertciti-dealdesk.vercel.app/api/v2/cre/example` → 401（需要登录），**不是 404**（404 = 机构级代码没上去）。
+7. 机构级验收（令牌用 chairman 的，**不要贴进日志或聊天**；示例是演示数据，验完可在界面里放弃该交易）：
+   ```bash
+   B=https://vertciti-dealdesk.vercel.app/api/v2; H="Authorization: Bearer $DD_TOKEN"
+   for k in office multifamily development; do
+     ex=$(curl -s -H "$H" "$B/cre/example?kind=$k")
+     id=$(curl -s -H "$H" -H 'Content-Type: application/json' -X POST "$B/deals" \
+          -d "{\"name\":\"上线验收 · $k\",\"track\":\"institutional\",\"kill_criteria\":[]}" | python3 -c 'import sys,json;print(json.load(sys.stdin)["id"])')
+     curl -s -o /dev/null -w "$k version %{http_code}\n" -H "$H" -H 'Content-Type: application/json' -X POST "$B/deals/$id/versions" -d "{\"inputs\":$ex,\"label\":\"验收\"}"
+     echo "$k → https://vertciti-dealdesk.vercel.app/app/#/deals/$id"
+   done
+   ```
+   三个 version 都是 201。再用真浏览器打开打印出的三个链接：结论卡出 IRR / DSCR / 债务收益率，“租金表”“模型”页有数；
+   导出卡里“承销模型 Excel（带公式）”与“机构投委会备忘录 PDF”能下载、能打开。
+8. 截图 1–7 发回给 HUIIIM。上线后告诉 Claude 部署日期，CHANGELOG 的 2.1.0 由“未发布”改成日期。
 
 ## 8. 发布前
 跑敏感扫描：`bash ~/workspace/vertcity/security-watch/data-room-gate.sh`，FAIL 则停。
