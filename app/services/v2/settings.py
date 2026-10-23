@@ -13,7 +13,6 @@ from app.domain.v2 import kill_criteria
 from app.services.persistence import audit
 from app.services.persistence.engine import session_scope
 from app.services.persistence.schema import AuditLog, SavedView, Template, User
-from app.services.v2 import google_auth
 from app.services.v2.errors import ConflictError, InvalidInputError, NotFoundError
 from app.services.v2.serialize import row
 
@@ -173,8 +172,6 @@ def data_sources() -> list[JSON]:
         {"key": "census", "label": T("Census 人口与就业"), "configured": True, "detail": T("公开接口，免 key")},
         {"key": "web", "label": T("公开网页（遵守 robots.txt）"), "configured": True, "detail": T(
             "失败诚实降级为手动录入")},
-        {"key": "google_login", "label": T("Google 登录"), "configured": google_auth.configured(),
-         "detail": T("邀请制：在“用户”里登记邮箱的人可用 Google 账号登录；配置见 docs/GOOGLE-LOGIN.md")},
         {"key": "database", "label": T("数据库"), "configured": True,
          "detail": T("Postgres（DATABASE_URL）") if os.environ.get("DATABASE_URL") else T("SQLite（本机开发）")},
     ]

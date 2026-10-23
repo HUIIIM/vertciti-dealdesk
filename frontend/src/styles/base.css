@@ -352,12 +352,3 @@ table.t a.rowlink:hover { text-decoration: underline; }
   font-size: 13px; color: var(--text-2); }
 @media print { .brandbar, .appbar, .tabs, .draftbar, .no-print { display: none !important; } body { background: #fff; }
   *, *::before, *::after { animation: none !important; } }
-
-/* 设置 · 系统：状态格（与结论卡指标格同一节奏） */
-.sys-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1px; background: var(--border); border: 1px solid var(--border); }
-.sys-tile { display: grid; gap: 6px; align-content: start; padding: var(--s3); background: var(--surface); min-height: 112px; }
-.sys-tile .k { font-size: 12px; font-weight: 800; letter-spacing: .04em; color: var(--text-3); }
-.sys-tile .v { font-size: 20px; font-weight: 800; }
-.sys-tile .d { font-size: 13px; color: var(--text-2); overflow-wrap: anywhere; }
-.nowrap { white-space: nowrap; }
-.audit-diff { font-size: 13px; overflow-wrap: anywhere; max-width: 520px; }

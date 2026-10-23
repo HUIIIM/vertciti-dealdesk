@@ -220,7 +220,7 @@ def test_health_catalog_and_templates(client):
                                                                                "threshold": 1.4}]}}).status_code == 200
     v = c.put("/api/v2/settings/views", json={"name": "只看商业", "config": {"track": "commercial"}}).json()
     assert c.delete(f"/api/v2/settings/views/{v['id']}").status_code == 204
-    assert len(c.get("/api/v2/settings/data-sources").json()) == 6
+    assert len(c.get("/api/v2/settings/data-sources").json()) == 5
 
 
 def test_health_does_not_leak_db_error_text(client, monkeypatch):
