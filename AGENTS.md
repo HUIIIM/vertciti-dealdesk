@@ -2,7 +2,8 @@
 
 > 给打开这个仓库的 AI agent：按本手册干活，不许凭记忆编脚本、编命令。
 > 仓库：DealDesk 房地产交易核保台（`HUIIIM/vertciti-dealdesk`，MIT，公开）。
-> 技术栈：Python 后端（`app/main.py`，uvicorn）＋ 纯静态前端（`static/`）＋ SQLite。
+> 技术栈：FastAPI 后端（`app/` 分 domain / services / api 三层，uvicorn）＋ React 19 + TypeScript + Vite 前端
+> （源码 `frontend/`，构建产物 `static/app/` 入库）＋ SQLite（本机）/ Postgres（生产，`DATABASE_URL`）。
 
 ## 快速开始
 
@@ -48,7 +49,7 @@ rm -f dealdesk.db && .venv/bin/pytest tests/ -q
 
 ## 构建与部署
 
-- 本地即生产形态：无构建步骤，后端 `app/`＋静态 `static/` 直接跑。v2 前端源码在 `frontend/`，
+- 后端无构建步骤；前端改了 `frontend/` 必须 `cd frontend && npm run build` 重建 `static/app/` 并一起提交，
   构建产物 `static/app/` 入库（随 `static/` 一起同步到 vercel-deploy/）。
 - v2 运维（环境变量、用户与权限、备份恢复、排障、迁移）：见 `docs/RUNBOOK.md`。
 - 生产部署源是 `vercel-deploy/`（`app/`、`static/`、根静态文件、`requirements.txt`

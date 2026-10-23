@@ -6,7 +6,7 @@
 
 | 场景 | 命令 |
 |---|---|
-| 本机（SQLite） | `./run.sh` → <http://127.0.0.1:8100/app/>（v2 工作台），`/` 为 v1 页面 |
+| 本机（SQLite） | `./run.sh` → <http://127.0.0.1:8100/app/>（v2 工作台）；`/` 307 到 `/app/`（v1 单页已下线） |
 | 指定库文件 | `DEALDESK_DB=/home/…/deals.db ./run.sh` |
 | Postgres | `DATABASE_URL=postgresql://user:pass@host/db ./run.sh`（`postgres://` 也认） |
 

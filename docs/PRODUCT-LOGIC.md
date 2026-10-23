@@ -27,7 +27,7 @@ erDiagram
 
 | 对象 | 含义 | 关键规则 | 位置 |
 |---|---|---|---|
-| 交易 Deal | 一笔待评估或已买的物业 | 赛道二选一：住宅 / 商业；淘汰条件在建交易时就要写 | `services/v2/deals.py` |
+| 交易 Deal | 一笔待评估或已买的物业 | 赛道三选一：住宅 / 商业 / 机构级（逐租约或按户型逐月，见 docs/INSTITUTIONAL-ENGINE.md）；淘汰条件在建交易时就要写 | `services/v2/deals.py` |
 | 承销版本 DealVersion | 一次保存的全部假设与结果 | 只增不改；版本号递增；当前版本 = 最新保存的那版 | `deals.save_version` |
 | 运行 Run | 引擎版本 + 规范化输入的哈希 | 同一编号重算，结果分毫不差（`/runs/{id}/verify`） | `domain/v2/reproducible.py` |
 | 数字护照 FieldProvenance | 某字段的一条来源登记 | 来源、页码、抽取方式、可信度、复核状态、新鲜度；历史全保留 | `services/v2/evidence.py` |
