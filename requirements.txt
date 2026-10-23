@@ -1,5 +1,5 @@
 fastapi>=0.115,<1
-uvicorn[standard]>=0.30,<1
+uvicorn[standard]>=0.54.0,<1
 httpx>=0.27,<1
 python-multipart>=0.0.18,<0.1
 reportlab>=4.0,<6  # 5.x 已实测金标准全过；上限 <5 会让生产从 5.1 降级
