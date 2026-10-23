@@ -1,6 +1,6 @@
 // 设置：淘汰条件 / 假设 / 市场默认值模板、数据源状态、用户（董事长）、外观与快捷键。
 import { T } from "@/i18n";
-import { useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 import { api, call } from "@/api/client";
 import { useApi } from "@/api/useApi";
 import { useApp } from "@/app-context";
@@ -202,10 +202,12 @@ export function changes(before: unknown, after: unknown): string[] {
 function Audit() {
   const [entity, setEntity] = useState("");
   const [who, setWho] = useState("");
-  const a = useApi(() => call(api.GET("/api/v2/admin/audit", { params: { query: { limit: 500, ...(entity ? { entity } : {}) } } })), [entity]);
+  // 不筛选的那份既用来列“对象类型”选项，也是选“全部”时的结果；选了类型再按类型向服务端查
+  const base = useApi(() => call(api.GET("/api/v2/admin/audit", { params: { query: { limit: 500 } } })), []);
+  const typed = useApi(() => (entity ? call(api.GET("/api/v2/admin/audit", { params: { query: { limit: 500, entity } } })) : Promise.resolve(null)), [entity]);
+  const a = entity ? typed : base;
   const all = (a.data ?? []) as unknown as AuditRow[];
-  const [kinds, setKinds] = useState<string[]>([]);
-  useEffect(() => { if (!entity && all.length) setKinds([...new Set(all.map((r) => r.entity))].sort()); }, [entity, all]);
+  const kinds = useMemo(() => [...new Set(((base.data ?? []) as unknown as AuditRow[]).map((r) => r.entity))].sort(), [base.data]);
   const rows = who.trim() ? all.filter((r) => r.actor.toLowerCase().includes(who.trim().toLowerCase())) : all;
   return (
     <section className="card" aria-label={T("审计日志")}>
