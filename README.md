@@ -7,7 +7,7 @@ the public record for a property, scores the deal against written rules, and att
 |---|---|
 | Status | Active — v1.0.0 (`pyproject.toml`); v2 deal workbench listed as 2.0.0, unreleased, in the [CHANGELOG](CHANGELOG.md). CI runs pytest, ruff, mypy, a Postgres suite, frontend typecheck / lint / unit tests, Playwright E2E with axe, CodeQL, dependency review, pip-audit / npm audit, gitleaks and OpenSSF Scorecard |
 | Deployment | Self-hosted: Python 3.10+, SQLite by default (Postgres supported); production instance on Vercel |
-| Live demo | [vertciti-dealdesk.vercel.app](https://vertciti-dealdesk.vercel.app/app/) — production instance of the v2 workbench; data requires sign-in |
+| Live instance | [vertciti-dealdesk.vercel.app](https://vertciti-dealdesk.vercel.app/app/) — the founder's production workbench; sign-in is for the operator and invited friends only, with no public sign-up. |
 | Interfaces | Web UI (v2 workbench at `/app/`) · HTTP API (`/api`, `/api/v2`, bearer tokens) |
 | Licence | MIT ([LICENSE](LICENSE)) |
 | Languages | English · [简体中文](README.zh.md) |
@@ -65,7 +65,7 @@ interface; the [CHANGELOG](CHANGELOG.md) records that v2 retires the v1 single p
 | **Cash to close** | Down payment, closing costs, first-year capex and reserves summed for every deal. |
 | **Sensitivity** | Rent ±10% and rate ±2% bands showing cash flow, cash-on-cash, DSCR and entry cap. |
 | **Workbench** | Comps valuation (distance-weighted, reconciled with the income approach), market research on embedded public FHFA index data, a six-dimension market report; results can be sent into the scoring engine. |
-| **Reports** | Interactive HTML report with inline SVG charts, PDF underwriting memo, Excel model, one-page Tear Sheet PDF — same numbers in every format. |
+| **Reports** | Interactive HTML report with inline SVG charts, PDF underwriting memo, Excel model (rolling out in batches), one-page Tear Sheet PDF — same numbers in every format. |
 | **Compare** | Up to three projects side by side: CoC, DSCR, payback period. |
 | **v2 deal workbench** (`/app/`) | Pipeline (kanban / table) and a deal page with verdict card, verification progress and tabs for rent roll, T12, model, red team, market, files and evidence, committee, holding and log. Every number has a "passport" (source, page, extraction method, confidence, reviewer, freshness); conflicting sources must be resolved with a written reason. Max bid worked backwards from IRR / DSCR / cash-on-cash targets, naming the binding constraint. Seven-stage lifecycle with gates, committee votes and pack, a decision log that freezes the numbers, post-hoc attribution. Roles (chairman / analyst / viewer), audit log, keyboard-first, dark mode, mobile read-only. v1 calculations are unchanged and replayed against recorded outputs on every test run ([ADR 0001](docs/adr/0001-golden-master.md)). |
 

@@ -7,7 +7,7 @@
 |---|---|
 | 状态 | 活跃：v1.0.0（`pyproject.toml`）；v2 交易工作台在 [CHANGELOG](CHANGELOG.md) 中记为 2.0.0、未发布。CI 覆盖 pytest、ruff、mypy、Postgres 套件、前端类型检查 / lint / 单元测试、Playwright E2E（含 axe）、CodeQL、依赖审查、pip-audit / npm audit、gitleaks 和 OpenSSF Scorecard |
 | 部署 | 自部署：Python 3.10+，默认 SQLite（支持 Postgres）；生产实例部署在 Vercel |
-| 在线演示 | [vertciti-dealdesk.vercel.app](https://vertciti-dealdesk.vercel.app/app/)：v2 工作台的生产实例，查看数据需要登录 |
+| 生产实例 | [vertciti-dealdesk.vercel.app](https://vertciti-dealdesk.vercel.app/app/)：创始人自用的 v2 工作台，登录仅对操作人与受邀朋友开放，无公开注册。 |
 | 接口 | Web 界面（v2 工作台在 `/app/`）· HTTP API（`/api`、`/api/v2`，Bearer 令牌） |
 | 许可证 | MIT（[LICENSE](LICENSE)） |
 | 语言 | [English](README.md) · 简体中文 |
@@ -58,7 +58,7 @@
 | **现金需求** | 每笔交易自动汇总首付、交割费、首年 capex 和储备金。 |
 | **敏感性分析** | 租金 ±10%、利率 ±2% 分档，看现金流、CoC、DSCR 和入场 cap 的变化。 |
 | **工作台** | 可比成交估值（距离加权，与收益法调和）、基于内置 FHFA 公开房价指数的市场调查、六维市场报告；结果可送入打分引擎。 |
-| **报告** | 带内联 SVG 图表的 HTML 交互报告、核保备忘录 PDF、Excel 模型、一页纸 Tear Sheet PDF，各格式数字同源。 |
+| **报告** | 带内联 SVG 图表的 HTML 交互报告、核保备忘录 PDF、Excel 模型（分批上线中）、一页纸 Tear Sheet PDF，各格式数字同源。 |
 | **对比** | 最多 3 个项目并排：CoC、DSCR、回本周期。 |
 | **v2 交易工作台**（`/app/`） | 流水线（看板 / 表格）和交易页：结论卡、核对进度，标签页含租金表、T12、模型、红队、市场、文件与证据、投委会、持有、日志。每个数字有"护照"（来源、页码、抽取方式、可信度、复核人、新鲜度）；来源冲突须写理由裁决。按 IRR / DSCR / 现金回报目标反推最高出价，并写明卡价约束。七阶段生命周期与关卡、投委会投票与投委会包、冻结数字的决策日志、持有期事后归因。角色（董事长 / 分析 / 只读）、审计日志、键盘优先、暗色模式、手机只读。v1 计算不变，每次测试都与录制输出逐一比对（[ADR 0001](docs/adr/0001-golden-master.md)）。 |
 
