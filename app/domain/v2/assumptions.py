@@ -53,6 +53,8 @@ INSTITUTIONAL: tuple[Assumption, ...] = (  # 按租约与多户公寓两种物�
     Assumption("reno_premium", "翻新溢价", ("unit_mix.*.reno_premium",), "benchmark"),
     Assumption("reno_cost", "翻新成本", ("unit_mix.*.reno_cost_per_unit",), "analyst"),
     Assumption("other_income", "其他收入", ("multifamily.other_income_per_unit",), "historical"),
+    Assumption("hard_costs", "硬成本", ("development.hard_costs",), "document"),
+    Assumption("absorption", "去化速度", ("development.absorption_units_per_month",), "benchmark"),
     Assumption("vacancy", "一般空置率", ("general_vacancy_pct",), "benchmark"),
     Assumption("exit_cap", "退出 Cap Rate", ("exit_cap_pct",), "benchmark"),
     Assumption("opex", "运营费用", ("opex.recoverable_psf_yr", "opex.non_recoverable_psf_yr",

@@ -65,3 +65,33 @@ def garden_multifamily() -> dict[str, Any]:
         "waterfall": {"lp_equity_pct": 90, "pref_pct": 8, "tiers": [{"irr_pct": 13, "lp_share_pct": 80}],
                       "final_lp_share_pct": 70},
     }
+
+
+def ground_up_multifamily() -> dict[str, Any]:
+    """示例：200 户新建公寓（演示数字）。
+
+    土地 800 万、硬成本 3,600 万（5% 不可预见）、软成本 600 万、施工 20 个月，竣工后每月去化 15 户；
+    施工贷 60% LTC、8.5%；第 40 个月按 5.25% 估值、65% LTV 再融资；持有 5 年按 5.25% 退出。
+    数字为演示用，不是真实交易。
+    """
+    return {
+        "property_type": "multifamily", "analysis_start": "2026-01", "hold_years": 5, "area_sf": 190_000,
+        "purchase_price": 8_000_000, "closing_costs_pct": 1.0,
+        "unit_mix": [
+            {"name": "1B1B", "units": 120, "avg_sf": 780, "in_place_rent": 2_150, "market_rent": 2_150},
+            {"name": "2B2B", "units": 80, "avg_sf": 1_150, "in_place_rent": 2_850, "market_rent": 2_850},
+        ],
+        "multifamily": {"rent_growth_pct": 3, "lease_term_months": 12, "concessions_pct": 2,
+                        "other_income_per_unit": 110,
+                        "turnover_pct": 45, "make_ready_per_turn": 800, "opex_per_unit_yr": 4_800, "taxes_yr": 650_000,
+                        "insurance_yr": 160_000, "reserves_per_unit_yr": 250},
+        "opex": {"growth_pct": 3, "mgmt_fee_pct_egr": 3},
+        "general_vacancy_pct": 5, "credit_loss_pct": 1,
+        "development": {"construction_months": 20, "hard_costs": 36_000_000, "soft_costs": 6_000_000,
+                        "contingency_pct": 5, "draw_curve": "s_curve", "absorption_units_per_month": 15},
+        "construction_loan": {"ltc_pct": 60, "rate_pct": 8.5, "orig_fee_pct": 1},
+        "refinance": {"month": 40, "value_cap_pct": 5.25, "ltv_pct": 65, "min_dscr": 1.25, "rate_pct": 5.75},
+        "exit_cap_pct": 5.25, "selling_costs_pct": 1.5, "discount_rate_pct": 9,
+        "waterfall": {"lp_equity_pct": 90, "pref_pct": 8, "catch_up_target_pct": 20,
+                      "tiers": [{"irr_pct": 14, "lp_share_pct": 70}], "final_lp_share_pct": 60},
+    }

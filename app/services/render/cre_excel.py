@@ -21,6 +21,11 @@ from openpyxl.worksheet.worksheet import Worksheet
 from app.core import brand
 from app.domain.v2.cre.waterfall import describe as describe_waterfall
 
+
+def stabilization_month_of(dev: JSON) -> int:
+    """与 development.stabilization_month 同口径（这里拿的是 dict）。"""
+    return int(dev["stabilization_month"]) if dev.get("stabilization_month") is not None else int(dev["construction_months"]) + 12
+
 JSON = dict[str, Any]
 
 _F = "Microsoft YaHei"
@@ -158,6 +163,14 @@ def _assumptions(ws: Worksheet, cre: JSON, r: JSON, meta: JSON) -> None:
     if cre.get("mezz"):
         mz = cre["mezz"]
         debt_rows.append(("夹层", f"${m['mezz_amount']:,.0f}，固定 {mz['rate_pct']:g}%，只付息"))
+    cons = r.get("construction")
+    if cons:
+        cl, dv = cre["construction_loan"], cre["development"]
+        debt_rows += [("开发", f"施工 {dv['construction_months']} 个月；总成本 ${cons['total_cost']:,.0f}"),
+                      ("施工贷", f"LTC {cl['ltc_pct']:g}%（承诺 ${cons['commitment']:,.0f}），{cl['rate_pct']:g}%，"
+                                 f"资本化利息 ${cons['capitalized_interest']:,.0f}，峰值 ${cons['peak_balance']:,.0f}")]
+    elif cre.get("development"):
+        debt_rows.append(("开发", f"施工 {cre['development']['construction_months']} 个月，全股权"))
     refi = r.get("refinance")
     if refi:
         debt_rows += [("再融资", f"第 {refi['month']} 月：新贷款 ${refi['amount']:,.0f}（按{_SIZED[refi['sized_by']]}限额），"
@@ -188,6 +201,7 @@ Formula = str | tuple[str, ...]
 _DEBT_ROWS: list[tuple[str, str, Formula]] = [
     ("debt_service", "还本付息（优先 + 夹层）", "v"),
     ("refi_proceeds", "再融资净所得", "v"),
+    ("construction_draws", "施工贷提款", "v"),
     ("cf_after_debt", "债后现金流（有杠杆）", "after"),
     ("dscr", "DSCR", "dscr"),
     ("occupancy_pct", "平均出租率", "v"),
@@ -209,7 +223,8 @@ _COMMERCIAL_ROWS: list[tuple[str, str, Formula]] = [
     ("ti", "租户改造 TI", "v"),
     ("lc", "租赁佣金 LC", "v"),
     ("reserves", "资本储备", "v"),
-    ("cf_before_debt", "债前现金流（无杠杆）", ("noi", "ti", "lc", "reserves")),
+    ("dev_costs", "开发成本（施工期）", "v"),
+    ("cf_before_debt", "债前现金流（无杠杆）", ("noi", "ti", "lc", "reserves", "dev_costs")),
     *_DEBT_ROWS,
 ]
 _MULTIFAMILY_ROWS: list[tuple[str, str, Formula]] = [
@@ -231,7 +246,8 @@ _MULTIFAMILY_ROWS: list[tuple[str, str, Formula]] = [
     ("noi", "净营业收入 NOI", ("egr", "opex")),
     ("capex", "翻新资本支出", "v"),
     ("reserves", "资本储备", "v"),
-    ("cf_before_debt", "债前现金流（无杠杆）", ("noi", "capex", "reserves")),
+    ("dev_costs", "开发成本（施工期）", "v"),
+    ("cf_before_debt", "债前现金流（无杠杆）", ("noi", "capex", "reserves", "dev_costs")),
     *_DEBT_ROWS,
 ]
 
@@ -250,7 +266,8 @@ ROW = row_index("commercial")
 
 def _formula(kind: Formula, row: dict[str, int], c: str) -> str:
     if kind == "after":
-        return f"={c}{row['cf_before_debt']}-{c}{row['debt_service']}+{c}{row['refi_proceeds']}"
+        return (f"={c}{row['cf_before_debt']}-{c}{row['debt_service']}+{c}{row['refi_proceeds']}"
+                f"+{c}{row['construction_draws']}")
     if kind == "dscr":
         return f'=IF({c}{row["debt_service"]}=0,"",{c}{row["noi"]}/{c}{row["debt_service"]})'
     rows = [row[k] for k in kind]
@@ -282,7 +299,7 @@ def _cashflow(ws: Worksheet, cre: JSON, r: JSON) -> None:
             else:
                 _put(ws, r_i, col, _formula(kind, row, _col(col)), BOLD if key in bold_rows else BODY,
                      X if key == "dscr" else MONEY)
-        if key in ("debt_service", "refi_proceeds", "cf_after_debt", "dscr"):  # 第 N+1 年只用于退出 NOI，不计债务
+        if key in ("debt_service", "refi_proceeds", "construction_draws", "cf_after_debt", "dscr"):  # 第 N+1 年只用于退出 NOI，不计债务
             ws.cell(row=r_i, column=n + 2).value = None
     for col in range(2, n + 3):
         ws.column_dimensions[_col(col)].width = 14
@@ -334,7 +351,9 @@ def _returns(ws: Worksheet, cre: JSON, r: JSON) -> None:
     noi1, ds1 = _ref(CF, f"B{ROW['noi']}"), _ref(CF, f"B{ROW['cf_after_debt']}")
     loan = _ref(A, "$B$11")
     rate = _ref(A, "$B$8")
-    dscr_rng = _ref(CF, f"B{ROW['dscr']}:{hold_col}{ROW['dscr']}")
+    dv = cre.get("development")
+    first = _col(stabilization_month_of(dv) // 12 + 2) if dv else "B"   # 开发项目：从稳定月所在年起算 DSCR
+    dscr_rng = _ref(CF, f"{first}{ROW['dscr']}:{hold_col}{ROW['dscr']}")
 
     def pct(x: float | None) -> float | None:
         return None if x is None else x / 100
@@ -351,7 +370,7 @@ def _returns(ws: Worksheet, cre: JSON, r: JSON) -> None:
         ("进入资本化率", f"={noi1}/{p}", pct(m["going_in_cap_pct"]), PCT),
         ("成本收益率", f"={noi1}/({acq})", pct(m["yield_on_cost_pct"]), PCT),
         ("债务收益率（优先贷款）", f'=IF({m["loan_amount"]}=0,"",{noi1}/{m["loan_amount"]})', pct(m["debt_yield_pct"]), PCT),
-        ("首年 DSCR", f"={_ref(CF, 'B' + str(ROW['dscr']))}", m["dscr_year1"], X),
+        ("首年 DSCR", "" if dv else f"={_ref(CF, 'B' + str(ROW['dscr']))}", m["dscr_year1"], X),
         ("持有期最小 DSCR", f'=IF(COUNT({dscr_rng})=0,"",MIN({dscr_rng}))', m["dscr_min"], X),
         ("首年现金回报", f"={ds1}/-B13", pct(m["cash_on_cash_year1_pct"]), PCT),
         ("股权投入", "=-B13", m["equity"], MONEY),

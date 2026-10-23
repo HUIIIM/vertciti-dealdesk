@@ -4,7 +4,7 @@ import { useApp } from "@/app-context";
 import { FieldInput, NumberInput } from "@/components/FieldInput";
 import { passportStatus } from "@/components/Passport";
 import { Metric, MetricGrid, NumCell } from "@/components/ui";
-import { INST_DEAL, INST_DEBT, INST_MARKET, INST_MEZZ, INST_REFI, MEZZ_DEFAULTS, REFI_DEFAULTS, INST_MF_OPEX, INST_MF_RENO, INST_MF_REVENUE, INST_OPEX, INST_WATERFALL, MF_DEFAULTS,
+import { CL_DEFAULTS, DEV_DEFAULTS, INST_CL, INST_DEAL, INST_DEBT, INST_DEV, INST_MARKET, INST_MEZZ, INST_REFI, MEZZ_DEFAULTS, REFI_DEFAULTS, INST_MF_OPEX, INST_MF_RENO, INST_MF_REVENUE, INST_OPEX, INST_WATERFALL, MF_DEFAULTS,
   blankInstitutional, blankUnit, type FieldSpec } from "@/domain/fields";
 import { fmt, type Unit } from "@/lib/format";
 import { getPath, type JsonObj } from "@/lib/paths";
@@ -19,6 +19,7 @@ interface Seg { tenant: string; suite: string; sf: number; start: number; end: n
 interface Cre { metrics: Record<string, number | null>; annual: Record<string, number[]>; rent_roll: Seg[];
   waterfall: { lp_irr_pct: number | null; gp_irr_pct: number | null; lp_multiple: number | null; gp_multiple: number | null; gp_promote: number;
     clawback?: number } | null;
+  construction?: { total_cost: number; peak_balance: number; capitalized_interest: number } | null;
   refinance?: { month: number; value: number; amount: number; sized_by: string; net: number } | null;
   exit: { sale_price: number; selling_costs: number; loan_payoff: number; net_proceeds_levered: number } }
 
@@ -243,7 +244,9 @@ const ROWS: [string, string, boolean][] = [
   ["general_vacancy", T("一般空置"), false], ["credit_loss", T("信用损失"), false], ["egr", T("有效总收入 EGR"), true],
   ["opex_recoverable", T("可回收费用"), false], ["opex_non_recoverable", T("不可回收费用"), false], ["mgmt_fee", T("管理费"), false],
   ["noi", "NOI", true], ["ti", "TI", false], ["lc", "LC", false], ["reserves", T("资本储备"), false],
+  ["dev_costs", T("开发成本"), false],
   ["cf_before_debt", T("债前现金流"), true], ["debt_service", T("还本付息"), false], ["refi_proceeds", T("再融资净所得"), false],
+  ["construction_draws", T("施工贷提款"), false],
   ["cf_after_debt", T("债后现金流"), true],
 ];
 
@@ -254,18 +257,21 @@ const ROWS_MF: [string, string, boolean][] = [
   ["recoveries", T("其他收入"), false], ["egr", T("有效总收入 EGR"), true], ["opex_recoverable", T("房产税与保险"), false],
   ["opex_non_recoverable", T("运营费用"), false], ["mgmt_fee", T("管理费"), false], ["noi", "NOI", true],
   ["capex", T("翻新支出"), false], ["reserves", T("资本储备"), false],
+  ["dev_costs", T("开发成本"), false],
   ["cf_before_debt", T("债前现金流"), true], ["debt_service", T("还本付息"), false], ["refi_proceeds", T("再融资净所得"), false],
+  ["construction_draws", T("施工贷提款"), false],
   ["cf_after_debt", T("债后现金流"), true],
 ];
 
 /** 可选的资本结构块（夹层 / 再融资）：勾选即用默认值建起来，取消即清空。 */
-function OptionalBlock({ path, title, defaults, specs, hint }: { path: string; title: string; defaults: JsonObj; specs: FieldSpec[]; hint: string }) {
+function OptionalBlock({ path, title, defaults, specs, hint, onToggle }: { path: string; title: string; defaults: JsonObj; specs: FieldSpec[];
+  hint: string; onToggle?: (on: boolean) => void }) {
   const { draft, set } = useDeal();
   const on = Boolean(draft[path]);
   return (
     <div style={{ marginTop: 16 }}>
       <label className="row" style={{ gap: 8, alignItems: "center" }}>
-        <input type="checkbox" checked={on} onChange={(e) => set(path, e.target.checked ? { ...defaults } : null)} />
+        <input type="checkbox" checked={on} onChange={(e) => { set(path, e.target.checked ? { ...defaults } : null); onToggle?.(e.target.checked); }} />
         <span style={{ fontWeight: 700 }}>{title}</span>
       </label>
       <p className="sub" style={{ marginTop: 4 }}>{hint}</p>
@@ -291,7 +297,12 @@ export function InstModel() {
   return (
     <div className="split">
       <div>
-        <section className="card" aria-label={T("交易与退出")}><h2>{T("交易与退出")}</h2><Fields specs={INST_DEAL} /></section>
+        <section className="card" aria-label={T("交易与退出")}><h2>{T("交易与退出")}</h2><Fields specs={INST_DEAL} />
+          <OptionalBlock path="development" title={T("开发 / 重度改造")} defaults={DEV_DEFAULTS} specs={INST_DEV}
+            onToggle={(on) => { if (on) set("debt", null); else set("construction_loan", null); }}
+            hint={T("收购价当作土地或旧楼价款；施工期按支出曲线投入成本，竣工后起租（预租租约须在竣工后起租）。")} />
+          {draft.development ? <OptionalBlock path="construction_loan" title={T("施工贷")} defaults={CL_DEFAULTS} specs={INST_CL}
+            hint={T("股权先投，投满后按月提款；用“再融资”在稳定后换成长期贷款。开发项目不填优先贷款。")} /> : null}</section>
         <section className="card" aria-label={T("债务")}><h2>{T("债务")}</h2><Fields specs={INST_DEBT} />
           {floating ? <label className="field" style={{ marginTop: 12 }}>{T("SOFR 曲线（逐年，%）")}<span className="hint">{T("逗号分隔，最后一年向后沿用")}</span>
             <input className="input mono" defaultValue={curve.join(", ")} aria-label={T("SOFR 曲线")}
@@ -323,6 +334,9 @@ export function InstModel() {
           <li><span className="chip">NPV</span><span>{T("有杠杆 {0} · 无杠杆 {1}", [fmt(cm.levered_npv, "usd"), fmt(cm.unlevered_npv, "usd")])}</span></li>
           <li><span className="chip">{T("退出")}</span><span>{T("售价 {0}（下一年 NOI {1} ÷ {2}）· 偿还贷款 {3} · 有杠杆净所得 {4}", [fmt(cre.exit.sale_price, "usd"), fmt(cm.forward_noi, "usd"),
             fmt(cm.exit_cap_pct, "pct"), fmt(cre.exit.loan_payoff, "usd"), fmt(cre.exit.net_proceeds_levered, "usd")])}</span></li>
+          {cre.construction ? <li><span className="chip">{T("开发")}</span><span>{T("总成本 {0}；开发收益率 {1}；施工贷峰值 {2}，资本化利息 {3}",
+            [fmt(cre.construction.total_cost, "usd"), fmt(cm.development_yield_pct, "pct"), fmt(cre.construction.peak_balance, "usd"),
+              fmt(cre.construction.capitalized_interest, "usd")])}</span></li> : null}
           {cre.refinance ? <li><span className="chip">{T("再融资")}</span><span>{T("第 {0} 月：价值 {1}，新贷款 {2}（按 {3} 限额），股权净所得 {4}",
             [cre.refinance.month, fmt(cre.refinance.value, "usd"), fmt(cre.refinance.amount, "usd"), SIZED[cre.refinance.sized_by] ?? cre.refinance.sized_by,
               fmt(cre.refinance.net, "usd")])}</span></li> : null}

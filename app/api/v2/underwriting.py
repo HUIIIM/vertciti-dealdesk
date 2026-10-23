@@ -26,7 +26,7 @@ from app.core.i18n import label
 from app.domain.v2 import kill_criteria, scenarios
 from app.domain.v2.assumptions import BY_TRACK
 from app.domain.v2.cre import engine as cre_engine
-from app.domain.v2.cre.example import garden_multifamily, suburban_office
+from app.domain.v2.cre.example import garden_multifamily, ground_up_multifamily, suburban_office
 from app.domain.v2.model import METRICS, PRIMARY_METRIC, TRACKS, ModelInputError, run_model
 from app.services.v2 import analysis
 from app.services.v2.errors import InvalidInputError
@@ -48,12 +48,15 @@ def institutional(inputs: dict[str, Any]) -> dict[str, Any]:
 
 
 @router.get("/cre/example", dependencies=[need("deal.read")])
-def institutional_example(kind: Literal["office", "multifamily"] = "office") -> dict[str, Any]:
+def institutional_example(kind: Literal["office", "multifamily", "development"] = "office") -> dict[str, Any]:
     """示例输入（演示数字）。
 
     office = 郊区办公楼（含空置、基年租约、即将到期租约、浮动利率带上限、两档瀑布）；
-    multifamily = 240 户花园式公寓（loss-to-lease、翻新 120 户、固定利率、一档瀑布）。
+    multifamily = 240 户花园式公寓（loss-to-lease、翻新 120 户、固定利率、一档瀑布）；
+    development = 200 户新建公寓（施工 20 个月、施工贷、去化、再融资）。
     """
+    if kind == "development":
+        return ground_up_multifamily()
     return garden_multifamily() if kind == "multifamily" else suburban_office()
 
 

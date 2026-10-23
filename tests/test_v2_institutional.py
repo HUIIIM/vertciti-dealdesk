@@ -99,3 +99,23 @@ def test_multifamily_deal_through_the_whole_toolchain(c):
     for kind, magic in (("memo", b"%PDF-"), ("model", b"PK")):
         r = c.get(f"/api/v2/deals/{did}/export/{kind}")
         assert r.status_code == 200 and r.content.startswith(magic), (kind, r.text[:300])
+
+
+def test_development_deal_through_the_whole_toolchain(c):
+    """开发项目同一套工具链：红队含硬成本与去化速度，情景、最高出价、投委会包、两种导出都能用。"""
+    ex = c.get("/api/v2/cre/example?kind=development").json()
+    d = c.post("/api/v2/deals", json={"name": "Ground-up", "track": "institutional", "kill_criteria": []}).json()
+    v = c.post(f"/api/v2/deals/{d['id']}/versions", json={"inputs": ex, "label": "pro forma"})
+    assert v.status_code == 201, v.text
+    did = d["id"]
+    keys = {r["key"] for r in c.get(f"/api/v2/deals/{did}/redteam").json()["all"]}
+    assert {"hard_costs", "absorption", "exit_cap"} <= keys
+    sc = c.post(f"/api/v2/deals/{did}/scenarios", json={}).json()
+    assert all(r["primary"] is not None for r in sc["scenarios"])
+    assert c.post(f"/api/v2/deals/{did}/max-bid", json={}).status_code == 200
+    assert c.get(f"/api/v2/deals/{did}/committee/pack.pdf").content.startswith(b"%PDF-")
+    for kind, magic in (("memo", b"%PDF-"), ("model", b"PK")):
+        r = c.get(f"/api/v2/deals/{did}/export/{kind}")
+        assert r.status_code == 200 and r.content.startswith(magic), (kind, r.text[:300])
+    bad = c.post(f"/api/v2/deals/{did}/versions", json={"inputs": {**ex, "debt": {"ltv_pct": 50}}})
+    assert bad.status_code == 422 and "不填优先贷款" in bad.json()["detail"]

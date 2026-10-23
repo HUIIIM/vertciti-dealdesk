@@ -220,4 +220,15 @@ describe("机构级交易页", () => {
     fireEvent.click(screen.getByRole("checkbox", { name: "夹层贷款" }));
     await waitFor(() => expect(lastPreview()?.mezz).toBeNull());
   });
+  it("开发：勾选开发即清掉优先贷款，再勾施工贷；取消开发一并清掉施工贷", async () => {
+    seedInstitutionalDeal();
+    at("#/deals/9/model");
+    fireEvent.click(await screen.findByRole("checkbox", { name: "开发 / 重度改造" }, { timeout: 3000 }));
+    await waitFor(() => expect(lastPreview()).toMatchObject({ debt: null, development: { construction_months: 18 } }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "施工贷" }));
+    await waitFor(() => expect(lastPreview()?.construction_loan).toMatchObject({ ltc_pct: 60 }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "开发 / 重度改造" }));
+    await waitFor(() => expect(lastPreview()).toMatchObject({ development: null, construction_loan: null }));
+    expect(screen.queryByRole("checkbox", { name: "施工贷" })).toBeNull();
+  });
 });

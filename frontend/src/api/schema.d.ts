@@ -128,7 +128,8 @@ export interface paths {
          * @description 示例输入（演示数字）。
          *
          *     office = 郊区办公楼（含空置、基年租约、即将到期租约、浮动利率带上限、两档瀑布）；
-         *     multifamily = 240 户花园式公寓（loss-to-lease、翻新 120 户、固定利率、一档瀑布）。
+         *     multifamily = 240 户花园式公寓（loss-to-lease、翻新 120 户、固定利率、一档瀑布）；
+         *     development = 200 户新建公寓（施工 20 个月、施工贷、去化、再融资）。
          */
         get: operations["institutional_example_api_v2_cre_example_get"];
         put?: never;
@@ -1974,6 +1975,10 @@ export interface components {
             annual: {
                 [key: string]: number[];
             };
+            /** Construction */
+            construction?: {
+                [key: string]: unknown;
+            } | null;
             /** Engine */
             engine: string;
             /** Exit */
@@ -3567,7 +3572,7 @@ export interface operations {
     institutional_example_api_v2_cre_example_get: {
         parameters: {
             query?: {
-                kind?: "office" | "multifamily";
+                kind?: "office" | "multifamily" | "development";
             };
             header?: never;
             path?: never;

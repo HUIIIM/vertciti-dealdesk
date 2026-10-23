@@ -12,6 +12,12 @@ Recovery = Literal["nnn", "gross", "base_year"]
 Pct = float  # 百分比数：6.5 表示 6.5%
 
 
+def month_offset(ym: str, origin: str) -> int:
+    y, m = (int(x) for x in ym.split("-"))
+    y0, m0 = (int(x) for x in origin.split("-"))
+    return (y - y0) * 12 + (m - m0)
+
+
 class _In(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -126,6 +132,35 @@ class Refinance(_In):
     repay_mezz: bool = Field(default=True, description="再融资时一并偿清夹层")
 
 
+class Development(_In):
+    """开发 / 重度改造：交割后先施工（不出租、不计运营），竣工后起租。收购价 = 土地或旧楼价款，交割当月支付。
+
+    硬成本（含不可预见费）与软成本按施工期逐月支出：straight = 平均；s_curve = 两头少中间多（正弦权重）。
+    """
+
+    construction_months: int = Field(ge=1, le=60)
+    hard_costs: float = Field(ge=0, description="硬成本合计")
+    soft_costs: float = Field(default=0, ge=0, description="软成本合计（设计、许可、开发商费等）")
+    soft_upfront_pct: Pct = Field(default=20, ge=0, le=100, description="软成本在交割当月先付的比例")
+    contingency_pct: Pct = Field(default=5, ge=0, le=30, description="不可预见费：占硬成本")
+    draw_curve: Literal["straight", "s_curve"] = "s_curve"
+    absorption_units_per_month: float | None = Field(default=None, gt=0,
+                                                     description="多户公寓竣工后每月租出的户数；空 = 竣工即稳定")
+    stabilization_month: int | None = Field(default=None, ge=1,
+                                            description="稳定月（算开发收益率）；空 = 竣工后 12 个月")
+
+
+class ConstructionLoan(_In):
+    """施工贷：按总成本（土地 + 交割 + 硬 + 软 + 不可预见）的 LTC 承诺。
+
+    股权先投，投满后贷款按月提款；施工期利息资本化（滚入本金），竣工后按月付息；再融资或出售时偿清。
+    """
+
+    ltc_pct: Pct = Field(default=60, gt=0, le=90, description="贷款占总成本比例")
+    rate_pct: Pct = Field(default=8, ge=0, le=30)
+    orig_fee_pct: Pct = Field(default=1, ge=0, le=10, description="开办费：占承诺额，交割时付")
+
+
 class Tier(_In):
     irr_pct: Pct = Field(gt=0, le=100, description="LP 达到此 IRR 后进入下一档分配")
     lp_share_pct: Pct = Field(gt=0, le=100, description="本档（上一门槛到本门槛之间）LP 拿的现金比例")
@@ -215,6 +250,8 @@ class CreInputs(_In):
     debt: Debt | None = None
     mezz: Mezz | None = None
     refinance: Refinance | None = None
+    development: Development | None = None
+    construction_loan: ConstructionLoan | None = None
     exit_cap_pct: Pct = Field(gt=0, le=25)
     exit_noi_basis: Literal["forward", "stabilized"] = Field(
         default="forward",
@@ -239,9 +276,26 @@ class CreInputs(_In):
         return self.multifamily
 
     @model_validator(mode="after")
-    def _space(self) -> CreInputs:
+    def _capital_and_development(self) -> CreInputs:
+        dev = self.development
+        if self.construction_loan is not None and dev is None:
+            raise ValueError("施工贷需要开发计划（development）")
         if self.refinance is not None and self.refinance.month >= self.hold_years * 12:
             raise ValueError(f"再融资月（第 {self.refinance.month} 月）必须早于出售（第 {self.hold_years * 12} 月）")
+        if dev is None:
+            return self
+        if dev.construction_months >= self.hold_years * 12:
+            raise ValueError("施工期必须短于持有期")
+        if self.debt is not None:
+            raise ValueError("开发项目用施工贷（construction_loan），竣工后用再融资换成长期贷款；不填优先贷款")
+        c = dev.construction_months
+        late = [le.tenant for le in self.leases if month_offset(le.start, self.analysis_start) < c]
+        if late:
+            raise ValueError(f"开发项目的预租租约须在竣工后起租：{'、'.join(late)}")
+        return self
+
+    @model_validator(mode="after")
+    def _space(self) -> CreInputs:
         if self.property_type == "multifamily":
             if not self.unit_mix:
                 raise ValueError("多户公寓需要户型表（unit_mix）")

@@ -20,7 +20,7 @@ EN: dict[str, str] = {
     "商业默认": "Commercial default", "住宅默认": "Residential default", "机构默认": "Institutional default",
     "已停用·需重拉": "Stale · re-pull", "时间未知": "Date unknown",
     # 假设与指标
-    "翻新溢价": "Renovation premium", "翻新成本": "Renovation cost",
+    "翻新溢价": "Renovation premium", "翻新成本": "Renovation cost", "硬成本": "Hard costs", "去化速度": "Absorption pace",
     "租金水平": "Rent level", "月租金": "Monthly rent", "其他收入": "Other income", "空置率": "Vacancy",
     "空置率（预测）": "Vacancy (projected)", "房产税": "Property tax", "保险": "Insurance", "管理费": "Management fee",
     "管理费比例": "Management fee %", "维修保养": "Repairs & maintenance", "维修比例": "Repairs %",
