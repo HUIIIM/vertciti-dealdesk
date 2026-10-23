@@ -4,7 +4,7 @@ import { useApp } from "@/app-context";
 import { FieldInput, NumberInput } from "@/components/FieldInput";
 import { passportStatus } from "@/components/Passport";
 import { Metric, MetricGrid, NumCell } from "@/components/ui";
-import { INST_DEAL, INST_DEBT, INST_MARKET, INST_MF_OPEX, INST_MF_RENO, INST_MF_REVENUE, INST_OPEX, INST_WATERFALL, MF_DEFAULTS,
+import { INST_DEAL, INST_DEBT, INST_MARKET, INST_MEZZ, INST_REFI, MEZZ_DEFAULTS, REFI_DEFAULTS, INST_MF_OPEX, INST_MF_RENO, INST_MF_REVENUE, INST_OPEX, INST_WATERFALL, MF_DEFAULTS,
   blankInstitutional, blankUnit, type FieldSpec } from "@/domain/fields";
 import { fmt, type Unit } from "@/lib/format";
 import { getPath, type JsonObj } from "@/lib/paths";
@@ -19,6 +19,7 @@ interface Seg { tenant: string; suite: string; sf: number; start: number; end: n
 interface Cre { metrics: Record<string, number | null>; annual: Record<string, number[]>; rent_roll: Seg[];
   waterfall: { lp_irr_pct: number | null; gp_irr_pct: number | null; lp_multiple: number | null; gp_multiple: number | null; gp_promote: number;
     clawback?: number } | null;
+  refinance?: { month: number; value: number; amount: number; sized_by: string; net: number } | null;
   exit: { sale_price: number; selling_costs: number; loan_payoff: number; net_proceeds_levered: number } }
 
 /** 多户公寓（按户型）还是按租约（写字楼 / 零售 / 工业）。 */
@@ -108,6 +109,7 @@ function UnitMix() {
   );
 }
 
+const SIZED: Record<string, string> = { ltv: "LTV", dscr: T("最低 DSCR"), debt_yield: T("最低债务收益率") };
 const RECOVERY: [string, string][] = [["nnn", "NNN"], ["gross", T("毛租约")], ["base_year", T("基年")]];
 
 /** 分析月下标 → YYYY-MM（以交割月为 0）。 */
@@ -241,7 +243,8 @@ const ROWS: [string, string, boolean][] = [
   ["general_vacancy", T("一般空置"), false], ["credit_loss", T("信用损失"), false], ["egr", T("有效总收入 EGR"), true],
   ["opex_recoverable", T("可回收费用"), false], ["opex_non_recoverable", T("不可回收费用"), false], ["mgmt_fee", T("管理费"), false],
   ["noi", "NOI", true], ["ti", "TI", false], ["lc", "LC", false], ["reserves", T("资本储备"), false],
-  ["cf_before_debt", T("债前现金流"), true], ["debt_service", T("还本付息"), false], ["cf_after_debt", T("债后现金流"), true],
+  ["cf_before_debt", T("债前现金流"), true], ["debt_service", T("还本付息"), false], ["refi_proceeds", T("再融资净所得"), false],
+  ["cf_after_debt", T("债后现金流"), true],
 ];
 
 const ROWS_MF: [string, string, boolean][] = [
@@ -251,8 +254,25 @@ const ROWS_MF: [string, string, boolean][] = [
   ["recoveries", T("其他收入"), false], ["egr", T("有效总收入 EGR"), true], ["opex_recoverable", T("房产税与保险"), false],
   ["opex_non_recoverable", T("运营费用"), false], ["mgmt_fee", T("管理费"), false], ["noi", "NOI", true],
   ["capex", T("翻新支出"), false], ["reserves", T("资本储备"), false],
-  ["cf_before_debt", T("债前现金流"), true], ["debt_service", T("还本付息"), false], ["cf_after_debt", T("债后现金流"), true],
+  ["cf_before_debt", T("债前现金流"), true], ["debt_service", T("还本付息"), false], ["refi_proceeds", T("再融资净所得"), false],
+  ["cf_after_debt", T("债后现金流"), true],
 ];
+
+/** 可选的资本结构块（夹层 / 再融资）：勾选即用默认值建起来，取消即清空。 */
+function OptionalBlock({ path, title, defaults, specs, hint }: { path: string; title: string; defaults: JsonObj; specs: FieldSpec[]; hint: string }) {
+  const { draft, set } = useDeal();
+  const on = Boolean(draft[path]);
+  return (
+    <div style={{ marginTop: 16 }}>
+      <label className="row" style={{ gap: 8, alignItems: "center" }}>
+        <input type="checkbox" checked={on} onChange={(e) => set(path, e.target.checked ? { ...defaults } : null)} />
+        <span style={{ fontWeight: 700 }}>{title}</span>
+      </label>
+      <p className="sub" style={{ marginTop: 4 }}>{hint}</p>
+      {on ? <Fields specs={specs} /> : null}
+    </div>
+  );
+}
 
 export function InstModel() {
   const { draft, set, preview, previewing } = useDeal();
@@ -276,6 +296,10 @@ export function InstModel() {
           {floating ? <label className="field" style={{ marginTop: 12 }}>{T("SOFR 曲线（逐年，%）")}<span className="hint">{T("逗号分隔，最后一年向后沿用")}</span>
             <input className="input mono" defaultValue={curve.join(", ")} aria-label={T("SOFR 曲线")}
               onBlur={(e) => set("debt.sofr_curve_pct", e.target.value.split(/[,\s]+/).map(Number).filter((x) => Number.isFinite(x)))} /></label> : null}
+          <OptionalBlock path="mezz" title={T("夹层贷款")} defaults={MEZZ_DEFAULTS} specs={INST_MEZZ}
+            hint={T("交割时与优先贷款一起放款，只付息，退出或再融资时偿清。")} />
+          <OptionalBlock path="refinance" title={T("再融资")} defaults={REFI_DEFAULTS} specs={INST_REFI}
+            hint={T("按届时价值重新贷款（LTV、最低 DSCR、最低债务收益率取最小），偿清原贷款，净额分给股权。")} />
         </section>
         <section className="card" aria-label={T("分配瀑布")}><h2>{T("分配瀑布（GP / LP）")}</h2>
           <p className="sub">{T("按 LP IRR 门槛：优先回报以内按出资比例分；每过一档 LP 份额下降、GP 拿 promote。")}</p>
@@ -299,6 +323,9 @@ export function InstModel() {
           <li><span className="chip">NPV</span><span>{T("有杠杆 {0} · 无杠杆 {1}", [fmt(cm.levered_npv, "usd"), fmt(cm.unlevered_npv, "usd")])}</span></li>
           <li><span className="chip">{T("退出")}</span><span>{T("售价 {0}（下一年 NOI {1} ÷ {2}）· 偿还贷款 {3} · 有杠杆净所得 {4}", [fmt(cre.exit.sale_price, "usd"), fmt(cm.forward_noi, "usd"),
             fmt(cm.exit_cap_pct, "pct"), fmt(cre.exit.loan_payoff, "usd"), fmt(cre.exit.net_proceeds_levered, "usd")])}</span></li>
+          {cre.refinance ? <li><span className="chip">{T("再融资")}</span><span>{T("第 {0} 月：价值 {1}，新贷款 {2}（按 {3} 限额），股权净所得 {4}",
+            [cre.refinance.month, fmt(cre.refinance.value, "usd"), fmt(cre.refinance.amount, "usd"), SIZED[cre.refinance.sized_by] ?? cre.refinance.sized_by,
+              fmt(cre.refinance.net, "usd")])}</span></li> : null}
           {cre.waterfall ? <li><span className="chip">{T("瀑布")}</span><span>{T("LP IRR {0}（{1}）· GP IRR {2}（{3}）· GP promote {4}", [fmt(cre.waterfall.lp_irr_pct, "pct"), fmt(cre.waterfall.lp_multiple, "x"),
             fmt(cre.waterfall.gp_irr_pct, "pct"), fmt(cre.waterfall.gp_multiple, "x"), fmt(cre.waterfall.gp_promote, "usd")])}
             {cre.waterfall.clawback ? T("（已回拨 {0}）", [fmt(cre.waterfall.clawback, "usd")]) : null}</span></li> : null}

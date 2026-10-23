@@ -443,13 +443,15 @@ def _capital(cre: JSON, r: JSON) -> list[Any]:
     m, ex = r["metrics"], r["exit"]
     story = _h1("四、资本结构、债务与退出")
     acq_close = cre["purchase_price"] * cre["closing_costs_pct"] / 100
-    fee = m["equity"] - cre["purchase_price"] - acq_close + m["loan_amount"]
+    fee = m["equity"] - cre["purchase_price"] - acq_close + m["loan_amount"] + m["mezz_amount"]
     total = cre["purchase_price"] + acq_close + fee
     su = [_hdr_row(["资金来源与用途", "金额", "占比"])]
     for label, v in (("收购价", cre["purchase_price"]), ("交割成本", acq_close), ("贷款开办费", fee)):
         su.append([_p(label, 8), _num(money(v)), _num(f"{v / total * 100:.1f}%")])
     su.append([_p("用途合计", 8, INK, True), _num(money(total), True), _num("100.0%", True)])
-    for label, v in (("优先贷款", m["loan_amount"]), ("股权", m["equity"])):
+    sources = [("优先贷款", m["loan_amount"]), *([("夹层", m["mezz_amount"])] if m["mezz_amount"] else []),
+               ("股权", m["equity"])]
+    for label, v in sources:
         su.append([_p(label, 8), _num(money(v)), _num(f"{v / total * 100:.1f}%")])
     left = [_table(su, [CW * 0.2, CW * 0.13, CW * 0.08], bold_rows=(4,))]
 
@@ -466,7 +468,10 @@ def _capital(cre: JSON, r: JSON) -> list[Any]:
         if d["rate_type"] == "floating":
             terms.insert(1, ("SOFR 曲线（逐年）", "、".join(f"{x:g}%" for x in d["sofr_curve_pct"])))
     else:
-        terms = [("贷款", "无（全股权）")]
+        terms = [("优先贷款", "无")] if cre.get("mezz") else [("贷款", "无（全股权）")]
+    if cre.get("mezz"):
+        terms += [("夹层", f"{money(m['mezz_amount'])}，固定 {cre['mezz']['rate_pct']:g}%，只付息"),
+                  ("合计 LTV", pct(m["combined_ltv_pct"], 1)), ("优先贷款最小 DSCR", mult(m["dscr_senior_min"]))]
     dt = [_hdr_row(["贷款条款", ""])] + [[_p(k, 8), _num(v)] for k, v in terms]
     ext = [_hdr_row(["退出", ""]),
            [_p(f"退出年 NOI（第 {cre['hold_years'] + 1} 年{'，稳定化' if cre['exit_noi_basis'] == 'stabilized' else ''}）", 8),
@@ -482,7 +487,24 @@ def _capital(cre: JSON, r: JSON) -> list[Any]:
                   colWidths=[CW * 0.41 + 4 * mm, CW * 0.30 + 4 * mm, CW * 0.26])
     three.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("LEFTPADDING", (0, 0), (-1, -1), 0)]))
     story.append(three)
+    refi = r.get("refinance")
+    if refi:
+        lim = "、".join(f"{_SIZED[k]} {money(v)}" for k, v in refi["limits"].items())
+        rows = [_hdr_row(["再融资（第 {0} 月）".format(refi["month"]), ""]),
+                [_p("届时 12 个月 NOI", 8), _num(money(refi["noi_12m"]))],
+                [_p(f"估值（资本化率 {cre['refinance']['value_cap_pct']:g}%）", 8), _num(money(refi["value"]))],
+                [_p("新贷款", 8, INK, True), _num(f"{money(refi['amount'])}（按{_SIZED[refi['sized_by']]}）", True)],
+                [_p("偿还原贷款" + ("与夹层" if cre["refinance"]["repay_mezz"] and cre.get("mezz") else ""), 8),
+                 _num(money(-refi["repaid"]))],
+                [_p("再融资费用", 8), _num(money(-refi["costs"]))],
+                [_p("股权净所得", 8, INK, True), _num(money(refi["net"]), True)]]
+        story += [Spacer(1, 3 * mm), _table(rows, [CW * 0.2, CW * 0.2]),
+                  Spacer(1, 1.5 * mm), _note(f"各限额：{lim}。取最小值。新贷款利率 {refi['rate_pct']:g}%。"
+                                             + ("净所得为负：再融资需要股权补钱。" if refi["net"] < 0 else ""))]
     return story
+
+
+_SIZED = {"ltv": "LTV", "dscr": "最低 DSCR", "debt_yield": "最低债务收益率"}
 
 
 def _returns(cre: JSON, r: JSON) -> list[Any]:
@@ -612,7 +634,7 @@ _METHOD = [
     "费用回收：NNN 按面积占比分摊可回收费用；毛租不回收；基年租约只回收超过基年的部分。免租只免基本租金。",
     "一般空置按潜在总收入计提，先扣除已建模的周转空置，不低于 0。管理费按有效总收入计、不回收。",
     "售价 = 第 N+1 年 NOI ÷ 退出资本化率，扣卖方成本（可选稳定化 NOI：加回该年周转空置与免租、按潜在收入重算一般空置）；贷款按退出当月余额偿清。浮动利率 = min(SOFR, 上限) + 利差。",
-    "本版不建模：CPI 递增、百分比租金、费用上限 / gross-up、再融资 / 夹层 / 施工贷、开发期、按概率分叉的续租树、"
+    "本版不建模：CPI 递增、百分比租金、费用上限 / gross-up、施工贷、开发期、按概率分叉的续租树、"
     "欧式（整只基金）瀑布。",
     "续上的租约段是假设，不是签约事实；本备忘录只基于录入的输入，不构成投资建议。",
 ]
@@ -625,7 +647,7 @@ _METHOD_MF = [
     "翻新后的户按当月租金计，不计续约滞后（简化）。",
     "空置、优惠按在租租金计；其他收入按在线户数 × (1 − 空置率) 计；坏账按收入合计计。管理费按有效总收入计。",
     "售价 = 第 N+1 年 NOI ÷ 退出资本化率，扣卖方成本（可选稳定化 NOI：加回退出年翻新停用损失）；贷款按退出当月余额偿清。",
-    "本版不建模：按户逐份租约、续约涨幅上限、租金管制、短租、欧式（整只基金）瀑布、再融资 / 夹层。",
+    "本版不建模：按户逐份租约、续约涨幅上限、租金管制、短租、欧式（整只基金）瀑布、施工贷。",
     "本备忘录只基于录入的输入，不构成投资建议。",
 ]
 

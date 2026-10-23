@@ -876,4 +876,5 @@ class InstitutionalOut(Out):
     exit: dict[str, float]
     rent_roll: list[dict[str, Any]]
     unit_mix: list[dict[str, Any]] | None = None
+    refinance: dict[str, Any] | None = None
     waterfall: dict[str, Any] | None

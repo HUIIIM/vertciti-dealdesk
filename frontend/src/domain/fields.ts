@@ -106,6 +106,26 @@ export const INST_DEBT: FieldSpec[] = [
   { path: "debt.amort_years", label: T("摊还年数"), unit: "int" },
   { path: "debt.orig_fee_pct", label: T("贷款开办费"), unit: "pct", step: 0.25 },
 ];
+export const INST_MEZZ: FieldSpec[] = [
+  { path: "mezz.ltv_pct", label: T("夹层比例"), unit: "pct", step: 1, hint: T("占收购价，在优先贷款之上") },
+  { path: "mezz.rate_pct", label: T("夹层利率"), unit: "pct", step: 0.25, hint: T("固定，只付息") },
+  { path: "mezz.orig_fee_pct", label: T("夹层开办费"), unit: "pct", step: 0.25 },
+];
+export const MEZZ_DEFAULTS: JsonObj = { ltv_pct: 10, rate_pct: 11, orig_fee_pct: 1 };
+export const INST_REFI: FieldSpec[] = [
+  { path: "refinance.month", label: T("再融资月"), unit: "int", hint: T("交割后第几个月") },
+  { path: "refinance.value_cap_pct", label: T("估值资本化率"), unit: "pct", step: 0.05, hint: T("届时 12 个月 NOI ÷ 资本化率 = 价值") },
+  { path: "refinance.ltv_pct", label: T("再融资 LTV"), unit: "pct", step: 1 },
+  { path: "refinance.min_dscr", label: T("最低 DSCR"), unit: "x", step: 0.05, hint: T("限额；空 = 不限") },
+  { path: "refinance.min_debt_yield_pct", label: T("最低债务收益率"), unit: "pct", step: 0.25, hint: T("限额；空 = 不限") },
+  { path: "refinance.rate_pct", label: T("新贷款利率"), unit: "pct", step: 0.05 },
+  { path: "refinance.io_months", label: T("新贷款只付息月数"), unit: "int" },
+  { path: "refinance.amort_years", label: T("新贷款摊还年数"), unit: "int" },
+  { path: "refinance.costs_pct", label: T("再融资费用"), unit: "pct", step: 0.25, hint: T("占新贷款") },
+  { path: "refinance.repay_mezz", label: T("一并偿清夹层"), unit: "bool" },
+];
+export const REFI_DEFAULTS: JsonObj = { month: 36, value_cap_pct: 6.5, ltv_pct: 65, min_dscr: 1.25, min_debt_yield_pct: null, rate_pct: 6.0,
+  io_months: 0, amort_years: 30, costs_pct: 1, repay_mezz: true };
 export const INST_WATERFALL: FieldSpec[] = [
   { path: "waterfall.lp_equity_pct", label: T("LP 出资比例"), unit: "pct", step: 1 },
   { path: "waterfall.pref_pct", label: T("优先回报"), unit: "pct", step: 0.5, hint: T("LP IRR 门槛") },

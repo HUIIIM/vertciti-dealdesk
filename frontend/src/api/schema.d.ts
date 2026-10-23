@@ -1992,6 +1992,10 @@ export interface components {
             monthly: {
                 [key: string]: number[];
             };
+            /** Refinance */
+            refinance?: {
+                [key: string]: unknown;
+            } | null;
             /** Rent Roll */
             rent_roll: {
                 [key: string]: unknown;

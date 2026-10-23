@@ -208,4 +208,16 @@ describe("机构级交易页", () => {
     fireEvent.click(screen.getByRole("checkbox", { name: /期末回拨/ }));
     await waitFor(() => expect(lastPreview()?.waterfall).toMatchObject({ frequency: "monthly", catch_up_target_pct: 20, clawback: true }));
   });
+  it("资本结构：勾选夹层、再融资即带默认值进草稿，结果里显示再融资", async () => {
+    seedInstitutionalDeal();
+    at("#/deals/9/model");
+    const mezz = await screen.findByRole("checkbox", { name: "夹层贷款" }, { timeout: 3000 });
+    fireEvent.click(mezz);
+    await waitFor(() => expect(lastPreview()?.mezz).toMatchObject({ ltv_pct: 10, rate_pct: 11 }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "再融资" }));
+    await waitFor(() => expect(lastPreview()?.refinance).toMatchObject({ month: 36, ltv_pct: 65 }));
+    expect(screen.getByRole("textbox", { name: /^再融资月/ })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("checkbox", { name: "夹层贷款" }));
+    await waitFor(() => expect(lastPreview()?.mezz).toBeNull());
+  });
 });

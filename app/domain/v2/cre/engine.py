@@ -10,7 +10,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from app.domain.v2.cre import cashflow, debt, leases, multifamily
+from app.domain.v2.cre import capital, cashflow, leases, multifamily
 from app.domain.v2.cre.inputs import CreInputs
 from app.domain.v2.cre.returns import equity_multiple, irr, npv
 from app.domain.v2.cre.waterfall import annual as annual_series
@@ -95,14 +95,16 @@ def run(inputs: JSON) -> JSON:
     is_mf = cre.property_type == "multifamily"
     chains = [] if is_mf else leases.expand(cre, months)
     cf = multifamily.project(cre, months) if is_mf else cashflow.project(cre, chains, months)
-    ds = debt.schedule(cre.debt, cre.purchase_price, months)
     lines = cf.lines
-    debt_service = [i + p for i, p in zip(ds.interest, ds.principal, strict=True)]
+    ds = capital.build(cre, lines["noi"], months)
+    debt_service = ds.debt_service
 
     annual = {k: _years(v, cre.hold_years + 1) for k, v in lines.items() if k != "occupancy_pct"}
     annual["occupancy_pct"] = [sum(lines["occupancy_pct"][y * 12:(y + 1) * 12]) / 12 for y in range(cre.hold_years + 1)]
     annual["debt_service"] = _years(debt_service, cre.hold_years + 1)
-    annual["cf_after_debt"] = [a - b for a, b in zip(annual["cf_before_debt"], annual["debt_service"], strict=True)]
+    annual["refi_proceeds"] = _years(ds.refi_net, cre.hold_years + 1)
+    cfbd, dsv, refi = annual["cf_before_debt"], annual["debt_service"], annual["refi_proceeds"]
+    annual["cf_after_debt"] = [a - b + c for a, b, c in zip(cfbd, dsv, refi, strict=True)]
 
     fwd_noi_raw = annual["noi"][cre.hold_years]
     stab_noi = _stabilized_noi(cre, annual, cre.hold_years)
@@ -111,13 +113,14 @@ def run(inputs: JSON) -> JSON:
     selling = sale * cre.selling_costs_pct / 100
     payoff = ds.payoff(hold_m - 1)
     acquisition = cre.purchase_price * (1 + cre.closing_costs_pct / 100)
-    equity = acquisition + ds.orig_fee - ds.amount
+    loans_at_close = ds.senior_at_close + ds.mezz_at_close
+    equity = acquisition + ds.fees_at_close - loans_at_close
 
     unlev = [-acquisition, *annual["cf_before_debt"][:cre.hold_years]]
     unlev[-1] += sale - selling
     lev = [-equity, *annual["cf_after_debt"][:cre.hold_years]]
     lev[-1] += sale - selling - payoff
-    lev_m = [-equity] + [lines["cf_before_debt"][m] - debt_service[m] for m in range(hold_m)]
+    lev_m = [-equity] + [lines["cf_before_debt"][m] - debt_service[m] + ds.refi_net[m] for m in range(hold_m)]
     lev_m[-1] += sale - selling - payoff
     unlev_m = [-acquisition, *lines["cf_before_debt"][:hold_m]]
     unlev_m[-1] += sale - selling
@@ -127,6 +130,10 @@ def run(inputs: JSON) -> JSON:
 
     noi1 = annual["noi"][0]
     dscr = [_div(n, s) for n, s in zip(annual["noi"][:cre.hold_years], annual["debt_service"], strict=False)]
+    senior_ds = [t - mz for t, mz in zip(debt_service, ds.mezz_service, strict=True)]
+    dscr_senior = [_div(n, s) for n, s in zip(annual["noi"][:cre.hold_years],
+                                              _years(senior_ds, cre.hold_years), strict=True)]
+    dscr_senior_known = [x for x in dscr_senior if x is not None]
     dscr_known = [x for x in dscr if x is not None]
     disc = cre.discount_rate_pct / 100
     metrics: JSON = {
@@ -138,9 +145,12 @@ def run(inputs: JSON) -> JSON:
         "levered_irr_pct": _pct(irr(lev)), "levered_irr_monthly_pct": _pct(annualized(irr(lev_m))),
         "unlevered_multiple": equity_multiple(unlev), "levered_multiple": equity_multiple(lev),
         "unlevered_npv": npv(disc, unlev), "levered_npv": npv(disc, lev),
-        "equity": equity, "loan_amount": ds.amount,
-        "ltv_pct": _pct(_div(ds.amount, cre.purchase_price)),
-        "debt_yield_pct": _pct(_div(noi1, ds.amount)),
+        "equity": equity, "loan_amount": ds.senior_at_close, "mezz_amount": ds.mezz_at_close,
+        "ltv_pct": _pct(_div(ds.senior_at_close, cre.purchase_price)),
+        "combined_ltv_pct": _pct(_div(loans_at_close, cre.purchase_price)),
+        "debt_yield_pct": _pct(_div(noi1, ds.senior_at_close)),
+        "dscr_senior_min": min(dscr_senior_known) if dscr_senior_known else None,
+        "refi_net_proceeds": ds.refi["net"] if ds.refi else None,
         "dscr_year1": dscr[0] if dscr else None, "dscr_min": min(dscr_known) if dscr_known else None,
         "cash_on_cash_year1_pct": _pct(_div(annual["cf_after_debt"][0], equity)),
         "avg_occupancy_pct": sum(annual["occupancy_pct"][:cre.hold_years]) / cre.hold_years,
@@ -157,6 +167,7 @@ def run(inputs: JSON) -> JSON:
                     "debt_service": debt_service[:hold_m], "occupancy_pct": lines["occupancy_pct"][:hold_m],
                     "rate_pct": ds.rate_pct[:hold_m]},
         "flows": {"unlevered": unlev, "levered": lev},
+        "refinance": ds.refi,
         "exit": {"sale_price": sale, "selling_costs": selling, "loan_payoff": payoff,
                  "net_proceeds_levered": sale - selling - payoff},
         "rent_roll": [{"tenant": s.tenant, "suite": s.suite, "sf": s.sf, "start": s.start, "end": s.end,
