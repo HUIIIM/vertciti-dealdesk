@@ -1026,4 +1026,5 @@ export const EN: Record<string, string> = {
   "股权先投，投满后按月提款；用“再融资”在稳定后换成长期贷款。开发项目不填优先贷款。": "Equity goes in first, then the loan draws monthly; use Refinance to take it out with permanent debt after stabilization. Development deals don't use a senior loan.",
   "开发": "Development",
   "总成本 {0}；开发收益率 {1}；施工贷峰值 {2}，资本化利息 {3}": "Total cost {0}; yield on cost {1}; peak construction loan {2}, capitalized interest {3}",
+  "开发项目不用优先贷款：施工期用施工贷（在“交易与退出”里），稳定后用下方“再融资”换成长期贷款。": "Development deals use no senior loan: the construction loan (under Deal & exit) funds the build, and Refinance below takes it out with permanent debt after stabilization.",
 };

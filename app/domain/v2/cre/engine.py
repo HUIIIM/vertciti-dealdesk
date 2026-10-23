@@ -88,6 +88,27 @@ def _waterfall(cre: CreInputs, lev: list[float], lev_m: list[float]) -> JSON | N
     return out
 
 
+def _dscr_from_year(cre: CreInputs) -> int:
+    """DSCR 从哪一年（0 起）开始算。开发项目：施工与去化期 NOI 为 0 或负、还在付施工贷利息，DSCR 没有意义；
+    机构口径按长期贷款测——有再融资从再融资的下一个整年起，否则从稳定月所在年起。其余项目从第 1 年起。"""
+    dev = cre.development
+    if dev is None:
+        return 0
+    if cre.refinance is not None:
+        return cre.refinance.month // 12 + 1
+    return development.stabilization_month(dev) // 12
+
+
+def _debt_yield(cre: CreInputs, ds: capital.Stack, noi: list[float]) -> float | None:
+    """债务收益率：首年 NOI ÷ 优先贷款；开发项目按稳定后 NOI ÷ 长期贷款（再融资额，没有则按施工贷承诺额）。"""
+    dev = cre.development
+    if dev is None:
+        return _div(sum(noi[:12]), ds.senior_at_close)
+    loan = ds.refi["amount"] if ds.refi else (ds.construction or {}).get("commitment", 0.0)
+    s_m = development.stabilization_month(dev)
+    return _div(sum(noi[s_m:s_m + 12]), loan)
+
+
 def _development_metrics(cre: CreInputs, noi: list[float]) -> JSON:
     """总成本；开发项目另报稳定后 12 个月 NOI、开发收益率（÷ 总成本）与价值创造（按退出资本化率估值 − 总成本）。"""
     total = development.total_cost(cre)
@@ -147,9 +168,8 @@ def run(inputs: JSON) -> JSON:
 
     noi1 = annual["noi"][0]
     dscr = [_div(n, s) for n, s in zip(annual["noi"][:cre.hold_years], annual["debt_service"], strict=False)]
-    if cre.development is not None:  # 施工与去化期 NOI 为 0 或负，DSCR 没有意义：只从稳定月所在年起算
-        first = development.stabilization_month(cre.development) // 12
-        dscr = [None if y < first else x for y, x in enumerate(dscr)]
+    dscr_from = _dscr_from_year(cre)
+    dscr = [None if y < dscr_from else x for y, x in enumerate(dscr)]
     senior_ds = [t - mz for t, mz in zip(debt_service, ds.mezz_service, strict=True)]
     dscr_senior = [_div(n, s) if dscr[y] is not None else None for y, (n, s) in
                    enumerate(zip(annual["noi"][:cre.hold_years], _years(senior_ds, cre.hold_years), strict=True))]
@@ -171,11 +191,12 @@ def run(inputs: JSON) -> JSON:
         "equity": equity, "loan_amount": ds.senior_at_close, "mezz_amount": ds.mezz_at_close,
         "ltv_pct": _pct(_div(ds.senior_at_close, cre.purchase_price)),
         "combined_ltv_pct": _pct(_div(loans_at_close, cre.purchase_price)),
-        "debt_yield_pct": _pct(_div(noi1, ds.senior_at_close)),
+        "debt_yield_pct": _pct(_debt_yield(cre, ds, lines["noi"])),
+        "dscr_from_year": dscr_from + 1,
         "dscr_senior_min": min(dscr_senior_known) if dscr_senior_known else None,
         "refi_net_proceeds": ds.refi["net"] if ds.refi else None,
         "dscr_year1": dscr[0] if dscr else None, "dscr_min": min(dscr_known) if dscr_known else None,
-        "cash_on_cash_year1_pct": _pct(_div(annual["cf_after_debt"][0], equity)),
+        "cash_on_cash_year1_pct": None if cre.development else _pct(_div(annual["cf_after_debt"][0], equity)),
         "avg_occupancy_pct": sum(annual["occupancy_pct"][:cre.hold_years]) / cre.hold_years,
         "leasing_costs_total": abs(sum(annual["ti"][:cre.hold_years]) + sum(annual["lc"][:cre.hold_years])),
         "capex_total": abs(sum(annual["capex"][:cre.hold_years])),

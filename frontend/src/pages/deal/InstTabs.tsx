@@ -303,8 +303,10 @@ export function InstModel() {
             hint={T("收购价当作土地或旧楼价款；施工期按支出曲线投入成本，竣工后起租（预租租约须在竣工后起租）。")} />
           {draft.development ? <OptionalBlock path="construction_loan" title={T("施工贷")} defaults={CL_DEFAULTS} specs={INST_CL}
             hint={T("股权先投，投满后按月提款；用“再融资”在稳定后换成长期贷款。开发项目不填优先贷款。")} /> : null}</section>
-        <section className="card" aria-label={T("债务")}><h2>{T("债务")}</h2><Fields specs={INST_DEBT} />
-          {floating ? <label className="field" style={{ marginTop: 12 }}>{T("SOFR 曲线（逐年，%）")}<span className="hint">{T("逗号分隔，最后一年向后沿用")}</span>
+        <section className="card" aria-label={T("债务")}><h2>{T("债务")}</h2>
+          {draft.development ? <p className="sub">{T("开发项目不用优先贷款：施工期用施工贷（在“交易与退出”里），稳定后用下方“再融资”换成长期贷款。")}</p>
+            : <Fields specs={INST_DEBT} />}
+          {floating && !draft.development ? <label className="field" style={{ marginTop: 12 }}>{T("SOFR 曲线（逐年，%）")}<span className="hint">{T("逗号分隔，最后一年向后沿用")}</span>
             <input className="input mono" defaultValue={curve.join(", ")} aria-label={T("SOFR 曲线")}
               onBlur={(e) => set("debt.sofr_curve_pct", e.target.value.split(/[,\s]+/).map(Number).filter((x) => Number.isFinite(x)))} /></label> : null}
           <OptionalBlock path="mezz" title={T("夹层贷款")} defaults={MEZZ_DEFAULTS} specs={INST_MEZZ}

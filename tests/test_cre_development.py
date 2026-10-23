@@ -87,8 +87,12 @@ def test_multifamily_absorption_after_completion():
     assert m["levered_irr_pct"] == pytest.approx(19.307, abs=1e-3)
     assert r["construction"]["capitalized_interest"] > 0 and r["refinance"]["sized_by"] == "dscr"
     a = r["annual"]
-    assert 0 < m["dscr_min"] < 1                                  # 稳定年仍在付 8.5% 施工贷利息：如实低于 1
-    assert a["noi"][3] / a["debt_service"][3] > 1.25               # 再融资后（第 4 年）按 DSCR 限额定的贷款
+    # DSCR 按长期贷款测：第 40 月再融资 → 从第 5 年起算（第 3 年还在付 8.5% 施工贷利息，DSCR 低于 1，不计）
+    assert m["dscr_from_year"] == 5 and m["dscr_year1"] is None
+    assert m["dscr_min"] == pytest.approx(a["noi"][4] / a["debt_service"][4]) and m["dscr_min"] > 1.25
+    assert a["noi"][2] / a["debt_service"][2] < 1
+    assert m["debt_yield_pct"] == pytest.approx(m["stabilized_noi"] / r["refinance"]["amount"] * 100)
+    assert m["cash_on_cash_year1_pct"] is None
 
 
 @pytest.mark.parametrize(("patch", "fragment"), [

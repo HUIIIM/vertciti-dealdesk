@@ -225,6 +225,8 @@ describe("机构级交易页", () => {
     at("#/deals/9/model");
     fireEvent.click(await screen.findByRole("checkbox", { name: "开发 / 重度改造" }, { timeout: 3000 }));
     await waitFor(() => expect(lastPreview()).toMatchObject({ debt: null, development: { construction_months: 18 } }));
+    expect(screen.getByText(/开发项目不用优先贷款/)).toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: /^LTV/ })).toBeNull();
     fireEvent.click(screen.getByRole("checkbox", { name: "施工贷" }));
     await waitFor(() => expect(lastPreview()?.construction_loan).toMatchObject({ ltc_pct: 60 }));
     fireEvent.click(screen.getByRole("checkbox", { name: "开发 / 重度改造" }));

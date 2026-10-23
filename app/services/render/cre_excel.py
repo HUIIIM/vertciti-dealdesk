@@ -22,10 +22,6 @@ from app.core import brand
 from app.domain.v2.cre.waterfall import describe as describe_waterfall
 
 
-def stabilization_month_of(dev: JSON) -> int:
-    """与 development.stabilization_month 同口径（这里拿的是 dict）。"""
-    return int(dev["stabilization_month"]) if dev.get("stabilization_month") is not None else int(dev["construction_months"]) + 12
-
 JSON = dict[str, Any]
 
 _F = "Microsoft YaHei"
@@ -352,7 +348,7 @@ def _returns(ws: Worksheet, cre: JSON, r: JSON) -> None:
     loan = _ref(A, "$B$11")
     rate = _ref(A, "$B$8")
     dv = cre.get("development")
-    first = _col(stabilization_month_of(dv) // 12 + 2) if dv else "B"   # 开发项目：从稳定月所在年起算 DSCR
+    first = _col(int(m["dscr_from_year"]) + 1)   # 开发项目：DSCR 从长期贷款的第一个整年起算（与引擎同口径）
     dscr_rng = _ref(CF, f"{first}{ROW['dscr']}:{hold_col}{ROW['dscr']}")
 
     def pct(x: float | None) -> float | None:
@@ -369,10 +365,11 @@ def _returns(ws: Worksheet, cre: JSON, r: JSON) -> None:
         ("有杠杆 NPV", f"=B13+NPV({rate},C13:{end}13)", m["levered_npv"], MONEY),
         ("进入资本化率", f"={noi1}/{p}", pct(m["going_in_cap_pct"]), PCT),
         ("成本收益率", f"={noi1}/({acq})", pct(m["yield_on_cost_pct"]), PCT),
-        ("债务收益率（优先贷款）", f'=IF({m["loan_amount"]}=0,"",{noi1}/{m["loan_amount"]})', pct(m["debt_yield_pct"]), PCT),
+        ("债务收益率（开发：稳定 NOI ÷ 长期贷款，引擎）" if dv else "债务收益率（优先贷款）",
+         "" if dv else f'=IF({m["loan_amount"]}=0,"",{noi1}/{m["loan_amount"]})', pct(m["debt_yield_pct"]), PCT),
         ("首年 DSCR", "" if dv else f"={_ref(CF, 'B' + str(ROW['dscr']))}", m["dscr_year1"], X),
         ("持有期最小 DSCR", f'=IF(COUNT({dscr_rng})=0,"",MIN({dscr_rng}))', m["dscr_min"], X),
-        ("首年现金回报", f"={ds1}/-B13", pct(m["cash_on_cash_year1_pct"]), PCT),
+        ("首年现金回报", "" if dv else f"={ds1}/-B13", pct(m["cash_on_cash_year1_pct"]), PCT),
         ("股权投入", "=-B13", m["equity"], MONEY),
     ]
     for i, (label, f, v, fmt) in enumerate(rows, start=16):
