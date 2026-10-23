@@ -1,8 +1,11 @@
 # DealDesk
 
-Self-hosted real-estate underwriting for investors and investment teams — from a bare address or an offering
-memorandum to an investment-committee pack. Three underwriting tracks (residential, commercial, institutional),
-every figure traceable to its source, every run reproducible by ID.
+**Institutional-grade underwriting, with every number accounted for.**
+
+DealDesk takes a deal from a bare address or an offering memorandum to an investment-committee pack in one
+system: lease-by-lease cash flows, the full capital stack and GP / LP waterfall, a red team that finds the
+assumption that matters, and an audit trail a committee can verify to the cent. Self-hosted, open source (MIT),
+built by [vertciti](https://vertciti.com).
 
 | | |
 |---|---|
@@ -17,10 +20,25 @@ every figure traceable to its source, every run reproducible by ID.
 
 ![DealDesk deal page: verdict, kill criteria, verification progress and "verify first" queue for an office acquisition](https://raw.githubusercontent.com/HUIIIM/vertciti-dealdesk/main/assets/v2-deal.png)
 
+## Why DealDesk
+
+Most underwriting still lives in a spreadsheet nobody else can audit: figures typed in from a broker flyer, an
+assumption buried in a hidden tab, a committee asked to approve numbers it cannot trace. DealDesk is built for
+the opposite — a decision you can defend line by line.
+
+| | |
+|---|---|
+| **Depth of a CRE model** | Lease-by-lease and unit-by-unit monthly cash flow, mezzanine, refinance, construction loans and a GP / LP waterfall with catch-up and clawback — exported as a live-formula Excel model that recalculates to match the engine. |
+| **Discipline of an audit** | Every figure carries its source, page, reviewer and freshness. Conflicts must be resolved in writing. Missing data stays missing. |
+| **Judgement you can check** | The red team ranks assumptions by how far they move the return; the devil's-advocate memo is assembled by fixed rules, never by AI; every run can be recomputed by ID. |
+| **Control of your own stack** | Self-hosted on your infrastructure, SQLite or Postgres, roles and an audit log of every change; deal data stays on your servers, and the one paid data integration is off by default. |
+
+Built for investors, family offices and small investment teams who underwrite their own deals and answer to a
+committee — residential rentals through institutional office, multifamily and ground-up development.
+
 ## Overview
 
-Screening a deal usually starts from a broker flyer and ends hours later in a spreadsheet whose numbers cannot
-be traced back to anything. DealDesk keeps the underwriting and its evidence in one place:
+How DealDesk keeps the underwriting and its evidence in one place:
 
 - **Every number has a passport** — source, page, extraction method, confidence, reviewer and freshness.
   Conflicting sources are logged and must be resolved with a written reason. Missing data stays missing
