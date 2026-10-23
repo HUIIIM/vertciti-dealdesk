@@ -1,4 +1,4 @@
-"""统一模型入口：两条赛道一个出口，输出同一套标准指标。
+"""统一模型入口：三条赛道（住宅 / 商业 / 机构级）一个出口，输出同一套标准指标。
 
 - residential：v1 住宅打分引擎（ResidentialInput 严格校验 → scoring_residential.score）
 - commercial：v1 商业核保全链路（uw_commercial.compute_all：租金表 → 现金流 → 分析 → 退出 IRR）
@@ -144,7 +144,7 @@ def _institutional(inputs: JSON) -> tuple[JSON, JSON]:
         "price": float(clean["purchase_price"]), "noi": a["noi"][0], "cap_rate_pct": m["going_in_cap_pct"],
         "dscr": m["dscr_min"], "irr_pct": m["levered_irr_pct"], "coc_pct": m["cash_on_cash_year1_pct"],
         "equity_multiple": m["levered_multiple"], "annual_cash_flow": a["cf_after_debt"][0],
-        "cash_to_close": m["equity"], "ltv_pct": m["ltv_pct"], "breakeven_occupancy_pct": None, "score": None,
+        "cash_to_close": m["equity_total"], "ltv_pct": m["ltv_pct"], "breakeven_occupancy_pct": None, "score": None,
         "unlevered_irr_pct": m["unlevered_irr_pct"], "debt_yield_pct": m["debt_yield_pct"],
         "avg_occupancy_pct": m["avg_occupancy_pct"],
     }

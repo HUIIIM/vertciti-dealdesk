@@ -7,9 +7,17 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from app.core.i18n import T
+
 _MONTH = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
 Recovery = Literal["nnn", "gross", "base_year"]
 Pct = float  # 百分比数：6.5 表示 6.5%
+
+
+def month_offset(ym: str, origin: str) -> int:
+    y, m = (int(x) for x in ym.split("-"))
+    y0, m0 = (int(x) for x in origin.split("-"))
+    return (y - y0) * 12 + (m - m0)
 
 
 class _In(BaseModel):
@@ -18,7 +26,7 @@ class _In(BaseModel):
 
 def _month(v: str) -> str:
     if not _MONTH.match(v):
-        raise ValueError("日期格式应为 YYYY-MM")
+        raise ValueError(T("日期格式应为 YYYY-MM"))
     return v
 
 
@@ -41,7 +49,7 @@ class Lease(_In):
     @model_validator(mode="after")
     def _order(self) -> Lease:
         if self.end < self.start:
-            raise ValueError(f"{self.tenant}：到期月早于起始月")
+            raise ValueError(T("{0}：到期月早于起始月", self.tenant))
         return self
 
 
@@ -87,10 +95,72 @@ class Debt(_In):
     @model_validator(mode="after")
     def _one_size(self) -> Debt:
         if self.ltv_pct is not None and self.amount is not None:
-            raise ValueError("贷款额与 LTV 只能填一个")
+            raise ValueError(T("贷款额与 LTV 只能填一个"))
         if self.rate_type == "floating" and not self.sofr_curve_pct:
-            raise ValueError("浮动利率需要 SOFR 曲线（逐年）")
+            raise ValueError(T("浮动利率需要 SOFR 曲线（逐年）"))
         return self
+
+
+class Mezz(_In):
+    """夹层贷款：交割时与优先贷款一起放款，只付息，退出（或再融资）时偿清。"""
+
+    ltv_pct: Pct | None = Field(default=None, gt=0, le=40, description="夹层占收购价的比例（在优先贷款之上）")
+    amount: float | None = Field(default=None, gt=0, description="夹层金额；与 ltv_pct 二选一")
+    rate_pct: Pct = Field(default=11, ge=0, le=30)
+    orig_fee_pct: Pct = Field(default=1, ge=0, le=10)
+
+    @model_validator(mode="after")
+    def _one_size(self) -> Mezz:
+        if (self.ltv_pct is None) == (self.amount is None):
+            raise ValueError(T("夹层：金额与 LTV 填且只填一个"))
+        return self
+
+
+class Refinance(_In):
+    """再融资：在第 month 月按届时的物业价值重新贷款，偿清原优先贷款（与夹层），净额分给股权（负数 = 需补钱）。
+
+    新贷款额 = min(LTV × 价值, 按最低 DSCR 反推, 按最低债务收益率反推)；价值 = 再融资月起 12 个月 NOI ÷ 估值资本化率。
+    """
+
+    month: int = Field(ge=1, le=359, description="交割后第几个月再融资")
+    value_cap_pct: Pct = Field(gt=0, le=25, description="估值资本化率")
+    ltv_pct: Pct = Field(default=65, gt=0, le=90)
+    min_dscr: float | None = Field(default=1.25, gt=0, le=5, description="按最低 DSCR 限额；空 = 不限")
+    min_debt_yield_pct: Pct | None = Field(default=None, gt=0, le=30, description="按最低债务收益率限额；空 = 不限")
+    rate_pct: Pct = Field(default=6.0, ge=0, le=30)
+    io_months: int = Field(default=0, ge=0, le=360)
+    amort_years: int = Field(default=30, ge=1, le=40)
+    costs_pct: Pct = Field(default=1, ge=0, le=10, description="再融资费用：占新贷款")
+    repay_mezz: bool = Field(default=True, description="再融资时一并偿清夹层")
+
+
+class Development(_In):
+    """开发 / 重度改造：交割后先施工（不出租、不计运营），竣工后起租。收购价 = 土地或旧楼价款，交割当月支付。
+
+    硬成本（含不可预见费）与软成本按施工期逐月支出：straight = 平均；s_curve = 两头少中间多（正弦权重）。
+    """
+
+    construction_months: int = Field(ge=1, le=60)
+    hard_costs: float = Field(ge=0, description="硬成本合计")
+    soft_costs: float = Field(default=0, ge=0, description="软成本合计（设计、许可、开发商费等）")
+    soft_upfront_pct: Pct = Field(default=20, ge=0, le=100, description="软成本在交割当月先付的比例")
+    contingency_pct: Pct = Field(default=5, ge=0, le=30, description="不可预见费：占硬成本")
+    draw_curve: Literal["straight", "s_curve"] = "s_curve"
+    absorption_units_per_month: float | None = Field(default=None, gt=0,
+                                                     description="多户公寓竣工后每月租出的户数；空 = 竣工即稳定")
+    stabilization_month: int | None = Field(default=None, ge=1,
+                                            description="稳定月（算开发收益率）；空 = 竣工后 12 个月")
+
+
+class ConstructionLoan(_In):
+    """施工贷：按总成本（土地 + 交割 + 硬 + 软 + 不可预见）的 LTC 承诺。
+
+    股权先投，投满后贷款按月提款；施工期利息资本化（滚入本金），竣工后按月付息；再融资或出售时偿清。
+    """
+
+    ltc_pct: Pct = Field(default=60, gt=0, le=90, description="贷款占总成本比例")
+    rate_pct: Pct = Field(default=8, ge=0, le=30)
+    orig_fee_pct: Pct = Field(default=1, ge=0, le=10, description="开办费：占承诺额，交割时付")
 
 
 class Tier(_In):
@@ -116,9 +186,9 @@ class Waterfall(_In):
     def _ascending(self) -> Waterfall:
         hs = [self.pref_pct, *(t.irr_pct for t in self.tiers)]
         if any(b <= a for a, b in itertools.pairwise(hs)):
-            raise ValueError("瀑布门槛必须逐档递增（优先回报 < 第一档 < 第二档 …）")
+            raise ValueError(T("瀑布门槛必须逐档递增（优先回报 < 第一档 < 第二档 …）"))
         if self.catch_up_target_pct is not None and self.catch_up_rate_pct <= self.catch_up_target_pct:
-            raise ValueError("catch-up 期间 GP 的现金比例必须高于目标利润比例，否则永远补不到")
+            raise ValueError(T("catch-up 期间 GP 的现金比例必须高于目标利润比例，否则永远补不到"))
         return self
 
 
@@ -137,7 +207,7 @@ class UnitType(_In):
     @model_validator(mode="after")
     def _reno(self) -> UnitType:
         if self.renovate_units > self.units:
-            raise ValueError(f"{self.name}：翻新户数 {self.renovate_units} 超过户数 {self.units}")
+            raise ValueError(T("{0}：翻新户数 {1} 超过户数 {2}", self.name, self.renovate_units, self.units))
         return self
 
 
@@ -164,6 +234,9 @@ class Multifamily(_In):
     reno_downtime_months: int = Field(default=1, ge=0, le=12, description="每户翻新停用月数")
 
 
+MAX_LEASE_MONTHS = 120_000  # 例：1,000 份租约 × 10 年；红队 / 敏感性要重跑十几到几十次，控制单请求耗时
+
+
 class CreInputs(_In):
     analysis_start: str = Field(description="分析起点（收购交割）月 YYYY-MM")
     hold_years: int = Field(ge=1, le=30)
@@ -180,6 +253,10 @@ class CreInputs(_In):
     general_vacancy_pct: Pct = Field(default=5, ge=0, le=50, description="一般空置：会扣除已建模的周转空置后再计")
     credit_loss_pct: Pct = Field(default=1, ge=0, le=20)
     debt: Debt | None = None
+    mezz: Mezz | None = None
+    refinance: Refinance | None = None
+    development: Development | None = None
+    construction_loan: ConstructionLoan | None = None
     exit_cap_pct: Pct = Field(gt=0, le=25)
     exit_noi_basis: Literal["forward", "stabilized"] = Field(
         default="forward",
@@ -194,31 +271,54 @@ class CreInputs(_In):
     def mla(self) -> Market:
         """按租约物业的市场租赁假设（校验器保证 commercial 必有）。"""
         if self.market is None:
-            raise ValueError("按租约物业需要市场租赁假设（market）")
+            raise ValueError(T("按租约物业需要市场租赁假设（market）"))
         return self.market
 
     def mfa(self) -> Multifamily:
         """多户公寓假设（校验器保证 multifamily 必有，缺省时补默认值）。"""
         if self.multifamily is None:
-            raise ValueError("多户公寓需要户型假设（multifamily）")
+            raise ValueError(T("多户公寓需要户型假设（multifamily）"))
         return self.multifamily
+
+    @model_validator(mode="after")
+    def _capital_and_development(self) -> CreInputs:
+        dev = self.development
+        if self.construction_loan is not None and dev is None:
+            raise ValueError(T("施工贷需要开发计划（development）"))
+        if self.refinance is not None and self.refinance.month >= self.hold_years * 12:
+            raise ValueError(T("再融资月（第 {0} 月）必须早于出售（第 {1} 月）",
+                               self.refinance.month, self.hold_years * 12))
+        if dev is None:
+            return self
+        if dev.construction_months >= self.hold_years * 12:
+            raise ValueError(T("施工期必须短于持有期"))
+        if self.debt is not None:
+            raise ValueError(T("开发项目用施工贷（construction_loan），竣工后用再融资换成长期贷款；不填优先贷款"))
+        c = dev.construction_months
+        late = [le.tenant for le in self.leases if month_offset(le.start, self.analysis_start) < c]
+        if late:
+            raise ValueError(T("开发项目的预租租约须在竣工后起租：{0}", T("、").join(late)))
+        return self
 
     @model_validator(mode="after")
     def _space(self) -> CreInputs:
         if self.property_type == "multifamily":
             if not self.unit_mix:
-                raise ValueError("多户公寓需要户型表（unit_mix）")
+                raise ValueError(T("多户公寓需要户型表（unit_mix）"))
             if self.leases:
-                raise ValueError("多户公寓按户型建模，不填逐份租约")
+                raise ValueError(T("多户公寓按户型建模，不填逐份租约"))
             if self.multifamily is None:
                 self.multifamily = Multifamily()
             total = sum(u.units for u in self.unit_mix)
             if self.multifamily.non_revenue_units >= total:
-                raise ValueError(f"不产生租金的户数 {self.multifamily.non_revenue_units} 不少于总户数 {total}")
+                raise ValueError(T("不产生租金的户数 {0} 不少于总户数 {1}", self.multifamily.non_revenue_units, total))
             return self
         if self.market is None:
-            raise ValueError("按租约物业需要市场租赁假设（market）")
+            raise ValueError(T("按租约物业需要市场租赁假设（market）"))
+        if len(self.leases) * self.hold_years * 12 > MAX_LEASE_MONTHS:
+            raise ValueError(T("租约数 × 持有月数超过 {0:,}（单次承销的计算上限）：请合并小租约或缩短持有期",
+                               MAX_LEASE_MONTHS))
         leased = sum(lease.sf for lease in self.leases)
         if leased > self.area_sf * 1.0001:
-            raise ValueError(f"租约面积合计 {leased:,.0f} SF 超过可租面积 {self.area_sf:,.0f} SF")
+            raise ValueError(T("租约面积合计 {0:,.0f} SF 超过可租面积 {1:,.0f} SF", leased, self.area_sf))
         return self

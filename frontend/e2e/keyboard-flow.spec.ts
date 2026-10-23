@@ -261,3 +261,25 @@ test("机构级多户公寓：真后端按户型引擎——户型表、收入�
     expect(dl.suggestedFilename()).toMatch(new RegExp(`\\.${ext}$`));
   }
 });
+
+test("机构级开发项目英文：每个标签页零中文（用户数据除外），开发指标与施工贷都出数", async ({ page, request }) => {
+  const ex = await (await request.get("/api/v2/cre/example?kind=development")).json();
+  const d = await (await request.post("/api/v2/deals", { data: { name: "Ground-up Check", track: "institutional",
+    address: "5 Build Rd", kill_criteria: [] } })).json();
+  expect((await request.post(`/api/v2/deals/${d.id}/versions`, { data: { inputs: ex, label: "pro forma" } })).status()).toBe(201);
+  await page.goto(`/app/#/deals/${d.id}`);
+  await page.getByRole("button", { name: "Switch to English" }).click();
+  await page.waitForLoadState("load");
+  const CJK = /[　-〿一-鿿＀-￯]/;
+  for (const tab of ["", "/rentroll", "/t12", "/model", "/risk", "/committee", "/log"]) {
+    await page.goto(`/app/#/deals/${d.id}${tab}`);
+    await page.waitForLoadState("networkidle");
+    await page.waitForTimeout(400);
+    const text = await page.locator("main").innerText();
+    const hits = text.split("\n").filter((l) => CJK.test(l));
+    expect(hits, `tab ${tab || "overview"}`).toEqual([]);
+  }
+  await page.goto(`/app/#/deals/${d.id}/model`);
+  await expect(page.getByText(/yield on cost/i).first()).toBeVisible();
+  await page.getByRole("button", { name: "切换到中文" }).click();
+});

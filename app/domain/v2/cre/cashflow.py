@@ -16,7 +16,7 @@ from app.domain.v2.cre.leases import Segment, market_rent_psf, year_step
 LINES = ("potential_rent", "loss_to_lease", "premium", "non_revenue", "turnover_vacancy", "free_rent", "base_rent",
          "recoveries", "general_vacancy",
          "credit_loss", "egr", "opex_recoverable", "opex_non_recoverable", "mgmt_fee", "opex", "noi",
-         "ti", "lc", "reserves", "capex", "cf_before_debt", "occupancy_pct")
+         "ti", "lc", "reserves", "capex", "dev_costs", "cf_before_debt", "occupancy_pct")
 # loss_to_lease / premium / non_revenue / capex 只有多户公寓有值（见 multifamily.py）；按租约物业恒为 0
 
 

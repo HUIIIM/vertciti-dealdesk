@@ -109,7 +109,7 @@ def extract_document(deal_id: int, doc_id: int) -> JSON:
 # ---------------------------------------------------------------- 按地址 / 链接搜集公开信息
 def research(track: str, mode: str, text: str) -> JSON:
     if track not in _PATHS:
-        raise InvalidInputError(T("赛道只能是 residential 或 commercial"))
+        raise InvalidInputError(T("赛道只能是 residential、commercial 或 institutional"))
     if mode not in ("address", "url"):
         raise InvalidInputError(T("搜集方式只能是 address（地址）或 url（房源链接）"))
     if not text.strip():

@@ -12,7 +12,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-APP_VERSION = "2.0.0"
+APP_VERSION = "2.1.0"
 _DOMAIN_DIR = Path(__file__).resolve().parents[1]
 
 

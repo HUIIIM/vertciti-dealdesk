@@ -12,6 +12,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
+from app.core.i18n import T
 from app.domain.v2.cre.inputs import CreInputs, Lease, Market, Recovery
 
 
@@ -117,6 +118,8 @@ def expand(cre: CreInputs, horizon: int) -> list[list[Segment]]:
             chains.append(_chain(first, cre, horizon, renewal_prob=p))
     vacant = cre.area_sf - sum(lease.sf for lease in cre.leases)
     if vacant > 0.5:  # 空置面积：没有在位租户，续租概率为 0（全按新租招租）
-        first = _rollover(-1, vacant, "（空置）", "", "nnn", cre, renewal_prob=0.0)
+        # 开发项目：空置面积从竣工月起才开始招租
+        ready = cre.development.construction_months - 1 if cre.development else -1
+        first = _rollover(ready, vacant, T("（空置）"), "", "nnn", cre, renewal_prob=0.0)
         chains.append(_chain(first, cre, horizon, renewal_prob=p))
     return chains

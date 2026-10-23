@@ -313,3 +313,70 @@ def test_irr_picks_root_nearest_ten_percent_when_flows_change_sign_twice():
     assert irr([-90, 119.6, -24.192]) == pytest.approx(0.08, abs=1e-9)
     assert irr([-100, 110]) == pytest.approx(0.10, abs=1e-9)
     assert irr([100, 50]) is None
+
+
+# ---------------------------------------------------------------- 资本结构：夹层与再融资（可手算）
+def test_mezz_interest_only_on_top_of_senior():
+    """收购价 500 万、NOI 40 万；夹层 10%（50 万）× 11% 只付息 → 每年 5.5 万；股权 = 500 万 + 0.5 万开办费 − 50 万。"""
+    r = run(base(mezz={"ltv_pct": 10, "rate_pct": 11, "orig_fee_pct": 1}))
+    m, a = r["metrics"], r["annual"]
+    assert m["mezz_amount"] == pytest.approx(500_000) and m["combined_ltv_pct"] == pytest.approx(10)
+    assert m["equity"] == pytest.approx(5_000_000 + 5_000 - 500_000)
+    assert a["debt_service"][0] == pytest.approx(55_000)
+    assert m["dscr_min"] == pytest.approx(400_000 / 55_000)
+    assert m["dscr_senior_min"] is None            # 没有优先贷款
+    assert r["exit"]["loan_payoff"] == pytest.approx(500_000)
+
+
+def test_cash_out_refinance_sized_by_ltv():
+    """优先贷款 60%（300 万）6% 只付息；第 24 月按 8% 估值（NOI 40 万 → 价值 500 万）再融资 70% = 350 万，
+    偿还 300 万、费用 1% = 3.5 万 → 净所得 46.5 万进第 24 月股权现金流；之后按 350 万、6%、30 年等额本息还款。"""
+    d = base(debt={"ltv_pct": 60, "rate_pct": 6, "io_months": 60, "orig_fee_pct": 0},
+             refinance={"month": 24, "value_cap_pct": 8, "ltv_pct": 70, "rate_pct": 6, "costs_pct": 1})
+    r = run(d)
+    rf = r["refinance"]
+    assert rf["value"] == pytest.approx(5_000_000) and rf["sized_by"] == "ltv"
+    assert rf["amount"] == pytest.approx(3_500_000) and rf["repaid"] == pytest.approx(3_000_000)
+    assert rf["net"] == pytest.approx(465_000) and r["metrics"]["refi_net_proceeds"] == pytest.approx(465_000)
+    assert r["annual"]["refi_proceeds"][2] == pytest.approx(465_000)
+    mo = r["monthly"]["debt_service"]
+    assert mo[24] == pytest.approx(3_000_000 * 0.005)                 # 第 24 月还旧贷款
+    pmt = 3_500_000 * (0.005 / (1 - 1.005 ** -360))
+    assert mo[25] == pytest.approx(pmt)                               # 第 25 月起按新贷款
+    assert r["exit"]["loan_payoff"] < 3_500_000
+    plain = run(base(debt={"ltv_pct": 60, "rate_pct": 6, "io_months": 60, "orig_fee_pct": 0}))
+    assert r["metrics"]["levered_irr_pct"] != plain["metrics"]["levered_irr_pct"]
+
+
+def test_refinance_sized_by_dscr_and_repays_mezz():
+    """LTV 90% 不卡，按最低 DSCR 1.25 卡：新贷款 = 40 万 ÷ (1.25 × 年还款常数)；夹层在再融资时一并偿清。"""
+    from app.domain.v2.cre.capital import annual_constant
+    d = base(debt={"ltv_pct": 50, "rate_pct": 6, "io_months": 60, "orig_fee_pct": 0},
+             mezz={"amount": 500_000, "rate_pct": 12, "orig_fee_pct": 0},
+             refinance={"month": 12, "value_cap_pct": 8, "ltv_pct": 90, "min_dscr": 1.25, "rate_pct": 6.5})
+    r = run(d)
+    rf = r["refinance"]
+    k = annual_constant(6.5, 30, 0)
+    assert rf["sized_by"] == "dscr" and rf["amount"] == pytest.approx(400_000 / (1.25 * k))
+    assert rf["repaid"] == pytest.approx(2_500_000 + 500_000)
+    assert r["annual"]["debt_service"][2] == pytest.approx(rf["amount"] * k, rel=1e-9)  # 次年起只剩新贷款
+    yield_bound = run({**d, "refinance": {**d["refinance"], "min_debt_yield_pct": 12}})["refinance"]
+    assert yield_bound["sized_by"] == "debt_yield" and yield_bound["amount"] == pytest.approx(400_000 / 0.12)
+
+
+def test_refinance_must_precede_sale():
+    with pytest.raises(CreInputError, match="再融资月"):
+        run(base(refinance={"month": 60, "value_cap_pct": 8}))
+    with pytest.raises(CreInputError, match="夹层"):
+        run(base(mezz={"rate_pct": 10}))
+
+
+def test_lease_count_times_hold_is_capped():
+    """单次承销的计算上限：租约数 × 持有月数超过上限时直接拒绝，不让一次请求跑几十秒。"""
+    from app.domain.v2.cre.example import suburban_office  # noqa: PLC0415
+    x = suburban_office()
+    lease = x["leases"][0]
+    x["leases"] = [{**lease, "tenant": f"T{i}", "suite": str(i), "sf": 10} for i in range(1001)]
+    x["hold_years"] = 10
+    with pytest.raises(CreInputError, match="计算上限"):
+        run(x)

@@ -106,6 +106,44 @@ export const INST_DEBT: FieldSpec[] = [
   { path: "debt.amort_years", label: T("摊还年数"), unit: "int" },
   { path: "debt.orig_fee_pct", label: T("贷款开办费"), unit: "pct", step: 0.25 },
 ];
+export const INST_MEZZ: FieldSpec[] = [
+  { path: "mezz.ltv_pct", label: T("夹层比例"), unit: "pct", step: 1, hint: T("占收购价，在优先贷款之上") },
+  { path: "mezz.rate_pct", label: T("夹层利率"), unit: "pct", step: 0.25, hint: T("固定，只付息") },
+  { path: "mezz.orig_fee_pct", label: T("夹层开办费"), unit: "pct", step: 0.25 },
+];
+export const MEZZ_DEFAULTS: JsonObj = { ltv_pct: 10, rate_pct: 11, orig_fee_pct: 1 };
+export const INST_REFI: FieldSpec[] = [
+  { path: "refinance.month", label: T("再融资月"), unit: "int", hint: T("交割后第几个月") },
+  { path: "refinance.value_cap_pct", label: T("估值资本化率"), unit: "pct", step: 0.05, hint: T("届时 12 个月 NOI ÷ 资本化率 = 价值") },
+  { path: "refinance.ltv_pct", label: T("再融资 LTV"), unit: "pct", step: 1 },
+  { path: "refinance.min_dscr", label: T("最低 DSCR"), unit: "x", step: 0.05, hint: T("限额；空 = 不限") },
+  { path: "refinance.min_debt_yield_pct", label: T("最低债务收益率"), unit: "pct", step: 0.25, hint: T("限额；空 = 不限") },
+  { path: "refinance.rate_pct", label: T("新贷款利率"), unit: "pct", step: 0.05 },
+  { path: "refinance.io_months", label: T("新贷款只付息月数"), unit: "int" },
+  { path: "refinance.amort_years", label: T("新贷款摊还年数"), unit: "int" },
+  { path: "refinance.costs_pct", label: T("再融资费用"), unit: "pct", step: 0.25, hint: T("占新贷款") },
+  { path: "refinance.repay_mezz", label: T("一并偿清夹层"), unit: "bool" },
+];
+export const REFI_DEFAULTS: JsonObj = { month: 36, value_cap_pct: 6.5, ltv_pct: 65, min_dscr: 1.25, min_debt_yield_pct: null, rate_pct: 6.0,
+  io_months: 0, amort_years: 30, costs_pct: 1, repay_mezz: true };
+export const INST_DEV: FieldSpec[] = [
+  { path: "development.construction_months", label: T("施工期"), unit: "int", hint: T("月；施工期不出租、不计运营") },
+  { path: "development.hard_costs", label: T("硬成本"), unit: "usd" },
+  { path: "development.contingency_pct", label: T("不可预见费"), unit: "pct", step: 1, hint: T("占硬成本") },
+  { path: "development.soft_costs", label: T("软成本"), unit: "usd", hint: T("设计、许可、开发商费等") },
+  { path: "development.soft_upfront_pct", label: T("软成本交割时先付"), unit: "pct", step: 5 },
+  { path: "development.draw_curve", label: T("支出曲线"), unit: "select", options: [["s_curve", T("S 曲线")], ["straight", T("平均")]] },
+  { path: "development.absorption_units_per_month", label: T("竣工后每月去化户数"), unit: "int", hint: T("多户公寓；空 = 竣工即稳定") },
+  { path: "development.stabilization_month", label: T("稳定月"), unit: "int", hint: T("算开发收益率；空 = 竣工后 12 个月") },
+];
+export const DEV_DEFAULTS: JsonObj = { construction_months: 18, hard_costs: 0, soft_costs: 0, soft_upfront_pct: 20, contingency_pct: 5,
+  draw_curve: "s_curve", absorption_units_per_month: null, stabilization_month: null };
+export const INST_CL: FieldSpec[] = [
+  { path: "construction_loan.ltc_pct", label: "LTC", unit: "pct", step: 1, hint: T("贷款占总成本") },
+  { path: "construction_loan.rate_pct", label: T("施工贷利率"), unit: "pct", step: 0.25, hint: T("施工期资本化，竣工后付息") },
+  { path: "construction_loan.orig_fee_pct", label: T("施工贷开办费"), unit: "pct", step: 0.25, hint: T("占承诺额") },
+];
+export const CL_DEFAULTS: JsonObj = { ltc_pct: 60, rate_pct: 8, orig_fee_pct: 1 };
 export const INST_WATERFALL: FieldSpec[] = [
   { path: "waterfall.lp_equity_pct", label: T("LP 出资比例"), unit: "pct", step: 1 },
   { path: "waterfall.pref_pct", label: T("优先回报"), unit: "pct", step: 0.5, hint: T("LP IRR 门槛") },

@@ -90,8 +90,9 @@ def project(cre: CreInputs, months: int) -> Monthly:
         non_revenue = nr_share * gpr
         base = gpr + ltl + premium - offline_loss - non_revenue
         free = -conc * base
-        gv = -vac * base
-        other = mf.other_income_per_unit * year_step(mf.other_income_growth_pct, m) * online_units * (1 - vac)
+        vac_m = max(vac, _unleased(cre, m, rs * total_units))  # 去化期：未租出的户也计空置
+        gv = -vac_m * base
+        other = mf.other_income_per_unit * year_step(mf.other_income_growth_pct, m) * online_units * (1 - vac_m)
         credit = -bad * (base + free + gv + other)
         egr = base + free + other + gv + credit
         taxes_ins = (mf.taxes_yr + mf.insurance_yr) / 12 * g_opex
@@ -108,5 +109,15 @@ def project(cre: CreInputs, months: int) -> Monthly:
                        ("reserves", -reserves)):
             out.add(key, m, v)
         out.add("cf_before_debt", m, noi - reserves + out.lines["capex"][m])
-        out.add("occupancy_pct", m, online_units * (1 - vac) / total_units * 100)
+        out.add("occupancy_pct", m, online_units * (1 - vac_m) / total_units * 100)
     return out
+
+
+def _unleased(cre: CreInputs, m: int, revenue_units: float) -> float:
+    """开发项目竣工后的去化：第 C 月起每月租出 absorption 户，未租出的比例（计为空置）；不是开发项目或已满租时为 0。"""
+    dev = cre.development
+    if dev is None or dev.absorption_units_per_month is None or revenue_units <= 0:
+        return 0.0
+    leased = dev.absorption_units_per_month * (m - dev.construction_months + 1)
+    return max(0.0, 1 - leased / revenue_units)
+

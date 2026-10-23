@@ -228,3 +228,13 @@ describe("投委会阶段投票", () => {
     expect(posted("/api/v2/deals/1/committee/vote")[0]!.body).toMatchObject({ comment: "价格需议" });
   });
 });
+
+describe("流水线淘汰条件标签", () => {
+  it("已承销但没写淘汰条件时写“未设淘汰条件”，没有版本时写“未承销”", async () => {
+    const { killText } = await import("@/pages/Pipeline");
+    const base = { kill: { triggered: [], unknown: [], clear: false }, kill_criteria: [] } as never as Parameters<typeof killText>[0];
+    expect(killText({ ...base, current_version_id: 3 })).toBe("未设淘汰条件");
+    expect(killText({ ...base, current_version_id: null })).toBe("未承销");
+    expect(killText({ ...base, current_version_id: 3, kill: { triggered: [{}], unknown: [], clear: false } } as never)).toBe("触发淘汰");
+  });
+});

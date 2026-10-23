@@ -210,7 +210,7 @@ def test_documents_and_compare(client):
 def test_health_catalog_and_templates(client):
     c = client
     h = c.get("/api/v2/health").json()
-    assert h["ok"] and h["db"]["revision"] == "0002" and h["engine_version"].startswith("2.0.0+")
+    assert h["ok"] and h["db"]["revision"] == "0002" and h["engine_version"].startswith("2.1.0+")
     cat = c.get("/api/v2/catalog").json()
     assert cat["primary_metric"]["commercial"] == "irr_pct" and "rent_level" in str(cat["assumptions"])
     t = c.get("/api/v2/settings/templates", params={"kind": "kill_criteria"}).json()

@@ -436,7 +436,7 @@ class MemoPointOut(Out):
     severity: Literal["high", "medium"]
     title: str
     text: str
-    tab: Literal["overview", "risk", "files", "model"]
+    tab: Literal["overview", "risk", "files", "model", "rentroll"]
 
 
 class DevilsMemoOut(Out):
@@ -876,4 +876,6 @@ class InstitutionalOut(Out):
     exit: dict[str, float]
     rent_roll: list[dict[str, Any]]
     unit_mix: list[dict[str, Any]] | None = None
+    refinance: dict[str, Any] | None = None
+    construction: dict[str, Any] | None = None
     waterfall: dict[str, Any] | None

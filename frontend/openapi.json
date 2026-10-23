@@ -2325,6 +2325,18 @@
       "title": "Annual",
       "type": "object"
      },
+     "construction": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Construction"
+     },
      "engine": {
       "title": "Engine",
       "type": "string"
@@ -2369,6 +2381,18 @@
       },
       "title": "Monthly",
       "type": "object"
+     },
+     "refinance": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Refinance"
      },
      "rent_roll": {
       "items": {
@@ -2783,7 +2807,8 @@
        "overview",
        "risk",
        "files",
-       "model"
+       "model",
+       "rentroll"
       ],
       "title": "Tab",
       "type": "string"
@@ -5454,7 +5479,7 @@
  "info": {
   "description": "vertciti 房地产交易核保台",
   "title": "DealDesk",
-  "version": "2.0.0"
+  "version": "2.1.0"
  },
  "openapi": "3.1.0",
  "paths": {
@@ -5763,7 +5788,7 @@
   },
   "/api/v2/cre/example": {
    "get": {
-    "description": "示例输入（演示数字）。\n\noffice = 郊区办公楼（含空置、基年租约、即将到期租约、浮动利率带上限、两档瀑布）；\nmultifamily = 240 户花园式公寓（loss-to-lease、翻新 120 户、固定利率、一档瀑布）。",
+    "description": "示例输入（演示数字）。\n\noffice = 郊区办公楼（含空置、基年租约、即将到期租约、浮动利率带上限、两档瀑布）；\nmultifamily = 240 户花园式公寓（loss-to-lease、翻新 120 户、固定利率、一档瀑布）；\ndevelopment = 200 户新建公寓（施工 20 个月、施工贷、去化、再融资）。",
     "operationId": "institutional_example_api_v2_cre_example_get",
     "parameters": [
      {
@@ -5774,7 +5799,8 @@
        "default": "office",
        "enum": [
         "office",
-        "multifamily"
+        "multifamily",
+        "development"
        ],
        "title": "Kind",
        "type": "string"

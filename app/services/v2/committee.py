@@ -125,7 +125,9 @@ def pack_data(s: Session, deal_id: int) -> JSON:
         if r.get("material"):
             risks.append(T("敏感假设：{0} ±{1:g}% → {2}波动 {3:.0f} bp",
                            r["label"], rt["shock_pct"], rt["metric_label"], r["swing_bps"]))
-    unknown = [k for k, val in ctx["metrics"].items() if val is None and k in CARD_KEYS[d.track]]
+    # 开发项目建成前没有进入资本化率与首年现金回报：不适用，不算“未能计算”
+    n_a = {"cap_rate_pct", "coc_pct"} if d.track == "institutional" and (v.inputs or {}).get("development") else set()
+    unknown = [k for k, val in ctx["metrics"].items() if val is None and k in CARD_KEYS[d.track] and k not in n_a]
     if unknown:
         risks.append(T("以下结论卡指标未能计算（未知保持未知）：") + T("、").join(unknown))
     # 反方意见（不经 AI）：与交易页同一套规则；附“先核哪个”提示

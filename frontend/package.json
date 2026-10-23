@@ -1,7 +1,7 @@
 {
   "name": "dealdesk-web",
   "private": true,
-  "version": "2.0.0",
+  "version": "2.1.0",
   "type": "module",
   "description": "DealDesk v2 前端：TypeScript + React + Vite，vertciti DNA 组件库；构建产物输出到 ../static/app（入库，部署零构建）",
   "engines": {

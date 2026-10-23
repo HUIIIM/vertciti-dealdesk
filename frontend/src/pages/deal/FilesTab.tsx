@@ -40,6 +40,10 @@ export function FilesTab() {
     catch (e) { toast.err(e); } finally { setExtracting(null); }
   };
   const adoptTenants = (rows: Extract["tenants"]) => {
+    if (track === "institutional" && draft.property_type === "multifamily") {  // 多户公寓按户型建模，不收逐份租约
+      toast.err(T("多户公寓按户型建模：请在“租金表”页的户型表里按户型填户数与租金，PDF 里的租约行不能直接加入"));
+      return;
+    }
     if (track === "institutional") {  // 机构级：转成逐份租约；起止日期只是按新租期估的，必须核对
       set("leases", [...((draft.leases as unknown[] | undefined) ?? []), ...tenantsToLeases(rows, draft)]);
       toast.ok(T("已加入 {0} 份租约草稿：起止日期是估的，务必按租约原件改", [rows.length]));

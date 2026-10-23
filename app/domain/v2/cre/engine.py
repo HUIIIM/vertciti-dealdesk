@@ -10,7 +10,8 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from app.domain.v2.cre import cashflow, debt, leases, multifamily
+from app.core.i18n import T
+from app.domain.v2.cre import capital, cashflow, development, leases, multifamily
 from app.domain.v2.cre.inputs import CreInputs
 from app.domain.v2.cre.returns import equity_multiple, irr, npv
 from app.domain.v2.cre.waterfall import annual as annual_series
@@ -29,7 +30,7 @@ def parse(inputs: JSON) -> CreInputs:
         return CreInputs.model_validate(inputs)
     except ValidationError as e:
         parts = [f"[{'.'.join(str(x) for x in err.get('loc', ()))}] {err.get('msg', '')}" for err in e.errors()]
-        raise CreInputError("；".join(parts)) from e
+        raise CreInputError(T("；").join(parts)) from e
 
 
 def _years(series: list[float], n_years: int) -> list[float]:
@@ -88,6 +89,52 @@ def _waterfall(cre: CreInputs, lev: list[float], lev_m: list[float]) -> JSON | N
     return out
 
 
+def _peak_equity(flows: list[float]) -> float:
+    """股权峰值：累计净投入（出资 − 已收分配）的最大值。开发项目 = 交割 + 施工期追加出资。"""
+    out = acc = 0.0
+    for x in flows:
+        acc -= x
+        out = max(out, acc)
+    return out
+
+
+def _dscr_from_year(cre: CreInputs) -> int:
+    """DSCR 从哪一年（0 起）开始算。
+
+    开发项目：施工与去化期 NOI 为 0 或负、还在付施工贷利息，DSCR 没有意义；
+    机构口径按长期贷款测——有再融资从再融资的下一个整年起，否则从稳定月所在年起。其余项目从第 1 年起。
+    """
+    dev = cre.development
+    if dev is None:
+        return 0
+    if cre.refinance is not None:
+        return cre.refinance.month // 12 + 1
+    return development.stabilization_month(dev) // 12
+
+
+def _debt_yield(cre: CreInputs, ds: capital.Stack, noi: list[float]) -> float | None:
+    """债务收益率：首年 NOI ÷ 优先贷款；开发项目按稳定后 NOI ÷ 长期贷款（再融资额，没有则按施工贷承诺额）。"""
+    dev = cre.development
+    if dev is None:
+        return _div(sum(noi[:12]), ds.senior_at_close)
+    loan = ds.refi["amount"] if ds.refi else (ds.construction or {}).get("commitment", 0.0)
+    s_m = development.stabilization_month(dev)
+    return _div(sum(noi[s_m:s_m + 12]), loan)
+
+
+def _development_metrics(cre: CreInputs, noi: list[float]) -> JSON:
+    """总成本；开发项目另报稳定后 12 个月 NOI、开发收益率（÷ 总成本）与价值创造（按退出资本化率估值 − 总成本）。"""
+    total = development.total_cost(cre)
+    dev = cre.development
+    if dev is None:
+        return {"total_project_cost": total, "development_yield_pct": None, "stabilized_noi": None,
+                "value_creation": None}
+    s_m = development.stabilization_month(dev)
+    stab = sum(noi[s_m:s_m + 12])
+    return {"total_project_cost": total, "development_yield_pct": _pct(_div(stab, total)), "stabilized_noi": stab,
+            "value_creation": stab / (cre.exit_cap_pct / 100) - total}
+
+
 def run(inputs: JSON) -> JSON:
     cre = parse(inputs)
     hold_m = cre.hold_years * 12
@@ -95,14 +142,19 @@ def run(inputs: JSON) -> JSON:
     is_mf = cre.property_type == "multifamily"
     chains = [] if is_mf else leases.expand(cre, months)
     cf = multifamily.project(cre, months) if is_mf else cashflow.project(cre, chains, months)
-    ds = debt.schedule(cre.debt, cre.purchase_price, months)
+    dev_costs = development.apply(cre, cf)
     lines = cf.lines
-    debt_service = [i + p for i, p in zip(ds.interest, ds.principal, strict=True)]
+    ds = capital.build(cre, lines["noi"], months, dev_costs)
+    debt_service = ds.debt_service
 
     annual = {k: _years(v, cre.hold_years + 1) for k, v in lines.items() if k != "occupancy_pct"}
     annual["occupancy_pct"] = [sum(lines["occupancy_pct"][y * 12:(y + 1) * 12]) / 12 for y in range(cre.hold_years + 1)]
     annual["debt_service"] = _years(debt_service, cre.hold_years + 1)
-    annual["cf_after_debt"] = [a - b for a, b in zip(annual["cf_before_debt"], annual["debt_service"], strict=True)]
+    annual["refi_proceeds"] = _years(ds.refi_net, cre.hold_years + 1)
+    annual["construction_draws"] = _years(ds.draws, cre.hold_years + 1)
+    keys = ("cf_before_debt", "debt_service", "refi_proceeds", "construction_draws")
+    cfbd, dsv, refi, draws = (annual[k] for k in keys)
+    annual["cf_after_debt"] = [a - b + c + d for a, b, c, d in zip(cfbd, dsv, refi, draws, strict=True)]
 
     fwd_noi_raw = annual["noi"][cre.hold_years]
     stab_noi = _stabilized_noi(cre, annual, cre.hold_years)
@@ -111,13 +163,15 @@ def run(inputs: JSON) -> JSON:
     selling = sale * cre.selling_costs_pct / 100
     payoff = ds.payoff(hold_m - 1)
     acquisition = cre.purchase_price * (1 + cre.closing_costs_pct / 100)
-    equity = acquisition + ds.orig_fee - ds.amount
+    loans_at_close = ds.senior_at_close + ds.mezz_at_close
+    equity = acquisition + ds.fees_at_close - loans_at_close
 
     unlev = [-acquisition, *annual["cf_before_debt"][:cre.hold_years]]
     unlev[-1] += sale - selling
     lev = [-equity, *annual["cf_after_debt"][:cre.hold_years]]
     lev[-1] += sale - selling - payoff
-    lev_m = [-equity] + [lines["cf_before_debt"][m] - debt_service[m] for m in range(hold_m)]
+    lev_m = [-equity, *(lines["cf_before_debt"][m] - debt_service[m] + ds.refi_net[m] + ds.draws[m]
+                        for m in range(hold_m))]
     lev_m[-1] += sale - selling - payoff
     unlev_m = [-acquisition, *lines["cf_before_debt"][:hold_m]]
     unlev_m[-1] += sale - selling
@@ -127,22 +181,36 @@ def run(inputs: JSON) -> JSON:
 
     noi1 = annual["noi"][0]
     dscr = [_div(n, s) for n, s in zip(annual["noi"][:cre.hold_years], annual["debt_service"], strict=False)]
+    dscr_from = _dscr_from_year(cre)
+    dscr = [None if y < dscr_from else x for y, x in enumerate(dscr)]
+    senior_ds = [t - mz for t, mz in zip(debt_service, ds.mezz_service, strict=True)]
+    dscr_senior = [_div(n, s) if dscr[y] is not None else None for y, (n, s) in
+                   enumerate(zip(annual["noi"][:cre.hold_years], _years(senior_ds, cre.hold_years), strict=True))]
+    dscr_senior_known = [x for x in dscr_senior if x is not None]
     dscr_known = [x for x in dscr if x is not None]
     disc = cre.discount_rate_pct / 100
+    dev = cre.development
     metrics: JSON = {
-        "going_in_cap_pct": _pct(_div(noi1, cre.purchase_price)),
-        "yield_on_cost_pct": _pct(_div(noi1, acquisition)),
+        # 开发项目首年在施工、没有 NOI：进入资本化率 / 首年成本收益率没有意义，如实留空
+        "going_in_cap_pct": None if dev else _pct(_div(noi1, cre.purchase_price)),
+        "yield_on_cost_pct": None if dev else _pct(_div(noi1, acquisition)),
+        **_development_metrics(cre, lines["noi"]),
         "exit_value": sale, "exit_cap_pct": cre.exit_cap_pct, "forward_noi": fwd_noi,
         "forward_noi_unadjusted": fwd_noi_raw, "forward_noi_stabilized": stab_noi,
         "unlevered_irr_pct": _pct(irr(unlev)), "unlevered_irr_monthly_pct": _pct(annualized(irr(unlev_m))),
         "levered_irr_pct": _pct(irr(lev)), "levered_irr_monthly_pct": _pct(annualized(irr(lev_m))),
         "unlevered_multiple": equity_multiple(unlev), "levered_multiple": equity_multiple(lev),
         "unlevered_npv": npv(disc, unlev), "levered_npv": npv(disc, lev),
-        "equity": equity, "loan_amount": ds.amount,
-        "ltv_pct": _pct(_div(ds.amount, cre.purchase_price)),
-        "debt_yield_pct": _pct(_div(noi1, ds.amount)),
+        "equity": equity, "equity_total": _peak_equity(lev_m),
+        "loan_amount": ds.senior_at_close, "mezz_amount": ds.mezz_at_close,
+        "ltv_pct": _pct(_div(ds.senior_at_close, cre.purchase_price)),
+        "combined_ltv_pct": _pct(_div(loans_at_close, cre.purchase_price)),
+        "debt_yield_pct": _pct(_debt_yield(cre, ds, lines["noi"])),
+        "dscr_from_year": dscr_from + 1,
+        "dscr_senior_min": min(dscr_senior_known) if dscr_senior_known else None,
+        "refi_net_proceeds": ds.refi["net"] if ds.refi else None,
         "dscr_year1": dscr[0] if dscr else None, "dscr_min": min(dscr_known) if dscr_known else None,
-        "cash_on_cash_year1_pct": _pct(_div(annual["cf_after_debt"][0], equity)),
+        "cash_on_cash_year1_pct": None if cre.development else _pct(_div(annual["cf_after_debt"][0], equity)),
         "avg_occupancy_pct": sum(annual["occupancy_pct"][:cre.hold_years]) / cre.hold_years,
         "leasing_costs_total": abs(sum(annual["ti"][:cre.hold_years]) + sum(annual["lc"][:cre.hold_years])),
         "capex_total": abs(sum(annual["capex"][:cre.hold_years])),
@@ -157,6 +225,8 @@ def run(inputs: JSON) -> JSON:
                     "debt_service": debt_service[:hold_m], "occupancy_pct": lines["occupancy_pct"][:hold_m],
                     "rate_pct": ds.rate_pct[:hold_m]},
         "flows": {"unlevered": unlev, "levered": lev},
+        "refinance": ds.refi,
+        "construction": ds.construction,
         "exit": {"sale_price": sale, "selling_costs": selling, "loan_payoff": payoff,
                  "net_proceeds_levered": sale - selling - payoff},
         "rent_roll": [{"tenant": s.tenant, "suite": s.suite, "sf": s.sf, "start": s.start, "end": s.end,

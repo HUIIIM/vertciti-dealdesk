@@ -7,6 +7,8 @@ from fastapi.testclient import TestClient
 
 from app.domain.v2.cre.example import suburban_office
 from app.main import app
+from app.services.persistence.engine import session_scope
+from app.services.v2.committee import pack_data
 
 
 @pytest.fixture
@@ -99,3 +101,43 @@ def test_multifamily_deal_through_the_whole_toolchain(c):
     for kind, magic in (("memo", b"%PDF-"), ("model", b"PK")):
         r = c.get(f"/api/v2/deals/{did}/export/{kind}")
         assert r.status_code == 200 and r.content.startswith(magic), (kind, r.text[:300])
+
+
+def test_development_deal_through_the_whole_toolchain(c):
+    """开发项目同一套工具链：红队含硬成本与去化速度，情景、最高出价、投委会包、两种导出都能用。"""
+    ex = c.get("/api/v2/cre/example?kind=development").json()
+    d = c.post("/api/v2/deals", json={"name": "Ground-up", "track": "institutional", "kill_criteria": []}).json()
+    v = c.post(f"/api/v2/deals/{d['id']}/versions", json={"inputs": ex, "label": "pro forma"})
+    assert v.status_code == 201, v.text
+    did = d["id"]
+    keys = {r["key"] for r in c.get(f"/api/v2/deals/{did}/redteam").json()["all"]}
+    assert {"hard_costs", "absorption", "exit_cap"} <= keys
+    sc = c.post(f"/api/v2/deals/{did}/scenarios", json={}).json()
+    assert all(r["primary"] is not None for r in sc["scenarios"])
+    assert c.post(f"/api/v2/deals/{did}/max-bid", json={}).status_code == 200
+    assert c.get(f"/api/v2/deals/{did}/committee/pack.pdf").content.startswith(b"%PDF-")
+    for kind, magic in (("memo", b"%PDF-"), ("model", b"PK")):
+        r = c.get(f"/api/v2/deals/{did}/export/{kind}")
+        assert r.status_code == 200 and r.content.startswith(magic), (kind, r.text[:300])
+    with session_scope() as s:
+        risks = " ".join(pack_data(s, did)["risks"])
+    assert "cap_rate_pct" not in risks and "coc_pct" not in risks   # 建成前不适用，不报“未能计算”
+    bad = c.post(f"/api/v2/deals/{did}/versions", json={"inputs": {**ex, "debt": {"ltv_pct": 50}}})
+    assert bad.status_code == 422 and "不填优先贷款" in bad.json()["detail"]
+
+
+def test_devils_memo_has_institutional_checks():
+    from app.domain.v2 import devils_advocate
+    from app.domain.v2.cre.example import ground_up_multifamily, suburban_office
+    office = suburban_office()
+    pts = {p["key"] for p in devils_advocate._cre_points("institutional", office)}
+    assert "cre:rollover" in pts                       # 6 万 / 10 万 SF 在持有期内到期
+    dev = ground_up_multifamily()
+    dev["development"] = {**dev["development"], "contingency_pct": 3, "absorption_units_per_month": 8}
+    dev["refinance"] = {**dev["refinance"], "ltv_pct": 20, "min_dscr": None}
+    pts = {p["key"] for p in devils_advocate._cre_points("institutional", dev)}
+    assert {"dev:contingency", "dev:leaseup", "refi:cash_in"} <= pts
+    assert devils_advocate._cre_points("commercial", office) == []
+    # 退出 cap 低于买入 cap：机构级读顶层 exit_cap_pct
+    s = devils_advocate._structure_points("institutional", {**office, "exit_cap_pct": 6.0}, {"cap_rate_pct": 7.26})
+    assert any(p["key"] == "cap:compress" for p in s)

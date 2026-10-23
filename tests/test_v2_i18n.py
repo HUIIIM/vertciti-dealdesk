@@ -16,7 +16,8 @@ from app.domain import uw_commercial
 from app.main import app
 
 CJK = re.compile(r"[　-〿一-鿿＀-￯]")
-FILES = [*glob.glob("app/domain/v2/*.py"), *glob.glob("app/services/v2/*.py"), *glob.glob("app/api/v2/*.py"),
+FILES = [*glob.glob("app/domain/v2/*.py"), *glob.glob("app/domain/v2/cre/*.py"), *glob.glob("app/services/v2/*.py"),
+         *glob.glob("app/api/v2/*.py"),
          "app/core/security.py", "app/services/render/committee_pack.py"]
 
 

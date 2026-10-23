@@ -28,7 +28,7 @@ async def _lifespan(_app: FastAPI) -> AsyncIterator[None]:
 
 
 configure_logging()
-app = FastAPI(title="DealDesk", description="vertciti 房地产交易核保台", version="2.0.0", lifespan=_lifespan)
+app = FastAPI(title="DealDesk", description="vertciti 房地产交易核保台", version="2.1.0", lifespan=_lifespan)
 app.add_middleware(RequestContextMiddleware)  # 请求编号 · 身份 · 限流 · 安全头 · 访问日志 · 错误上报
 app.add_middleware(BodySizeLimit)  # 最外层：请求体硬上限（分块上传也计数），先于一切解析
 api_v2.install_error_handlers(app)

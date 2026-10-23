@@ -184,7 +184,7 @@ def test_multifamily_workbook_bridges_rent_with_formulas():
     row = cre_excel.row_index("multifamily")
     cf = wb["现金流"]
     assert cf[f"B{row['base_rent']}"].value == f"=SUM(B{row['potential_rent']}:B{row['non_revenue']})"
-    assert cf[f"B{row['cf_before_debt']}"].value == f"=SUM(B{row['noi']}:B{row['reserves']})"  # NOI、翻新支出、储备相邻
+    assert cf[f"B{row['cf_before_debt']}"].value == f"=SUM(B{row['noi']}:B{row['dev_costs']})"  # NOI、翻新、储备、开发成本相邻
     assert wb["收益"]["B3"].value == f"='现金流'!{cre_excel._col(cre['hold_years'] + 2)}{row['noi']}"
 
 
@@ -236,3 +236,63 @@ def test_monthly_catch_up_clawback_waterfall_in_exports():
     assert "回拨（clawback）" in labels
     text = _pdf_text(cre_memo.build_cre_memo(cre, r, META, None))
     assert "按月分配" in text and "GP catch-up" in text
+
+
+def _refi_case():
+    inp = suburban_office()
+    inp["mezz"] = {"ltv_pct": 10, "rate_pct": 11}
+    inp["refinance"] = {"month": 36, "value_cap_pct": 7.25, "ltv_pct": 65, "rate_pct": 6.25}
+    cre = engine.parse(inp).model_dump()
+    return cre, engine.run(cre)
+
+
+def test_refinance_and_mezz_flow_into_exports():
+    cre, r = _refi_case()
+    assert r["refinance"]["net"] != 0
+    wb = load_workbook(io.BytesIO(cre_excel.build_cre_xlsx(cre, r, META)))
+    row = cre_excel.row_index("commercial")
+    cf = wb["现金流"]
+    assert cf[f"D{row['refi_proceeds']}"].value == pytest.approx(r["annual"]["refi_proceeds"][2])  # 第 36 月在第 3 年
+    assert cf[f"B{row['cf_after_debt']}"].value == (f"=B{row['cf_before_debt']}-B{row['debt_service']}"
+                                                     f"+B{row['refi_proceeds']}+B{row['construction_draws']}")
+    assert wb["假设"]["B11"].value == pytest.approx(r["metrics"]["loan_amount"] + r["metrics"]["mezz_amount"])
+    text = _pdf_text(cre_memo.build_cre_memo(cre, r, META, None))
+    assert "再融资（第 36 月）" in text and "夹层" in text and "股权净所得" in text
+
+
+@pytest.mark.skipif(shutil.which("soffice") is None, reason="没装 LibreOffice，无法重算公式")
+def test_refinance_libreoffice_recalc_matches_engine(tmp_path):
+    cre, r = _refi_case()
+    ret = _recalc(cre_excel.build_cre_xlsx(cre, r, META), tmp_path)["收益"]
+    for row in [*range(3, 10), *range(16, 31)]:
+        label, formula_v, engine_v = (ret.cell(row=row, column=c).value for c in (1, 2, 3))
+        if isinstance(formula_v, (int, float)) and isinstance(engine_v, (int, float)):
+            assert formula_v == pytest.approx(engine_v, rel=1e-6, abs=1e-6), label
+
+
+def _dev_case():
+    from app.domain.v2.cre.example import ground_up_multifamily
+    cre = engine.parse(ground_up_multifamily()).model_dump()
+    return cre, engine.run(cre)
+
+
+def test_development_flows_into_exports():
+    cre, r = _dev_case()
+    wb = load_workbook(io.BytesIO(cre_excel.build_cre_xlsx(cre, r, META)))
+    row = cre_excel.row_index("multifamily")
+    cf = wb["现金流"]
+    assert cf[f"B{row['dev_costs']}"].value == pytest.approx(r["annual"]["dev_costs"][0])
+    assert cf[f"B{row['construction_draws']}"].value == pytest.approx(r["annual"]["construction_draws"][0])
+    text = _pdf_text(cre_memo.build_cre_memo(cre, r, META, None))
+    for s_ in ("开发预算与施工贷", "开发收益率", "资本化利息", "再融资（第 40 月）"):
+        assert s_ in text, s_
+
+
+@pytest.mark.skipif(shutil.which("soffice") is None, reason="没装 LibreOffice，无法重算公式")
+def test_development_libreoffice_recalc_matches_engine(tmp_path):
+    cre, r = _dev_case()
+    ret = _recalc(cre_excel.build_cre_xlsx(cre, r, META), tmp_path)["收益"]
+    for row in [*range(3, 10), *range(16, 31)]:
+        label, formula_v, engine_v = (ret.cell(row=row, column=c).value for c in (1, 2, 3))
+        if isinstance(formula_v, (int, float)) and isinstance(engine_v, (int, float)):
+            assert formula_v == pytest.approx(engine_v, rel=1e-6, abs=1e-6), label

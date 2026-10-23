@@ -44,7 +44,7 @@ def _deal_dict(d: Deal) -> JSON:
 def create_deal(name: str, track: str, *, address: str = "", asking_price: float | None = None,
                 kill: list[JSON] | None = None, tags: list[str] | None = None) -> JSON:
     if track not in TRACKS:
-        raise InvalidInputError(T("赛道只能是 residential 或 commercial"))
+        raise InvalidInputError(T("赛道只能是 residential、commercial 或 institutional"))
     if not name.strip():
         raise InvalidInputError(T("交易名称不能为空"))
     try:

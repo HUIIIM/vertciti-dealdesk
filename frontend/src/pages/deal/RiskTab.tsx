@@ -147,7 +147,7 @@ function MaxBidCard() {
 }
 
 
-const TAB_HREF: Record<string, string> = { overview: "", risk: "/risk", files: "/files", model: "/model" };
+const TAB_HREF: Record<string, string> = { overview: "", risk: "/risk", files: "/files", model: "/model", rentroll: "/rentroll" };
 
 /** 反方备忘录：上会前先读“这笔交易最可能怎么失败”。规则生成、不经 AI；每条带去处理的入口。 */
 function DevilsCard({ id, version }: { id: number; version: number }) {
@@ -166,8 +166,8 @@ function DevilsCard({ id, version }: { id: number; version: number }) {
         <ol className="devils-list">
           {d.points.map((p) => (
             <li key={p.key}>
-              <Status s={p.severity === "high" ? "risk" : "building"}>{p.severity === "high" ? T("高") : T("中")} · {p.title}</Status>
-              <span>{p.text}</span>
+              <Status s={p.severity === "high" ? "risk" : "building"}>{p.severity === "high" ? T("高危") : T("中危")}</Status>
+              <span><strong>{p.title}</strong>{T("：")}{p.text}</span>
               <a className="btn sm ghost" href={`#/deals/${id}${TAB_HREF[p.tab] ?? ""}`}>{T("去看")}</a>
             </li>))}
         </ol>) : null}

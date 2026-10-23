@@ -21,6 +21,7 @@ from openpyxl.worksheet.worksheet import Worksheet
 from app.core import brand
 from app.domain.v2.cre.waterfall import describe as describe_waterfall
 
+
 JSON = dict[str, Any]
 
 _F = "Microsoft YaHei"
@@ -114,6 +115,9 @@ def _mf_info(cre: JSON) -> list[tuple[str, Any, str | None]]:
     ]
 
 
+_SIZED = {"ltv": "LTV", "dscr": "最低 DSCR", "debt_yield": "最低债务收益率"}
+
+
 def _assumptions(ws: Worksheet, cre: JSON, r: JSON, meta: JSON) -> None:
     ws.column_dimensions["A"].width = 30
     ws.column_dimensions["B"].width = 18
@@ -136,12 +140,12 @@ def _assumptions(ws: Worksheet, cre: JSON, r: JSON, meta: JSON) -> None:
         _put(ws, i, 3, note, NOTE)
     _section(ws, 10, "债务（引擎按月贷款计划，固定值；改贷款条款请回 DealDesk 重跑）", 3)
     # 开办费按引擎口径反推：股权 = 收购价 × (1 + 交割成本) + 开办费 − 贷款额
-    fee = m["equity"] - cre["purchase_price"] * (1 + cre["closing_costs_pct"] / 100) + m["loan_amount"]
-    _put(ws, 11, 1, "贷款额")
-    _put(ws, 11, 2, m["loan_amount"], ENGINE, MONEY)
-    _put(ws, 12, 1, "开办费")
+    fee = m["equity"] - cre["purchase_price"] * (1 + cre["closing_costs_pct"] / 100) + m["loan_amount"] + m["mezz_amount"]
+    _put(ws, 11, 1, "交割时贷款（优先 + 夹层）")
+    _put(ws, 11, 2, m["loan_amount"] + m["mezz_amount"], ENGINE, MONEY)
+    _put(ws, 12, 1, "开办费（优先 + 夹层）")
     _put(ws, 12, 2, fee, ENGINE, MONEY)
-    _put(ws, 13, 1, "退出时贷款余额")
+    _put(ws, 13, 1, "退出时贷款余额（含再融资后的新贷款、夹层）")
     _put(ws, 13, 2, r["exit"]["loan_payoff"], ENGINE, MONEY)
     d = cre.get("debt")
     debt_rows: list[tuple[str, Any]] = []
@@ -151,7 +155,23 @@ def _assumptions(ws: Worksheet, cre: JSON, r: JSON, meta: JSON) -> None:
                 + (f"，上限 {d['cap_strike_pct']:g}%" if d.get("cap_strike_pct") is not None else ""))
         debt_rows = [("利率", rate), ("只付息月数", d.get("io_months", 0)), ("摊还年限", d.get("amort_years", 30))]
     else:
-        debt_rows = [("贷款", "无（全股权）")]
+        debt_rows = [("优先贷款", "无")]
+    if cre.get("mezz"):
+        mz = cre["mezz"]
+        debt_rows.append(("夹层", f"${m['mezz_amount']:,.0f}，固定 {mz['rate_pct']:g}%，只付息"))
+    cons = r.get("construction")
+    if cons:
+        cl, dv = cre["construction_loan"], cre["development"]
+        debt_rows += [("开发", f"施工 {dv['construction_months']} 个月；总成本 ${cons['total_cost']:,.0f}"),
+                      ("施工贷", f"LTC {cl['ltc_pct']:g}%（承诺 ${cons['commitment']:,.0f}），{cl['rate_pct']:g}%，"
+                                 f"资本化利息 ${cons['capitalized_interest']:,.0f}，峰值 ${cons['peak_balance']:,.0f}")]
+    elif cre.get("development"):
+        debt_rows.append(("开发", f"施工 {cre['development']['construction_months']} 个月，全股权"))
+    refi = r.get("refinance")
+    if refi:
+        debt_rows += [("再融资", f"第 {refi['month']} 月：新贷款 ${refi['amount']:,.0f}（按{_SIZED[refi['sized_by']]}限额），"
+                                f"利率 {refi['rate_pct']:g}%"),
+                      ("再融资净所得", f"${refi['net']:,.0f}（偿还 ${refi['repaid']:,.0f}、费用 ${refi['costs']:,.0f}）")]
     row = 14
     for label, v in debt_rows:
         _put(ws, row, 1, label)
@@ -175,7 +195,9 @@ def _assumptions(ws: Worksheet, cre: JSON, r: JSON, meta: JSON) -> None:
 # 现金流页的行：(科目键, 标签, 取值)。取值 "v" = 引擎值；元组 = 这些科目相加的 Excel 公式；"after" / "dscr" 为专用公式。
 Formula = str | tuple[str, ...]
 _DEBT_ROWS: list[tuple[str, str, Formula]] = [
-    ("debt_service", "还本付息", "v"),
+    ("debt_service", "还本付息（优先 + 夹层）", "v"),
+    ("refi_proceeds", "再融资净所得", "v"),
+    ("construction_draws", "施工贷提款", "v"),
     ("cf_after_debt", "债后现金流（有杠杆）", "after"),
     ("dscr", "DSCR", "dscr"),
     ("occupancy_pct", "平均出租率", "v"),
@@ -197,7 +219,8 @@ _COMMERCIAL_ROWS: list[tuple[str, str, Formula]] = [
     ("ti", "租户改造 TI", "v"),
     ("lc", "租赁佣金 LC", "v"),
     ("reserves", "资本储备", "v"),
-    ("cf_before_debt", "债前现金流（无杠杆）", ("noi", "ti", "lc", "reserves")),
+    ("dev_costs", "开发成本（施工期）", "v"),
+    ("cf_before_debt", "债前现金流（无杠杆）", ("noi", "ti", "lc", "reserves", "dev_costs")),
     *_DEBT_ROWS,
 ]
 _MULTIFAMILY_ROWS: list[tuple[str, str, Formula]] = [
@@ -219,7 +242,8 @@ _MULTIFAMILY_ROWS: list[tuple[str, str, Formula]] = [
     ("noi", "净营业收入 NOI", ("egr", "opex")),
     ("capex", "翻新资本支出", "v"),
     ("reserves", "资本储备", "v"),
-    ("cf_before_debt", "债前现金流（无杠杆）", ("noi", "capex", "reserves")),
+    ("dev_costs", "开发成本（施工期）", "v"),
+    ("cf_before_debt", "债前现金流（无杠杆）", ("noi", "capex", "reserves", "dev_costs")),
     *_DEBT_ROWS,
 ]
 
@@ -238,7 +262,8 @@ ROW = row_index("commercial")
 
 def _formula(kind: Formula, row: dict[str, int], c: str) -> str:
     if kind == "after":
-        return f"={c}{row['cf_before_debt']}-{c}{row['debt_service']}"
+        return (f"={c}{row['cf_before_debt']}-{c}{row['debt_service']}+{c}{row['refi_proceeds']}"
+                f"+{c}{row['construction_draws']}")
     if kind == "dscr":
         return f'=IF({c}{row["debt_service"]}=0,"",{c}{row["noi"]}/{c}{row["debt_service"]})'
     rows = [row[k] for k in kind]
@@ -270,7 +295,7 @@ def _cashflow(ws: Worksheet, cre: JSON, r: JSON) -> None:
             else:
                 _put(ws, r_i, col, _formula(kind, row, _col(col)), BOLD if key in bold_rows else BODY,
                      X if key == "dscr" else MONEY)
-        if key in ("debt_service", "cf_after_debt", "dscr"):  # 第 N+1 年只用于退出 NOI，不计债务
+        if key in ("debt_service", "refi_proceeds", "construction_draws", "cf_after_debt", "dscr"):  # 第 N+1 年只用于退出 NOI，不计债务
             ws.cell(row=r_i, column=n + 2).value = None
     for col in range(2, n + 3):
         ws.column_dimensions[_col(col)].width = 14
@@ -322,7 +347,9 @@ def _returns(ws: Worksheet, cre: JSON, r: JSON) -> None:
     noi1, ds1 = _ref(CF, f"B{ROW['noi']}"), _ref(CF, f"B{ROW['cf_after_debt']}")
     loan = _ref(A, "$B$11")
     rate = _ref(A, "$B$8")
-    dscr_rng = _ref(CF, f"B{ROW['dscr']}:{hold_col}{ROW['dscr']}")
+    dv = cre.get("development")
+    first = _col(int(m["dscr_from_year"]) + 1)   # 开发项目：DSCR 从长期贷款的第一个整年起算（与引擎同口径）
+    dscr_rng = _ref(CF, f"{first}{ROW['dscr']}:{hold_col}{ROW['dscr']}")
 
     def pct(x: float | None) -> float | None:
         return None if x is None else x / 100
@@ -336,12 +363,13 @@ def _returns(ws: Worksheet, cre: JSON, r: JSON) -> None:
         ("有杠杆权益倍数", f'=SUMIF({lv},">0")/-SUMIF({lv},"<0")', m["levered_multiple"], X),
         ("无杠杆 NPV", f"=B12+NPV({rate},C12:{end}12)", m["unlevered_npv"], MONEY),
         ("有杠杆 NPV", f"=B13+NPV({rate},C13:{end}13)", m["levered_npv"], MONEY),
-        ("进入资本化率", f"={noi1}/{p}", pct(m["going_in_cap_pct"]), PCT),
-        ("成本收益率", f"={noi1}/({acq})", pct(m["yield_on_cost_pct"]), PCT),
-        ("债务收益率", f'=IF({loan}=0,"",{noi1}/{loan})', pct(m["debt_yield_pct"]), PCT),
-        ("首年 DSCR", f"={_ref(CF, 'B' + str(ROW['dscr']))}", m["dscr_year1"], X),
+        ("进入资本化率", "" if dv else f"={noi1}/{p}", pct(m["going_in_cap_pct"]), PCT),
+        ("成本收益率", "" if dv else f"={noi1}/({acq})", pct(m["yield_on_cost_pct"]), PCT),
+        ("债务收益率（开发：稳定 NOI ÷ 长期贷款，引擎）" if dv else "债务收益率（优先贷款）",
+         "" if dv else f'=IF({m["loan_amount"]}=0,"",{noi1}/{m["loan_amount"]})', pct(m["debt_yield_pct"]), PCT),
+        ("首年 DSCR", "" if dv else f"={_ref(CF, 'B' + str(ROW['dscr']))}", m["dscr_year1"], X),
         ("持有期最小 DSCR", f'=IF(COUNT({dscr_rng})=0,"",MIN({dscr_rng}))', m["dscr_min"], X),
-        ("首年现金回报", f"={ds1}/-B13", pct(m["cash_on_cash_year1_pct"]), PCT),
+        ("首年现金回报", "" if dv else f"={ds1}/-B13", pct(m["cash_on_cash_year1_pct"]), PCT),
         ("股权投入", "=-B13", m["equity"], MONEY),
     ]
     for i, (label, f, v, fmt) in enumerate(rows, start=16):
@@ -455,7 +483,7 @@ _NOTES = [
     "“租金表”页灰字行是假设续上的，不是签约事实。",
     "一般空置先扣除已建模的周转空置，避免重复扣。免租只免基本租金，费用回收照收。",
     "IRR 两种口径：年度现金流 IRR（Excel 可重算）与按月现金流折算的年化 IRR（更精确，引擎值）。",
-    "本版不建模：CPI 递增、百分比租金、费用上限 / gross-up、再融资 / 夹层、开发期、欧式（整只基金）瀑布。",
+    "本版不建模：CPI 递增、百分比租金、费用上限 / gross-up、施工贷、开发期、欧式（整只基金）瀑布。",
     "完整方法论：docs/INSTITUTIONAL-ENGINE.md。",
 ]
 
