@@ -136,7 +136,7 @@ def build_pdf(pack: JSON) -> bytes:
     story: list[Any] = [
         Paragraph(_esc(T("投委会包 · {0} · 第 {1} 版", deal["stage_label"], pack["version"]["version_no"])), st["eyebrow"]),
         Paragraph(_esc(deal["name"]), st["h1"]),
-        Paragraph(_esc(T("{0} · {1} · 生成 {2}", deal.get("address") or "—", T("商业") if deal["track"] == "commercial" else T("住宅"), pack["generated_at"])), st["small"]),
+        Paragraph(_esc(T("{0} · {1} · 生成 {2}", deal.get("address") or "—", {"commercial": T("商业"), "institutional": T("机构级")}.get(deal["track"], T("住宅")), pack["generated_at"])), st["small"]),
         Spacer(1, 6)]
     # 结论卡
     kill = pack["kill"]

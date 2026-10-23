@@ -7,6 +7,7 @@ from app.domain.v2.cre.development import cost_schedule, weights
 from app.domain.v2.cre.engine import CreInputError, run
 from app.domain.v2.cre.example import ground_up_multifamily
 from app.domain.v2.cre.inputs import Development
+from app.domain.v2.model import run_model
 
 QUIET = {"recoverable_psf_yr": 0, "non_recoverable_psf_yr": 0, "growth_pct": 0, "mgmt_fee_pct_egr": 0, "reserves_psf_yr": 0}
 
@@ -104,3 +105,12 @@ def test_multifamily_absorption_after_completion():
 def test_rejects_inconsistent_development_inputs(patch, fragment):
     with pytest.raises(CreInputError, match=fragment):
         run({**dev_office(), **patch})
+
+
+def test_cash_to_close_counts_construction_equity():
+    """全口径现金需求取股权峰值：开发项目 = 土地股权 + 施工期股权先投 + 开办费，远大于交割当日的股权。"""
+    r = run(ground_up_multifamily())
+    m, cl = r["metrics"], r["construction"]
+    assert m["equity_total"] >= cl["equity_required"] > m["equity"]
+    assert run_model("institutional", ground_up_multifamily())["metrics"]["cash_to_close"] == pytest.approx(
+        m["equity_total"])

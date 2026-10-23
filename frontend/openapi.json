@@ -2807,7 +2807,8 @@
        "overview",
        "risk",
        "files",
-       "model"
+       "model",
+       "rentroll"
       ],
       "title": "Tab",
       "type": "string"

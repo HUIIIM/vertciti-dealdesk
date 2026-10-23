@@ -369,3 +369,14 @@ def test_refinance_must_precede_sale():
         run(base(refinance={"month": 60, "value_cap_pct": 8}))
     with pytest.raises(CreInputError, match="夹层"):
         run(base(mezz={"rate_pct": 10}))
+
+
+def test_lease_count_times_hold_is_capped():
+    """单次承销的计算上限：租约数 × 持有月数超过上限时直接拒绝，不让一次请求跑几十秒。"""
+    from app.domain.v2.cre.example import suburban_office  # noqa: PLC0415
+    x = suburban_office()
+    lease = x["leases"][0]
+    x["leases"] = [{**lease, "tenant": f"T{i}", "suite": str(i), "sf": 10} for i in range(1001)]
+    x["hold_years"] = 10
+    with pytest.raises(CreInputError, match="计算上限"):
+        run(x)

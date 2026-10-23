@@ -10,6 +10,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
+from app.core.i18n import T
 from app.domain.v2.cre import capital, cashflow, development, leases, multifamily
 from app.domain.v2.cre.inputs import CreInputs
 from app.domain.v2.cre.returns import equity_multiple, irr, npv
@@ -29,7 +30,7 @@ def parse(inputs: JSON) -> CreInputs:
         return CreInputs.model_validate(inputs)
     except ValidationError as e:
         parts = [f"[{'.'.join(str(x) for x in err.get('loc', ()))}] {err.get('msg', '')}" for err in e.errors()]
-        raise CreInputError("；".join(parts)) from e
+        raise CreInputError(T("；").join(parts)) from e
 
 
 def _years(series: list[float], n_years: int) -> list[float]:
@@ -88,9 +89,21 @@ def _waterfall(cre: CreInputs, lev: list[float], lev_m: list[float]) -> JSON | N
     return out
 
 
+def _peak_equity(flows: list[float]) -> float:
+    """股权峰值：累计净投入（出资 − 已收分配）的最大值。开发项目 = 交割 + 施工期追加出资。"""
+    out = acc = 0.0
+    for x in flows:
+        acc -= x
+        out = max(out, acc)
+    return out
+
+
 def _dscr_from_year(cre: CreInputs) -> int:
-    """DSCR 从哪一年（0 起）开始算。开发项目：施工与去化期 NOI 为 0 或负、还在付施工贷利息，DSCR 没有意义；
-    机构口径按长期贷款测——有再融资从再融资的下一个整年起，否则从稳定月所在年起。其余项目从第 1 年起。"""
+    """DSCR 从哪一年（0 起）开始算。
+
+    开发项目：施工与去化期 NOI 为 0 或负、还在付施工贷利息，DSCR 没有意义；
+    机构口径按长期贷款测——有再融资从再融资的下一个整年起，否则从稳定月所在年起。其余项目从第 1 年起。
+    """
     dev = cre.development
     if dev is None:
         return 0
@@ -188,7 +201,8 @@ def run(inputs: JSON) -> JSON:
         "levered_irr_pct": _pct(irr(lev)), "levered_irr_monthly_pct": _pct(annualized(irr(lev_m))),
         "unlevered_multiple": equity_multiple(unlev), "levered_multiple": equity_multiple(lev),
         "unlevered_npv": npv(disc, unlev), "levered_npv": npv(disc, lev),
-        "equity": equity, "loan_amount": ds.senior_at_close, "mezz_amount": ds.mezz_at_close,
+        "equity": equity, "equity_total": _peak_equity(lev_m),
+        "loan_amount": ds.senior_at_close, "mezz_amount": ds.mezz_at_close,
         "ltv_pct": _pct(_div(ds.senior_at_close, cre.purchase_price)),
         "combined_ltv_pct": _pct(_div(loans_at_close, cre.purchase_price)),
         "debt_yield_pct": _pct(_debt_yield(cre, ds, lines["noi"])),

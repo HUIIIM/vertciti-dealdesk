@@ -2153,7 +2153,7 @@ export interface components {
              * Tab
              * @enum {string}
              */
-            tab: "overview" | "risk" | "files" | "model";
+            tab: "overview" | "risk" | "files" | "model" | "rentroll";
             /** Text */
             text: string;
             /** Title */

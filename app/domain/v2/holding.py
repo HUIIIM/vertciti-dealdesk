@@ -103,7 +103,8 @@ def _calibrate_noi(track: str, inputs: JSON, target: float) -> JSON:
 
 def attribution(track: str, inputs: JSON, actuals: list[JSON]) -> JSON:
     if track != "commercial":
-        return {"available": False, "reason": T("事后归因目前支持商业赛道（IRR）；住宅请看偏差表")}
+        return {"available": False,
+                "reason": T("事后归因（逐条假设拆 IRR 偏差）目前只支持商业赛道；住宅与机构级请看上面的偏差表")}
     acts = [a for a in annualize(actuals) if a.get("noi") is not None]
     if not acts:
         return {"available": False, "reason": T("还没有录入实际 NOI")}

@@ -147,7 +147,7 @@ function MaxBidCard() {
 }
 
 
-const TAB_HREF: Record<string, string> = { overview: "", risk: "/risk", files: "/files", model: "/model" };
+const TAB_HREF: Record<string, string> = { overview: "", risk: "/risk", files: "/files", model: "/model", rentroll: "/rentroll" };
 
 /** 反方备忘录：上会前先读“这笔交易最可能怎么失败”。规则生成、不经 AI；每条带去处理的入口。 */
 function DevilsCard({ id, version }: { id: number; version: number }) {

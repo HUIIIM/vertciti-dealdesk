@@ -61,7 +61,10 @@ INSTITUTIONAL: tuple[Assumption, ...] = (  # 按租约与多户公寓两种物�
                                   "multifamily.opex_per_unit_yr", "multifamily.taxes_yr", "multifamily.insurance_yr"),
                "historical"),
     Assumption("opex_growth", "费用增长", ("opex.growth_pct",), "historical"),
-    Assumption("rate", "贷款利率", ("debt.rate_pct", "debt.spread_bps"), "benchmark"),
+    Assumption("rate", "贷款利率", ("debt.rate_pct", "debt.spread_bps", "mezz.rate_pct", "construction_loan.rate_pct",
+                                  "refinance.rate_pct"), "benchmark"),
+    Assumption("soft_costs", "软成本", ("development.soft_costs",), "document"),
+    Assumption("refi_cap", "再融资估值资本化率", ("refinance.value_cap_pct",), "benchmark"),
     Assumption("closing_costs", "交割费用", ("closing_costs_pct",)),
 )
 

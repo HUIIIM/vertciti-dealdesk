@@ -123,7 +123,8 @@ def _structure_points(track: str, inputs: JSON, metrics: JSON) -> list[JSON]:
                            "出租率跌破 {0:.1f}% 就入不敷出——空置只要超过 {1:.1f}% 就开始亏现金。",
                            be, 100 - be), "model"))
     a = inputs.get("analysis") or {}
-    exit_cap, entry = _num(a.get("exit_cap_rate")), _num(metrics.get("cap_rate_pct"))
+    exit_cap = _num(inputs.get("exit_cap_pct") if track == "institutional" else a.get("exit_cap_rate"))
+    entry = _num(metrics.get("cap_rate_pct"))
     if exit_cap is not None and entry is not None and exit_cap < entry:
         out.append(_pt("cap:compress", "medium", T("回报靠估值上升"),
                        T(
@@ -135,6 +136,74 @@ def _structure_points(track: str, inputs: JSON, metrics: JSON) -> list[JSON]:
                        T("DSCR {0:.2f}×，只比贷款常见门槛 1.25× 高 {1:.2f}，"
                          "NOI 小幅下滑就可能触发贷款条款。", dscr, max(dscr - 1.25, 0)), "model"))
     return out
+
+
+ROLLOVER_MED, ROLLOVER_HIGH = 40.0, 60.0       # 持有期内到期面积占可租面积（%）
+CONTINGENCY_THIN = 5.0                         # 不可预见费低于硬成本的 5%
+LEASE_UP_LONG = 18.0                           # 竣工后去化超过 18 个月
+
+
+def _months(ym: str, origin: str) -> int:
+    return (int(ym[:4]) - int(origin[:4])) * 12 + int(ym[5:7]) - int(origin[5:7])
+
+
+def _rollover_point(inputs: JSON) -> list[JSON]:
+    start, hold = str(inputs.get("analysis_start") or ""), int(_num(inputs.get("hold_years")) or 0)
+    area = _num(inputs.get("area_sf")) or 0.0
+    leases = inputs.get("leases") or []
+    if not (start and hold and area and leases):
+        return []
+    try:
+        rolling = sum(_num(le.get("sf")) or 0.0 for le in leases
+                      if 0 <= _months(str(le.get("end")), start) < hold * 12)
+    except (TypeError, ValueError):
+        return []
+    share = rolling / area * 100
+    if share < ROLLOVER_MED:
+        return []
+    return [_pt("cre:rollover", "high" if share >= ROLLOVER_HIGH else "medium", T("到期集中"),
+                T("持有期内到期 {0:,.0f} SF，占可租面积 {1:.0f}%：续租概率、空置月数与 TI 假设决定了大半回报。",
+                  rolling, share), "rentroll")]
+
+
+def _development_points(inputs: JSON) -> list[JSON]:
+    dev = inputs.get("development") or {}
+    if not dev:
+        return []
+    out: list[JSON] = []
+    cont = _num(dev.get("contingency_pct"))
+    if cont is not None and cont < CONTINGENCY_THIN:
+        out.append(_pt("dev:contingency", "medium", T("不可预见费偏薄"),
+                       T("不可预见费只有硬成本的 {0:g}%：超支直接吃掉股权回报。", cont), "model"))
+    units = sum(int(_num(u.get("units")) or 0) for u in inputs.get("unit_mix") or [])
+    pace = _num(dev.get("absorption_units_per_month"))
+    if units and pace and units / pace > LEASE_UP_LONG:
+        out.append(_pt("dev:leaseup", "medium", T("去化期长"),
+                       T("{0} 户按每月 {1:g} 户去化要 {2:.0f} 个月，期间还在付施工贷利息。", units, pace, units / pace),
+                       "model"))
+    return out
+
+
+def _refi_point(inputs: JSON) -> list[JSON]:
+    if not inputs.get("refinance"):
+        return []
+    from app.domain.v2.cre import engine as cre_engine  # noqa: PLC0415 — 只有机构级交易才需要
+    try:
+        refi = cre_engine.run({k: v for k, v in inputs.items() if k not in ("name", "address")}).get("refinance")
+    except (cre_engine.CreInputError, ValueError):
+        return []
+    net = _num((refi or {}).get("net"))
+    if net is None or net >= 0:
+        return []
+    return [_pt("refi:cash_in", "high", T("再融资要补钱"),
+                T("再融资新贷款不够偿还旧贷款：股权要补 ${0:,.0f}。", -net), "model")]
+
+
+def _cre_points(track: str, inputs: JSON) -> list[JSON]:
+    """机构级专项：持有期到期集中、开发预算的不可预见费、去化期长短、再融资要补钱。只用输入与一次引擎测算，缺数不写。"""
+    if track != "institutional":
+        return []
+    return [*_rollover_point(inputs), *_development_points(inputs), *_refi_point(inputs)]
 
 
 def _governance_points(kill_changes: int) -> list[JSON]:
@@ -162,7 +231,8 @@ def build(track: str, inputs: JSON, metrics: JSON, facts: JSON) -> JSON:
     points = [*_kill_points(facts.get("kill") or {}), *_price_point(facts.get("max_bid")),
               *_swing_point(facts.get("redteam")), *_downside_point(facts.get("scenarios")),
               *_verify_points(facts.get("key_numbers"), facts.get("queue"), int(facts.get("stale") or 0)),
-              *_structure_points(track, inputs, metrics), *_governance_points(int(facts.get("kill_changes") or 0))]
+              *_structure_points(track, inputs, metrics), *_cre_points(track, inputs),
+              *_governance_points(int(facts.get("kill_changes") or 0))]
     if any(p["key"] == "near:dscr" for p in points):  # 同一件事（DSCR 贴近 1.25×）只说一次
         points = [p for p in points if p["key"] != "dscr:thin"]
     order = {"high": 0, "medium": 1}

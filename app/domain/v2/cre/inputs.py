@@ -7,6 +7,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from app.core.i18n import T
+
 _MONTH = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
 Recovery = Literal["nnn", "gross", "base_year"]
 Pct = float  # 百分比数：6.5 表示 6.5%
@@ -24,7 +26,7 @@ class _In(BaseModel):
 
 def _month(v: str) -> str:
     if not _MONTH.match(v):
-        raise ValueError("日期格式应为 YYYY-MM")
+        raise ValueError(T("日期格式应为 YYYY-MM"))
     return v
 
 
@@ -47,7 +49,7 @@ class Lease(_In):
     @model_validator(mode="after")
     def _order(self) -> Lease:
         if self.end < self.start:
-            raise ValueError(f"{self.tenant}：到期月早于起始月")
+            raise ValueError(T("{0}：到期月早于起始月", self.tenant))
         return self
 
 
@@ -93,9 +95,9 @@ class Debt(_In):
     @model_validator(mode="after")
     def _one_size(self) -> Debt:
         if self.ltv_pct is not None and self.amount is not None:
-            raise ValueError("贷款额与 LTV 只能填一个")
+            raise ValueError(T("贷款额与 LTV 只能填一个"))
         if self.rate_type == "floating" and not self.sofr_curve_pct:
-            raise ValueError("浮动利率需要 SOFR 曲线（逐年）")
+            raise ValueError(T("浮动利率需要 SOFR 曲线（逐年）"))
         return self
 
 
@@ -110,7 +112,7 @@ class Mezz(_In):
     @model_validator(mode="after")
     def _one_size(self) -> Mezz:
         if (self.ltv_pct is None) == (self.amount is None):
-            raise ValueError("夹层：金额与 LTV 填且只填一个")
+            raise ValueError(T("夹层：金额与 LTV 填且只填一个"))
         return self
 
 
@@ -184,9 +186,9 @@ class Waterfall(_In):
     def _ascending(self) -> Waterfall:
         hs = [self.pref_pct, *(t.irr_pct for t in self.tiers)]
         if any(b <= a for a, b in itertools.pairwise(hs)):
-            raise ValueError("瀑布门槛必须逐档递增（优先回报 < 第一档 < 第二档 …）")
+            raise ValueError(T("瀑布门槛必须逐档递增（优先回报 < 第一档 < 第二档 …）"))
         if self.catch_up_target_pct is not None and self.catch_up_rate_pct <= self.catch_up_target_pct:
-            raise ValueError("catch-up 期间 GP 的现金比例必须高于目标利润比例，否则永远补不到")
+            raise ValueError(T("catch-up 期间 GP 的现金比例必须高于目标利润比例，否则永远补不到"))
         return self
 
 
@@ -205,7 +207,7 @@ class UnitType(_In):
     @model_validator(mode="after")
     def _reno(self) -> UnitType:
         if self.renovate_units > self.units:
-            raise ValueError(f"{self.name}：翻新户数 {self.renovate_units} 超过户数 {self.units}")
+            raise ValueError(T("{0}：翻新户数 {1} 超过户数 {2}", self.name, self.renovate_units, self.units))
         return self
 
 
@@ -230,6 +232,9 @@ class Multifamily(_In):
     reno_start_month: int = Field(default=0, ge=0, le=360, description="翻新计划从交割后第几个月开始")
     reno_units_per_month: int = Field(default=4, ge=1, le=500, description="每月开工翻新的户数")
     reno_downtime_months: int = Field(default=1, ge=0, le=12, description="每户翻新停用月数")
+
+
+MAX_LEASE_MONTHS = 120_000  # 例：1,000 份租约 × 10 年；红队 / 敏感性要重跑十几到几十次，控制单请求耗时
 
 
 class CreInputs(_In):
@@ -266,50 +271,54 @@ class CreInputs(_In):
     def mla(self) -> Market:
         """按租约物业的市场租赁假设（校验器保证 commercial 必有）。"""
         if self.market is None:
-            raise ValueError("按租约物业需要市场租赁假设（market）")
+            raise ValueError(T("按租约物业需要市场租赁假设（market）"))
         return self.market
 
     def mfa(self) -> Multifamily:
         """多户公寓假设（校验器保证 multifamily 必有，缺省时补默认值）。"""
         if self.multifamily is None:
-            raise ValueError("多户公寓需要户型假设（multifamily）")
+            raise ValueError(T("多户公寓需要户型假设（multifamily）"))
         return self.multifamily
 
     @model_validator(mode="after")
     def _capital_and_development(self) -> CreInputs:
         dev = self.development
         if self.construction_loan is not None and dev is None:
-            raise ValueError("施工贷需要开发计划（development）")
+            raise ValueError(T("施工贷需要开发计划（development）"))
         if self.refinance is not None and self.refinance.month >= self.hold_years * 12:
-            raise ValueError(f"再融资月（第 {self.refinance.month} 月）必须早于出售（第 {self.hold_years * 12} 月）")
+            raise ValueError(T("再融资月（第 {0} 月）必须早于出售（第 {1} 月）",
+                               self.refinance.month, self.hold_years * 12))
         if dev is None:
             return self
         if dev.construction_months >= self.hold_years * 12:
-            raise ValueError("施工期必须短于持有期")
+            raise ValueError(T("施工期必须短于持有期"))
         if self.debt is not None:
-            raise ValueError("开发项目用施工贷（construction_loan），竣工后用再融资换成长期贷款；不填优先贷款")
+            raise ValueError(T("开发项目用施工贷（construction_loan），竣工后用再融资换成长期贷款；不填优先贷款"))
         c = dev.construction_months
         late = [le.tenant for le in self.leases if month_offset(le.start, self.analysis_start) < c]
         if late:
-            raise ValueError(f"开发项目的预租租约须在竣工后起租：{'、'.join(late)}")
+            raise ValueError(T("开发项目的预租租约须在竣工后起租：{0}", T("、").join(late)))
         return self
 
     @model_validator(mode="after")
     def _space(self) -> CreInputs:
         if self.property_type == "multifamily":
             if not self.unit_mix:
-                raise ValueError("多户公寓需要户型表（unit_mix）")
+                raise ValueError(T("多户公寓需要户型表（unit_mix）"))
             if self.leases:
-                raise ValueError("多户公寓按户型建模，不填逐份租约")
+                raise ValueError(T("多户公寓按户型建模，不填逐份租约"))
             if self.multifamily is None:
                 self.multifamily = Multifamily()
             total = sum(u.units for u in self.unit_mix)
             if self.multifamily.non_revenue_units >= total:
-                raise ValueError(f"不产生租金的户数 {self.multifamily.non_revenue_units} 不少于总户数 {total}")
+                raise ValueError(T("不产生租金的户数 {0} 不少于总户数 {1}", self.multifamily.non_revenue_units, total))
             return self
         if self.market is None:
-            raise ValueError("按租约物业需要市场租赁假设（market）")
+            raise ValueError(T("按租约物业需要市场租赁假设（market）"))
+        if len(self.leases) * self.hold_years * 12 > MAX_LEASE_MONTHS:
+            raise ValueError(T("租约数 × 持有月数超过 {0:,}（单次承销的计算上限）：请合并小租约或缩短持有期",
+                               MAX_LEASE_MONTHS))
         leased = sum(lease.sf for lease in self.leases)
         if leased > self.area_sf * 1.0001:
-            raise ValueError(f"租约面积合计 {leased:,.0f} SF 超过可租面积 {self.area_sf:,.0f} SF")
+            raise ValueError(T("租约面积合计 {0:,.0f} SF 超过可租面积 {1:,.0f} SF", leased, self.area_sf))
         return self

@@ -436,7 +436,7 @@ class MemoPointOut(Out):
     severity: Literal["high", "medium"]
     title: str
     text: str
-    tab: Literal["overview", "risk", "files", "model"]
+    tab: Literal["overview", "risk", "files", "model", "rentroll"]
 
 
 class DevilsMemoOut(Out):
