@@ -43,7 +43,7 @@ def test_adopts_existing_v1_database_without_data_loss(fresh_db):
     assert "created_by" in cols
     assert "created_by" not in p  # v1 响应结构不变（金标准锁定）
     with sqlite3.connect(fresh_db) as c:
-        assert c.execute("select version_num from alembic_version").fetchone()[0] == "0003"  # head
+        assert c.execute("select version_num from alembic_version").fetchone()[0] == "0002"  # head
 
 
 def test_fresh_database_gets_all_v2_tables(fresh_db):

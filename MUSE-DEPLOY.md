@@ -32,7 +32,6 @@ PR #23 由 Claude 维护（CI 红了会修）。等 HUIIIM 合并后，从 `main
 | `DATABASE_URL` | Postgres 连接串（Neon / Vercel Postgres 均可） | **必须**：Serverless 留不住 SQLite，没有它保存的数据会丢 |
 | `DEALDESK_TRUST_PROXY` | `1` | **必须**：否则一人输错令牌全员被锁 |
 | 认证相关 | 见 `docs/RUNBOOK.md`「用户与权限」 | 开认证并建用户：`.venv/bin/python -m app.core.security add-user <名> chairman` |
-| `DEALDESK_GOOGLE_CLIENT_ID` / `DEALDESK_GOOGLE_CLIENT_SECRET` / `DEALDESK_OWNER_EMAIL` | 见 `docs/GOOGLE-LOGIN.md` | Google 登录（邀请制）；HUIIIM 在 Google Cloud 建好 OAuth 客户端后填。不填则登录页只有令牌框 |
 
 首次连 Postgres 需跑迁移（见 `docs/RUNBOOK.md`「迁移」）。token/密码**不要**写进日志、代码、聊天。
 

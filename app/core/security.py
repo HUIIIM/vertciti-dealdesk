@@ -24,7 +24,7 @@ from sqlalchemy import select
 from app.core.context import Actor, current_actor
 from app.core.i18n import T
 from app.services.persistence.engine import session_scope
-from app.services.persistence.schema import User, UserSession, utcnow
+from app.services.persistence.schema import User
 
 
 class Role(str, Enum):
@@ -109,33 +109,23 @@ def resolve_token(token: str | None) -> Actor:
         return LOCAL
     if not token:
         return ANONYMOUS
-    h = token_hash(token)
     with session_scope() as s:
-        u = s.scalar(select(User).where(User.token_sha256 == h, User.active.is_(True)))
-        if u is None:  # Google 登录换来的会话令牌：未过期、且用户仍在用
-            u = s.scalar(select(User).join(UserSession, UserSession.username == User.username).where(
-                UserSession.token_sha256 == h, UserSession.expires_at > utcnow(), User.active.is_(True)))
+        u = s.scalar(select(User).where(User.token_sha256 == token_hash(token), User.active.is_(True)))
         if u is None:
             return ANONYMOUS
         return Actor(u.username, u.role, u.display_name)
 
 
-def add_user(username: str, role: str, display_name: str = "", email: str | None = None) -> str:
-    """创建用户并返回一次性明文 token。email：允许此人用 Google 登录（小写存）。"""
+def add_user(username: str, role: str, display_name: str = "") -> str:
+    """创建用户并返回一次性明文 token。"""
     Role(role)  # 校验
     if username.strip().lower() in RESERVED_USERNAMES:
         raise ValueError(T("用户名 {0} 是系统保留名，请换一个", username))
     token = "dd_" + secrets.token_urlsafe(32)
     with session_scope() as s:
         s.add(User(username=username, role=role, display_name=display_name or username,
-                   token_sha256=token_hash(token), created_by=current_actor().username,
-                   email=normalize_email(email)))
+                   token_sha256=token_hash(token), created_by=current_actor().username))
     return token
-
-
-def normalize_email(email: str | None) -> str | None:
-    e = (email or "").strip().lower()
-    return e or None
 
 
 if __name__ == "__main__":  # pragma: no cover — 运维命令行

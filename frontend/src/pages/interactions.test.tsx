@@ -179,12 +179,10 @@ describe("设置与外观", () => {
     override("GET /api/v2/admin/users", 200, []);
     override("POST /api/v2/admin/users", 201, { id: 1, username: "ana", display_name: "Ana", role: "analyst", active: true, token: "dd_secret", note: "" });
     at("#/settings/users");
-    await heading("邀请用户");
-    await userEvent.type(screen.getByLabelText("Google 邮箱"), "ana@gmail.com");
+    await heading("创建用户");
     await userEvent.type(screen.getByLabelText("用户名"), "ana");
-    await userEvent.click(screen.getByRole("button", { name: "邀请" }));
+    await userEvent.click(screen.getByRole("button", { name: "创建并生成令牌" }));
     expect(await screen.findByText("dd_secret")).toBeInTheDocument();
-    expect(posted("/api/v2/admin/users")[0]?.body).toMatchObject({ username: "ana", email: "ana@gmail.com", role: "analyst" });
     await act(async () => { window.location.hash = "#/settings/templates"; window.dispatchEvent(new HashChangeEvent("hashchange")); });
     await userEvent.click(await screen.findByRole("button", { name: "保存模板" }));
     await waitFor(() => expect(posted("/api/v2/settings/templates")).toHaveLength(1));
@@ -213,43 +211,6 @@ describe("设置与外观", () => {
     await userEvent.type(input, "dd_tok");
     await userEvent.click(within(input.closest("form")!).getByRole("button", { name: "进入" }));
     expect(sessionStorage.getItem("dd.token")).toBe("dd_tok");
-  });
-  it("Google 登录：登录页给 Google 按钮；回跳 #auth= 存会话令牌并抹掉地址栏；#auth_error= 显示原因", async () => {
-    override("GET /api/v2/me", 200, { username: "anonymous", role: "viewer", role_label: "只读", display_name: "匿名", auth: true, permissions: [] });
-    override("GET /api/v2/auth/providers", 200, { google: true });
-    window.location.hash = "#auth_error=not_invited";
-    render(<ToastHost><App /></ToastHost>);
-    expect(await screen.findByRole("alert")).toHaveTextContent("还没有被邀请");
-    expect(await screen.findByRole("link", { name: "使用 Google 账号登录" })).toHaveAttribute("href", "/api/v2/auth/google/start");
-    expect(window.location.hash).toBe("#/");
-    const { consumeAuthFragment, getToken, setToken } = await import("@/api/client");
-    window.location.hash = "#auth=dds_abc";
-    expect(consumeAuthFragment()).toBeNull();
-    expect(localStorage.getItem("dd.token")).toBe("dds_abc");
-    expect(getToken()).toBe("dds_abc");
-    expect(window.location.hash).toBe("#/");
-    window.location.hash = "#/deals/1";
-    expect(consumeAuthFragment()).toBeNull();
-    setToken(null);
-    expect(getToken()).toBeNull();
-  });
-  it("设置 · 用户：改邮箱、停用别人；自己不出现停用按钮", async () => {
-    override("GET /api/v2/admin/users", 200, [
-      { id: 1, username: "local", display_name: "本机", role: "chairman", active: true, email: null },
-      { id: 2, username: "pat", display_name: "Pat", role: "analyst", active: true, email: "pat@g.com" }]);
-    override("PATCH /api/v2/admin/users/pat", 200, { id: 2, username: "pat", display_name: "Pat", role: "analyst", active: false, email: "p2@g.com" });
-    at("#/settings/users");
-    const box = await screen.findByLabelText("pat 的 Google 邮箱");
-    await userEvent.clear(box);
-    await userEvent.type(box, "p2@g.com");
-    const row = box.closest("li")!;
-    await userEvent.click(within(row).getByRole("button", { name: "保存邮箱" }));
-    await userEvent.click(within(row).getByRole("button", { name: "停用" }));
-    await waitFor(() => expect(posted("/api/v2/admin/users/pat")).toHaveLength(2));
-    expect(posted("/api/v2/admin/users/pat")[0]?.body).toEqual({ email: "p2@g.com" });
-    expect(posted("/api/v2/admin/users/pat")[1]?.body).toEqual({ active: false });
-    const me = (await screen.findByLabelText("local 的 Google 邮箱")).closest("li")!;
-    expect(within(me).queryByRole("button", { name: "停用" })).toBeNull();
   });
 });
 

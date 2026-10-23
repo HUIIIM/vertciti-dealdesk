@@ -290,9 +290,6 @@ EN: dict[str, str] = {
     "（空置）": "(vacant)",
     "租约数 × 持有月数超过 {0:,}（单次承销的计算上限）：请合并小租约或缩短持有期":
         "Leases × hold months exceeds {0:,} (per-run compute limit): combine small leases or shorten the hold",
-    "不能停用或降级自己": "You can't deactivate or demote yourself",
-    "用户 {0} 不存在": "User {0} doesn't exist",
-    "邮箱 {0} 已登记给用户 {1}": "Email {0} is already registered to user {1}",
     "软成本": "Soft costs", "再融资估值资本化率": "Refinance valuation cap rate",
     "出租率（实际平均）": "Occupancy (actual average)",
     "其他经营差异（第 1 年 NOI 校准到实际）": "Other operating variance (year-1 NOI calibrated to actual)",
