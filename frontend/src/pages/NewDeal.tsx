@@ -1,7 +1,7 @@
 // 新建交易：名称、赛道、地址、要价 + 淘汰条件（必填至少一条，按赛道预填默认模板）。
 import { T } from "@/i18n";
 import { useState } from "react";
-import { api, call } from "@/api/client";
+import { api, call, rawJson } from "@/api/client";
 import type { Candidate, Research } from "@/api/types";
 import { useApp } from "@/app-context";
 import { Candidates } from "@/components/Candidates";
@@ -11,6 +11,9 @@ import type { Track } from "@/domain/fields";
 import { parseNum } from "@/lib/format";
 import { prefillKey } from "@/lib/prefill";
 import { navigate } from "@/lib/router";
+
+type Example = "office" | "multifamily" | "development";
+const EXAMPLES: Record<Example, string> = { office: T("示例：写字楼"), multifamily: T("示例：多户公寓"), development: T("示例：新建开发") };
 
 export function NewDeal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const { catalog } = useApp();
@@ -24,6 +27,7 @@ export function NewDeal({ onClose, onCreated }: { onClose: () => void; onCreated
   const [found, setFound] = useState<Research | null>(null);
   const [researching, setResearching] = useState(false);
   const [carry, setCarry] = useState<Candidate[]>([]);
+  const [example, setExample] = useState<"" | Example>("");
   const research = async () => {
     const text = address.trim();
     if (!text) { toast.err(T("先填地址或贴房源链接")); return; }
@@ -39,14 +43,18 @@ export function NewDeal({ onClose, onCreated }: { onClose: () => void; onCreated
     setCarry(picked); setFound(null);
     toast.ok(T("已带入 {0} 项：建好交易后写进承销草稿并登记来源", [picked.length]));
   };
-  const switchTrack = (t: Track) => { setTrack(t); setKill((catalog.kill_criteria_defaults[t] ?? []) as Crit[]); };
+  const switchTrack = (t: Track) => { setTrack(t); setExample(""); setKill((catalog.kill_criteria_defaults[t] ?? []) as Crit[]); };
   const submit = async () => {
-    if (!name.trim()) { toast.err(T("先写交易名称")); return; }
+    const title = name.trim() || (example ? EXAMPLES[example] : "");
+    if (!title) { toast.err(T("先写交易名称")); return; }
     if (kill.length === 0) { toast.err(T("至少写一条淘汰条件：先想清楚什么情况下放弃")); return; }
     setBusy(true);
     try {
-      const d = await call(api.POST("/api/v2/deals", { body: { name: name.trim(), track, address: address.trim(),
-        asking_price: parseNum(asking), kill_criteria: kill, tags: [] } }));
+      const inputs = example ? await rawJson<Record<string, unknown>>(`/api/v2/cre/example?kind=${example}`) : null;
+      const d = await call(api.POST("/api/v2/deals", { body: { name: title, track, address: address.trim(),
+        asking_price: parseNum(asking) ?? (inputs ? Number(inputs.purchase_price) : null), kill_criteria: kill, tags: [] } }));
+      // 示例：直接存成第一版承销（演示数据，不是真实交易），打开就能看全套结果
+      if (inputs) await call(api.POST("/api/v2/deals/{deal_id}/versions", { params: { path: { deal_id: d.id } }, body: { inputs, label: T("示例数据") } }));
       if (carry.length) { try { localStorage.setItem(prefillKey(d.id), JSON.stringify(carry)); } catch { /* 存不了就只建交易，不带入 */ } }
       toast.ok(T("已建交易：{0}", [d.name]));
       onCreated(); onClose();
@@ -64,7 +72,13 @@ export function NewDeal({ onClose, onCreated }: { onClose: () => void; onCreated
           <button type="button" aria-pressed={track === "institutional"} onClick={() => switchTrack("institutional")}>{T("机构级")}</button>
           <button type="button" aria-pressed={track === "residential"} onClick={() => switchTrack("residential")}>{T("住宅")}</button>
         </div>
-        <label className="field">{T("交易名称")}<input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder={T("如 39-09 Main St")} required /></label>
+        {track === "institutional" ? <div className="field">{T("从哪里开始")}
+          <div className="seg" role="group" aria-label={T("从哪里开始")} style={{ flexWrap: "wrap" }}>
+            <button type="button" aria-pressed={example === ""} onClick={() => setExample("")}>{T("空白")}</button>
+            {(Object.keys(EXAMPLES) as Example[]).map((k) => <button key={k} type="button" aria-pressed={example === k} onClick={() => setExample(k)}>{EXAMPLES[k]}</button>)}
+          </div>
+          {example ? <span className="hint">{T("示例是演示数据（不是真实交易），建好后可以逐项改。")}</span> : null}</div> : null}
+        <label className="field">{T("交易名称")}<input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder={T("如 39-09 Main St")} required={!example} /></label>
         <label className="field">{T("地址")}<span className="hint">{T("也可以贴房源链接")}</span>
           <input className="input" value={address} onChange={(e) => setAddress(e.target.value)} placeholder={T("街道, 城市, 州")} /></label>
         <div className="row">
