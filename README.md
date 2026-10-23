@@ -9,7 +9,7 @@ the public record for a property, scores the deal against written rules, and att
 | Deployment | Self-hosted: Python 3.10+, SQLite by default (Postgres supported); production instance on Vercel |
 | Live demo | [vertciti-dealdesk.vercel.app](https://vertciti-dealdesk.vercel.app/app/) — production instance of the v2 workbench; data requires sign-in |
 | Interfaces | Web UI (v2 workbench at `/app/`) · HTTP API (`/api`, `/api/v2`, bearer tokens) |
-| Licence | MIT ([LICENSE](LICENSE)); the LICENSE file notes MIT is the default and the final terms are subject to company GC sign-off |
+| Licence | MIT ([LICENSE](LICENSE)) |
 | Languages | English · [简体中文](README.zh.md) |
 | Contact | Vulnerabilities: [SECURITY.md](SECURITY.md) · Product: [vertciti.com](https://vertciti.com) |
 
@@ -160,7 +160,7 @@ Direction: [ROADMAP.md](ROADMAP.md) · [docs/improvement-backlog.md](docs/improv
 - Contributing: [CONTRIBUTING.md](CONTRIBUTING.md). Tests pin the headline numbers, comments state their
   assumptions, and no figure is fabricated.
 - Security: [SECURITY.md](SECURITY.md).
-- Licence: MIT — see [LICENSE](LICENSE) (default licence; final terms subject to GC sign-off). Created by
+- Licence: MIT — see [LICENSE](LICENSE). Created by
   Jiahui Miao.
 
 ---

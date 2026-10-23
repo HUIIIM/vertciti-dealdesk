@@ -9,7 +9,7 @@
 | 部署 | 自部署：Python 3.10+，默认 SQLite（支持 Postgres）；生产实例部署在 Vercel |
 | 在线演示 | [vertciti-dealdesk.vercel.app](https://vertciti-dealdesk.vercel.app/app/)：v2 工作台的生产实例，查看数据需要登录 |
 | 接口 | Web 界面（v2 工作台在 `/app/`）· HTTP API（`/api`、`/api/v2`，Bearer 令牌） |
-| 许可证 | MIT（[LICENSE](LICENSE)）；LICENSE 文件注明 MIT 为默认值，最终口径以公司 GC 定夺为准 |
+| 许可证 | MIT（[LICENSE](LICENSE)） |
 | 语言 | [English](README.md) · 简体中文 |
 | 联系 | 安全漏洞：[SECURITY.md](SECURITY.md) · 产品：[vertciti.com](https://vertciti.com) |
 
@@ -146,7 +146,7 @@ DealDesk 是 vertciti 的实作展示品，为一位使用者而建，生产实�
   [docs/adr/](docs/adr/) · [docs/PRODUCT-LOGIC.md](docs/PRODUCT-LOGIC.md)
 - 贡献：[CONTRIBUTING.md](CONTRIBUTING.md)。测试钉住关键数字，注释写明假设，不编造任何数字。
 - 安全：[SECURITY.md](SECURITY.md)。
-- 许可证：MIT，见 [LICENSE](LICENSE)（默认许可证，最终口径以 GC 定夺为准）。作者 Jiahui Miao。
+- 许可证：MIT，见 [LICENSE](LICENSE)。作者 Jiahui Miao。
 
 ---
 
