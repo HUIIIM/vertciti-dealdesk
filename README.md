@@ -1,133 +1,82 @@
-<p align="center">
-  <img src="assets/banner.png" alt="vertciti-dealdesk — screen a real-estate deal end to end, every number with its source attached" width="880">
-</p>
+# DealDesk
 
-<p align="center">
-  <strong>Screen a real-estate deal end to end — every number with its source attached.</strong><br>
-  An underwriting desk that gathers the public record, scores the deal, and shows its work.
-</p>
+A self-hosted real-estate underwriting desk for individual investors and small investment teams: it gathers
+the public record for a property, scores the deal against written rules, and attaches a source to every figure.
 
-<p align="center">
-  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
-  <a href="https://github.com/HUIIIM/vertciti-dealdesk/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/HUIIIM/vertciti-dealdesk/actions/workflows/ci.yml/badge.svg"></a>
-  <a href="https://github.com/HUIIIM/vertciti-dealdesk/actions/workflows/gitleaks.yml"><img alt="Gitleaks scan" src="https://github.com/HUIIIM/vertciti-dealdesk/actions/workflows/gitleaks.yml/badge.svg"></a>
-  <a href="https://vertciti-dealdesk.vercel.app"><img alt="Live demo" src="https://img.shields.io/badge/live%20demo-vertciti--dealdesk-brightgreen.svg"></a>
-  <img alt="Tests: 633 passing" src="https://img.shields.io/badge/tests-633%20passing-brightgreen.svg">
-</p>
+| | |
+|---|---|
+| Status | Active — v1.0.0 (`pyproject.toml`); v2 deal workbench listed as 2.0.0, unreleased, in the [CHANGELOG](CHANGELOG.md). CI runs pytest, ruff, mypy, a Postgres suite, frontend typecheck / lint / unit tests, Playwright E2E with axe, CodeQL, dependency review, pip-audit / npm audit, gitleaks and OpenSSF Scorecard |
+| Deployment | Self-hosted: Python 3.10+, SQLite by default (Postgres supported); production instance on Vercel |
+| Live demo | [vertciti-dealdesk.vercel.app](https://vertciti-dealdesk.vercel.app/app/) — production instance of the v2 workbench; data requires sign-in |
+| Interfaces | Web UI (v2 workbench at `/app/`) · HTTP API (`/api`, `/api/v2`, bearer tokens) |
+| Licence | MIT ([LICENSE](LICENSE)); the LICENSE file notes MIT is the default and the final terms are subject to company GC sign-off |
+| Languages | English · [简体中文](README.zh.md) |
+| Contact | Vulnerabilities: [SECURITY.md](SECURITY.md) · Product: [vertciti.com](https://vertciti.com) |
 
-<p align="center">
-  <a href="README.zh.md">中文版</a> · <a href="https://vertciti-dealdesk.vercel.app">Live demo</a> · <a href="https://vertciti.com">vertciti.com</a> · <a href="https://github.com/HUIIIM">Author</a>
-</p>
+![DealDesk decision sheet for a real Astoria, NY duplex: verdict, deal score and confidence](https://raw.githubusercontent.com/HUIIIM/vertciti-dealdesk/main/assets/ui-intake.png)
 
-> The old way: a broker flyer lands, and the next two hours disappear into
-> spreadsheets, five data sites, and numbers you can't trace back to anything.
-> DealDesk: paste the address, and the desk gathers the public record itself,
-> scores the deal against written rules, and pins a source to every figure —
-> what it can't find, it marks missing instead of inventing it.
+## Overview
 
-## Demo — a real run, not a mockup
+An investor screening a deal usually starts from a broker flyer and spends hours moving figures between
+spreadsheets and data sites, ending with numbers that cannot be traced back to anything. DealDesk takes a bare
+address, a listing URL or a PDF flyer / offering memorandum, gathers public listings, public records, taxes,
+schools and neighbourhood data, and stops at a data-quality gate if key fields are missing. Deals that pass are
+scored by residential or commercial rule sets, with sensitivity bands and a full cash-to-close figure. Every
+field carries its source, fetch time and confidence; what cannot be fetched is shown as missing, never filled in.
 
-![DealDesk live walkthrough](assets/demo.gif)
+It is a screening aid, not investment advice. Before any signing, closing or tax filing, a licensed local
+real-estate attorney, a CPA and a title company review the deal.
 
-*Recorded live on 2026-10-20 against a local instance of this exact code.
-The subject is a real Astoria, NY duplex whose public record was gathered
-the same day by the production intake (TopHap via MCP: 28 fields with
-sources). The walkthrough values it from its 10 real comparable sales,
-runs the 5-year scenarios, then opens a built-in demo project's stored
-score and the HTML report it generates. Captions on each still below.*
+## Demo — a real run
 
-**The intake's subject — a real duplex, public-record figures, nothing staged:**
+![DealDesk live walkthrough](https://raw.githubusercontent.com/HUIIIM/vertciti-dealdesk/main/assets/demo.gif)
 
-![Terminal: subject property gathered by the intake](assets/terminal-intake.png)
+Recorded on 2026-10-20 against a local instance of this code. The subject is a real Astoria, NY duplex whose
+public record was gathered the same day by the production intake (TopHap via MCP, 28 fields with sources). The
+walkthrough values it from its 10 comparable sales, runs the 5-year scenarios, then opens a built-in demo
+project's stored score and the HTML report it generates.
 
-**Ten real comparable sales become a reconciled estimate ($1,211,530).
-Note the income approach: rent isn't in the public record, so the desk
-says "manual needed" — it never fills the gap with a guess:**
+- **Intake** — the subject property with public-record figures.
+  ![Terminal: subject property gathered by the intake](https://raw.githubusercontent.com/HUIIIM/vertciti-dealdesk/main/assets/terminal-intake.png)
+- **Valuation** — ten comparable sales reconcile to an estimate of $1,211,530. Rent is not in the public record,
+  so the income approach reports "manual needed" instead of a guess.
+  ![Terminal: comps valuation](https://raw.githubusercontent.com/HUIIIM/vertciti-dealdesk/main/assets/terminal-valuation.png)
+- **Forecast** — five-year scenarios on top of the estimate; the API labels a scenario as a hypothesis.
+  ![Terminal: forecast scenarios](https://raw.githubusercontent.com/HUIIIM/vertciti-dealdesk/main/assets/terminal-forecast.png)
+- **Score and report** — a scored deal dimension by dimension, and the HTML report (inline SVG charts) generated
+  in the same run.
+  ![Terminal: demo project score and report](https://raw.githubusercontent.com/HUIIIM/vertciti-dealdesk/main/assets/terminal-report.png)
+- **v1 web UI** — the mode picker (residential plain-language mode, commercial pro mode), and the same duplex as a
+  one-page decision sheet at a $1,150,000 ask: verdict PASS, deal score 43/100, confidence 64.2. Because rent data
+  is missing, the sheet states that DSCR cannot be underwritten and downgrades itself.
+  ![DealDesk web UI: mode picker](https://raw.githubusercontent.com/HUIIIM/vertciti-dealdesk/main/assets/ui-main.png)
 
-![Terminal: comps valuation](assets/terminal-valuation.png)
+UI captures, 2026-10-20: browser screenshots of a local instance of this repo's code (seed-DB copy), Chromium
+via Playwright. Capture basis is registered in [assets/ASSETS.md](assets/ASSETS.md). These show the v1
+interface; the [CHANGELOG](CHANGELOG.md) records that v2 retires the v1 single page and redirects it to `/app/`.
 
-**Five-year scenarios ride on the estimate (a scenario is a hypothesis,
-never a promise — the API says so itself):**
+## Capabilities
 
-![Terminal: forecast scenarios](assets/terminal-forecast.png)
+| Area | What it does |
+|---|---|
+| **Intake** | Address, listing URL or PDF flyer / OM. Public listings, public records, taxes, schools and neighbourhood data; each field carries source, fetch time and confidence grade. Seller-supplied figures stay labelled *seller's figures — unverified*. |
+| **Data-quality gate** | Missing key fields or an untrusted source stop the deal with a "needs manual input" list before any calculation. |
+| **Scoring** | Residential and commercial tracks score independently (A / B / C / reject). Hard vetoes are surfaced first: floating rates, a balloon inside five years, no exit plan, pro-forma rent without comps. Each point traces to a written rule in the code. |
+| **Cash to close** | Down payment, closing costs, first-year capex and reserves summed for every deal. |
+| **Sensitivity** | Rent ±10% and rate ±2% bands showing cash flow, cash-on-cash, DSCR and entry cap. |
+| **Workbench** | Comps valuation (distance-weighted, reconciled with the income approach), market research on embedded public FHFA index data, a six-dimension market report; results can be sent into the scoring engine. |
+| **Reports** | Interactive HTML report with inline SVG charts, PDF underwriting memo, Excel model, one-page Tear Sheet PDF — same numbers in every format. |
+| **Compare** | Up to three projects side by side: CoC, DSCR, payback period. |
+| **v2 deal workbench** (`/app/`) | Pipeline (kanban / table) and a deal page with verdict card, verification progress and tabs for rent roll, T12, model, red team, market, files and evidence, committee, holding and log. Every number has a "passport" (source, page, extraction method, confidence, reviewer, freshness); conflicting sources must be resolved with a written reason. Max bid worked backwards from IRR / DSCR / cash-on-cash targets, naming the binding constraint. Seven-stage lifecycle with gates, committee votes and pack, a decision log that freezes the numbers, post-hoc attribution. Roles (chairman / analyst / viewer), audit log, keyboard-first, dark mode, mobile read-only. v1 calculations are unchanged and replayed against recorded outputs on every test run ([ADR 0001](docs/adr/0001-golden-master.md)). |
 
-**A scored deal, dimension by dimension — the report at the end is a real
-17 KB HTML file with three inline SVG charts, generated in the same run:**
-
-![Terminal: demo project score and report](assets/terminal-report.png)
-
-**The product UI itself — the mode picker every run starts from
-(residential plain-language mode vs. commercial pro mode):**
-
-![DealDesk web UI: mode picker](assets/ui-main.png)
-
-**The same Astoria duplex as a finished one-page decision sheet in the
-web UI — a live intake at a $1,150,000 ask. The verdict is a PASS:
-deal score 43/100, confidence 64.2, and because rent data is missing the
-sheet says DSCR cannot be underwritten and downgrades itself instead of
-rounding up:**
-
-![DealDesk web UI: decision sheet with verdict](assets/ui-intake.png)
-
-<sub>UI captures, 2026-10-20: browser screenshots of a local instance of
-this repo's code (seed-DB copy), Chromium via Playwright — capture basis
-registered in `assets/ASSETS.md`.</sub>
-
-## What it does
-
-- **Smart intake, three doors in** — a bare address, a listing URL, or a
-  PDF flyer / offering memorandum. The pipeline gathers public listings,
-  public records, taxes, schools, and neighborhood data; every field
-  carries its source, fetch time, and a confidence grade.
-  Seller-supplied figures are labeled *seller's figures — unverified*
-  and stay labeled. ([demo](#demo--a-real-run-not-a-mockup))
-- **A data-quality gate before any math** — missing key fields or an
-  untrusted source stops the deal at the door with a "needs manual input"
-  list. Dirty data never reaches the model.
-- **Two scoring engines, written rules** — residential and commercial
-  tracks score independently (grades A / B / C / reject), with hard
-  vetoes floated to the top in red: floating rates, a balloon inside
-  five years, no exit plan, pro-forma rent with no comps behind it.
-  Every point traces to a written rule in the code — the rules are the
-  code, not tuning knobs.
-- **Full cash-to-close, every time** — down payment + closing costs +
-  first-year capex + reserves, summed automatically. No line item
-  quietly forgotten.
-- **Sensitivity in five bands** — rent ±10%, rate ±2%: watch cash flow,
-  cash-on-cash, DSCR, and entry cap move before the market does it for you.
-- **A workbench next to the desk** — comps valuation (distance-weighted,
-  reconciled with the income approach), market research on embedded
-  public FHFA index data, and a six-dimension market report; one click
-  sends a workbench result into the scoring engine.
-  ([valuation still](#demo--a-real-run-not-a-mockup))
-- **Reports that travel** — an interactive HTML report with inline SVG
-  charts (zero plotting dependencies), a PDF underwriting memo, an
-  Excel model, and a one-page Tear Sheet PDF for partners. Same numbers,
-  same source, every format.
-- **Side-by-side compare** — up to three projects in one table: CoC,
-  DSCR, payback period in the same columns.
-
-## Why it's cheaper / freer
-
-DealDesk is MIT-licensed and self-hosted: no subscription, no per-seat
-or per-deal fee, and your deal data lives in a SQLite file on your own
-machine — it is never uploaded anywhere. The one optional paid layer is
-TopHap public-record enrichment (off by default; priced by TopHap, not
-by us). What it replaces is the manual ritual: hours of spreadsheet
-underwriting and tab-hopping per deal, with numbers you couldn't audit
-afterwards.
-
-## Quick start (≤5 minutes, verified 2026-10-20)
+## Quick start
 
 ```bash
 git clone https://github.com/HUIIIM/vertciti-dealdesk.git && cd vertciti-dealdesk
-./run.sh        # creates the venv, installs deps, inits the DB, serves
+./run.sh        # creates the venv, installs deps, initialises the DB, serves
 ```
 
-Open **http://127.0.0.1:8100** — create a project, and the first score is
-about three minutes away. (Verified end-to-end on 2026-10-20:
-`./run.sh` brings the app up and `GET /api/health` answers
-`{"ok": true, "service": "dealdesk"}`.)
+Open http://127.0.0.1:8100 and create a project. `GET /api/health` answers `{"ok": true, "service": "dealdesk"}`.
 
 Manual equivalent:
 
@@ -137,8 +86,8 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8100
 ```
 
-Run the tests (delete the dev by-product DB first — a known test-isolation
-quirk, documented in [AGENTS.md](AGENTS.md); 573 passed, run 2026-10-20):
+Run the tests (delete the dev by-product DB first — a known test-isolation quirk, documented in
+[AGENTS.md](AGENTS.md)):
 
 ```bash
 rm -f dealdesk.db
@@ -163,102 +112,57 @@ flowchart LR
     COM <--> DB
 ```
 
-## DealDesk v2 — the deal workbench (built 2026-10-22, not yet deployed)
+v2 adds `domain / services / api` layers, SQLAlchemy 2 + Alembic (SQLite or Postgres) and a TypeScript + React
+frontend with an OpenAPI-generated client. Design decisions are recorded in [docs/adr/](docs/adr/); operations
+in the [runbook](docs/RUNBOOK.md) and [docs/PRODUCT-LOGIC.md](docs/PRODUCT-LOGIC.md).
 
-v2 adds a deal-lifecycle workbench at `/app/` on top of everything above,
-with **every v1 calculation unchanged** — 1,500+ recorded v1 outputs are
-replayed on every test run and must match byte for byte
-([ADR 0001](docs/adr/0001-golden-master.md)).
+## Security and compliance
 
-- **Pipeline** (kanban / table) → **deal page**: a verdict card, a
-  verification progress bar, and tabs for rent roll, T12, model, red team,
-  market, files & evidence, committee, holding and log.
-- **Every number has a passport** — source, page, extraction method,
-  confidence, who reviewed it, how fresh it is. Conflicting sources are
-  logged and must be resolved with a written reason.
-- **Max bid, worked backwards** from IRR / DSCR / cash-on-cash targets and
-  your kill criteria — and it names the constraint that sets the price.
-- **Seven-stage lifecycle with gates** (no skipping; going back needs a
-  reason), committee votes and pack, a decision log that freezes the
-  numbers at the moment of decision, and post-hoc attribution once held.
-- Roles (chairman / analyst / viewer), audit log, Postgres support, JSON
-  logs with request IDs. Keyboard-first (⌘K, J/K, ?), dark mode, mobile
-  read-only, WCAG AA (axe-clean).
+- Self-hosted: deal data stays in a database on your own infrastructure. The one optional external paid layer is
+  TopHap public-record enrichment, off by default and priced by TopHap.
+- v2: roles (chairman / analyst / viewer), bearer tokens stored only as hashes, rate limiting on bad tokens, an
+  audit log, security response headers and a strict CSP, JSON logs with request IDs.
+- Collection touches public pages only and respects `robots.txt`; when a site blocks the fetch, the pipeline
+  stops, logs it and falls back to manual entry.
+- Listing-page and PDF figures stay labelled *seller's figures — unverified* until independently checked.
+- Report vulnerabilities privately as described in [SECURITY.md](SECURITY.md).
 
-Engineering: `domain / services / api` layers, SQLAlchemy 2 + Alembic,
-TypeScript + React with an OpenAPI-generated client; CI runs ruff (all
-rules on v2), mypy strict, property tests, a Postgres suite, Playwright
-E2E, CodeQL and dependency audits. See [CHANGELOG](CHANGELOG.md),
-[runbook](docs/RUNBOOK.md) and [ADRs](docs/adr/).
+## Status and limitations
 
-## The honesty contract
+DealDesk is vertciti's working showcase, built for one operator and run in production at
+[vertciti-dealdesk.vercel.app](https://vertciti-dealdesk.vercel.app/app/). Improvements are logged in
+[docs/improvement-backlog.md](docs/improvement-backlog.md).
 
-This is a screening aid, **not investment advice**, and it is built to
-refuse the usual shortcuts:
+- **Primary data source in production: TopHap** (public-record aggregation over MCP — valuation reference with
+  range, loan and title history, tax assessments, foreclosure signals, comparable sales), verified live on
+  2026-10-20. The public-web pipeline and the U.S. Census geocoder act as fallbacks.
+- **RentCast: adapter built, not active** until its account is funded — an external blocker.
+- The public-web search layer is subject to search-engine anti-bot walls; when blocked, fields degrade to
+  "manual needed", visible in the run log.
+- Scanned-PDF OCR exists, but complex two-column offering memoranda are flagged for human review rather than
+  parsed by guesswork.
+- v2 is recorded as unreleased (2.0.0) in the [CHANGELOG](CHANGELOG.md).
 
-- Every field shows its source, fetch time, and confidence. What can't
-  be fetched is rendered as missing — never as a plausible-looking
-  number. (In the demo above, the income approach returns N/A because
-  rent is not a public-record field.)
-- Listing-page and PDF figures are *seller's figures — unverified*
-  until independently checked.
-- Public pages only, `robots.txt` respected; when a site blocks the
-  fetch, the pipeline stops, logs it, and degrades to manual entry.
-- Before any real signing, closing, or tax filing, a licensed local
-  real-estate attorney, a CPA, and a title company review the deal.
-  The desk screens; professionals close.
+## Roadmap (planned, not shipped)
 
-## Status — where it stands (2026-10-20)
-
-DealDesk is vertciti's working showcase, built for an audience of one
-(Miao) and run in production at
-[vertciti-dealdesk.vercel.app](https://vertciti-dealdesk.vercel.app).
-It improves on a daily cadence — one backlog item implemented, tested,
-deployed, and production-smoked every day (the log lives in
-[docs/improvement-backlog.md](docs/improvement-backlog.md)).
-
-- **Test suite: 573 passed** (1 pre-existing deselect), re-run
-  2026-10-20. Charts are all inline SVG / embedded PNG — zero plotting
-  dependencies.
-- **Primary data source in production: TopHap** (public-record
-  aggregation over MCP — valuation reference with range, loan and
-  title history, tax assessments, foreclosure signals, comparable
-  sales), verified live on 2026-10-20. The public-web pipeline and a
-  U.S. Census geocoder act as fallbacks.
-- **RentCast: adapter built, not active.** It stays off until its
-  account is funded — an external blocker, stated plainly rather than
-  papered over.
-- **Known limits:** the public-web search layer is at the mercy of
-  search-engine anti-bot walls (when blocked, fields degrade to
-  "manual needed" — visible in the run log, never silent); scanned-PDF
-  OCR exists but complex two-column offering memoranda are flagged
-  for human review instead of being guessed at.
-
-## Roadmap (planned — labeled, not shipped)
-
-- **One-sentence verdict entry** — ask in natural language; the desk
-  orchestrates comps → underwriting → tear sheet and answers with a
-  cited decision.
-- **Buy-box auto-scoring** — your written constraints as config;
-  incoming deals scored against them automatically.
+- **One-sentence verdict entry** — a natural-language question orchestrates comps → underwriting → tear sheet
+  and returns a cited decision.
+- **Buy-box auto-scoring** — written constraints as config; incoming deals scored against them.
 - **Deal watchlist** — tracked deals re-valued weekly, with drift alerts.
-- **DealDesk MCP server** — pipeline, comps, and underwriting results
-  queryable by an AI agent in natural language.
+- **DealDesk MCP server** — pipeline, comps and underwriting results queryable by an AI agent.
 
-Direction and receipts: [ROADMAP.md](ROADMAP.md) ·
-[docs/improvement-backlog.md](docs/improvement-backlog.md)
+Direction: [ROADMAP.md](ROADMAP.md) · [docs/improvement-backlog.md](docs/improvement-backlog.md)
 
-## Contributing
+## Documentation · Support · Licence
 
-Issues and PRs welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md);
-the house rules are simple: tests pin the headline numbers, comments
-state their assumptions, and no figure is ever fabricated.
-
-## License
-
-MIT — see [LICENSE](LICENSE). Created by Jiahui Miao
-([vertciti](https://vertciti.com)).
+- [CHANGELOG.md](CHANGELOG.md) · [ROADMAP.md](ROADMAP.md) · [docs/RUNBOOK.md](docs/RUNBOOK.md) ·
+  [docs/adr/](docs/adr/) · [docs/PRODUCT-LOGIC.md](docs/PRODUCT-LOGIC.md)
+- Contributing: [CONTRIBUTING.md](CONTRIBUTING.md). Tests pin the headline numbers, comments state their
+  assumptions, and no figure is fabricated.
+- Security: [SECURITY.md](SECURITY.md).
+- Licence: MIT — see [LICENSE](LICENSE) (default licence; final terms subject to GC sign-off). Created by
+  Jiahui Miao.
 
 ---
 
-[vertciti.com](https://vertciti.com) · [github.com/HUIIIM](https://github.com/HUIIIM)
+Built by [vertciti](https://vertciti.com) — https://vertciti.com
