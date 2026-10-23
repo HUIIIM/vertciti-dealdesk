@@ -1,6 +1,7 @@
 // 外壳：与 vertciti.com 一致的黑色品牌条 + 产品栏（导航 / 命令栏入口 / 密度与主题 / 当前身份）。
 import { lang, setLang, T } from "@/i18n";
 import type { ReactNode } from "react";
+import { api, setToken } from "@/api/client";
 import { useApp } from "@/app-context";
 import { Kbd } from "@/components/ui";
 import type { Density, Theme } from "@/lib/prefs";
@@ -42,8 +43,17 @@ export function AppShell({ route, children, onCmdk, density, setDensity, theme, 
         <button type="button" className="btn ghost sm desktop-only" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
           aria-label={theme === "dark" ? T("切换到浅色") : T("切换到深色（长时间建模）")}>{theme === "dark" ? T("浅色") : T("深色")}</button>
         <span className="who" title={me.permissions.join(T("、"))}><span className="name">{me.display_name || me.username}</span><span className="chip">{me.role_label}</span></span>
+        {me.auth ? <button type="button" className="btn ghost sm" onClick={() => void signOut()}>{T("退出登录")}</button> : null}
       </header>
       <main id="main" className="page" tabIndex={-1}>{children}</main>
     </>
   );
+}
+
+/** 退出：作废服务端会话令牌（Google 登录那种）、清掉本地令牌，回到登录页。 */
+async function signOut(): Promise<void> {
+  try { await api.POST("/api/v2/auth/logout"); } catch { /* 离线也照样清本地 */ }
+  setToken(null);
+  window.location.replace(window.location.pathname + "#/");
+  window.location.reload();
 }

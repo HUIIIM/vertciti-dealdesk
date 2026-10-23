@@ -69,28 +69,64 @@ function Sources() {
   );
 }
 
+type UserRow = { username: string; display_name: string; role: string; active: boolean; email?: string | null };
+type RoleKey = "chairman" | "analyst" | "viewer";
+const ROLE_TEXT: Record<string, string> = { chairman: T("董事长"), analyst: T("分析"), viewer: T("只读") };
+
+/** 用户：按 Google 邮箱邀请（邀请制，无公开注册）；可改邮箱、角色、停用。访问令牌只给脚本 / 管理员用。 */
 function Users() {
   const toast = useToast();
+  const { me } = useApp();
   const u = useApi(() => call(api.GET("/api/v2/admin/users")), []);
-  const [form, setForm] = useState<{ username: string; role: "chairman" | "analyst" | "viewer"; display_name: string }>({ username: "", role: "analyst", display_name: "" });
+  const [form, setForm] = useState<{ username: string; role: RoleKey; display_name: string; email: string }>({ username: "", role: "analyst", display_name: "", email: "" });
   const [token, setToken] = useState<string | null>(null);
   const create = async () => {
-    try { const r = await call(api.POST("/api/v2/admin/users", { body: form })); setToken(String((r as { token: string }).token)); await u.reload(); }
+    try {
+      const r = await call(api.POST("/api/v2/admin/users", { body: { ...form, email: form.email.trim() || null } }));
+      setToken(String((r as { token: string }).token));
+      setForm({ username: "", role: "analyst", display_name: "", email: "" });
+      toast.ok(form.email.trim() ? T("已邀请：对方用这个 Google 账号打开 DealDesk 即可登录") : T("用户已创建"));
+      await u.reload();
+    } catch (e) { toast.err(e); }
+  };
+  const patch = async (username: string, body: { email?: string; role?: RoleKey; active?: boolean }) => {
+    try { await call(api.PATCH("/api/v2/admin/users/{username}", { params: { path: { username } }, body })); toast.ok(T("已保存")); await u.reload(); }
     catch (e) { toast.err(e); }
   };
+  const rows = (u.data ?? []) as unknown as UserRow[];
   return (
     <div className="split">
       <section className="card"><h2>{T("用户")}</h2>{u.error ? <ErrorBox error={u.error} /> : null}
-        <ul className="checks">{(u.data ?? []).map((x) => <li key={String(x.username)}><span className="chip">{String(x.role)}</span><span>{String(x.display_name)}<div className="d">{String(x.username)}</div></span></li>)}</ul></section>
-      <section className="card"><h2>{T("创建用户")}</h2>
+        <p className="sub">{T("登记了 Google 邮箱的人，打开 DealDesk 点“使用 Google 账号登录”即可进入；清空邮箱即撤销。")}</p>
+        <ul className="checks">{rows.map((x) => <UserItem key={x.username} x={x} self={x.username === me.username} onPatch={(b) => void patch(x.username, b)} />)}</ul></section>
+      <section className="card"><h2>{T("邀请用户")}</h2>
         <form style={{ display: "grid", gap: 12 }} onSubmit={(e) => { e.preventDefault(); void create(); }}>
+          <label className="field">{T("Google 邮箱")}<input className="input" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="name@gmail.com" autoComplete="off" /></label>
           <label className="field">{T("用户名")}<input className="input" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} pattern="[A-Za-z0-9._-]{2,80}" required /></label>
           <label className="field">{T("显示名")}<input className="input" value={form.display_name} onChange={(e) => setForm({ ...form, display_name: e.target.value })} /></label>
-          <label className="field">{T("角色")}<select className="input" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as typeof form.role })}>
+          <label className="field">{T("角色")}<select className="input" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as RoleKey })}>
             <option value="chairman">{T("董事长")}</option><option value="analyst">{T("分析")}</option><option value="viewer">{T("只读")}</option></select></label>
-          <div><button className="btn primary" type="submit">{T("创建并生成令牌")}</button></div></form>
-        {token ? <div className="banner warn" role="alert" style={{ marginTop: 12 }}><strong>{T("访问令牌（只显示这一次）：")}</strong><div className="mono" style={{ wordBreak: "break-all" }}>{token}</div></div> : null}</section>
+          <div><button className="btn primary" type="submit">{T("邀请")}</button></div></form>
+        {token ? <details style={{ marginTop: 12 }}><summary className="muted">{T("访问令牌（脚本 / 管理员用，只显示这一次）")}</summary>
+          <div className="mono" style={{ wordBreak: "break-all", marginTop: 8 }}>{token}</div></details> : null}</section>
     </div>
+  );
+}
+
+function UserItem({ x, self, onPatch }: { x: UserRow; self: boolean; onPatch: (b: { email?: string; role?: RoleKey; active?: boolean }) => void }) {
+  const [email, setEmail] = useState(x.email ?? "");
+  return (
+    <li style={{ alignItems: "start" }}>
+      <span className="chip">{ROLE_TEXT[x.role] ?? x.role}</span>
+      <span style={{ display: "grid", gap: 6, flex: 1 }}>
+        <span>{x.display_name}<span className="d">{x.username}{x.active ? "" : T(" · 已停用")}</span></span>
+        <span style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <input className="input" type="email" aria-label={T("{0} 的 Google 邮箱", [x.username])} value={email} onChange={(e) => setEmail(e.target.value)} placeholder={T("未登记 Google 邮箱")} style={{ flex: "1 1 200px" }} />
+          <button type="button" className="btn sm" disabled={email.trim() === (x.email ?? "")} onClick={() => onPatch({ email: email.trim() })}>{T("保存邮箱")}</button>
+          {self ? null : <button type="button" className="btn sm ghost" onClick={() => onPatch({ active: !x.active })}>{x.active ? T("停用") : T("启用")}</button>}
+        </span>
+      </span>
+    </li>
   );
 }
 
