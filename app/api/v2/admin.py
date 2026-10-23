@@ -20,6 +20,7 @@ from app.api.v2.schemas import (
     UserCreatedOut,
     UserIn,
     UserOut,
+    UserPatch,
     ViewIn,
     ViewOut,
 )
@@ -78,7 +79,13 @@ def users() -> list[dict[str, Any]]:
 @router.post("/admin/users", response_model=UserCreatedOut, status_code=201, dependencies=[need("users.manage")])
 def create_user(body: UserIn) -> dict[str, Any]:
     """创建用户并返回一次性访问令牌（只显示这一次）。"""
-    return settings.create_user(body.username, body.role, body.display_name)
+    return settings.create_user(body.username, body.role, body.display_name, body.email)
+
+
+@router.patch("/admin/users/{username}", response_model=UserOut, dependencies=[need("users.manage")])
+def update_user(username: str, body: UserPatch) -> dict[str, Any]:
+    """邀请（填 Google 邮箱）/ 撤销（邮箱填空）、改角色、停用。"""
+    return settings.update_user(username, body.model_dump(exclude_unset=True))
 
 
 @router.get("/admin/audit", response_model=list[AuditOut], dependencies=[need("audit.read")])

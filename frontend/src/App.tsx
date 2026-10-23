@@ -1,7 +1,7 @@
 // 根组件：加载身份与目录 → 外壳 → 路由；全局快捷键（⌘K / ? / N / G+字母）。
 import { T } from "@/i18n";
 import { lazy, Suspense, useCallback, useMemo, useState } from "react";
-import { api, ApiError, call, rawJson } from "@/api/client";
+import { api, ApiError, call, consumeAuthFragment, rawJson } from "@/api/client";
 import type { Catalog, Me } from "@/api/types";
 import { useApi } from "@/api/useApi";
 import { Ctx } from "@/app-context";
@@ -26,6 +26,7 @@ export function App() {
   const route = useRoute();
   const { density, setDensity, theme, setTheme } = useAppearance();
   const phone = useMediaQuery(PHONE_QUERY);
+  const [authError] = useState(consumeAuthFragment);  // 必须在首次请求 /me 之前取走回跳令牌
   const [authTick, setAuthTick] = useState(0);
   const boot = useApi(async () => {
     const me = (await call(api.GET("/api/v2/me"))) as unknown as Me;
@@ -61,7 +62,7 @@ export function App() {
 
   if (boot.error && !(boot.error instanceof ApiError && boot.error.status === 401)) return <main className="page"><ErrorBox error={boot.error} onRetry={boot.reload} /></main>;
   if (boot.loading && !boot.data) return <main className="page"><Skeleton rows={6} h={32} /></main>;
-  if (!boot.data?.catalog || (boot.error instanceof ApiError && boot.error.status === 401)) return <Login onDone={() => setAuthTick((t) => t + 1)} />;
+  if (!boot.data?.catalog || (boot.error instanceof ApiError && boot.error.status === 401)) return <Login error={authError} onDone={() => setAuthTick((t) => t + 1)} />;
   const { me, catalog } = boot.data;
   const perms = effectivePermissions(me.permissions, phone);
   const can = (p: string) => perms.includes(p);
