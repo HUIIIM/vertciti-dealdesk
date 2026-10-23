@@ -59,10 +59,10 @@ handling, not of the product.
 `v2-pipeline.png`, `v2-deal.png`, `v2-office-model.png`, `v2-mf-unitmix.png`,
 `v2-dev-model.png`, `v2-redteam.png` — the v2 workbench (`/app/`) in English, light theme,
 1440×960 viewport at 2× (2880×1920). Basis: this repo at branch `feat/cre-development`
-(commit 5f7dfb3, institutional engine cre-1.0), run locally with a fresh SQLite database, Chromium
+(institutional engine cre-1.0; recaptured after the badge and kill-criteria label fixes), run locally with a fresh SQLite database, Chromium
 via Playwright, reduced motion. Seed data is the repo's own example inputs, not real deals:
 `GET /api/v2/cre/example?kind=office|multifamily|development` (deals 1–3) and the v1 template
-`example_39_main` (deal 4, commercial track). Every number shown is computed by the running app.
+`example_39_main` (deal 4, commercial track). Deals 1–3 were advanced through their stage gates via the API so the pipeline shows several stages; the development deal stays in Screening because it has no kill criteria (the gate blocks it). Every number shown is computed by the running app.
 Names and addresses on the deals are illustrative placeholders typed in for the capture.
 The three institutional captures (office model, unit mix, development model) show 2.1.0 features
 that are in review, not yet in production (production runs 2.0.0 as of 2026-10-23).

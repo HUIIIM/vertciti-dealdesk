@@ -142,7 +142,7 @@ export function DealPage({ id, tab }: { id: number; tab: DealTab }) {
           <div className="muted" style={{ fontSize: 14 }}>{d.address || T("地址未填")}</div>
           <div className="maxbid">
             <span className="muted" style={{ fontWeight: 800, fontSize: 13 }}>{T("结论")}</span>
-            <Status s={killStatus(kill)}>{kill.triggered.length ? T("触发淘汰 {0} 条", [kill.triggered.length]) : kill.unknown.length ? T("淘汰条件无法判定") : kill.clear ? T("淘汰条件未触发") : T("未承销")}</Status>
+            <Status s={killStatus(kill)}>{kill.triggered.length ? T("触发淘汰 {0} 条", [kill.triggered.length]) : kill.unknown.length ? T("淘汰条件无法判定") : kill.clear ? T("淘汰条件未触发") : o.version && !d.kill_criteria?.length ? T("未设淘汰条件") : T("未承销")}</Status>
             {o.last_verdict ? <span className="chip">{T("最近决策")}{" "}{o.last_verdict}</span> : null}
             <MaxBidInline mb={mb} hasVersion={Boolean(o.version)} dirty={dirty} />
           </div>

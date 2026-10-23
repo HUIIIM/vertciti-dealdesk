@@ -32,6 +32,11 @@ export function killState(d: DealListItem): "risk" | "verified" | "building" | "
   return k.clear ? "verified" : "planned";
 }
 const KILL_TEXT = { risk: T("触发淘汰"), verified: T("未触发"), building: T("指标未知"), planned: T("未承销") } as const;
+/** 已承销但没写淘汰条件时，“未承销”会误导：直说没设。 */
+export function killText(d: DealListItem): string {
+  const st = killState(d);
+  return st === "planned" && d.current_version_id != null && !d.kill_criteria?.length ? T("未设淘汰条件") : KILL_TEXT[st];
+}
 
 export function Pipeline() {
   const { catalog, can, dealsVersion, refreshDeals } = useApp();
@@ -65,7 +70,7 @@ export function Pipeline() {
     { key: "primary", header: T("主回报"), unit: "pct", width: 100, render: (d) => fmt(m(d, primary(d)), "pct").replace("%", ""), sortValue: (d) => m(d, primary(d)) },
     { key: "dscr", header: "DSCR", unit: "x", width: 80, render: (d) => fmt(m(d, "dscr"), "x").replace("×", ""), sortValue: (d) => m(d, "dscr") },
     { key: "cap", header: "Cap Rate", unit: "pct", width: 90, render: (d) => fmt(m(d, "cap_rate_pct"), "pct").replace("%", ""), sortValue: (d) => m(d, "cap_rate_pct") },
-    { key: "kill", header: T("淘汰条件"), width: 120, render: (d) => <Status s={killState(d)}>{KILL_TEXT[killState(d)]}</Status>, sortValue: (d) => killState(d) },
+    { key: "kill", header: T("淘汰条件"), width: 120, render: (d) => <Status s={killState(d)}>{killText(d)}</Status>, sortValue: (d) => killState(d) },
     { key: "updated", header: T("更新"), width: 110, render: (d) => d.updated_at.slice(0, 10), sortValue: (d) => d.updated_at },
   ];
   const saveView = async () => {
@@ -125,7 +130,7 @@ export function Pipeline() {
                       <div className="kv"><span className="muted">{T("价格")}</span><span>{fmtShort(m(d, "price") ?? d.asking_price)}</span></div>
                       <div className="kv"><span className="muted">{catalog.metrics[primary(d)]?.label}</span><span>{fmt(m(d, primary(d)), "pct")}</span></div>
                       <div className="kv"><span className="muted">DSCR</span><span>{fmt(m(d, "dscr"), "x")}</span></div>
-                      <div className="foot"><Status s={st}>{KILL_TEXT[st]}</Status></div>
+                      <div className="foot"><Status s={st}>{killText(d)}</Status></div>
                     </a>); })}
               </section>);
           })}

@@ -199,9 +199,9 @@ table.t a.rowlink:hover { text-decoration: underline; }
 .devils .headline { font-size: 17px; font-weight: 800; line-height: 1.45; margin: var(--s3) 0; padding-left: var(--s3);
   border-left: 4px solid var(--risk); text-wrap: pretty; }
 .devils-list { list-style: none; margin: 0; padding: 0; }
-.devils-list li { display: grid; grid-template-columns: 168px minmax(0, 1fr) 64px; gap: var(--s3); align-items: start; padding: var(--s2) 0;
+.devils-list li { display: grid; grid-template-columns: max-content minmax(0, 1fr) 64px; gap: var(--s3); align-items: start; padding: var(--s2) 0;
   border-bottom: 1px solid var(--line-soft); }
-.devils-list li > .status { justify-self: stretch; overflow: hidden; text-overflow: ellipsis; }
+.devils-list li > .status { justify-self: start; }
 @media (max-width: 640px) { .devils-list li { grid-template-columns: 1fr; gap: 4px; } .devils-list .btn { justify-self: start; } }
 /* 先核哪个：序号 · 什么 · 摆动条（从 0 起）· 基点 · 去处理 */
 .vfirst { margin: var(--s3) 0 var(--s2); padding-top: var(--s3); border-top: 1px solid var(--line-soft); }

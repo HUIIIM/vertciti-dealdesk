@@ -1028,4 +1028,7 @@ export const EN: Record<string, string> = {
   "总成本 {0}；开发收益率 {1}；施工贷峰值 {2}，资本化利息 {3}": "Total cost {0}; yield on cost {1}; peak construction loan {2}, capitalized interest {3}",
   "开发项目不用优先贷款：施工期用施工贷（在“交易与退出”里），稳定后用下方“再融资”换成长期贷款。": "Development deals use no senior loan: the construction loan (under Deal & exit) funds the build, and Refinance below takes it out with permanent debt after stabilization.",
   "多户公寓按户型建模：请在“租金表”页的户型表里按户型填户数与租金，PDF 里的租约行不能直接加入": "Multifamily is modeled by unit type: enter unit counts and rents in the unit mix on the Rent roll tab. Lease rows from the PDF can't be added directly",
+  "高危": "High",
+  "中危": "Medium",
+  "未设淘汰条件": "No kill criteria",
 };
