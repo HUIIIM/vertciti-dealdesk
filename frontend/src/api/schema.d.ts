@@ -116,6 +116,52 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v2/cre/example": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Institutional Example
+         * @description 示例输入（演示数字）。
+         *
+         *     office = 郊区办公楼（含空置、基年租约、即将到期租约、浮动利率带上限、两档瀑布）；
+         *     multifamily = 240 户花园式公寓（loss-to-lease、翻新 120 户、固定利率、一档瀑布）。
+         */
+        get: operations["institutional_example_api_v2_cre_example_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/cre/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Institutional
+         * @description 机构级引擎的完整结果（逐月 / 逐年 / 租期段 / 瀑布）；工作台试算走 POST /model/institutional（统一指标口径）。
+         *
+         *     逐租约按月现金流、到期续租（MLA 加权）、TI / LC、费用回收、一般空置抵减周转空置、
+         *     固定 / 浮动债务（含利率上限）、按下一年 NOI 退出、有杠杆 / 无杠杆收益与 GP / LP 瀑布。
+         */
+        post: operations["institutional_api_v2_cre_run_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v2/deals": {
         parameters: {
             query?: never;
@@ -1469,7 +1515,7 @@ export interface components {
              * Track
              * @enum {string}
              */
-            track: "residential" | "commercial";
+            track: "residential" | "commercial" | "institutional";
         };
         /** DealListItem */
         DealListItem: {
@@ -1513,7 +1559,7 @@ export interface components {
              * Track
              * @enum {string}
              */
-            track: "residential" | "commercial";
+            track: "residential" | "commercial" | "institutional";
             /** Updated At */
             updated_at: string;
         } & {
@@ -1551,7 +1597,7 @@ export interface components {
              * Track
              * @enum {string}
              */
-            track: "residential" | "commercial";
+            track: "residential" | "commercial" | "institutional";
             /** Updated At */
             updated_at: string;
         } & {
@@ -1791,7 +1837,7 @@ export interface components {
              * Track
              * @enum {string}
              */
-            track: "residential" | "commercial";
+            track: "residential" | "commercial" | "institutional";
         } & {
             [key: string]: unknown;
         };
@@ -1919,6 +1965,48 @@ export interface components {
         } & {
             [key: string]: unknown;
         };
+        /**
+         * InstitutionalOut
+         * @description 逐租约按月引擎的结果：metrics 主指标；annual / monthly 为逐期现金流科目；rent_roll 含到期续上的假设段。
+         */
+        InstitutionalOut: {
+            /** Annual */
+            annual: {
+                [key: string]: number[];
+            };
+            /** Engine */
+            engine: string;
+            /** Exit */
+            exit: {
+                [key: string]: number;
+            };
+            /** Flows */
+            flows: {
+                [key: string]: number[];
+            };
+            /** Metrics */
+            metrics: {
+                [key: string]: number | null;
+            };
+            /** Monthly */
+            monthly: {
+                [key: string]: number[];
+            };
+            /** Rent Roll */
+            rent_roll: {
+                [key: string]: unknown;
+            }[];
+            /** Unit Mix */
+            unit_mix?: {
+                [key: string]: unknown;
+            }[] | null;
+            /** Waterfall */
+            waterfall: {
+                [key: string]: unknown;
+            } | null;
+        } & {
+            [key: string]: unknown;
+        };
         /** KillCriterion */
         KillCriterion: {
             /** Metric */
@@ -1994,7 +2082,7 @@ export interface components {
              * Track
              * @enum {string}
              */
-            track: "residential" | "commercial";
+            track: "residential" | "commercial" | "institutional";
             /** Updated At */
             updated_at: number | null;
         } & {
@@ -2097,7 +2185,7 @@ export interface components {
              * Track
              * @enum {string}
              */
-            track: "residential" | "commercial";
+            track: "residential" | "commercial" | "institutional";
         } & {
             [key: string]: unknown;
         };
@@ -2356,7 +2444,7 @@ export interface components {
              * Track
              * @enum {string}
              */
-            track: "residential" | "commercial";
+            track: "residential" | "commercial" | "institutional";
         };
         /** ResearchOut */
         ResearchOut: {
@@ -2374,7 +2462,7 @@ export interface components {
              * Track
              * @enum {string}
              */
-            track: "residential" | "commercial";
+            track: "residential" | "commercial" | "institutional";
         } & {
             [key: string]: unknown;
         };
@@ -3472,11 +3560,79 @@ export interface operations {
             };
         };
     };
+    institutional_example_api_v2_cre_example_get: {
+        parameters: {
+            query?: {
+                kind?: "office" | "multifamily";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    institutional_api_v2_cre_run_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstitutionalOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_deals_api_v2_deals_get: {
         parameters: {
             query?: {
                 stage?: ("sourcing" | "screening" | "underwriting" | "committee" | "diligence" | "closing" | "holding" | "passed") | null;
-                track?: ("residential" | "commercial") | null;
+                track?: ("residential" | "commercial" | "institutional") | null;
                 q?: string | null;
             };
             header?: never;
@@ -5027,7 +5183,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                track: "residential" | "commercial";
+                track: "residential" | "commercial" | "institutional";
             };
             cookie?: never;
         };

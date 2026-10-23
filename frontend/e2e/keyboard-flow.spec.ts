@@ -214,3 +214,50 @@ test("导出：真后端生成备忘录 PDF 与 Excel，浏览器真的下载到
     expect(dl.suggestedFilename()).toMatch(new RegExp(`^dealdesk_3-Export-St_\\w+_v1_\\d{8}\\.${ext}$`));
   }
 });
+
+test("机构级：真后端逐租约引擎——租金表、市场与费用、模型（逐年现金流 + 瀑布），无严重无障碍问题", async ({ page, request }) => {
+  const ex = await (await request.get("/api/v2/cre/example")).json();
+  const cat = await (await request.get("/api/v2/catalog")).json();
+  const d = await (await request.post("/api/v2/deals", { data: { name: "机构验收 · Suburban Office", track: "institutional", address: "1 Park Ave",
+    kill_criteria: cat.kill_criteria_defaults.institutional } })).json();
+  expect((await request.post(`/api/v2/deals/${d.id}/versions`, { data: { inputs: ex, label: "OM" } })).status()).toBe(201);
+  await page.goto(`/app/#/deals/${d.id}/rentroll`);
+  await expect(page.getByLabel("第 1 份租约租户")).toHaveValue("Northwind Legal");
+  await expect(page.getByRole("region", { name: "到期续租假设" })).toContainText("Contoso Health");
+  await page.getByRole("tab", { name: "市场与费用" }).click();
+  await expect(page.getByRole("heading", { name: "市场租赁假设（MLA）" })).toBeVisible();
+  await page.getByRole("tab", { name: "模型" }).click();
+  await expect(page.getByRole("heading", { name: "逐年现金流（$）" })).toBeVisible();
+  await expect(page.getByText(/LP IRR \d+\.\d+%/)).toBeVisible();
+  await page.emulateMedia({ reducedMotion: "reduce" });             // 入场动画中途的半透明文字会被误判对比度不足
+  await page.waitForTimeout(300);
+  const r = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa"]).analyze();
+  const bad = r.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
+  expect(bad.map((v) => `${v.id}: ${v.nodes.slice(0, 2).map((n) => n.target.join(" ")).join(" | ")}`)).toEqual([]);
+});
+
+test("机构级多户公寓：真后端按户型引擎——户型表、收入与费用、模型、导出，无严重无障碍问题", async ({ page, request }) => {
+  const ex = await (await request.get("/api/v2/cre/example?kind=multifamily")).json();
+  const cat = await (await request.get("/api/v2/catalog")).json();
+  const d = await (await request.post("/api/v2/deals", { data: { name: "机构验收 · Garden Apartments", track: "institutional", address: "2 Oak Ln",
+    kill_criteria: cat.kill_criteria_defaults.institutional } })).json();
+  expect((await request.post(`/api/v2/deals/${d.id}/versions`, { data: { inputs: ex, label: "OM" } })).status()).toBe(201);
+  await page.goto(`/app/#/deals/${d.id}/rentroll`);
+  await expect(page.getByLabel("第 1 个户型名称")).toHaveValue("1B1B");
+  await expect(page.getByText(/持有期翻新支出 \$1,440,000/)).toBeVisible();
+  await page.getByRole("tab", { name: "市场与费用" }).click();
+  await expect(page.getByRole("heading", { name: "翻新计划" })).toBeVisible();
+  await page.getByRole("tab", { name: "模型" }).click();
+  await expect(page.getByRole("cell", { name: "Loss-to-lease" })).toBeVisible();
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.waitForTimeout(300);
+  const r = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa"]).analyze();
+  const bad = r.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
+  expect(bad.map((v) => `${v.id}: ${v.nodes.slice(0, 2).map((n) => n.target.join(" ")).join(" | ")}`)).toEqual([]);
+  await page.goto(`/app/#/deals/${d.id}`);
+  const card = page.getByRole("region", { name: "导出" });
+  for (const [name, ext] of [["机构投委会备忘录 PDF", "pdf"], ["承销模型 Excel（带公式）", "xlsx"]] as const) {
+    const [dl] = await Promise.all([page.waitForEvent("download"), card.getByRole("button", { name }).click()]);
+    expect(dl.suggestedFilename()).toMatch(new RegExp(`\\.${ext}$`));
+  }
+});

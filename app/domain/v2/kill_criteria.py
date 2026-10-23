@@ -22,6 +22,12 @@ DEFAULT_COMMERCIAL = [
     {"metric": "dscr", "op": "<", "threshold": 1.25},
     {"metric": "irr_pct", "op": "<", "threshold": 12.0},
 ]
+# 机构默认：贷款条款看最差年 DSCR、有杠杆 IRR 门槛、债务收益率（贷方常用 8–10%）
+DEFAULT_INSTITUTIONAL = [
+    {"metric": "dscr", "op": "<", "threshold": 1.25},
+    {"metric": "irr_pct", "op": "<", "threshold": 12.0},
+    {"metric": "debt_yield_pct", "op": "<", "threshold": 8.0},
+]
 DEFAULT_RESIDENTIAL = [
     {"metric": "dscr", "op": "<", "threshold": 1.2},
     {"metric": "annual_cash_flow", "op": "<", "threshold": 0.0},

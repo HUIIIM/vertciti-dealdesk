@@ -6,7 +6,7 @@ from typing import Annotated, Any, Literal, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-Track = Literal["residential", "commercial"]
+Track = Literal["residential", "commercial", "institutional"]
 Stage = Literal["sourcing", "screening", "underwriting", "committee", "diligence", "closing", "holding", "passed"]
 
 
@@ -862,3 +862,18 @@ class LegacyImportOut(Out):
     deal: DealOut
     version: VersionOut | None
     warning: str
+
+
+# ---------------------------------------------------------------- 机构级承销引擎
+class InstitutionalOut(Out):
+    """逐租约按月引擎的结果：metrics 主指标；annual / monthly 为逐期现金流科目；rent_roll 含到期续上的假设段。"""
+
+    engine: str
+    metrics: dict[str, float | None]
+    annual: dict[str, list[float]]
+    monthly: dict[str, list[float]]
+    flows: dict[str, list[float]]
+    exit: dict[str, float]
+    rent_roll: list[dict[str, Any]]
+    unit_mix: list[dict[str, Any]] | None = None
+    waterfall: dict[str, Any] | None

@@ -39,6 +39,11 @@ def underwritten_series(track: str, outputs: JSON) -> dict[int, JSON]:
             out[y] = {"noi": None if noi1 is None else noi1 * (1 + g) ** (y - 1),
                       "cash_flow": cfs[y] if y < len(cfs) - 1 else None}
         return out
+    if track == "institutional":  # 逐租约引擎本身就给逐年 NOI 与有杠杆现金流
+        ann = ((outputs.get("detail") or {}).get("cre") or {}).get("annual") or {}
+        noi, cf = ann.get("noi") or [], ann.get("cf_after_debt") or []
+        hold = len(noi) - 1  # 引擎多算一年（退出用下一年 NOI）
+        return {y: {"noi": noi[y - 1], "cash_flow": cf[y - 1] if y < hold else None} for y in range(1, hold + 1)}
     return {1: {"noi": m.get("noi"), "cash_flow": m.get("annual_cash_flow")}}
 
 

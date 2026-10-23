@@ -61,6 +61,7 @@ export function NewDeal({ onClose, onCreated }: { onClose: () => void; onCreated
       <form id="new-deal-form" onSubmit={(e) => { e.preventDefault(); void submit(); }} style={{ display: "grid", gap: 16 }}>
         <div className="seg" role="group" aria-label={T("赛道")}>
           <button type="button" aria-pressed={track === "commercial"} onClick={() => switchTrack("commercial")}>{T("商业")}</button>
+          <button type="button" aria-pressed={track === "institutional"} onClick={() => switchTrack("institutional")}>{T("机构级")}</button>
           <button type="button" aria-pressed={track === "residential"} onClick={() => switchTrack("residential")}>{T("住宅")}</button>
         </div>
         <label className="field">{T("交易名称")}<input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder={T("如 39-09 Main St")} required /></label>

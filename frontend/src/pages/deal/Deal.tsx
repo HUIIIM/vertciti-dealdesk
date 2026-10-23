@@ -8,7 +8,7 @@ import { useApi } from "@/api/useApi";
 import { useApp } from "@/app-context";
 import { passportStatus, PassportDialog } from "@/components/Passport";
 import { Dialog, ErrorBox, Kbd, Metric, MetricGrid, Skeleton, Status, useToast, type StatusKey } from "@/components/ui";
-import { blankInputs, CARD_METRICS, fieldLabel, STAGES, type Track } from "@/domain/fields";
+import { blankInputs, CARD_METRICS, fieldLabel, STAGES, trackLabel, type Track } from "@/domain/fields";
 import { fmt, fmtShort, type Unit } from "@/lib/format";
 import { useHotkeys } from "@/lib/hotkeys";
 import { useTween } from "@/lib/motion";
@@ -137,7 +137,7 @@ export function DealPage({ id, tab }: { id: number; tab: DealTab }) {
       <Prefill id={id} />
       <div className="deal-head">
         <section className={`verdict-card ${kill.triggered.length ? "risk" : kill.clear ? "ok" : ""}`} aria-label={T("结论卡")}>
-          <p className="eyebrow">{d.track === "commercial" ? T("商业") : T("住宅")} · {d.stage_label}{o.version ? T(" · 第 {0} 版", [(o.version as { version_no: number }).version_no]) : T(" · 尚未承销")}</p>
+          <p className="eyebrow">{trackLabel(d.track)} · {d.stage_label}{o.version ? T(" · 第 {0} 版", [(o.version as { version_no: number }).version_no]) : T(" · 尚未承销")}</p>
           <h1>{d.name}</h1>
           <div className="muted" style={{ fontSize: 14 }}>{d.address || T("地址未填")}</div>
           <div className="maxbid">
@@ -147,7 +147,7 @@ export function DealPage({ id, tab }: { id: number; tab: DealTab }) {
             <MaxBidInline mb={mb} hasVersion={Boolean(o.version)} dirty={dirty} />
           </div>
           <MetricGrid count={metricKeys.length} style={{ marginTop: 8 }}>
-            {metricKeys.map((k) => { const meta = catalog.metrics[k]!;
+            {metricKeys.map((k) => { const meta = catalog.metrics[k] ?? { label: k, unit: "x" };  // 目录缺项（新旧版本混跑）也不崩
               return <Metric key={k} label={meta.label} value={m[k] ?? null} unit={meta.unit as Unit} testId={`metric-${k}`}
                 note={dirty ? T("草稿重算") : undefined} onOpen={() => setPassport({ path: `metric:${k}`, label: meta.label })} />; })}
           </MetricGrid>
@@ -181,7 +181,7 @@ export function DealPage({ id, tab }: { id: number; tab: DealTab }) {
       </div>
       <nav className="tabs" role="tablist" aria-label={T("交易标签页")}>
         {DEAL_TABS.map(([k, l], i) => <a key={k} role="tab" aria-selected={tab === k} href={k === "overview" ? `#/deals/${id}` : `#/deals/${id}/${k}`}
-          title={T("快捷键 {0}", [(i + 1) % 10])}>{l}</a>)}
+          title={T("快捷键 {0}", [(i + 1) % 10])}>{track === "institutional" && k === "t12" ? T("市场与费用") : l}</a>)}
       </nav>
       <div role="tabpanel" aria-label={DEAL_TABS.find(([k]) => k === tab)?.[1]}>
         <Suspense fallback={<Skeleton rows={5} h={28} />}>
@@ -301,7 +301,7 @@ export function PriceLadder({ mb, dealId, track }: { mb: MaxBid; dealId: number;
           </span>
           {shown?.err ? <span className="neg">{shown.err}</span> : null}
           {shown?.out ? (<>
-            <span className="row" style={{ gap: 12 }}>{CARD_METRICS[track].map((k) => { const meta = catalog.metrics[k]!;
+            <span className="row" style={{ gap: 12 }}>{CARD_METRICS[track].map((k) => { const meta = catalog.metrics[k] ?? { label: k, unit: "x" };
               return <span key={k}><span className="muted">{meta.label}</span> <strong className="num">{fmt(shown.out!.metrics[k] ?? null, meta.unit as Unit)}</strong></span>; })}</span>
             <span className="row" style={{ gap: 6 }}>{shown.out.kill.items.map((k, i) => <Status key={i} s={k.state === "triggered" ? "risk" : k.state === "unknown" ? "building" : "verified"}>
               {k.state === "triggered" ? T("触发") : k.state === "unknown" ? T("未知") : T("通过")} · {passText(k, catalog)}</Status>)}</span>

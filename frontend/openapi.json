@@ -1129,7 +1129,8 @@
      "track": {
       "enum": [
        "residential",
-       "commercial"
+       "commercial",
+       "institutional"
       ],
       "title": "Track",
       "type": "string"
@@ -1238,7 +1239,8 @@
      "track": {
       "enum": [
        "residential",
-       "commercial"
+       "commercial",
+       "institutional"
       ],
       "title": "Track",
       "type": "string"
@@ -1345,7 +1347,8 @@
      "track": {
       "enum": [
        "residential",
-       "commercial"
+       "commercial",
+       "institutional"
       ],
       "title": "Track",
       "type": "string"
@@ -1977,7 +1980,8 @@
      "track": {
       "enum": [
        "residential",
-       "commercial"
+       "commercial",
+       "institutional"
       ],
       "title": "Track",
       "type": "string"
@@ -2307,6 +2311,114 @@
     "title": "HoldingOut",
     "type": "object"
    },
+   "InstitutionalOut": {
+    "additionalProperties": true,
+    "description": "逐租约按月引擎的结果：metrics 主指标；annual / monthly 为逐期现金流科目；rent_roll 含到期续上的假设段。",
+    "properties": {
+     "annual": {
+      "additionalProperties": {
+       "items": {
+        "type": "number"
+       },
+       "type": "array"
+      },
+      "title": "Annual",
+      "type": "object"
+     },
+     "engine": {
+      "title": "Engine",
+      "type": "string"
+     },
+     "exit": {
+      "additionalProperties": {
+       "type": "number"
+      },
+      "title": "Exit",
+      "type": "object"
+     },
+     "flows": {
+      "additionalProperties": {
+       "items": {
+        "type": "number"
+       },
+       "type": "array"
+      },
+      "title": "Flows",
+      "type": "object"
+     },
+     "metrics": {
+      "additionalProperties": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "title": "Metrics",
+      "type": "object"
+     },
+     "monthly": {
+      "additionalProperties": {
+       "items": {
+        "type": "number"
+       },
+       "type": "array"
+      },
+      "title": "Monthly",
+      "type": "object"
+     },
+     "rent_roll": {
+      "items": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "title": "Rent Roll",
+      "type": "array"
+     },
+     "unit_mix": {
+      "anyOf": [
+       {
+        "items": {
+         "additionalProperties": true,
+         "type": "object"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Unit Mix"
+     },
+     "waterfall": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Waterfall"
+     }
+    },
+    "required": [
+     "engine",
+     "metrics",
+     "annual",
+     "monthly",
+     "flows",
+     "exit",
+     "rent_roll",
+     "waterfall"
+    ],
+    "title": "InstitutionalOut",
+    "type": "object"
+   },
    "KillCriterion": {
     "additionalProperties": false,
     "properties": {
@@ -2497,7 +2609,8 @@
      "track": {
       "enum": [
        "residential",
-       "commercial"
+       "commercial",
+       "institutional"
       ],
       "title": "Track",
       "type": "string"
@@ -2759,7 +2872,8 @@
      "track": {
       "enum": [
        "residential",
-       "commercial"
+       "commercial",
+       "institutional"
       ],
       "title": "Track",
       "type": "string"
@@ -3400,7 +3514,8 @@
      "track": {
       "enum": [
        "residential",
-       "commercial"
+       "commercial",
+       "institutional"
       ],
       "title": "Track",
       "type": "string"
@@ -3445,7 +3560,8 @@
      "track": {
       "enum": [
        "residential",
-       "commercial"
+       "commercial",
+       "institutional"
       ],
       "title": "Track",
       "type": "string"
@@ -5645,6 +5761,100 @@
     ]
    }
   },
+  "/api/v2/cre/example": {
+   "get": {
+    "description": "示例输入（演示数字）。\n\noffice = 郊区办公楼（含空置、基年租约、即将到期租约、浮动利率带上限、两档瀑布）；\nmultifamily = 240 户花园式公寓（loss-to-lease、翻新 120 户、固定利率、一档瀑布）。",
+    "operationId": "institutional_example_api_v2_cre_example_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "kind",
+      "required": false,
+      "schema": {
+       "default": "office",
+       "enum": [
+        "office",
+        "multifamily"
+       ],
+       "title": "Kind",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Institutional Example Api V2 Cre Example Get",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Institutional Example",
+    "tags": [
+     "v2 · underwriting"
+    ]
+   }
+  },
+  "/api/v2/cre/run": {
+   "post": {
+    "description": "机构级引擎的完整结果（逐月 / 逐年 / 租期段 / 瀑布）；工作台试算走 POST /model/institutional（统一指标口径）。\n\n逐租约按月现金流、到期续租（MLA 加权）、TI / LC、费用回收、一般空置抵减周转空置、\n固定 / 浮动债务（含利率上限）、按下一年 NOI 退出、有杠杆 / 无杠杆收益与 GP / LP 瀑布。",
+    "operationId": "institutional_api_v2_cre_run_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "additionalProperties": true,
+        "title": "Inputs",
+        "type": "object"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/InstitutionalOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Institutional",
+    "tags": [
+     "v2 · underwriting"
+    ]
+   }
+  },
   "/api/v2/deals": {
    "get": {
     "description": "流水线：全部交易（含当前版本标准指标与淘汰条件状态），看板与表格两种视图共用。",
@@ -5685,7 +5895,8 @@
         {
          "enum": [
           "residential",
-          "commercial"
+          "commercial",
+          "institutional"
          ],
          "type": "string"
         },
@@ -8047,7 +8258,8 @@
       "schema": {
        "enum": [
         "residential",
-        "commercial"
+        "commercial",
+        "institutional"
        ],
        "title": "Track",
        "type": "string"

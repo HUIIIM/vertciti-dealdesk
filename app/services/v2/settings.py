@@ -21,6 +21,7 @@ KINDS = ("assumptions", "market", "kill_criteria")
 BUILTIN = {
     ("kill_criteria", "商业默认"): {"track": "commercial", "criteria": kill_criteria.DEFAULT_COMMERCIAL},
     ("kill_criteria", "住宅默认"): {"track": "residential", "criteria": kill_criteria.DEFAULT_RESIDENTIAL},
+    ("kill_criteria", "机构默认"): {"track": "institutional", "criteria": kill_criteria.DEFAULT_INSTITUTIONAL},
 }
 
 

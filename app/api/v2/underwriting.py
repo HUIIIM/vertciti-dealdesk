@@ -1,7 +1,7 @@
 """承销：模型试算、红队面板、概率加权情景、反推最高出价、淘汰条件、指标与假设目录。"""
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter
 
@@ -9,6 +9,7 @@ from app.api.v2.deps import LocalizedRoute, need
 from app.api.v2.schemas import (
     CatalogOut,
     DevilsMemoOut,
+    InstitutionalOut,
     MaxBidIn,
     MaxBidOut,
     ModelOut,
@@ -24,11 +25,36 @@ from app.api.v2.schemas import (
 from app.core.i18n import label
 from app.domain.v2 import kill_criteria, scenarios
 from app.domain.v2.assumptions import BY_TRACK
-from app.domain.v2.model import METRICS, PRIMARY_METRIC, ModelInputError, run_model
+from app.domain.v2.cre import engine as cre_engine
+from app.domain.v2.cre.example import garden_multifamily, suburban_office
+from app.domain.v2.model import METRICS, PRIMARY_METRIC, TRACKS, ModelInputError, run_model
 from app.services.v2 import analysis
 from app.services.v2.errors import InvalidInputError
 
 router = APIRouter(prefix="/api/v2", tags=["v2 · underwriting"], route_class=LocalizedRoute)
+
+
+@router.post("/cre/run", response_model=InstitutionalOut, dependencies=[need("deal.read")])
+def institutional(inputs: dict[str, Any]) -> dict[str, Any]:
+    """机构级引擎的完整结果（逐月 / 逐年 / 租期段 / 瀑布）；工作台试算走 POST /model/institutional（统一指标口径）。
+
+    逐租约按月现金流、到期续租（MLA 加权）、TI / LC、费用回收、一般空置抵减周转空置、
+    固定 / 浮动债务（含利率上限）、按下一年 NOI 退出、有杠杆 / 无杠杆收益与 GP / LP 瀑布。
+    """
+    try:
+        return cre_engine.run(inputs)
+    except cre_engine.CreInputError as e:
+        raise InvalidInputError(str(e)) from e
+
+
+@router.get("/cre/example", dependencies=[need("deal.read")])
+def institutional_example(kind: Literal["office", "multifamily"] = "office") -> dict[str, Any]:
+    """示例输入（演示数字）。
+
+    office = 郊区办公楼（含空置、基年租约、即将到期租约、浮动利率带上限、两档瀑布）；
+    multifamily = 240 户花园式公寓（loss-to-lease、翻新 120 户、固定利率、一档瀑布）。
+    """
+    return garden_multifamily() if kind == "multifamily" else suburban_office()
 
 
 @router.post("/model/{track}", response_model=ModelOut, dependencies=[need("deal.read")])
@@ -52,8 +78,9 @@ def catalog() -> dict[str, Any]:
                              "source_hint": label(a.source_hint)}
                             for a in v] for t, v in BY_TRACK.items()},
         "kill_criteria_defaults": {"commercial": kill_criteria.DEFAULT_COMMERCIAL,
-                                   "residential": kill_criteria.DEFAULT_RESIDENTIAL},
-        "scenario_defaults": {t: scenarios.default_scenarios(t) for t in ("commercial", "residential")},
+                                   "residential": kill_criteria.DEFAULT_RESIDENTIAL,
+                                   "institutional": kill_criteria.DEFAULT_INSTITUTIONAL},
+        "scenario_defaults": {t: scenarios.default_scenarios(t) for t in TRACKS},
     }
 
 

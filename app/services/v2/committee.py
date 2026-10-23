@@ -35,7 +35,9 @@ from app.services.v2.serialize import row
 
 JSON = dict[str, Any]
 CARD_KEYS = {"commercial": ["irr_pct", "cap_rate_pct", "dscr", "coc_pct", "equity_multiple", "cash_to_close"],
-             "residential": ["coc_pct", "cap_rate_pct", "dscr", "annual_cash_flow", "cash_to_close", "score"]}
+             "residential": ["coc_pct", "cap_rate_pct", "dscr", "annual_cash_flow", "cash_to_close", "score"],
+             "institutional": ["irr_pct", "unlevered_irr_pct", "cap_rate_pct", "dscr", "debt_yield_pct",
+                               "equity_multiple"]}
 
 
 def _roles(s: Session) -> dict[str, str]:

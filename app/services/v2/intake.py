@@ -29,6 +29,9 @@ _PATHS: dict[str, dict[str, str]] = {
                     "taxes_annual": "taxes_annual", "hoa_monthly": "hoa_monthly"},
     "commercial": {"asking_price": "analysis.purchase_price", "address": "property.address",
                    "year_built": "property.year_built", "taxes_annual": "historical.property_tax"},
+    # 机构级：沿用商业 PDF 提取，键映射到逐租约引擎的输入；租约表行由前端转成 leases
+    "institutional": {"asking_price": "purchase_price", "analysis.purchase_price": "purchase_price",
+                      "property.net_rentable_sf": "area_sf", "building_sf": "area_sf"},
 }
 _CONFIDENCE = {"高": "high", "中": "medium", "high": "high", "medium": "medium"}  # 其余（低 / 卖方口径）→ low
 _TEXT_PATHS = {"property.address", "property.city", "property.state", "property.zip", "property.property_type"}
@@ -89,7 +92,7 @@ def extract_document(deal_id: int, doc_id: int) -> JSON:
     try:
         with os.fdopen(fd, "wb") as f:
             f.write(data)
-        run = pdf_intake.run_commercial_pdf_upload if track == "commercial" else pdf_intake.run_pdf_upload
+        run = pdf_intake.run_pdf_upload if track == "residential" else pdf_intake.run_commercial_pdf_upload
         r = run(path, filename)
     finally:
         Path(path).unlink()

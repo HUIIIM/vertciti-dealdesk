@@ -6,6 +6,7 @@ import { useApi } from "@/api/useApi";
 import { useApp } from "@/app-context";
 import { KillEditor, type Crit } from "@/components/KillEditor";
 import { ErrorBox, Kbd, Status, useToast } from "@/components/ui";
+import { trackLabel } from "@/domain/fields";
 import { fmtDate } from "@/lib/format";
 import { GLOBAL_HELP } from "@/lib/hotkeys";
 import { navigate } from "@/lib/router";
@@ -114,7 +115,7 @@ function Legacy() {
       {list.data && list.data.length === 0 ? <p className="muted">{T("没有老版项目。")}</p> : null}
       {list.data?.length ? <div className="table-wrap" style={{ maxHeight: "none" }}><table className="t">
         <thead><tr><th scope="col">{T("名称")}</th><th scope="col">{T("赛道")}</th><th scope="col">{T("地址")}</th><th scope="col">{T("最后修改")}</th><th scope="col"><span className="sr-only">{T("操作")}</span></th></tr></thead>
-        <tbody>{list.data.map((p) => <tr key={`${p.kind}:${p.id}`}><td>{p.name || "—"}</td><td>{p.track === "commercial" ? T("商业") : T("住宅")}</td>
+        <tbody>{list.data.map((p) => <tr key={`${p.kind}:${p.id}`}><td>{p.name || "—"}</td><td>{trackLabel(p.track)}</td>
           <td>{p.address || "—"}</td><td>{p.updated_at ? fmtDate(new Date(p.updated_at * 1000).toISOString()) : "—"}</td>
           <td>{p.imported_deal_id ? <a className="btn ghost sm" href={`#/deals/${p.imported_deal_id}`}>{T("已导入 · 打开")}</a>
             : <button className="btn sm" type="button" disabled={!can("deal.write") || busy !== null} onClick={() => void imp(p)}>{busy === `${p.kind}:${p.id}` ? T("导入中…") : T("导入")}</button>}</td></tr>)}</tbody></table></div> : null}

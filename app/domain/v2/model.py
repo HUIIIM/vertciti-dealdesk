@@ -16,10 +16,11 @@ from pydantic import ValidationError
 from app.core.i18n import T
 from app.domain import scoring_residential, uw_commercial
 from app.domain.models import ResidentialInput
+from app.domain.v2.cre import engine as cre_engine
 
-Track = Literal["residential", "commercial"]
+Track = Literal["residential", "commercial", "institutional"]
 JSON = dict[str, Any]
-TRACKS: tuple[Track, ...] = ("residential", "commercial")
+TRACKS: tuple[Track, ...] = ("residential", "commercial", "institutional")
 
 
 @dataclass(frozen=True)
@@ -44,12 +45,16 @@ METRICS: dict[str, Metric] = {m.key: m for m in (
     Metric("ltv_pct", "LTV", "LTV", "pct", "lower"),
     Metric("breakeven_occupancy_pct", "盈亏平衡出租率", "Breakeven occupancy", "pct", "lower"),
     Metric("score", "deal 评分", "Deal score", "pts", "higher"),
+    Metric("unlevered_irr_pct", "无杠杆 IRR", "Unlevered IRR", "pct", "higher"),
+    Metric("debt_yield_pct", "债务收益率", "Debt yield", "pct", "higher"),
+    Metric("avg_occupancy_pct", "平均出租率", "Average occupancy", "pct", "higher"),
 )}
 
 # 每条赛道的“主回报指标”：红队面板、情景加权、事后归因都围绕它
-PRIMARY_METRIC: dict[Track, str] = {"commercial": "irr_pct", "residential": "coc_pct"}
+PRIMARY_METRIC: dict[Track, str] = {"commercial": "irr_pct", "residential": "coc_pct", "institutional": "irr_pct"}
 # 价格所在路径（反推最高出价时改这里）
-PRICE_PATH: dict[Track, str] = {"commercial": "analysis.purchase_price", "residential": "price"}
+PRICE_PATH: dict[Track, str] = {"commercial": "analysis.purchase_price", "residential": "price",
+                                "institutional": "purchase_price"}
 _STRIP = ("name", "address")
 
 
@@ -127,14 +132,35 @@ def _commercial(inputs: JSON) -> tuple[JSON, JSON]:
     return metrics, {"compute": r}
 
 
+def _institutional(inputs: JSON) -> tuple[JSON, JSON]:
+    """机构级引擎（逐租约按月）：主指标取有杠杆 IRR；DSCR 取持有期最小值（贷款条款看最差年）。"""
+    clean = {k: v for k, v in (inputs or {}).items() if k not in _STRIP}
+    try:
+        r = cre_engine.run(clean)
+    except cre_engine.CreInputError as e:
+        raise ModelInputError(T("机构级承销输入校验失败：{0}", str(e))) from e
+    m, a = r["metrics"], r["annual"]
+    metrics: JSON = {
+        "price": float(clean["purchase_price"]), "noi": a["noi"][0], "cap_rate_pct": m["going_in_cap_pct"],
+        "dscr": m["dscr_min"], "irr_pct": m["levered_irr_pct"], "coc_pct": m["cash_on_cash_year1_pct"],
+        "equity_multiple": m["levered_multiple"], "annual_cash_flow": a["cf_after_debt"][0],
+        "cash_to_close": m["equity"], "ltv_pct": m["ltv_pct"], "breakeven_occupancy_pct": None, "score": None,
+        "unlevered_irr_pct": m["unlevered_irr_pct"], "debt_yield_pct": m["debt_yield_pct"],
+        "avg_occupancy_pct": m["avg_occupancy_pct"],
+    }
+    return metrics, {"cre": r}
+
+
 def run_model(track: str, inputs: JSON) -> JSON:
     """跑一次模型 → {"track", "metrics", "detail"}。坏输入抛 ModelInputError。"""
     if track == "residential":
         metrics, detail = _residential(inputs)
     elif track == "commercial":
         metrics, detail = _commercial(inputs)
+    elif track == "institutional":
+        metrics, detail = _institutional(inputs)
     else:
-        raise ModelInputError(T("未知赛道：{0!r}（只支持 residential / commercial）", track))
+        raise ModelInputError(T("未知赛道：{0!r}（只支持 residential / commercial / institutional）", track))
     return {"track": track, "metrics": metrics, "detail": detail}
 
 

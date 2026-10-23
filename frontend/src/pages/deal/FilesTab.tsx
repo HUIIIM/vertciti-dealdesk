@@ -12,6 +12,7 @@ import { fieldLabel } from "@/domain/fields";
 import { fmtDate } from "@/lib/format";
 import { useAdopt } from "./adopt";
 import { useDeal } from "./Deal";
+import { tenantsToLeases } from "./InstTabs";
 
 export function FilesTab() {
   const { id, track, draft, set, passports, openPassport, reload } = useDeal();
@@ -39,6 +40,11 @@ export function FilesTab() {
     catch (e) { toast.err(e); } finally { setExtracting(null); }
   };
   const adoptTenants = (rows: Extract["tenants"]) => {
+    if (track === "institutional") {  // 机构级：转成逐份租约；起止日期只是按新租期估的，必须核对
+      set("leases", [...((draft.leases as unknown[] | undefined) ?? []), ...tenantsToLeases(rows, draft)]);
+      toast.ok(T("已加入 {0} 份租约草稿：起止日期是估的，务必按租约原件改", [rows.length]));
+      return;
+    }
     const cur = (draft.tenants as unknown[] | undefined) ?? [];
     set("tenants", [...cur, ...rows.map((t) => ({ suite: t.suite ?? "", tenant: t.tenant ?? "", sf: t.sf ?? 0, monthly_rent: t.monthly_rent ?? 0 }))]);
     toast.ok(T("已加入 {0} 个租户到租金表草稿：记得核对并保存一版", [rows.length]));
@@ -58,7 +64,7 @@ export function FilesTab() {
           <button className="btn ghost sm" type="button" onClick={() => setEx(null)}>{T("关闭")}</button></div>
         <p className="sub">{ex.notice}</p>
         <Candidates key={ex.document_id} items={ex.candidates} onAdopt={(c) => void adopt(c, ex.document_id).then(() => setEx(null))} />
-        {track === "commercial" && ex.tenants.length ? <div style={{ marginTop: 16 }}>
+        {track !== "residential" && ex.tenants.length ? <div style={{ marginTop: 16 }}>
           <h3 style={{ fontSize: 15 }}>{T("租约表行（{0}）", [ex.tenants.length])}</h3>
           <ul className="checks">{ex.tenants.slice(0, 8).map((t, i) => <li key={i}><span className="chip">{t.suite}</span>
             <span>{t.tenant}<div className="d">{t.sf ?? "—"} SF · ${t.monthly_rent ?? "—"}{T("/月")}{t.page ? ` · p.${t.page}` : ""}</div></span></li>)}</ul>

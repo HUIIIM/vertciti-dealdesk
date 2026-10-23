@@ -122,7 +122,7 @@ def test_english_requests_have_no_chinese_in_system_text(client):
     # 内置模板的 name 是标识（保存时按它匹配），显示用 label——已是英文
     leaks = [x for x in leaks if not re.search(r"/settings/templates \[\d+\]\.name=", x)]
     tpl = client.get("/api/v2/settings/templates", headers=en).json()
-    assert {t["label"] for t in tpl if t["builtin"]} == {"Commercial default", "Residential default"}
+    assert {t["label"] for t in tpl if t["builtin"]} == {"Commercial default", "Residential default", "Institutional default"}
     assert not leaks, "\n".join(leaks[:30])
 
 

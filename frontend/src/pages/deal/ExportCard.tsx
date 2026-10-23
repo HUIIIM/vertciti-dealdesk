@@ -1,4 +1,5 @@
-// 导出（老版功能）：按当前承销版本生成投资备忘录 PDF、核保明细 Excel；商业另有一页纸与经典核保报告。
+// 导出（老版功能）：按当前承销版本生成投资备忘录 PDF、核保明细 Excel；商业另有一页纸与经典核保报告；
+// 机构级导出机构投委会备忘录与带公式的承销模型 Excel。
 import { T } from "@/i18n";
 import { useState } from "react";
 import { raw } from "@/api/client";
@@ -12,8 +13,10 @@ export function ExportCard() {
   const { id, track, ov } = useDeal();
   const toast = useToast();
   const [busy, setBusy] = useState<Kind | null>(null);
-  const kinds: [Kind, string][] = [["memo", T("投资备忘录 PDF")], ["model", T("核保明细 Excel")],
-    ...(track === "commercial" ? [["tearsheet", T("一页纸 Tear Sheet")], ["report", T("经典核保报告 PDF")]] as [Kind, string][] : [])];
+  const kinds: [Kind, string][] = track === "institutional"
+    ? [["memo", T("机构投委会备忘录 PDF")], ["model", T("承销模型 Excel（带公式）")]]
+    : [["memo", T("投资备忘录 PDF")], ["model", T("核保明细 Excel")],
+      ...(track === "commercial" ? [["tearsheet", T("一页纸 Tear Sheet")], ["report", T("经典核保报告 PDF")]] as [Kind, string][] : [])];
   const go = async (k: Kind) => {
     setBusy(k);
     try { const name = await saveResponse(await raw(`/api/v2/deals/${id}/export/${k}`), `dealdesk-${id}-${k}`); toast.ok(T("已导出：{0}", [name])); }
@@ -26,6 +29,7 @@ export function ExportCard() {
       <div className="row">{kinds.map(([k, l]) => (
         <button key={k} className={k === "memo" ? "btn primary" : "btn"} type="button" disabled={!ov.version || busy !== null} onClick={() => void go(k)}>
           {busy === k ? T("生成中…") : l}</button>))}</div>
+      {track === "institutional" && <p className="muted">{T("Excel 里蓝字为可改输入（收购价、交割成本、退出资本化率、卖方成本、折现率），售价、现金流、IRR 随之重算；物业层逐租约测算与贷款计划为引擎值。")}</p>}
     </section>
   );
 }
