@@ -179,10 +179,12 @@ describe("设置与外观", () => {
     override("GET /api/v2/admin/users", 200, []);
     override("POST /api/v2/admin/users", 201, { id: 1, username: "ana", display_name: "Ana", role: "analyst", active: true, token: "dd_secret", note: "" });
     at("#/settings/users");
-    await heading("创建用户");
+    await heading("邀请用户");
+    await userEvent.type(screen.getByLabelText("Google 邮箱"), "ana@gmail.com");
     await userEvent.type(screen.getByLabelText("用户名"), "ana");
-    await userEvent.click(screen.getByRole("button", { name: "创建并生成令牌" }));
+    await userEvent.click(screen.getByRole("button", { name: "邀请" }));
     expect(await screen.findByText("dd_secret")).toBeInTheDocument();
+    expect(posted("/api/v2/admin/users")[0]?.body).toMatchObject({ username: "ana", email: "ana@gmail.com", role: "analyst" });
     await act(async () => { window.location.hash = "#/settings/templates"; window.dispatchEvent(new HashChangeEvent("hashchange")); });
     await userEvent.click(await screen.findByRole("button", { name: "保存模板" }));
     await waitFor(() => expect(posted("/api/v2/settings/templates")).toHaveLength(1));
@@ -212,6 +214,43 @@ describe("设置与外观", () => {
     await userEvent.click(within(input.closest("form")!).getByRole("button", { name: "进入" }));
     expect(sessionStorage.getItem("dd.token")).toBe("dd_tok");
   });
+  it("Google 登录：登录页给 Google 按钮；回跳 #auth= 存会话令牌并抹掉地址栏；#auth_error= 显示原因", async () => {
+    override("GET /api/v2/me", 200, { username: "anonymous", role: "viewer", role_label: "只读", display_name: "匿名", auth: true, permissions: [] });
+    override("GET /api/v2/auth/providers", 200, { google: true });
+    window.location.hash = "#auth_error=not_invited";
+    render(<ToastHost><App /></ToastHost>);
+    expect(await screen.findByRole("alert")).toHaveTextContent("还没有被邀请");
+    expect(await screen.findByRole("link", { name: "使用 Google 账号登录" })).toHaveAttribute("href", "/api/v2/auth/google/start");
+    expect(window.location.hash).toBe("#/");
+    const { consumeAuthFragment, getToken, setToken } = await import("@/api/client");
+    window.location.hash = "#auth=dds_abc";
+    expect(consumeAuthFragment()).toBeNull();
+    expect(localStorage.getItem("dd.token")).toBe("dds_abc");
+    expect(getToken()).toBe("dds_abc");
+    expect(window.location.hash).toBe("#/");
+    window.location.hash = "#/deals/1";
+    expect(consumeAuthFragment()).toBeNull();
+    setToken(null);
+    expect(getToken()).toBeNull();
+  });
+  it("设置 · 用户：改邮箱、停用别人；自己不出现停用按钮", async () => {
+    override("GET /api/v2/admin/users", 200, [
+      { id: 1, username: "local", display_name: "本机", role: "chairman", active: true, email: null },
+      { id: 2, username: "pat", display_name: "Pat", role: "analyst", active: true, email: "pat@g.com" }]);
+    override("PATCH /api/v2/admin/users/pat", 200, { id: 2, username: "pat", display_name: "Pat", role: "analyst", active: false, email: "p2@g.com" });
+    at("#/settings/users");
+    const box = await screen.findByLabelText("pat 的 Google 邮箱");
+    await userEvent.clear(box);
+    await userEvent.type(box, "p2@g.com");
+    const row = box.closest("li")!;
+    await userEvent.click(within(row).getByRole("button", { name: "保存邮箱" }));
+    await userEvent.click(within(row).getByRole("button", { name: "停用" }));
+    await waitFor(() => expect(posted("/api/v2/admin/users/pat")).toHaveLength(2));
+    expect(posted("/api/v2/admin/users/pat")[0]?.body).toEqual({ email: "p2@g.com" });
+    expect(posted("/api/v2/admin/users/pat")[1]?.body).toEqual({ active: false });
+    const me = (await screen.findByLabelText("local 的 Google 邮箱")).closest("li")!;
+    expect(within(me).queryByRole("button", { name: "停用" })).toBeNull();
+  });
 });
 
 describe("投委会阶段投票", () => {
@@ -236,5 +275,59 @@ describe("流水线淘汰条件标签", () => {
     expect(killText({ ...base, current_version_id: 3 })).toBe("未设淘汰条件");
     expect(killText({ ...base, current_version_id: null })).toBe("未承销");
     expect(killText({ ...base, current_version_id: 3, kill: { triggered: [{}], unknown: [], clear: false } } as never)).toBe("触发淘汰");
+  });
+});
+
+describe("后台操作台", () => {
+  it("系统：版本、数据库、认证、Google 登录、运行时长、最近错误", async () => {
+    override("GET /api/v2/admin/errors", 200, [{ at: "2026-10-23T01:00:00Z", request_id: "abcdef123456", path: "/api/v2/deals/9", method: "GET", error: "KeyError: 'x'" }]);
+    at("#/settings/system");
+    const status = await screen.findByRole("region", { name: "运行状态" });
+    expect(await within(status).findByText("2.0.0")).toBeInTheDocument();
+    expect(within(status).getByText(/sqlite · 迁移版本 0002/)).toBeInTheDocument();
+    expect(within(status).getByText("本机模式")).toBeInTheDocument();
+    expect(within(status).getByText("5 分钟")).toBeInTheDocument();
+    const errs = screen.getByRole("region", { name: "最近的服务器错误" });
+    expect(await within(errs).findByText("KeyError: 'x'")).toBeInTheDocument();
+    expect(within(errs).getByText("abcdef12")).toBeInTheDocument();
+  });
+  it("审计日志：列出改前 → 改后，按对象类型重新查询、按操作人筛", async () => {
+    override("GET /api/v2/admin/audit", 200, [
+      { id: 2, entity: "user", entity_id: "3", action: "update", actor: "owner", before: { email: null, role: "viewer" }, after: { email: "p@g.com", role: "viewer" }, request_id: "r2", at: "2026-10-23T02:00:00Z" },
+      { id: 1, entity: "deal", entity_id: "1", action: "create", actor: "pat", before: null, after: { name: "A" }, request_id: "r1", at: "2026-10-23T01:00:00Z" }]);
+    at("#/settings/audit");
+    expect(await screen.findByText("email: — → p@g.com")).toBeInTheDocument();
+    expect(screen.queryByText(/role:/)).toBeNull();                      // 没变的字段不列
+    await userEvent.type(screen.getByLabelText("操作人"), "pat");
+    expect(screen.queryByText("email: — → p@g.com")).toBeNull();
+    expect(screen.getByText("共 1 条（最近 500 条内）")).toBeInTheDocument();
+    await userEvent.selectOptions(screen.getByLabelText("对象类型"), "user");
+    await waitFor(() => expect(calls.some((c) => c.path.startsWith("/api/v2/admin/audit") && c.path.includes("entity=user"))).toBe(true));
+  });
+  it("changes()：非对象整体显示、两边都空不列", async () => {
+    const { changes } = await import("@/pages/Settings");
+    expect(changes(null, null)).toEqual([]);
+    expect(changes(null, "x")).toEqual(["x"]);
+    expect(changes("a", "b")).toEqual(["a → b"]);
+    expect(changes({ a: 1, b: [1] }, { a: 1, b: [2], c: "" })).toEqual(["b: [1] → [2]"]);
+  });
+  it("新建机构级交易可从示例开始：建交易后直接存第一版承销，名称与要价按示例带出", async () => {
+    const fx = (await import("@/test/fixtures.json")).default as unknown as Record<string, [number, { kill_criteria_defaults: Record<string, unknown> }]>;
+    const cat = structuredClone(fx["GET /api/v2/catalog"]![1]);
+    cat.kill_criteria_defaults.institutional = [{ metric: "dscr", op: "<", threshold: 1.25 }];
+    override("GET /api/v2/catalog", 200, cat);
+    override("GET /api/v2/cre/example?kind=multifamily", 200, { purchase_price: 48000000, hold_years: 5 });
+    override("POST /api/v2/deals", 201, { id: 1, name: "示例：多户公寓", track: "institutional" });
+    override("POST /api/v2/deals/1/versions", 201, { id: 9, version_no: 1 });
+    at("#/");
+    await screen.findByText("4 笔交易");
+    await userEvent.click(screen.getAllByRole("button", { name: /新建交易/ })[0]!);
+    const dlg = await screen.findByRole("dialog", { name: "新建交易" });
+    await userEvent.click(within(dlg).getByRole("button", { name: "机构级" }));
+    await userEvent.click(within(dlg).getByRole("button", { name: "示例：多户公寓" }));
+    await userEvent.click(within(dlg).getByRole("button", { name: "创建并开始承销" }));
+    await waitFor(() => expect(posted("/api/v2/deals/1/versions")).toHaveLength(1));
+    expect(posted("/api/v2/deals")[0]?.body).toMatchObject({ name: "示例：多户公寓", track: "institutional", asking_price: 48000000 });
+    expect(posted("/api/v2/deals/1/versions")[0]?.body).toMatchObject({ inputs: { purchase_price: 48000000 }, label: "示例数据" });
   });
 });

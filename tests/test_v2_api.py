@@ -210,7 +210,7 @@ def test_documents_and_compare(client):
 def test_health_catalog_and_templates(client):
     c = client
     h = c.get("/api/v2/health").json()
-    assert h["ok"] and h["db"]["revision"] == "0002" and h["engine_version"].startswith("2.1.0+")
+    assert h["ok"] and h["db"]["revision"] == "0003" and h["engine_version"].startswith("2.1.0+")
     cat = c.get("/api/v2/catalog").json()
     assert cat["primary_metric"]["commercial"] == "irr_pct" and "rent_level" in str(cat["assumptions"])
     t = c.get("/api/v2/settings/templates", params={"kind": "kill_criteria"}).json()
@@ -220,7 +220,7 @@ def test_health_catalog_and_templates(client):
                                                                                "threshold": 1.4}]}}).status_code == 200
     v = c.put("/api/v2/settings/views", json={"name": "只看商业", "config": {"track": "commercial"}}).json()
     assert c.delete(f"/api/v2/settings/views/{v['id']}").status_code == 204
-    assert len(c.get("/api/v2/settings/data-sources").json()) == 5
+    assert len(c.get("/api/v2/settings/data-sources").json()) == 6
 
 
 def test_health_does_not_leak_db_error_text(client, monkeypatch):
