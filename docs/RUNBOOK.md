@@ -36,6 +36,10 @@ python -m app.core.security add-user miao chairman "苗总"   # 打印一次性 
 角色：`chairman` 董事长（付款审批、归档、用户管理）· `analyst` 分析 · `viewer` 只读。
 任何人不能审批自己发起的申请。令牌只存 sha256；丢了就新建用户 / 重新发放，无法找回。
 
+### Google 登录
+配置步骤、邀请与撤销：见 [GOOGLE-LOGIN.md](GOOGLE-LOGIN.md)。登录失败时登录页会写明原因（未被邀请 / 未配置 / 没有完成）；
+服务端日志 `dealdesk.auth` 只记 `google sign-in refused` 与原因代码（成功时记用户名），不记邮箱、不记令牌。
+
 ## 4. 排障
 
 1. 用户报错时让对方给出界面上的**请求编号**（响应头 `X-Request-ID`）。

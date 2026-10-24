@@ -95,6 +95,18 @@ class User(AuditMixin, Base):
     role: Mapped[str] = mapped_column(String(20), nullable=False)  # chairman | analyst | viewer
     token_sha256: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    # Google 登录：董事长邀请时填的邮箱（小写）；只有登记过邮箱的人能用 Google 登录（邀请制，无公开注册）
+    email: Mapped[str | None] = mapped_column(String(254), unique=True, nullable=True)
+
+
+class UserSession(AuditMixin, Base):
+    """Google 登录换来的会话令牌：只存 sha256，到期作废；与用户的长期访问令牌互不影响。"""
+
+    __tablename__ = "user_sessions"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    token_sha256: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    username: Mapped[str] = mapped_column(String(80), index=True, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
 # ---------------------------------------------------------------- v2：交易与生命周期
