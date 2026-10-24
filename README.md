@@ -9,7 +9,7 @@ built by [vertciti](https://vertciti.com).
 
 | | |
 |---|---|
-| Status | Production: **v2.0.0** (`/api/v2/health`, checked 2026-10-23). Next release: **2.1.0** — institutional underwriting engine cre-1.0, Google sign-in (invitation only) and the admin console; merged, awaiting deployment ([CHANGELOG](CHANGELOG.md)) |
+| Status | Production: **v2.0.0** (`/api/v2/health`, checked 2026-10-23). Next release: **2.1.0** — institutional underwriting engine cre-1.0; merged, awaiting deployment ([CHANGELOG](CHANGELOG.md)) |
 | Quality gates | CI on every PR: pytest (≥85% coverage, v1 golden master), ruff, mypy strict, Postgres suite, frontend typecheck / lint / unit tests, Playwright E2E with axe, CodeQL, dependency review, pip-audit / npm audit, gitleaks, OpenSSF Scorecard |
 | Deployment | Self-hosted: Python 3.10+, SQLite by default, Postgres via `DATABASE_URL`; production instance on Vercel |
 | Live instance | [vertciti-dealdesk.vercel.app](https://vertciti-dealdesk.vercel.app/app/) — the founder's production workbench; sign-in is for the operator and invited friends only, with no public sign-up. |
@@ -147,7 +147,7 @@ Layering, reproducibility and other decisions are recorded in [docs/adr/](docs/a
 DealDesk is vertciti's working showcase, run in production at
 [vertciti-dealdesk.vercel.app](https://vertciti-dealdesk.vercel.app/app/).
 
-- Production runs **2.0.0**. The institutional track, Google sign-in and the admin console (**2.1.0**) are merged and awaiting deployment.
+- Production runs **2.0.0**. The institutional track (**2.1.0**) is merged and awaiting deployment.
 - Institutional exports (Excel model, committee memo) are Chinese only; the UI and API are bilingual.
 - Institutional scope (cre-1.0) excludes CPI escalations, percentage rent, expense caps, European waterfalls,
   multiple refinancings and mezzanine PIK — full list in the [methodology](docs/INSTITUTIONAL-ENGINE.md).
