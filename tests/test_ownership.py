@@ -3,6 +3,8 @@
 覆盖：名称分类 / NY DOS 查询（mock）/ 建树全链路 / 降级路径 /
 待验证标注 / 联系方式只走 verified / 端点编排。
 """
+import json
+
 import pytest
 
 from app import ownership
@@ -67,9 +69,26 @@ _DOS_ROW = {
 
 
 class _FakeResp:
+    """httpx.stream 替身（台账第 25 项：NY DOS 改走 http_capped 流式上限）。"""
+
     def __init__(self, status_code, payload):
         self.status_code = status_code
+        self.headers = {}
+        self.encoding = "utf-8"
         self._payload = payload
+        if isinstance(payload, Exception):
+            self._body = b"not-json"
+        else:
+            self._body = json.dumps(payload).encode()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def iter_bytes(self, chunk_size=65536):
+        yield self._body
 
     def json(self):
         if isinstance(self._payload, Exception):
@@ -78,10 +97,10 @@ class _FakeResp:
 
 
 def _mock_dos(monkeypatch, rows):
-    def _fake_get(url, params=None, timeout=None, headers=None):
+    def _fake_stream(method, url, params=None, timeout=None, headers=None):
         assert "data.ny.gov" in url
         return _FakeResp(200, rows)
-    monkeypatch.setattr(ownership.httpx, "get", _fake_get)
+    monkeypatch.setattr(ownership.http_capped.httpx, "stream", _fake_stream)
 
 
 def test_query_ny_dos_ok(monkeypatch):
@@ -103,7 +122,7 @@ def test_query_ny_dos_empty(monkeypatch):
 
 
 def test_query_ny_dos_http_error(monkeypatch):
-    monkeypatch.setattr(ownership.httpx, "get",
+    monkeypatch.setattr(ownership.http_capped.httpx, "stream",
                         lambda *a, **k: _FakeResp(500, []))
     res = ownership.query_ny_dos("JC SPLENDID LLC")
     assert res["ok"] is False
@@ -113,7 +132,7 @@ def test_query_ny_dos_http_error(monkeypatch):
 def test_query_ny_dos_network_fail(monkeypatch):
     def _boom(*a, **k):
         raise ConnectionError("dns fail")
-    monkeypatch.setattr(ownership.httpx, "get", _boom)
+    monkeypatch.setattr(ownership.http_capped.httpx, "stream", _boom)
     res = ownership.query_ny_dos("JC SPLENDID LLC")
     assert res["ok"] is False
     assert "网络/超时" in res["note"]

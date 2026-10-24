@@ -339,20 +339,30 @@ def test_score_for_address_ecb_down():
 
 def test_query_ecb_cases_filters_by_house_and_street(monkeypatch):
     """Socrata 响应客户端过滤：门牌精确 + 街道 token 匹配（与 DOB 同口径）。"""
+    import json as _json
+
     class _Resp:
         status_code = 200
+        headers = {}
+        encoding = "utf-8"
 
-        def json(self):
-            return [
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def iter_bytes(self, chunk_size=65536):
+            yield _json.dumps([
                 {"respondent_house_number": "450",
                  "respondent_street": "WEST   44 STREET", "balance_due": "900"},
                 {"respondent_house_number": "450",
                  "respondent_street": "WEST 45 STREET", "balance_due": "900"},
                 {"respondent_house_number": "452",
                  "respondent_street": "WEST 44 STREET", "balance_due": "900"},
-            ]
+            ]).encode()
 
-    monkeypatch.setattr(sr.httpx, "get", lambda *a, **k: _Resp())
+    monkeypatch.setattr(sr.http_capped.httpx, "stream", lambda *a, **k: _Resp())
     res = sr.query_ecb_cases("450 W 44th St, New York, NY 10036")
     assert res["ok"] is True
     assert len(res["cases"]) == 1

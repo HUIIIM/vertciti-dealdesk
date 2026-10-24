@@ -23,7 +23,9 @@ import os
 import re
 from datetime import datetime
 
-import httpx
+import httpx  # noqa: F401  （_sanitize_proxy_env 的清洗对象；GET 已改走 http_capped）
+
+from app.services import http_capped
 
 
 def _sanitize_proxy_env() -> None:
@@ -180,18 +182,22 @@ def query_ny_dos(entity_name: str, timeout: int = SOS_TIMEOUT) -> dict:
         "$limit": "10",
     }
     try:
-        r = httpx.get(NY_DOS_URL, params=params, timeout=timeout,
-                      headers={"User-Agent": "dealdesk-ownership/1.0"})
+        r = http_capped.get_json_capped(
+            NY_DOS_URL, params=params, timeout=timeout,
+            headers={"User-Agent": "dealdesk-ownership/1.0"})
     except Exception as e:  # noqa: BLE001
         return {"ok": False, "records": [],
                 "note": f"NY DOS 查询失败（网络/超时）：{str(e)[:100]}"}
-    if r.status_code != 200:
+    if r["too_large"]:
         return {"ok": False, "records": [],
-                "note": f"NY DOS 返回 HTTP {r.status_code}"}
-    try:
-        rows = r.json()
-    except Exception:
+                "note": (f"NY DOS 响应过大（超过 {http_capped.MAX_JSON_BYTES} "
+                         "字节上限），已停止读取")}
+    if r["status_code"] != 200:
+        return {"ok": False, "records": [],
+                "note": f"NY DOS 返回 HTTP {r['status_code']}"}
+    if r["json_error"]:
         return {"ok": False, "records": [], "note": "NY DOS 返回非 JSON"}
+    rows = r["data"]
     if not isinstance(rows, list) or not rows:
         return {"ok": False, "records": [],
                 "note": f"NY DOS 未检索到“{entity_name}”（公开备案无此名）"}
