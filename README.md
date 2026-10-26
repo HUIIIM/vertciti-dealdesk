@@ -160,7 +160,7 @@ DealDesk is vertciti's working showcase, run in production at
 - **Deal watchlist** — tracked deals re-valued weekly, with drift alerts.
 - **DealDesk MCP server** — pipeline, comps and underwriting results queryable by an AI agent.
 
-Direction: [ROADMAP.md](ROADMAP.md) · [docs/improvement-backlog.md](docs/improvement-backlog.md)
+Direction: [ROADMAP.md](ROADMAP.md)
 
 ## Documentation · Support · Licence
 

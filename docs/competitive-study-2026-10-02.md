@@ -111,7 +111,7 @@
 4. **Ownership 穿透树**（学自 Reonomy#1）：intake 自动生成 LLC→真人→可信度树（SoS 公开查询 + TopHap ownership + 标注 verified/待验证）；联系方式只走 verified 来源。验收：450 W 44th 显示完整穿透链，任一推断字段带[待验证]。
 5. **Sell-readiness 卖方动机分**（学自 Reonomy#2）：0-100 规则分（持有>10年+25、maturity<24mo+30、refinance+15、lien/violation+20、同 zip 销售率↑+10），intake 输出字段，附每项信号来源。验收：3 个已知 deal 打分排序与人工判断一致。
 
-**暂缓（未丢弃，移入 backlog 暂缓区）**：截图/图片录取、扫描版 PDF OCR、移动端 390px QA、Provider 并行、fetch_page 上限——被挤掉的 5 项，待 Top5 消化后按序取回。
+**暂缓（未丢弃）**：截图/图片录取、扫描版 PDF OCR、移动端 390px QA、Provider 并行、fetch_page 上限——被挤掉的 5 项，待 Top5 消化后按序取回。
 **后续迭代候选**（本次未进 Top5）：canonical schema + connector 注册表（Cherre#1，架构重构，排大版本）、entity resolution（Cherre#2）、buy-box 打分（Dealpath#4）、MCP server（Dealpath#5，N=1 主线长期项）、in-context 估值栏（Crexi#2，可并入 comps 二期）、watchlist（Crexi#4/Reonomy#4）、债务时间线（Crexi#5，可并入 tear sheet 二期）。
 
 ---

@@ -14,3 +14,5 @@ e2e.db
 .coverage
 frontend/coverage/
 backups/
+# sourcemap 不入仓（发布暴露面审计整改 2026-10-26）
+static/app/**/*.map

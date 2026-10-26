@@ -55,7 +55,7 @@ rm -f dealdesk.db && .venv/bin/pytest tests/ -q
 - 生产部署源是 `vercel-deploy/`（`app/`、`static/`、根静态文件、`requirements.txt`
   必须与仓库根对齐，全量同步）。部署命令：
   `~/workspace/skills/vercel/bin/vc-deploy` → Vercel 项目 `vertciti-dealdesk`。
-- 部署前必跑 `tools/pre_deploy_diff_gate.sh`（台账第 9 项门禁）：按下方三条 rsync
+- 部署前必跑 `tools/pre_deploy_diff_gate.sh`：按下方三条 rsync
   规则 dry-run diff，失步→非零退出＋清单，直接拦截；`tools/deploy.sh` 已在
   vc-deploy 调用前强制执行。
 - 改了 `static/` 内联 JS 必须同步重算 CSP hash 并写入 `vercel.json`
