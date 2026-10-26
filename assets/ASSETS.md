@@ -37,7 +37,7 @@ in a real browser; a misrendered copy was not shipped.
 
 The gap described in the section above is closed (`ui-main.png`,
 `ui-intake.png`). Working route: the local QA channel —
-`/opt/meta-chromium/chrome` + Playwright (`~/workspace/.qa-venv`).
+`/opt/meta-chromium/chrome` + Playwright (`<workspace>/.qa-venv`).
 Direct navigation to 127.0.0.1 was refused by Chromium's
 local-network-access checks in every variant tried
 (ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS — direct loopback,

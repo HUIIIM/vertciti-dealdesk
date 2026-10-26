@@ -2,7 +2,7 @@
 # TopHap token 自愈 cron 脚本：调 app/token_watch.py 的 ensure_fresh_token()，
 # 刷新成功后把新 token 同步到 Vercel 生产环境变量并触发 redeploy。
 #
-# 用法（cron）：cd ~/workspace/vertcity/dealdesk && tools/tophap-auto-refresh.sh
+# 用法（cron）：cd <repo>（本仓根目录） && tools/tophap-auto-refresh.sh
 # - 没刷新（还够用 / 无法刷新）：直接 exit 0，什么都不做。
 # - 刷新成功：更新 Vercel vertciti-dealdesk（team vertciti）的
 #   TOPHAP_ACCESS_TOKEN / TOPHAP_TOKEN_EXPIRES_AT（production），然后
@@ -19,7 +19,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 PY="$REPO_ROOT/.venv/bin/python"
-VC_LIB_DIR="$HOME/workspace/skills/vercel/bin"
+VC_LIB_DIR="${VC_LIB_DIR:-$(dirname "$(dirname "$REPO_ROOT")")/skills/vercel/bin}"
 
 if [ ! -x "$PY" ]; then
   echo "[tophap-auto-refresh] 找不到 $PY，中止" >&2

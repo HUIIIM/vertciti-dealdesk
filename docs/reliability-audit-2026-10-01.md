@@ -103,7 +103,7 @@ pytest tests/ --deselect tests/test_intake.py::test_address_pipeline_degradation
 ###  cron 建议配置
 ```cron
 # 每天 08:00 America/New_York 检查 TopHap token
-0 8 * * * cd ~/workspace/vertcity/dealdesk && .venv/bin/python tools/tophap_token_watch.py
+0 8 * * * cd <repo> && .venv/bin/python tools/tophap_token_watch.py
 ```
 
 ### 重要限制

@@ -12,7 +12,7 @@ tophap_oauth_setup.py 的变体：redirect_uri 改用 https://webhook.site/<uuid
   4. 轮询 webhook.site 等回调 → 换 token → 写 .env（逻辑同原脚本）
 
 用法：
-  cd ~/workspace/vertcity/dealdesk && .venv/bin/python -u tools/tophap_oauth_webhook.py
+  cd <repo>（本仓根目录） && .venv/bin/python -u tools/tophap_oauth_webhook.py
 """
 
 from __future__ import annotations

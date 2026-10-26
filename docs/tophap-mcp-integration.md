@@ -57,7 +57,7 @@ intake（地址/链接/PDF/截图）
 ## 5. OAuth 首次授权（Miao 只需做 1 步）
 
 ```bash
-cd ~/workspace/vertcity/dealdesk
+cd <repo>（本仓根目录）
 .venv/bin/python tools/tophap_oauth_setup.py
 # 若浏览器打不开 localhost 回调：加 --manual，按提示粘贴跳转 URL 或 code
 ```
@@ -97,9 +97,9 @@ token 为短期（约 1 小时有效期）。过期后：
 1. 本机跑 `.venv/bin/python tools/tophap_oauth_setup.py --manual`，浏览器点 Approve 拿新 token（写入本机 `.env`）
 2. 用脚本把新 token 推到 Vercel 环境变量：
    ```
-   cd ~/workspace/vertcity/dealdesk && .venv/bin/python - <<'EOF'
+   cd <repo> && .venv/bin/python - <<'EOF'
    import sys, os
-   sys.path.insert(0, os.path.expanduser("~/workspace/skills/vercel/bin"))
+   sys.path.insert(0, os.environ["VC_LIB_DIR"])  # VC_LIB_DIR 指向 vercel 工具库目录（<workspace>/skills/vercel/bin）
    from vc_lib import api
    env = dict(l.split("=", 1) for l in open(".env") if "=" in l and not l.startswith("#"))
    TEAM = "team_QxXqQxZFY4NehOJd76UjkIXn"; PROJECT = "prj_8yRsROvVeOyk31En55tOSV1yRIFz"
