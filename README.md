@@ -214,8 +214,8 @@ DealDesk is vertciti's working showcase, built for an audience of one
 (Miao) and run in production at
 [vertciti-dealdesk.vercel.app](https://vertciti-dealdesk.vercel.app).
 It improves on a daily cadence — one backlog item implemented, tested,
-deployed, and production-smoked every day (the log lives in
-[docs/improvement-backlog.md](docs/improvement-backlog.md)).
+deployed, and production-smoked every day (the log lives in the
+internal ledger (off-repo)).
 
 - **Test suite: 573 passed** (1 pre-existing deselect), re-run
   2026-10-20. Charts are all inline SVG / embedded PNG — zero plotting
@@ -246,7 +246,7 @@ deployed, and production-smoked every day (the log lives in
   queryable by an AI agent in natural language.
 
 Direction and receipts: [ROADMAP.md](ROADMAP.md) ·
-[docs/improvement-backlog.md](docs/improvement-backlog.md)
+internal ledger (off-repo)
 
 ## Contributing
 

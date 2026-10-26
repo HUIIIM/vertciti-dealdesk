@@ -179,7 +179,7 @@ CI 跑 ruff（v2 全规则）、mypy strict、性质测试、Postgres 套件、P
 DealDesk 是 vertciti 的实作展示品，为一人（Miao）而建，生产在线：
 [vertciti-dealdesk.vercel.app](https://vertciti-dealdesk.vercel.app)。
 它按每日节奏改进 — 每天一项台账改进实现、上线并做生产冒烟
-（日志见 [docs/improvement-backlog.md](docs/improvement-backlog.md)）。
+（日志见内部台账（仓外））。
 
 - **测试全量：573 passed**（1 个 pre-existing deselect），2026-10-20
   复跑。图表全为内联 SVG / 嵌入 PNG — 零绘图依赖。
@@ -202,7 +202,7 @@ DealDesk 是 vertciti 的实作展示品，为一人（Miao）而建，生产在
   自然语言查询。
 
 方向与凭证：[ROADMAP.md](ROADMAP.md) ·
-[docs/improvement-backlog.md](docs/improvement-backlog.md)
+内部台账（仓外）
 
 ## 贡献
 
