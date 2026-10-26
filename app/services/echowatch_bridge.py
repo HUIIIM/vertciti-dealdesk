@@ -15,9 +15,15 @@
 
 from __future__ import annotations
 
+import json
+import logging
 import os
 
 import httpx
+
+from app.services import http_capped
+
+logger = logging.getLogger(__name__)
 
 # 维度 → 检索关键词（EchoWatch 采集以英文来源为主，FTS5 词项之间为 AND）
 DIM_TERMS = {
@@ -38,6 +44,13 @@ MARKET_CITY = {"us": "", "nyc": "New York", "phoenix": "Phoenix", "tampa": "Tamp
 PER_DIM = 3
 TIMEOUT_S = 8.0
 WINDOW = "30d"
+
+# 响应大小上限（台账第 27 项，2026-10-26）：与外部 JSON API 共用同一上限
+# 值（http_capped.MAX_JSON_BYTES = 2,000,000）与流式 helper
+# （http_capped.collect_capped）——per_page=3 约束的是条数不是字节数，
+# ECHOWATCH_URL 是环境配置的外部端点，异常/被劫持时可返回超大响应；
+# 超限按该维度诚实降级（error + items=[]），不整页读入内存、不截断凑解析。
+MAX_EVIDENCE_BYTES = http_capped.MAX_JSON_BYTES
 
 
 def _config() -> tuple[str, str]:
@@ -62,18 +75,38 @@ def fetch_evidence(market_key: str = "", client: httpx.Client | None = None, are
             q = _query(market_key, dim, area)
             entry = {"dim": dim, "label": DIM_LABELS[dim], "query": q}
             try:
-                r = client.get(f"{base}/api/v1/mentions",
-                               params={"q": q, "per_page": PER_DIM, "window": WINDOW})
-                if r.status_code != 200:
-                    entry["error"] = f"EchoWatch 返回 HTTP {r.status_code}"
-                    entry["items"] = []
-                else:
-                    entry["items"] = [
-                        {"title": m.get("title") or "", "url": m.get("url") or "",
-                         "source": m.get("source") or "", "published_at": m.get("published_at")}
-                        for m in (r.json().get("data") or [])[:PER_DIM]
-                        if m.get("url")  # 没有链接的提及不能当出处
-                    ]
+                with client.stream("GET", f"{base}/api/v1/mentions",
+                                   params={"q": q, "per_page": PER_DIM,
+                                           "window": WINDOW}) as r:
+                    if r.status_code != 200:
+                        entry["error"] = f"EchoWatch 返回 HTTP {r.status_code}"
+                        entry["items"] = []
+                    else:
+                        body, too_large = http_capped.collect_capped(
+                            r, MAX_EVIDENCE_BYTES)
+                        if too_large:
+                            logger.warning(
+                                "EchoWatch 响应过大（超过 %s 字节上限），"
+                                "已停止读取，该维度按失败降级：dim=%s",
+                                MAX_EVIDENCE_BYTES, dim)
+                            entry["error"] = (
+                                f"EchoWatch 响应过大（超过 {MAX_EVIDENCE_BYTES} "
+                                "字节上限），已停止读取")
+                            entry["items"] = []
+                        else:
+                            parsed = json.loads(
+                                (body or b"").decode(
+                                    r.encoding or "utf-8", errors="replace"))
+                            data = parsed if isinstance(parsed, dict) else {}
+                            entry["items"] = [
+                                {"title": m.get("title") or "",
+                                 "url": m.get("url") or "",
+                                 "source": m.get("source") or "",
+                                 "published_at": m.get("published_at")}
+                                for m in (data.get("data") or [])[:PER_DIM]
+                                if isinstance(m, dict) and m.get("url")
+                                # 没有链接的提及不能当出处
+                            ]
             except (httpx.HTTPError, ValueError) as e:
                 entry["error"] = f"EchoWatch 不可达：{type(e).__name__}"
                 entry["items"] = []
