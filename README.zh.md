@@ -143,7 +143,7 @@ DealDesk 是 vertciti 的在用样板，生产实例在 [vertciti-dealdesk.verce
 - **交易关注列表**：跟踪中的交易每周重估，偏离即提醒。
 - **DealDesk MCP Server**：流水线、可比与核保结果可被 AI 智能体查询。
 
-方向：[ROADMAP.md](ROADMAP.md) · [docs/improvement-backlog.md](docs/improvement-backlog.md)
+方向：[ROADMAP.md](ROADMAP.md)
 
 ## 文档 · 支持 · 许可证
 
