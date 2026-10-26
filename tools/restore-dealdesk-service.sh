@@ -3,15 +3,17 @@
 # 背景：VM 每日重启清空 /etc，/etc/systemd/system/dealdesk.service 随之丢失，
 #       此前靠人工按 plan §0 两步重建（2026-10-07 起连续 10 天）。
 # 本脚本 + Muse cron（dealdesk-resident-watchdog，每小时）构成自动恢复：
-# unit 唯一真源 = ~/workspace/vertcity/03-产品与工程/dealdesk.service.system-level（持久盘）
+# unit 唯一真源 = <monorepo>/03-产品与工程/dealdesk.service.system-level（持久盘）
 # （2026-10-19 路径修订：该文件已随信息归纳迁至 03-产品与工程/，旧址 deliverables/ 兜底）
 # 行为：健康时只读检查、零写操作；异常时才重装 unit 并拉起服务。幂等，可反复执行。
 set -u
 
-UNIT_SRC="/home/hatch/workspace/vertcity/03-产品与工程/dealdesk.service.system-level"
-[ -f "$UNIT_SRC" ] || UNIT_SRC="/home/hatch/workspace/vertcity/deliverables/dealdesk.service.system-level"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+APP_DIR="${DEALDESK_APP_DIR:-$(dirname -- "$SCRIPT_DIR")}"
+MONOREPO_ROOT="$(dirname -- "$APP_DIR")"
+UNIT_SRC="${DEALDESK_UNIT_SRC:-$MONOREPO_ROOT/03-产品与工程/dealdesk.service.system-level}"
+[ -f "$UNIT_SRC" ] || UNIT_SRC="$MONOREPO_ROOT/deliverables/dealdesk.service.system-level"
 UNIT_DST="/etc/systemd/system/dealdesk.service"
-APP_DIR="/home/hatch/workspace/vertcity/dealdesk"
 URL="http://127.0.0.1:8100/"
 
 state="$(systemctl is-active dealdesk.service 2>/dev/null || true)"
