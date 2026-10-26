@@ -1,4 +1,4 @@
-"""商业粘贴文本 intake 测试（台账 2026-10-07）：粘贴 OM/flyer 文本 → 提取字段 → 卖方口径 + 质量门."""
+"""商业粘贴文本 intake 测试：粘贴 OM/flyer 文本 → 提取字段 → 卖方口径 + 质量门."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""fetch_page 页面大小上限测试（台账暂缓项回补，2026-10-16）.
+"""fetch_page 页面大小上限测试.
 
 fetch_page 改流式抓取：解码后字节数超过 MAX_PAGE_BYTES 即停手并诚实降级
 （too_large），不再无上限整页读进内存；Content-Length 预检命中时不读 body。

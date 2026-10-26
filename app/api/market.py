@@ -208,7 +208,7 @@ def wb_photos(address: str = ""):
 
 @router.post("/api/wb/ownership/tree")
 def wb_ownership_tree(payload: dict):
-    """产权穿透树（台账 2026-10-08 第 1 项，学自 Reonomy Top4）。
+    """产权穿透树（学自 Reonomy Top4）。
 
     body: {"address": "...", "owner_name": "可选/手动指定",
            "owner_source": "可选/持有人来源说明"}。
@@ -227,7 +227,7 @@ def wb_ownership_tree(payload: dict):
 
 @router.post("/api/wb/sell-readiness/score")
 def wb_sell_readiness_score(payload: dict):
-    """卖方动机分（台账 2026-10-09 第 3 项，学自 Reonomy Top5）。
+    """卖方动机分（学自 Reonomy Top5）。
 
     body: {"address": "..."}。0-100 规则分（持有>10年+25 / 贷款到期<24mo+30 /
     再融资+15 / 留置权·违规+20 / 区域热度+10），每项附来源；

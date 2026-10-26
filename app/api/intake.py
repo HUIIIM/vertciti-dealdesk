@@ -1,4 +1,4 @@
-"""intake 域路由（台账第 14 项 routers 拆分样板，2026-10-15）。
+"""intake 域路由（routers 拆分样板）。
 
 首批迁入：混合型 PDF 逐页 OCR 合并端点（住宅＋商业，第 15 项所建，
 2026-10-15 自 app/main.py 逐字迁入，行为不变——tests/test_mixed_pdf_pages.py
@@ -16,7 +16,7 @@ router = APIRouter(tags=["intake"])
 
 @router.post("/api/wb/intake/pdf-ocr-pages")
 def wb_intake_pdf_ocr_pages(payload: dict):
-    """住宅混合型 PDF 逐页 OCR 合并（台账第 15 项，2026-10-15）。
+    """住宅混合型 PDF 逐页 OCR 合并。
 
     混合 PDF 上传返回 needs_ocr_pages + page_texts（文本层逐页文本）；
     浏览器只 OCR 低文本页后把 {page_texts, ocr_pages} 发到这里合并，
@@ -42,7 +42,7 @@ def wb_intake_pdf_ocr_pages(payload: dict):
 
 @router.post("/api/uw-commercial/intake/pdf-ocr-pages")
 def uw_commercial_intake_pdf_ocr_pages(payload: dict):
-    """商业混合型 PDF 逐页 OCR 合并（台账第 15 项，2026-10-15）。
+    """商业混合型 PDF 逐页 OCR 合并。
 
     混合 PDF 上传返回 needs_ocr_pages + page_texts（文本层逐页文本）；
     浏览器只 OCR 低文本页后把 {page_texts, ocr_pages} 发到这里合并，

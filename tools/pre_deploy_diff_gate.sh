@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# DealDesk 部署前 diff 门禁（台账第 9 项：vercel-deploy 静态双副本同步自动化）。
+# DealDesk 部署前 diff 门禁。
 #
 # 按 AGENTS.md 的三条 rsync 规则做 dry-run diff：
 #   规则 1：app/    -> vercel-deploy/app/

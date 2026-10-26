@@ -1,4 +1,4 @@
-"""卖方动机分 Sell-readiness Score（台账 2026-10-09 第 3 项，学自 Reonomy Top5）。
+"""卖方动机分 Sell-readiness Score（学自 Reonomy Top5）。
 
 0-100 规则分，5 个信号，每项附来源：
   持有>10年 +25 ｜ 贷款到期<24个月 +30 ｜ 24个月内再融资 +15 ｜
@@ -10,7 +10,7 @@
   2. 每项信号附来源（TopHap 公共记录 / NYC DOB 公开违规 / 人工覆盖）；
   3. DOB 查询 best-effort（超时/不可达只记 caveat），仅纽约市可用，
      非 NYC 地址该信号记 unavailable；
-  4. ECB 未关闭罚金已纳入（台账第 7 项，2026-10-15）：Socrata 6bgk-3dad
+  4. ECB 未关闭罚金已纳入：Socrata 6bgk-3dad
      按地址查 balance_due>0，与 DOB 违规同权并入留置权/违规信号，
      附未清偿案件数与欠款合计来源；无数据诚实降级（caveat 明示）。
 
@@ -167,7 +167,7 @@ def _parse_money(v) -> float | None:
 
 def ecb_balance(cases: list[dict] | None) -> tuple[int | None, float, int]:
     """ECB 案件：返回 (未清偿案件数|None, 欠款合计, 案件总数)。
-    cases 为 None → 未查询。未清偿判定 = balance_due > 0（台账第 7 项口径）；
+    cases 为 None → 未查询。未清偿判定 = balance_due > 0（既定口径）；
     balance_due 缺失/不可解析的案件不计未清偿（未知保持未知，不凑数）。"""
     if cases is None:
         return None, 0.0, 0
@@ -496,7 +496,7 @@ def score_for_address(address: str, tophap_fetch=None,
         caveats.append(f"DOB 违规仅支持纽约市（该地址州={state}）："
                        "违规信号仅基于 TopHap")
 
-    # ECB 未清偿罚金（仅 NY；best-effort，与 DOB 同权，台账第 7 项）
+    # ECB 未清偿罚金（仅 NY；best-effort，与 DOB 同权）
     if ecb_fetch is None:
         ecb_fetch = query_ecb_cases
     if state == "NY" or state == "":

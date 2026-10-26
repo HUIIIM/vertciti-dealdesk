@@ -1,11 +1,11 @@
-"""住宅门 seller_points 噪声消除（台账第 16 项，2026-10-15）测试。
+"""住宅门 seller_points 噪声消除测试。
 
 seller_points 是 intake 产物（卖方话术要点，文本列表），本不在
 residential-v1 schema 内，此前每次被 schema.unknown_field warn 并进
 yellow_fields 标黄，淹没真矛盾信号。修复：schema 登记为已知非数值
 字段（list_str），门内不再告警。
 
-验收口径（台账原文）：干净住宅样本 yellow_fields 不含 seller_points、
+验收口径：干净住宅样本 yellow_fields 不含 seller_points、
 矛盾样本标黄不变。
 """
 

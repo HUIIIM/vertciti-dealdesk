@@ -1,4 +1,4 @@
-"""产权穿透树（台账 2026-10-08 第 1 项，学自 Reonomy Top4）。
+"""产权穿透树（学自 Reonomy Top4）。
 
 intake 自动生成 LLC → 真人 → 可信度树：
   L0 标的物业 → L1 契约持有人（TopHap ownerName，公共记录 verified）

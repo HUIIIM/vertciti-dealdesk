@@ -46,7 +46,7 @@ def test_ddg_unwrap():
 
 
 def test_robots_parse(monkeypatch):
-    # 2026-10-17 台账第 18 项：robots 改流式抓取，替身同步为 stream 接口
+    # 2026-10-17：robots 改流式抓取，替身同步为 stream 接口
     class R:
         status_code = 200
         headers = {}

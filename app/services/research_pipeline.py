@@ -35,20 +35,20 @@ UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
 BOT_NAME = "DealDeskBot"
 FETCH_TIMEOUT = 15
 MAX_FETCHES = 6
-# 页面大小上限（台账暂缓项回补，2026-10-16）：流式抓取，解码后字节数超限即停，
+# 页面大小上限：流式抓取，解码后字节数超限即停，
 # 不再把整页无上限读进内存（与 P0 上传 OOM 同类风险）。房源页 HTML 通常 <1MB，
 # 2MB 留足余量；超限按诚实降级处理（too_large），不截断凑数、不静默用残页提取。
 MAX_PAGE_BYTES = 2_000_000
-# robots.txt 大小上限（台账第 18 项，2026-10-17）：与页面抓取共用同一上限常量
+# robots.txt 大小上限：与页面抓取共用同一上限常量
 # 与流式 helper——robots.txt 通常只有几 KB，恶意/异常站点返回超大响应时
 # 按"无 Disallow 信息"诚实降级（不把整页读进内存、不截断残页凑解析）。
 MAX_ROBOTS_BYTES = MAX_PAGE_BYTES
-# robots 成功缓存 TTL（台账第 21 项，2026-10-20）：24 小时。依据：RFC 9309
+# robots 成功缓存 TTL：24 小时。依据：RFC 9309
 # 未规定缓存时长，业界通行做法（Google robots.txt 规范说明）是爬虫可缓存
 # robots.txt 最长 24 小时；站点修改 robots.txt（如新增 Disallow）应在
 # 24h 内被长驻进程重新抓取生效，同时避免每次抓取都先打一发 robots 请求。
 ROBOTS_CACHE_TTL_SECONDS = 24 * 60 * 60
-# DDG 搜索响应大小上限（台账第 22 项，2026-10-21）：与页面抓取共用同一上限
+# DDG 搜索响应大小上限：与页面抓取共用同一上限
 # 值与流式 helper——搜索结果页通常只有几十 KB，异常/恶意端点返回超大响应
 # 时按该端点失败诚实降级（转下一端点/空结果），不整页读入内存、不截断凑解析。
 MAX_SEARCH_BYTES = MAX_PAGE_BYTES
@@ -127,7 +127,7 @@ def _collect_capped(resp, limit: int) -> tuple[bytes | None, bool]:
 def _parse_robots_rules(text: str) -> list[tuple[str, str]]:
     """按组解析 robots.txt，返回适用于本爬虫的 (kind, path) 规则列表。
 
-    kind 为 "allow" / "disallow"。组解析（台账第 19 项，RFC 9309 口径）：
+    kind 为 "allow" / "disallow"。组解析：
     - 连续多行 User-agent 同属一组（空行/注释不拆组——Google 的 robots.txt
       每行之间都夹空行，* 与 Yandex 同组即此形态）；一组出现规则行之后，
       再出现的 User-agent 行开启新组。
@@ -188,11 +188,11 @@ def _robots_pattern_matches(pattern: str, target: str) -> bool:
 def _robots_rules(host: str) -> list[tuple[str, str]]:
     """抓取并解析该 host 适用于本爬虫的 robots 规则（缓存）。
 
-    流式抓取＋MAX_ROBOTS_BYTES 上限（台账第 18 项）：超限按"无规则信息"
+    流式抓取＋MAX_ROBOTS_BYTES 上限：超限按"无规则信息"
     诚实降级——返回空列表并留 warning log，绝不整页读入内存、
     绝不截断残页凑解析。
 
-    缓存口径（台账第 20 项，2026-10-19）：二选一取「失败不缓存」——
+    缓存口径：二选一取「失败不缓存」——
     只有确定性结果进缓存：200 成功解析的规则、以及 404（该 host
     真无 robots.txt 文件，按 RFC 9309 无限制、放行正确）。失败结果
     （网络异常／超时／非 200 且非 404，含 429 与 5xx／超限降级）
@@ -200,7 +200,7 @@ def _robots_rules(host: str) -> list[tuple[str, str]]:
     一次瞬时故障不得让该 host 被当作"无限制"放行；下一次同进程
     调用会重新抓取，站点恢复后即可拿到真实规则。
 
-    缓存 TTL（台账第 21 项，2026-10-20）：成功缓存条目带抓取时间戳
+    缓存 TTL：成功缓存条目带抓取时间戳
     （time.monotonic），有效期 ROBOTS_CACHE_TTL_SECONDS（24h，依据
     见常量注释）；未过期直接返回不重抓，过期则删除旧条目重新抓取
     ——站点事后修改 robots.txt 最迟 24h 后在长驻进程里生效。过期后
@@ -513,7 +513,7 @@ def _parse_ddg_links(html_text: str, max_results: int) -> list[dict]:
 def ddg_search(query: str, log: list, max_results: int = 8) -> list[dict]:
     """DuckDuckGo 搜索（免 key）。lite 端点优先，html 端点兜底。返回 [{title, url}]。
 
-    流式抓取＋MAX_SEARCH_BYTES 上限（台账第 22 项）：超限按该端点失败
+    流式抓取＋MAX_SEARCH_BYTES 上限：超限按该端点失败
     诚实降级——留痕（pipeline log＋warning log）后转下一端点，两端点都
     超限/失败则返回空结果；绝不整页读入内存、绝不截断残页凑解析。
     """

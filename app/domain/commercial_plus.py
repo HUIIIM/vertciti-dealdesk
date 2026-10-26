@@ -31,7 +31,7 @@ def _f(x, default=0.0) -> float:
 
 
 def _div(a, b) -> float | None:
-    # D3（2026-10-10，D460 CEO 已定）：零分母 → None（N/A 链），禁止 0.0 冒充。
+    # 零分母处理（2026-10-10 已定）：零分母 → None（N/A 链），禁止 0.0 冒充。
     # 调用方一律做 None 守卫；前端/报表 None → "—"，绝不渲染 0.00/0%。
     b = _f(b)
     return _f(a) / b if b else None

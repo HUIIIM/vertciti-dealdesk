@@ -134,7 +134,7 @@ class _WbIntakeReq(BaseModel):
 
 
 def _enforce_gate_fields(gate_fields: dict | None, deal_type: str, action: str):
-    """导出前过门（台账第 4 项）：前端显式送来的 gate_fields 跑门，
+    """导出前过门：前端显式送来的 gate_fields 跑门，
     blocked → 422 硬拦（与商业 /api/uw/report 同口径）。
     未送 gate_fields 时不拦（向后兼容旧调用方）。"""
     if not gate_fields:
@@ -231,7 +231,7 @@ class _MemoReq(BaseModel):
     # Phase 5 第五轮 C9：网页 Zone 1 的估值结论（前端 valuationDisplay() 同源文案），
     # 备忘录 PDF 必须带上（放贷人必看）
     valuation_display: str = ""
-    # 台账第 4 项（2026-10-15）：导出前过门——前端送来的 intake 门字段
+    # 导出前过门——前端送来的 intake 门字段
     # （住宅 asking_price/building_sf/... 或商业扁平字段）；blocked → 422
     gate_fields: dict | None = None
     gate_deal_type: str = ""
@@ -245,6 +245,6 @@ class _ResXlsxReq(BaseModel):
     verdict: dict | None = None
     confidence: dict | None = None
     comps: list = []
-    # 台账第 4 项（2026-10-15）：导出前过门（同 _MemoReq）
+    # 导出前过门（同 _MemoReq）
     gate_fields: dict | None = None
     gate_deal_type: str = ""

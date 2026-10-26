@@ -1,4 +1,4 @@
-"""商业二维敏感性矩阵端点测试（P0-5，2026-10-05，D529）。
+"""商业二维敏感性矩阵端点测试（2026-10-05）。
 
 POST /api/com/sensitivity：退出 cap（±100bps，步长 50bps）×
 租金增长率（±100bps，步长 50bps）→ 25 格 IRR / Equity Multiple，

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # DealDesk 一键部署脚本：部署前自动把 repo 根同步到 vercel-deploy/，
-# 再跑 tools/pre_deploy_diff_gate.sh 门禁（台账第 9 项），通过才调用
+# 再跑 tools/pre_deploy_diff_gate.sh 门禁，通过才调用
 # vc-deploy 发布到 Vercel 生产环境并等待 READY。
 #
 # 用法：bash tools/deploy.sh   （在仓库根或任意目录执行均可）
@@ -76,7 +76,7 @@ cp "requirements.txt" "${DEPLOY_DIR}/requirements.txt" \
     || fail "requirements.txt 复制失败"
 log "  requirements.txt 同步完成"
 
-# ---- 步骤 5：部署前 diff 门禁（台账第 9 项，vc-deploy 调用前必跑） ----
+# ---- 步骤 5：部署前 diff 门禁 ----
 # 覆盖 AGENTS.md 三条 rsync 规则（含根静态副本——旧 diff -rq 校验漏了这一条）。
 log "步骤 5/6：部署前 diff 门禁 ..."
 bash "${SCRIPT_DIR}/pre_deploy_diff_gate.sh" \

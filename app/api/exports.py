@@ -52,7 +52,7 @@ def uw_report(payload: dict):
 
 @router.post("/api/uw/tearsheet")
 def uw_tearsheet(payload: dict):
-    """一键 Tear Sheet（台账 2026-10-05）：当前（未保存也行）输入 → 投资一页纸 PDF。
+    """一键 Tear Sheet：当前（未保存也行）输入 → 投资一页纸 PDF。
 
     关键字段（价格/NOI/cap rate/全口径现金需求/月供/DSCR）＋ 3 条 highlights ＋
     1 条下一步建议；缺数项渲染 "—"，不估算。
@@ -88,7 +88,7 @@ def uw_report_xlsx(payload: dict):
     """
     data = payload.get("input", payload)
     comps = payload.get("comps") or []
-    # 台账第 4 项：商业 Excel 同样导出前过门（gate_fields 显式送达才拦）
+    # 商业 Excel 同样导出前过门（gate_fields 显式送达才拦）
     _enforce_gate_fields(payload.get("gate_fields"),
                          payload.get("gate_deal_type") or "commercial",
                          "Excel 导出")
@@ -124,7 +124,7 @@ def memo_pdf(req: _MemoReq):
     富输入重算，不再导出全零模板。
     """
     from urllib.parse import quote
-    # 台账第 4 项：导出前过门（gate_fields 显式送达才拦，blocked → 422）
+    # 导出前过门（gate_fields 显式送达才拦，blocked → 422）
     _enforce_gate_fields(req.gate_fields,
                          req.gate_deal_type or req.track, "备忘录导出")
     try:
@@ -198,7 +198,7 @@ def memo_pdf(req: _MemoReq):
 def res_report_xlsx(req: _ResXlsxReq):
     """住宅核保明细 Excel：总览/现金流/comps/假设."""
     from urllib.parse import quote
-    # 台账第 4 项：导出前过门（gate_fields 显式送达才拦，blocked → 422）
+    # 导出前过门（gate_fields 显式送达才拦，blocked → 422）
     _enforce_gate_fields(req.gate_fields,
                          req.gate_deal_type or "residential", "Excel 导出")
     try:
