@@ -1,4 +1,4 @@
-"""routers 拆分冒烟测试（台账第 14 项，2026-10-15）。
+"""routers 拆分冒烟测试。
 
 守三件事：
 1. 样板域（intake）的端点经 APIRouter 装配后行为与在 main.py 时一致

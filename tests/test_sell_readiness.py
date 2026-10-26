@@ -1,4 +1,4 @@
-"""卖方动机分 Sell-readiness Score（台账 2026-10-09 第 3 项，学自 Reonomy Top5）测试。
+"""卖方动机分 Sell-readiness Score（学自 Reonomy Top5）测试。
 
 覆盖：规则层（持有年限/区域热度/DOB 未关闭判定/日期解析）/
 无数据信号诚实 unavailable / 编排（mock TopHap + DOB）/
@@ -256,7 +256,7 @@ def test_score_for_address_non_ny():
     assert any("仅支持纽约市" in c for c in out["caveats"])
 
 
-# ---------- ECB 未清偿罚金（台账第 7 项，2026-10-15） ----------
+# ---------- ECB 未清偿罚金 ----------
 
 def test_ecb_balance():
     assert sr.ecb_balance(None) == (None, 0.0, 0)

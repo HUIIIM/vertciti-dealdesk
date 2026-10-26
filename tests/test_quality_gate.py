@@ -1,4 +1,4 @@
-"""Intake 数据质量门（validators.py）测试。台账 2026-10-06 第 1 项。"""
+"""Intake 数据质量门（validators.py）测试。"""
 
 from __future__ import annotations
 

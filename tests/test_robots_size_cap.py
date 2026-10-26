@@ -1,4 +1,4 @@
-"""robots.txt 抓取大小上限测试（台账第 18 项，2026-10-17）.
+"""robots.txt 抓取大小上限测试.
 
 robots_disallows 改走与 fetch_page 同款流式＋上限 helper（_collect_capped，
 共用 MAX_PAGE_BYTES 常量）：超限按"无 Disallow 信息"诚实降级（空列表）

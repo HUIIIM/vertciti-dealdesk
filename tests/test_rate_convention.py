@@ -1,4 +1,4 @@
-"""利率口径统一回归测试（2026-10-11，台账第 1 项）.
+"""利率口径统一回归测试.
 
 埋雷复盘：app.finance.monthly_payment / finance.remaining_balance 用百分制
 （如 6.5 表示 6.5%），而 app.uw_commercial.amort_payment / remaining_balance

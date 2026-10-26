@@ -1,4 +1,4 @@
-"""一键 Tear Sheet 测试（台账 2026-10-05 待做第 1 项）。
+"""一键 Tear Sheet 测试。
 
 覆盖：
 1. build_tearsheet_data：39-09 Main St 模板示例 → 12 个关键指标齐全、

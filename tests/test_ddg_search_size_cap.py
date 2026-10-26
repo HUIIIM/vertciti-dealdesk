@@ -1,4 +1,4 @@
-"""ddg_search 搜索响应大小上限测试（台账第 22 项，2026-10-21）.
+"""ddg_search 搜索响应大小上限测试.
 
 ddg_search 改走与 fetch_page/robots 同款流式＋上限 helper（_collect_capped，
 上限 MAX_SEARCH_BYTES = MAX_PAGE_BYTES）：超限按该端点失败诚实降级

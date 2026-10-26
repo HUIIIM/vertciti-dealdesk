@@ -1,4 +1,4 @@
-// 黄金样本对照 · JS 引擎抽取运行器（台账第 13 项）
+// 黄金样本对照 · JS 引擎抽取运行器
 // 用法：node golden_js_runner.mjs <uw-commercial.js 路径> <jobs.json 路径>
 // 从 static/uw-commercial.js 抽取纯计算段（const EXPENSES … computeAll，
 // 止于 state 段落标记），在 Node 里求值后对 fixture 逐个跑 computeAll，
