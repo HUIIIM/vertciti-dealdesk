@@ -102,6 +102,11 @@ def test_v1_protection_is_opt_in(env, monkeypatch):
     assert c.post("/api/projects", json=body, headers=H(tok["viewer"])).status_code == 403
     assert c.post("/api/projects", json=body, headers=H(tok["analyst"])).status_code == 200
     assert c.post("/api/score", json={"track": "residential", "input": base_residential()}).status_code == 200
+    # SEC-A1（2026-10-26）：flag 同时管 v1 持久化面的读与 wb/research 写——匿名读 401、只读令牌可读
+    assert c.get("/api/projects").status_code == 401
+    assert c.get("/api/projects", headers=H(tok["viewer"])).status_code == 200
+    assert c.get("/api/compare?ids=1").status_code == 401
+    assert c.post("/api/wb/research", json={"bogus": True}).status_code == 401
 
 
 def test_request_id_and_unhandled_error_reporting(monkeypatch):

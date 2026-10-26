@@ -35,7 +35,11 @@ log = logging.getLogger("dealdesk")
 access_log = logging.getLogger("dealdesk.access")
 RECENT_ERRORS: deque[dict[str, Any]] = deque(maxlen=100)
 _RID_OK = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
-_V1_PROTECTED = re.compile(r"^/api/(projects|uw/projects)(/|$)")
+# SEC-A1（2026-10-26）：DEALDESK_AUTH_PROTECT_V1 门控的 v1 持久化面——读/写项目库、
+# 对比、研究证据与摄入待处理队列的路径。无状态计算面（/api/score 等）不在此列、保持公开
+# （口径由 tests/test_v2_security.py::test_v1_protection_is_opt_in 钉住）。
+_V1_PROTECTED = re.compile(
+    r"^/api/(projects|uw/projects|compare|wb/research|wb/intake/pending|wb/intake/extracted)(/|$)")
 
 
 class JsonFormatter(logging.Formatter):
@@ -96,10 +100,13 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
             if wait:
                 resp: Response = JSONResponse({"detail": T("令牌错误次数过多，请稍后再试"), "request_id": rid},
                                               status_code=429, headers={"Retry-After": str(int(wait) + 1)})
-            elif (security.protect_v1() and method in ("POST", "PUT", "DELETE") and _V1_PROTECTED.match(path)
-                    and not security.can(actor, "deal.write")):
-                resp = JSONResponse({"detail": T("需要“分析”及以上角色"), "request_id": rid},
-                                    status_code=401 if actor is security.ANONYMOUS else 403)
+            elif (security.protect_v1() and _V1_PROTECTED.match(path) and (
+                    (method in ("POST", "PUT", "DELETE") and not security.can(actor, "deal.write"))
+                    or (method == "GET" and (actor is security.ANONYMOUS or not security.can(actor, "deal.read"))))):
+                resp = JSONResponse(
+                    {"detail": T("需要“分析”及以上角色") if method != "GET" else T("需要登录：请提供有效的访问令牌"),
+                     "request_id": rid},
+                    status_code=401 if actor is security.ANONYMOUS else 403)
             else:
                 resp = await call_next(request)
         except Exception as e:
