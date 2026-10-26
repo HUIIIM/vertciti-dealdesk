@@ -19,12 +19,12 @@ from app.domain import demand_validation as dv
 from app.services import research_pipeline as rp
 
 CLAIM_LABEL = "卖方材料口径、待独立验证"
-# 扫描版 PDF OCR（台账第 3 项，2026-10-14）：无文本层 PDF 的提取结果
+# 扫描版 PDF OCR：无文本层 PDF 的提取结果
 # 一律走 OCR 口径标注，与普通文本层提取明确区分，绝不混标。
 PDF_OCR_CLAIM_NOTICE = ("以下全部数字为扫描版 PDF OCR 提取、卖方材料口径、待独立验证，"
                         "须独立验证后方可用于估值/打分")
 SCANNED_TEXT_THRESHOLD = 50  # 全文字符数低于此值视为无文本层（扫描件）
-PAGE_TEXT_MIN_CHARS = 50  # 逐页文本量低于此值视为低文本页（混合型 PDF 逐页检测，台账第 15 项）
+PAGE_TEXT_MIN_CHARS = 50  # 逐页文本量低于此值视为低文本页
 MIXED_PDF_CLAIM_NOTICE = ("以下全部数字为卖方材料口径、待独立验证；本文件为混合型 PDF："
                           "文本层页直接提取，扫描图页经 OCR 提取（字段来源逐页标注，"
                           "OCR 页字段来源标「扫描页OCR」），OCR 数字更须复核")
@@ -69,7 +69,7 @@ def extract_text(pdf_path: str) -> tuple[str, str]:
 
 
 def inspect_pdf(pdf_path: str) -> dict:
-    """扫描件检测（台账第 3 项）＋逐页文本量检测（第 15 项）。
+    """扫描件检测＋逐页文本量检测。
 
     返回页数/文本量/是否扫描件/是否加密，另加逐页口径：
     low_text_pages = 文本量 < PAGE_TEXT_MIN_CHARS 的页码（1-based）；
@@ -103,14 +103,14 @@ def inspect_pdf(pdf_path: str) -> dict:
                 "note": f"PDF 解析异常：{str(e)[:150]}"}
 
 
-# ---------------- 多栏版式检测与阅读顺序（台账第 8 项） ----------------
+# ---------------- 多栏版式检测与阅读顺序 ----------------
 # pypdf 无 pdftotext -layout 模式：extract_text 按内容流顺序拼接，
 # 双栏 flyer 的内容流常逐行交错左右栏 → 数字可能错位拼接。
 # 对策：visitor 采集片段坐标 → 检测双栏（中间有无片段跨越的空槽）→
 # 按栏重排（左栏自上而下 → 右栏）后再提取；重排不可靠时不硬排，
 # 结果附 layout_notice 明示「版式复杂、人工复核」。真实双栏 OM 样本
 # 本轮未获取（公网检索被沙箱出口挡），逻辑以高仿真合成双栏件验证，
-# 台账如实标注。
+# 如实标注。
 
 def _page_fragments(page) -> list[dict]:
     """pypdf visitor 采集文本片段及坐标（用户空间 pt，原点左上换算前）。"""
@@ -511,7 +511,7 @@ def try_server_pdf_ocr(saved_path: str) -> tuple[str, str]:
 
 
 def try_server_pdf_ocr_pages(saved_path: str, page_numbers: list[int]) -> dict[int, str]:
-    """逐页服务端 OCR（台账第 15 项）：只 OCR 指定页（1-based）的内嵌图。
+    """逐页服务端 OCR：只 OCR 指定页（1-based）的内嵌图。
 
     返回 {页码: OCR 文本}，只含识别出非空文本的页。无 tesseract 时
     返回空 dict（诚实降级，由浏览器端逐页 OCR 接管），绝不编造。"""
@@ -578,7 +578,7 @@ def _mark_ocr_fields(d: dict, ocr_pages: set[int], filename: str) -> None:
 def _parse_merged(filename: str, merged_pages: list[str], ocr_pages: list[int],
                   commercial: bool, engine: str, layout: dict | None = None) -> dict:
     """合并后逐页文本 → 走对应抽取引擎 + 质量门，字段逐页归属、
-    OCR 页字段标 OCR 来源（台账第 15 项验收口径）。"""
+    OCR 页字段标 OCR 来源。"""
     from app.domain import validators
     text = "\n".join(merged_pages)
     if commercial:
@@ -610,7 +610,7 @@ def _parse_merged(filename: str, merged_pages: list[str], ocr_pages: list[int],
 
 def _run_mixed_pdf_upload(saved_path: str, filename: str, info: dict,
                           commercial: bool) -> dict:
-    """混合型 PDF 上传处理（台账第 15 项）。
+    """混合型 PDF 上传处理。
 
     先试服务端逐页 OCR（有 tesseract 时直接闭环）；否则文本层页先提取、
     结构化返回 needs_ocr_pages + page_texts，前端只 OCR 低文本页后经
@@ -670,7 +670,7 @@ def run_commercial_pdf_upload(saved_path: str, filename: str) -> dict:
                 ocr_text, filename, engine="tesseract-server")
         return _scanned_needs_ocr("pdf-commercial", filename, info)
     if info.get("is_mixed"):
-        # 混合型 PDF（台账第 15 项）：低文本页逐页 OCR 补齐，不静默丢字段
+        # 混合型 PDF：低文本页逐页 OCR 补齐，不静默丢字段
         return _run_mixed_pdf_upload(saved_path, filename, info, commercial=True)
     pages, layout = apply_layout_order(saved_path, info["pages"])
     text = "\n".join(pages)
@@ -691,7 +691,7 @@ def run_commercial_pdf_upload(saved_path: str, filename: str) -> dict:
 
 def run_commercial_pdf_ocr_text(text: str, filename: str = "scanned.pdf",
                                 engine: str = "browser-tesseract") -> dict:
-    """扫描版 PDF OCR 文本 intake（台账第 3 项，2026-10-14）。
+    """扫描版 PDF OCR 文本 intake。
 
     扫描 PDF 经 OCR（浏览器端 pdf.js 渲染 + Tesseract.js，或服务端
     tesseract 内嵌图）转文本后走与普通 PDF 相同的抽取引擎；来源标
@@ -724,7 +724,7 @@ def run_commercial_pdf_ocr_text(text: str, filename: str = "scanned.pdf",
 
 def run_pdf_ocr_text(text: str, filename: str = "scanned.pdf",
                      engine: str = "browser-tesseract") -> dict:
-    """住宅扫描版 PDF OCR 文本 intake（台账第 3 项，住宅路同款）。
+    """住宅扫描版 PDF OCR 文本 intake。
 
     与商业路共用 OCR 口径标注：来源"扫描PDF OCR:<文件名>"、
     claim_notice 明示 OCR 口径，附质量门与需求验证清单。
@@ -757,7 +757,7 @@ def run_pdf_ocr_text(text: str, filename: str = "scanned.pdf",
 
 def _run_pdf_ocr_pages(page_texts, ocr_pages, filename: str,
                        engine: str, commercial: bool, layout: dict | None = None) -> dict:
-    """混合型 PDF 浏览器逐页 OCR 合并（台账第 15 项）。
+    """混合型 PDF 浏览器逐页 OCR 合并。
 
     page_texts = 上传时服务端提取的文本层逐页文本（响应回传，无状态）；
     ocr_pages = {"页码": "该页 OCR 文本"}（浏览器只 OCR 低文本页）。
@@ -809,7 +809,7 @@ def run_residential_pdf_ocr_pages(page_texts, ocr_pages, filename: str = "mixed.
 
 
 def run_commercial_text_upload(text: str) -> dict:
-    """商业粘贴文本 intake（台账 2026-10-07）：粘贴 OM/flyer 文本 → 结构化字段。
+    """商业粘贴文本 intake：粘贴 OM/flyer 文本 → 结构化字段。
 
     与 PDF intake 共用同一抽取引擎（parse_commercial_pdf_text），抽取逻辑
     完全一致；全部字段标"卖方材料口径、待独立验证"，同样跑数据质量门。
@@ -846,7 +846,7 @@ def run_pdf_upload(saved_path: str, filename: str) -> dict:
             "pdf", filename, info,
             extra={"demand_validation": dv.demand_validation_block()})
     if info.get("is_mixed"):
-        # 混合型 PDF（台账第 15 项）：低文本页逐页 OCR 补齐，不静默丢字段
+        # 混合型 PDF：低文本页逐页 OCR 补齐，不静默丢字段
         return _run_mixed_pdf_upload(saved_path, filename, info, commercial=False)
     pages, layout = apply_layout_order(saved_path, info["pages"])
     text = "\n".join(pages)
@@ -872,7 +872,7 @@ IMAGE_CLAIM_NOTICE = ("以下全部数字为截图 OCR 提取、卖方材料口�
 
 def run_commercial_image_ocr_text(text: str, filename: str = "screenshot.png",
                                   engine: str = "browser-tesseract") -> dict:
-    """商业截图 OCR 文本 intake（台账第 2 项，2026-10-13）。
+    """商业截图 OCR 文本 intake。
 
     截图先经 OCR（浏览器端 Tesseract.js，或服务端 tesseract 若可用）转文本，
     再与 PDF/粘贴 intake 共用同一抽取引擎（parse_commercial_pdf_text）。
@@ -904,7 +904,7 @@ def run_commercial_image_ocr_text(text: str, filename: str = "screenshot.png",
 
 def run_residential_image_ocr_text(text: str, filename: str = "screenshot.png",
                                    engine: str = "browser-tesseract") -> dict:
-    """住宅截图 OCR 文本 intake（台账第 4 项，2026-10-15）。
+    """住宅截图 OCR 文本 intake。
 
     住宅截图此前只有 pending 队列视觉提取一条路，无同步 OCR 文本路；
     现与商业路同构：OCR 文本走住宅抽取引擎（parse_pdf_text），来源标

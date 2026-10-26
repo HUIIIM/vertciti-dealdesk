@@ -1,6 +1,6 @@
 """一键 Tear Sheet（投资一页纸）。
 
-台账待做第 1 项（学自 Dealpath，Top2）：intake 完成后自动生成 deal 一页纸 ——
+（学自 Dealpath，Top2）：intake 完成后自动生成 deal 一页纸 ——
 关键字段（价格/NOI/cap rate/全口径现金需求/月供/DSCR）＋ 3 条 highlights ＋
 1 条下一步建议；进 PDF 备忘录封面页。
 

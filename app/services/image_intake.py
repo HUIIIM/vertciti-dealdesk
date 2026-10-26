@@ -105,7 +105,7 @@ def list_tasks() -> list[dict]:
 
 
 def infer_deal_type(fields: list, tenants: list | None = None) -> str:
-    """截图提取结果的 deal 类型推断（台账第 4 项，门覆盖补齐）。
+    """截图提取结果的 deal 类型推断。
 
     带租户表或商业键（analysis.*/property.*）→ commercial；其余
     （asking_price/building_sf 等住宅键）→ residential。
@@ -119,7 +119,7 @@ def infer_deal_type(fields: list, tenants: list | None = None) -> str:
 
 
 def attach_quality_gate(d: dict) -> dict:
-    """截图视觉提取结果附数据质量门（台账第 4 项，2026-10-15）。
+    """截图视觉提取结果附数据质量门。
 
     此前 pending 队列的视觉提取结果（extracted.json）原样返回、无
     quality_gate，截图路成了门覆盖的盲区（商业浏览器 OCR 路已在

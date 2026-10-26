@@ -426,7 +426,7 @@ def build_enhanced_pdf(r: dict, deal: dict | None = None,
     不再导出全零模板；deal 缺失时标题如实标注"数据未接入"。
 
     cover_tearsheet=True 时在正文前插入 Tear Sheet（一页纸）封面页
-    （台账 2026-10-05：一键 Tear Sheet 进备忘录封面页）。
+    （一键 Tear Sheet 进备忘录封面页）。
     """
     _register_fonts()
     deal = deal or {}
@@ -455,7 +455,7 @@ def build_enhanced_pdf(r: dict, deal: dict | None = None,
     story = []
     now = _now_et()
 
-    # 一键 Tear Sheet 封面页（台账 2026-10-05）：备忘录 PDF 第一页即一页纸
+    # 一键 Tear Sheet 封面页：备忘录 PDF 第一页即一页纸
     if cover_tearsheet:
         from app.services.render import tearsheet as _ts
         _ts_data = _ts.build_tearsheet_data(r, deal)

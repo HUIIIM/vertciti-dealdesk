@@ -1,4 +1,4 @@
-"""Intake 数据质量门（台账 2026-10-06：Intake 数据质量门，学自 Dealpath/Cherre Top3）。
+"""Intake 数据质量门（学自 Dealpath/Cherre Top3）。
 
 职责：
 1. 固定字段 schema（按 deal 类型版本化）：commercial-v1 / residential-v1，
@@ -418,8 +418,8 @@ def _normalize_flat(deal_type: str, flat: dict) -> dict:
     """扁平字段归一化：去空、零值视为空、小数口径归一。
 
     口径说明：intake 提取的 market_cap_rate 是小数口径（0.065=6.5%）；
-    但商业页 state 里存的是百分比数（6.5=6.5%，见台账第 7 项口径统一待做）。
-    这里 >1 即视为百分比数自动折算，避免误拦（台账#7 落地后可删此适配）。
+    但商业页 state 里存的是百分比数（6.5=6.5%）。
+    这里 >1 即视为百分比数自动折算，避免误拦（此适配为临时兼容，后续可删）。
     """
     schema = FIELD_SCHEMA.get(deal_type, {})
     out = {}
@@ -531,7 +531,7 @@ def residential_flat_from_score_input(inp: dict | None) -> dict:
 
     price→asking_price、monthly_rent 直通，building_sf/beds/baths/
     year_built 若输入带了也直通；其余打分参数（利率/首付等）不在
-    intake schema 内，不进门。供住宅导出前过门（台账第 4 项）复用。
+    intake schema 内，不进门。供住宅导出前过门复用。
     """
     inp = inp or {}
     flat = {}

@@ -22,7 +22,7 @@ router = APIRouter(tags=["documents"])
 
 @router.post("/api/wb/intake/gate")
 def wb_intake_gate(payload: dict):
-    """Intake 数据质量门（台账 2026-10-06）：对任意字段集合跑门。
+    """Intake 数据质量门：对任意字段集合跑门。
 
     payload: {deal_type: commercial|residential, fields: {flat_key: value} 或
               [{key,value,...}], tenants: [...], text: 原始文本(可选，用于文档内矛盾检测)}
@@ -85,7 +85,7 @@ async def wb_intake_pdf(request: Request, file: UploadFile = File(...)):
 
 @router.post("/api/wb/intake/pdf-ocr-text")
 def wb_intake_pdf_ocr_text(payload: dict):
-    """住宅扫描版 PDF OCR 文本 intake（台账第 3 项，2026-10-14）。
+    """住宅扫描版 PDF OCR 文本 intake。
 
     扫描 PDF 无文本层时 /api/wb/intake/pdf 返回 needs_ocr；浏览器端
     pdf.js 渲染 + Tesseract.js OCR 后把文本发到这里，走同一抽取引擎，
@@ -139,7 +139,7 @@ async def uw_commercial_intake_pdf(request: Request, file: UploadFile = File(...
 
 @router.post("/api/uw-commercial/intake/pdf-ocr-text")
 def uw_commercial_intake_pdf_ocr_text(payload: dict):
-    """商业扫描版 PDF OCR 文本 intake（台账第 3 项，2026-10-14）。
+    """商业扫描版 PDF OCR 文本 intake。
 
     扫描 PDF 无文本层时 /api/uw-commercial/intake/pdf 返回 needs_ocr；
     浏览器端 pdf.js 渲染 + Tesseract.js OCR 后把文本发到这里，与普通
@@ -165,7 +165,7 @@ def uw_commercial_intake_pdf_ocr_text(payload: dict):
 
 @router.post("/api/uw-commercial/intake/text")
 def uw_commercial_intake_text(payload: dict):
-    """商业粘贴文本 intake（台账 2026-10-07）：粘贴 OM/flyer/卖方材料文本
+    """商业粘贴文本 intake：粘贴 OM/flyer/卖方材料文本
     → 提取商业核保字段（价格/面积/NOI/租户）。
 
     与 PDF intake 共用同一抽取引擎，返回形状一致（fields[] 直接对应
@@ -187,7 +187,7 @@ def uw_commercial_intake_text(payload: dict):
 
 @router.post("/api/uw-commercial/intake/image-text")
 def uw_commercial_intake_image_text(payload: dict):
-    """商业截图 OCR 文本 intake（台账第 2 项，2026-10-13）。
+    """商业截图 OCR 文本 intake。
 
     浏览器端 Tesseract.js 对截图做 OCR 后把文本发到这里，与 PDF intake
     共用同一抽取引擎；返回 fields[]/tenants[]/quality_gate，全部标
@@ -275,7 +275,7 @@ def wb_intake_extracted(task_id: str):
 
 @router.post("/api/wb/intake/image-text")
 def wb_intake_image_text(payload: dict):
-    """住宅截图 OCR 文本 intake（台账第 4 项，2026-10-15）。
+    """住宅截图 OCR 文本 intake。
 
     浏览器端 OCR 后把文本发到这里，走住宅抽取引擎；返回
     fields[]/quality_gate（residential-v1），全部标"截图 OCR 提取、

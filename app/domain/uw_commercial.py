@@ -70,7 +70,7 @@ TIER_A = ("vacancy_pct", "down_pct", "rate", "amort_years", "market_cap_rate",
 
 
 def _div(a, b) -> float | None:
-    # D3（2026-10-10，D460 CEO 已定）：零分母 → None（N/A 链），禁止 0.0 冒充
+    # 零分母处理（2026-10-10 已定）：零分母 → None（N/A 链），禁止 0.0 冒充
     # —— 0.00/0% 会被误读为"真实算出的零"（如 IRR 0% 误读为保本）。
     # 调用方一律做 None 守卫（算术链断开处见 projected_resale / sale_price），
     # 前端 None → "—"（fmtVal），绝不渲染 0.00/0%。
