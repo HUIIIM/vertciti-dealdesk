@@ -54,7 +54,7 @@ rm -f dealdesk.db && .venv/bin/pytest tests/ -q
 - v2 运维（环境变量、用户与权限、备份恢复、排障、迁移）：见 `docs/RUNBOOK.md`。
 - 生产部署源是 `vercel-deploy/`（`app/`、`static/`、根静态文件、`requirements.txt`
   必须与仓库根对齐，全量同步）。部署命令：
-  `~/workspace/skills/vercel/bin/vc-deploy` → Vercel 项目 `vertciti-dealdesk`。
+  `<workspace>/skills/vercel/bin/vc-deploy` → Vercel 项目 `vertciti-dealdesk`。
 - 部署前必跑 `tools/pre_deploy_diff_gate.sh`：按下方三条 rsync
   规则 dry-run diff，失步→非零退出＋清单，直接拦截；`tools/deploy.sh` 已在
   vc-deploy 调用前强制执行。
@@ -104,4 +104,4 @@ rm -f dealdesk.db && .venv/bin/pytest tests/ -q
 | 备份 | `.venv/bin/python tools/db_backup.py backup ~/backups` |
 | 查 TopHap 状态 | `curl http://127.0.0.1:8100/api/tophap/status` |
 | 生产状态 | `curl https://vertciti-dealdesk.vercel.app/api/tophap/status` |
-| 敏感扫描 | `bash ~/workspace/vertcity/security-watch/data-room-gate.sh` |
+| 敏感扫描 | `bash <monorepo>/security-watch/data-room-gate.sh` |

@@ -41,7 +41,7 @@ PR #23 由 Claude 维护（CI 红了会修）。等 HUIIIM 合并后，从 `main
 # 同步 vercel-deploy/（三条 rsync 规则，见 AGENTS.md），然后：
 bash tools/pre_deploy_diff_gate.sh          # 必须 exit 0
 # 改过 static/ 内联 JS 的话：python tools/csp_hashes.py 重算并写入 vercel-deploy/vercel.json
-~/workspace/vertcity/deliverables/ship-gate/ship-gate dealdesk   # 统一流水线（tools/deploy.sh 已废弃，仅兜底）
+<monorepo>/deliverables/ship-gate/ship-gate dealdesk   # 统一流水线（tools/deploy.sh 已废弃，仅兜底）
 ```
 **注意两个坑：**
 1. 根目录同步规则排除了 `app/`，所以 `/app/` 必须能到达：确认 `vercel-deploy/vercel.json` 里 `/app` 和 `/app/(.*)` 指向 `static/app/…`（或指向 serverless 由 FastAPI 提供）。SPA 深链（如 `/app/deals/123`）要回落到 `static/app/index.html`。
@@ -79,4 +79,4 @@ bash tools/pre_deploy_diff_gate.sh          # 必须 exit 0
 8. 截图 1–7 发回给 HUIIIM。上线后告诉 Claude 部署日期，CHANGELOG 的 2.1.0 由“未发布”改成日期。
 
 ## 8. 发布前
-跑敏感扫描：`bash ~/workspace/vertcity/security-watch/data-room-gate.sh`，FAIL 则停。
+跑敏感扫描：`bash <monorepo>/security-watch/data-room-gate.sh`，FAIL 则停。

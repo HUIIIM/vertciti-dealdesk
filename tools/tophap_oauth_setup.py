@@ -17,7 +17,7 @@
         所以刷新凭证只存 .env（gitignored，权限 600），不进 Vault。
 
 用法：
-  cd ~/workspace/vertcity/dealdesk && .venv/bin/python tools/tophap_oauth_setup.py
+  cd <repo>（本仓根目录） && .venv/bin/python tools/tophap_oauth_setup.py
   # 若浏览器打不开 localhost 回调：加 --manual，按提示粘贴跳转 URL 或 code
 
 说明：
