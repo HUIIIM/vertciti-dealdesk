@@ -59,100 +59,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v2/admin/users/{username}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /**
-         * Update User
-         * @description 邀请（填 Google 邮箱）/ 撤销（邮箱填空）、改角色、停用。
-         */
-        patch: operations["update_user_api_v2_admin_users__username__patch"];
-        trace?: never;
-    };
-    "/api/v2/auth/google/callback": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Google Callback */
-        get: operations["google_callback_api_v2_auth_google_callback_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/auth/google/start": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Google Start */
-        get: operations["google_start_api_v2_auth_google_start_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/auth/logout": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Logout
-         * @description 退出：作废当前会话令牌（Google 登录换来的那种；长期访问令牌不受影响）。
-         */
-        post: operations["logout_api_v2_auth_logout_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/auth/providers": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Providers
-         * @description 登录页用：哪些登录方式可用（不需登录）。
-         */
-        get: operations["providers_api_v2_auth_providers_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v2/catalog": {
         parameters: {
             query?: never;
@@ -2223,12 +2129,22 @@ export interface components {
             auth: boolean;
             /** Display Name */
             display_name: string;
+            /**
+             * Google Login
+             * @default false
+             */
+            google_login: boolean;
             /** Permissions */
             permissions: string[];
             /** Role */
             role: string;
             /** Role Label */
             role_label: string;
+            /**
+             * Token Login
+             * @default false
+             */
+            token_login: boolean;
             /** Username */
             username: string;
         } & {
@@ -2860,8 +2776,6 @@ export interface components {
             active: boolean;
             /** Display Name */
             display_name: string;
-            /** Email */
-            email?: string | null;
             /** Id */
             id: number;
             /** Note */
@@ -2886,11 +2800,6 @@ export interface components {
              */
             display_name: string;
             /**
-             * Email
-             * @description 允许此人用 Google 登录（邀请制）
-             */
-            email?: string | null;
-            /**
              * Role
              * @enum {string}
              */
@@ -2904,8 +2813,6 @@ export interface components {
             active: boolean;
             /** Display Name */
             display_name: string;
-            /** Email */
-            email?: string | null;
             /** Id */
             id: number;
             /** Role */
@@ -2914,18 +2821,6 @@ export interface components {
             username: string;
         } & {
             [key: string]: unknown;
-        };
-        /** UserPatch */
-        UserPatch: {
-            /** Active */
-            active?: boolean | null;
-            /**
-             * Email
-             * @description 空字符串 = 撤销 Google 登录
-             */
-            email?: string | null;
-            /** Role */
-            role?: ("chairman" | "analyst" | "viewer") | null;
         };
         /** UwProjectIn */
         UwProjectIn: {
@@ -3595,134 +3490,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    update_user_api_v2_admin_users__username__patch: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                username: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UserPatch"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["UserOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    google_callback_api_v2_auth_google_callback_get: {
-        parameters: {
-            query?: {
-                code?: string;
-                state?: string;
-                error?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            302: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    google_start_api_v2_auth_google_start_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            302: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    logout_api_v2_auth_logout_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: boolean;
-                    };
-                };
-            };
-        };
-    };
-    providers_api_v2_auth_providers_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
                 };
             };
         };

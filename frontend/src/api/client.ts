@@ -14,26 +14,14 @@ export type GateOut = Schemas["GateOut"];
 
 const TOKEN_KEY = "dd.token";
 
-// 手动粘贴的长期令牌只存本标签页（sessionStorage）；Google 登录换来的会话令牌（dds_，服务端 12 小时过期）
-// 存 localStorage，关掉标签页再开不用重新登录
 export function getToken(): string | null {
-  try { return window.sessionStorage.getItem(TOKEN_KEY) ?? window.localStorage.getItem(TOKEN_KEY); } catch { return null; }
+  try { return window.sessionStorage.getItem(TOKEN_KEY); } catch { return null; }
 }
 export function setToken(t: string | null): void {
   try {
-    window.sessionStorage.removeItem(TOKEN_KEY);
-    window.localStorage.removeItem(TOKEN_KEY);
-    if (t) (t.startsWith("dds_") ? window.localStorage : window.sessionStorage).setItem(TOKEN_KEY, t);
-  } catch { /* 存储不可用时仅本页有效 */ }
-}
-
-/** Google 登录回跳：后端把结果放在 URL 片段（#auth=令牌 / #auth_error=原因），读出后立刻从地址栏抹掉。 */
-export function consumeAuthFragment(): string | null {
-  const h = window.location.hash;
-  if (!h.startsWith("#auth=") && !h.startsWith("#auth_error=")) return null;
-  window.history.replaceState(null, "", window.location.pathname + window.location.search + "#/");
-  if (h.startsWith("#auth=")) { setToken(decodeURIComponent(h.slice(6))); return null; }
-  return decodeURIComponent(h.slice(12));
+    if (t) window.sessionStorage.setItem(TOKEN_KEY, t);
+    else window.sessionStorage.removeItem(TOKEN_KEY);
+  } catch { /* 会话存储不可用时仅本页有效 */ }
 }
 
 export class ApiError extends Error {

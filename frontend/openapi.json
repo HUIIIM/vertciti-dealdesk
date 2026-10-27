@@ -2756,6 +2756,11 @@
       "title": "Display Name",
       "type": "string"
      },
+     "google_login": {
+      "default": false,
+      "title": "Google Login",
+      "type": "boolean"
+     },
      "permissions": {
       "items": {
        "type": "string"
@@ -2770,6 +2775,11 @@
      "role_label": {
       "title": "Role Label",
       "type": "string"
+     },
+     "token_login": {
+      "default": false,
+      "title": "Token Login",
+      "type": "boolean"
      },
      "username": {
       "title": "Username",
@@ -4351,17 +4361,6 @@
       "title": "Display Name",
       "type": "string"
      },
-     "email": {
-      "anyOf": [
-       {
-        "type": "string"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Email"
-     },
      "id": {
       "title": "Id",
       "type": "integer"
@@ -4405,20 +4404,6 @@
       "title": "Display Name",
       "type": "string"
      },
-     "email": {
-      "anyOf": [
-       {
-        "maxLength": 254,
-        "pattern": "^\\s*\\S+@\\S+\\.\\S+\\s*$",
-        "type": "string"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "description": "允许此人用 Google 登录（邀请制）",
-      "title": "Email"
-     },
      "role": {
       "enum": [
        "chairman",
@@ -4431,7 +4416,7 @@
      "username": {
       "maxLength": 80,
       "minLength": 2,
-      "pattern": "^[A-Za-z0-9._-]+$",
+      "pattern": "^[A-Za-z0-9._%+\\-@]+$",
       "title": "Username",
       "type": "string"
      }
@@ -4454,17 +4439,6 @@
       "title": "Display Name",
       "type": "string"
      },
-     "email": {
-      "anyOf": [
-       {
-        "type": "string"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Email"
-     },
      "id": {
       "title": "Id",
       "type": "integer"
@@ -4486,54 +4460,6 @@
      "active"
     ],
     "title": "UserOut",
-    "type": "object"
-   },
-   "UserPatch": {
-    "additionalProperties": false,
-    "properties": {
-     "active": {
-      "anyOf": [
-       {
-        "type": "boolean"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Active"
-     },
-     "email": {
-      "anyOf": [
-       {
-        "maxLength": 254,
-        "pattern": "^\\s*(\\S+@\\S+\\.\\S+)?\\s*$",
-        "type": "string"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "description": "空字符串 = 撤销 Google 登录",
-      "title": "Email"
-     },
-     "role": {
-      "anyOf": [
-       {
-        "enum": [
-         "chairman",
-         "analyst",
-         "viewer"
-        ],
-        "type": "string"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Role"
-     }
-    },
-    "title": "UserPatch",
     "type": "object"
    },
    "UwProjectIn": {
@@ -5759,179 +5685,6 @@
     "summary": "Create User",
     "tags": [
      "v2 · admin"
-    ]
-   }
-  },
-  "/api/v2/admin/users/{username}": {
-   "patch": {
-    "description": "邀请（填 Google 邮箱）/ 撤销（邮箱填空）、改角色、停用。",
-    "operationId": "update_user_api_v2_admin_users__username__patch",
-    "parameters": [
-     {
-      "in": "path",
-      "name": "username",
-      "required": true,
-      "schema": {
-       "title": "Username",
-       "type": "string"
-      }
-     }
-    ],
-    "requestBody": {
-     "content": {
-      "application/json": {
-       "schema": {
-        "$ref": "#/components/schemas/UserPatch"
-       }
-      }
-     },
-     "required": true
-    },
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/UserOut"
-        }
-       }
-      },
-      "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
-     }
-    },
-    "summary": "Update User",
-    "tags": [
-     "v2 · admin"
-    ]
-   }
-  },
-  "/api/v2/auth/google/callback": {
-   "get": {
-    "operationId": "google_callback_api_v2_auth_google_callback_get",
-    "parameters": [
-     {
-      "in": "query",
-      "name": "code",
-      "required": false,
-      "schema": {
-       "default": "",
-       "title": "Code",
-       "type": "string"
-      }
-     },
-     {
-      "in": "query",
-      "name": "state",
-      "required": false,
-      "schema": {
-       "default": "",
-       "title": "State",
-       "type": "string"
-      }
-     },
-     {
-      "in": "query",
-      "name": "error",
-      "required": false,
-      "schema": {
-       "default": "",
-       "title": "Error",
-       "type": "string"
-      }
-     }
-    ],
-    "responses": {
-     "302": {
-      "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
-     }
-    },
-    "summary": "Google Callback",
-    "tags": [
-     "v2 · auth"
-    ]
-   }
-  },
-  "/api/v2/auth/google/start": {
-   "get": {
-    "operationId": "google_start_api_v2_auth_google_start_get",
-    "responses": {
-     "302": {
-      "description": "Successful Response"
-     }
-    },
-    "summary": "Google Start",
-    "tags": [
-     "v2 · auth"
-    ]
-   }
-  },
-  "/api/v2/auth/logout": {
-   "post": {
-    "description": "退出：作废当前会话令牌（Google 登录换来的那种；长期访问令牌不受影响）。",
-    "operationId": "logout_api_v2_auth_logout_post",
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "additionalProperties": {
-          "type": "boolean"
-         },
-         "title": "Response Logout Api V2 Auth Logout Post",
-         "type": "object"
-        }
-       }
-      },
-      "description": "Successful Response"
-     }
-    },
-    "summary": "Logout",
-    "tags": [
-     "v2 · auth"
-    ]
-   }
-  },
-  "/api/v2/auth/providers": {
-   "get": {
-    "description": "登录页用：哪些登录方式可用（不需登录）。",
-    "operationId": "providers_api_v2_auth_providers_get",
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "additionalProperties": true,
-         "title": "Response Providers Api V2 Auth Providers Get",
-         "type": "object"
-        }
-       }
-      },
-      "description": "Successful Response"
-     }
-    },
-    "summary": "Providers",
-    "tags": [
-     "v2 · auth"
     ]
    }
   },
