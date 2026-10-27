@@ -106,11 +106,7 @@ def exchange_code(code: str, verifier: str) -> dict[str, Any]:
             "grant_type": "authorization_code",
             "code_verifier": verifier,
         }, timeout=10, limit=MAX_TOKEN_BYTES)
-        if r.status_code != 200:
-            raise GoogleAuthError("verify_failed")
-        data: dict[str, Any] = r.json()
-    except GoogleAuthError:
-        raise
+        data: dict[str, Any] = r.json() if r.status_code == 200 else {}
     except Exception as e:  # 上游错误细节（含超限）只收敛为一类，不进用户可见文案
         raise GoogleAuthError("verify_failed") from e
     if not isinstance(data, dict) or not data.get("id_token"):
