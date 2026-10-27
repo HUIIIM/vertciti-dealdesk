@@ -292,10 +292,9 @@ EN: dict[str, str] = {
         "Leases × hold months exceeds {0:,} (per-run compute limit): combine small leases or shorten the hold",
     "不能停用或降级自己": "You can't deactivate or demote yourself",
     "用户 {0} 不存在": "User {0} doesn't exist",
-    "邮箱 {0} 已登记给用户 {1}": "Email {0} is already registered to user {1}",
     "Google 登录": "Google sign-in",
-    "邀请制：在“用户”里登记邮箱的人可用 Google 账号登录；配置见 docs/GOOGLE-LOGIN.md":
-        "Invitation only: people whose email is registered under Users can sign in with Google; setup in docs/GOOGLE-LOGIN.md",
+    "既有用户（用户名即邮箱）可用 Google 账号登录；未配置时登录页回退令牌登录":
+        "Existing users (username is the email) can sign in with Google; when not configured, the sign-in page falls back to token login",
     "软成本": "Soft costs", "再融资估值资本化率": "Refinance valuation cap rate",
     "出租率（实际平均）": "Occupancy (actual average)",
     "其他经营差异（第 1 年 NOI 校准到实际）": "Other operating variance (year-1 NOI calibrated to actual)",

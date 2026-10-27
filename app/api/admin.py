@@ -15,9 +15,22 @@ def health():
 
 @router.get("/api/tophap/status")
 def tophap_status():
-    """TopHap 数据源状态：开关 / 授权 / 连通性 / tool 面（OAuth 授权后的校验入口）。"""
+    """TopHap 数据源状态（匿名面）：只回状态布尔与计数。
+
+    本端点无令牌可达（巡检与部署冒烟的既有消费方式不变），但响应按
+    2026-10-27 裁定收口：不回 MCP 地址与工具清单（内部全量状态仍走
+    app.services.tophap.status() 进程内调用）。
+    """
     from app.services import tophap  # 懒导入：未启用时不增加启动依赖
-    return tophap.status()
+    st = tophap.status()
+    return {
+        "enabled": bool(st.get("enabled")),
+        "configured": bool(st.get("configured")),
+        "reachable": st.get("reachable"),
+        "core_ready": bool(st.get("core_ready")),
+        "token_expired": bool(st.get("token_expired")),
+        "tools_count": len(st.get("tools") or []),
+    }
 
 
 # ---------------- 旧版页面 → v2 工作台 ----------------

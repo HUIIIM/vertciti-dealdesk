@@ -10,7 +10,7 @@ import { ApiError } from "@/api/client";
 
 const catalog = { metrics: { dscr: { label: "DSCR", label_en: "DSCR", unit: "x", better: "higher" }, irr_pct: { label: "IRR", label_en: "IRR", unit: "pct", better: "higher" } },
   primary_metric: { commercial: "irr_pct" }, assumptions: {}, kill_criteria_defaults: {}, scenario_defaults: {} } as unknown as AppCtx["catalog"];
-const ctx: AppCtx = { me: { username: "local", role: "chairman", role_label: "董事长", display_name: "本机", auth: false, permissions: [] }, catalog,
+const ctx: AppCtx = { me: { username: "local", role: "chairman", role_label: "董事长", display_name: "本机", auth: false, google_login: false, token_login: false, permissions: [] }, catalog,
   can: () => true, refreshDeals: () => {}, dealsVersion: 0 };
 
 describe("ui", () => {

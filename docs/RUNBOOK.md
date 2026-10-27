@@ -19,8 +19,11 @@
 |---|---|---|
 | `DATABASE_URL` | 空 | 设了就用 Postgres（生产） |
 | `DEALDESK_DB` | 仓库根 `dealdesk.db` | SQLite 库路径（开发） |
-| `DEALDESK_AUTH` | off | `on`：v2 接口需 `Authorization: Bearer <token>`；off 时所有请求视为本机董事长 |
-| `DEALDESK_AUTH_PROTECT_V1` | （已废弃） | 不再生效：`DEALDESK_AUTH=on` 时 v1 旧接口一律要求登录（`/api/health` 除外），v1 项目增删改要求“分析”及以上 |
+| `DEALDESK_AUTH` | off | `on`：v2 接口认 Bearer 令牌或 Google 登录会话 cookie；off 时所有请求视为本机董事长 |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` / `GOOGLE_REDIRECT_URI` | 空 | Google 登录凭证（OAuth 客户端）；回调 URI 须与控制台登记逐字一致，定版值：`https://vertciti-dealdesk.vercel.app/auth/google/callback`；三者齐全登录页才出现 Google 按钮 |
+| `DEALDESK_TOKEN_LOGIN_ENABLED` | 空（关） | `1`：登录页同时保留令牌粘贴入口（过渡期）；Google 未配置时前端自动回退显示令牌表单防锁死，不受此开关影响 |
+| `DEALDESK_SESSION_COOKIE_SECURE` | 1 | 会话 cookie 的 Secure 属性；本机 HTTP 调试可设 0，生产必须保持 1 |
+| `DEALDESK_AUTH_PROTECT_V1` | 空 | `1`（且 `DEALDESK_AUTH=on`）：v1 持久化面（项目 / uw 项目 / 对比 / 研究证据 / 摄入待处理与已提取队列）读要求登录、增删改要求“分析”及以上；无状态计算面（`/api/score` 等）不在此列、保持公开。生产已设 `1` |
 | `DEALDESK_AUTH_FAIL_LIMIT` / `_WINDOW` | 20 / 300 秒 | 同一 IP 错令牌达上限即 429 |
 | `DEALDESK_MAX_BODY_MB` | 32 | 请求体硬上限；分块上传也边收边计数，超限 413 |
 | `DEALDESK_TRUST_PROXY` | 空 | `1`：在可信反向代理（Vercel 等）后，限流按 X-Forwarded-For 第一跳计 IP；**生产必须设**，否则所有人共用代理 IP、一人输错令牌全员被锁 |
@@ -36,9 +39,11 @@ python -m app.core.security add-user miao chairman "苗总"   # 打印一次性 
 角色：`chairman` 董事长（付款审批、归档、用户管理）· `analyst` 分析 · `viewer` 只读。
 任何人不能审批自己发起的申请。令牌只存 sha256；丢了就新建用户 / 重新发放，无法找回。
 
-### Google 登录
-配置步骤、邀请与撤销：见 [GOOGLE-LOGIN.md](GOOGLE-LOGIN.md)。登录失败时登录页会写明原因（未被邀请 / 未配置 / 没有完成）；
-服务端日志 `dealdesk.auth` 只记 `google sign-in refused` 与原因代码（成功时记用户名），不记邮箱、不记令牌。
+**Google 登录（2026-10-22 起主登录方式）**：邮箱 == username 匹配既有用户（大小写不敏感）且 `active` 才放行，
+不开放注册——给受邀朋友开号就是用其 Google 邮箱建用户。登录后发服务端会话（`web_sessions` 表、可吊销、
+30 天滑动续期），cookie `dd_session`（HttpOnly + Secure + SameSite=Lax）。停用用户即断其新登录；
+已发会话在下一次校验时同步失效（resolve 时查 active）。董事长 Google 账号行（986miao@gmail.com、chairman）
+须在生产库在案，上线前核查项见施工回执。
 
 ## 4. 排障
 

@@ -486,6 +486,25 @@ def test_oauth_build_authorize_url():
     assert "client_id=cid-1" in url and "state=STATE1" in url
 
 
+def test_status_endpoint_trims_info_surface(monkeypatch):
+    """匿名 /api/tophap/status 只回布尔与计数：无 MCP 地址、无工具清单（2026-10-27 裁定收口）。"""
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+    from app.services import tophap as svc_tophap
+
+    full = {"enabled": True, "configured": True, "mcp_url": "https://mcp.example.invalid/api",
+            "reachable": True, "tools": ["find_property_by_address", "search_properties"],
+            "core_ready": True, "token_expired": False, "note": "MCP 连通"}
+    monkeypatch.setattr(svc_tophap, "status", lambda: dict(full))
+    r = TestClient(app).get("/api/tophap/status")
+    assert r.status_code == 200
+    body = r.json()
+    assert body == {"enabled": True, "configured": True, "reachable": True,
+                    "core_ready": True, "token_expired": False, "tools_count": 2}
+    assert "mcp" not in r.text and "find_property_by_address" not in r.text
+
+
 def test_write_dotenv_roundtrip(tmp_path, monkeypatch):
     env_file = tmp_path / ".env"
     env_file.write_text("A=1\nTOPHAP_ACCESS_TOKEN=old\n")

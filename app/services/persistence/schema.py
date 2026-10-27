@@ -95,18 +95,22 @@ class User(AuditMixin, Base):
     role: Mapped[str] = mapped_column(String(20), nullable=False)  # chairman | analyst | viewer
     token_sha256: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    # Google 登录：董事长邀请时填的邮箱（小写）；只有登记过邮箱的人能用 Google 登录（邀请制，无公开注册）
-    email: Mapped[str | None] = mapped_column(String(254), unique=True, nullable=True)
 
 
-class UserSession(AuditMixin, Base):
-    """Google 登录换来的会话令牌：只存 sha256，到期作废；与用户的长期访问令牌互不影响。"""
+class WebSession(AuditMixin, Base):
+    """浏览器会话（Google 登录签发）：cookie 只存不透明随机值，本表存其 sha256，可单条吊销。
 
-    __tablename__ = "user_sessions"
+    30 天滑动过期：expires_at 随有效访问后延（见 app/core/sessions.py）；revoked_at 非空即已吊销。
+    """
+
+    __tablename__ = "web_sessions"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     token_sha256: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
-    username: Mapped[str] = mapped_column(String(80), index=True, nullable=False)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    __table_args__ = (Index("ix_web_sessions_user", "user_id"),)
 
 
 # ---------------------------------------------------------------- v2：交易与生命周期
