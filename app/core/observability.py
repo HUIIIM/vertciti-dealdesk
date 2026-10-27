@@ -36,6 +36,9 @@ access_log = logging.getLogger("dealdesk.access")
 RECENT_ERRORS: deque[dict[str, Any]] = deque(maxlen=100)
 _RID_OK = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 _V1_PROTECTED = re.compile(r"^/api/(projects|uw/projects)(/|$)")
+# v1 旧接口 = /api/ 下除 v2 以外的一切；认证开启时匿名一律 401（健康检查除外）
+_V1_ANY = re.compile(r"^/api/(?!v2(/|$))")
+_V1_PUBLIC = frozenset({"/api/health"})
 
 
 class JsonFormatter(logging.Formatter):
@@ -96,6 +99,9 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
             if wait:
                 resp: Response = JSONResponse({"detail": T("令牌错误次数过多，请稍后再试"), "request_id": rid},
                                               status_code=429, headers={"Retry-After": str(int(wait) + 1)})
+            elif (security.protect_v1() and actor is security.ANONYMOUS and method != "OPTIONS"
+                    and _V1_ANY.match(path) and path not in _V1_PUBLIC):
+                resp = JSONResponse({"detail": T("需要登录：请提供有效的访问令牌"), "request_id": rid}, status_code=401)
             elif (security.protect_v1() and method in ("POST", "PUT", "DELETE") and _V1_PROTECTED.match(path)
                     and not security.can(actor, "deal.write")):
                 resp = JSONResponse({"detail": T("需要“分析”及以上角色"), "request_id": rid},

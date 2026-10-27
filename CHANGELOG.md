@@ -6,6 +6,14 @@
 
 机构级承销引擎 cre-1.0（第三条赛道 `institutional`）。住宅 / 商业两条赛道与 v1 金标准的计算结果不变。
 
+### 安全
+- **认证开启时 v1 旧接口默认关闭（独立评估 #30 SEC-A1，P0）**：以前要另设 `DEALDESK_AUTH_PROTECT_V1=1`，
+  且只管 `/api/projects|uw/projects` 的写；生产没设，于是 v1 读写、`/api/wb/research`、`/api/wb/intake/pdf`
+  （最多 32 MB 解析）、`/api/tophap/status`（泄露 MCP 地址与工具列表）全部匿名可用。现在 `DEALDESK_AUTH=on`
+  即生效：`/api/` 下非 v2 的接口匿名一律 401（解析之前就拒，不再是 422），`/api/health` 除外；项目增删改仍要
+  “分析”及以上。旧开关废弃、设成什么都不能把门重新打开。单机模式（认证关）行为不变。新增 2 个回归测试，
+  旧代码上失败、新代码上通过。
+
 ### 新增
 - **Google 登录（邀请制）**：董事长在“设置 → 用户”按 Gmail 邀请，对方点“使用 Google 账号登录”即可进入；
   未登记的邮箱进不来，没有公开注册。所有者邮箱（`DEALDESK_OWNER_EMAIL`）第一次登录自动建董事长账号。

@@ -20,7 +20,7 @@
 | `DATABASE_URL` | 空 | 设了就用 Postgres（生产） |
 | `DEALDESK_DB` | 仓库根 `dealdesk.db` | SQLite 库路径（开发） |
 | `DEALDESK_AUTH` | off | `on`：v2 接口需 `Authorization: Bearer <token>`；off 时所有请求视为本机董事长 |
-| `DEALDESK_AUTH_PROTECT_V1` | 空 | `1`：v1 项目增删改也要求“分析”及以上 |
+| `DEALDESK_AUTH_PROTECT_V1` | （已废弃） | 不再生效：`DEALDESK_AUTH=on` 时 v1 旧接口一律要求登录（`/api/health` 除外），v1 项目增删改要求“分析”及以上 |
 | `DEALDESK_AUTH_FAIL_LIMIT` / `_WINDOW` | 20 / 300 秒 | 同一 IP 错令牌达上限即 429 |
 | `DEALDESK_MAX_BODY_MB` | 32 | 请求体硬上限；分块上传也边收边计数，超限 413 |
 | `DEALDESK_TRUST_PROXY` | 空 | `1`：在可信反向代理（Vercel 等）后，限流按 X-Forwarded-For 第一跳计 IP；**生产必须设**，否则所有人共用代理 IP、一人输错令牌全员被锁 |
