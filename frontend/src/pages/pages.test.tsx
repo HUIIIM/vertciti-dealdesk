@@ -137,9 +137,17 @@ describe("比较与设置", () => {
     await go("#/settings/shortcuts");
     expect(await screen.findByText("打开命令栏：搜交易、跳页面、执行命令")).toBeInTheDocument();
   });
-  it("认证开启且未登录 → 令牌登录页", async () => {
-    override("GET /api/v2/me", 200, { username: "anonymous", role: "viewer", role_label: "只读", display_name: "匿名", auth: true, permissions: [] });
+  it("认证开启且未登录 → 登录页（Google 未配置时回退令牌）", async () => {
+    override("GET /api/v2/me", 200, { username: "anonymous", role: "viewer", role_label: "只读", display_name: "匿名", auth: true, google_login: false, token_login: false, permissions: [] });
     at("#/");
-    expect(await screen.findByRole("heading", { name: "输入访问令牌" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "登录" })).toBeInTheDocument();
+    expect(screen.getByLabelText("访问令牌")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "使用 Google 登录" })).not.toBeInTheDocument();
+  });
+  it("认证开启且未登录 → Google 已配置时只显示 Google 按钮", async () => {
+    override("GET /api/v2/me", 200, { username: "anonymous", role: "viewer", role_label: "只读", display_name: "匿名", auth: true, google_login: true, token_login: false, permissions: [] });
+    at("#/");
+    expect(await screen.findByRole("link", { name: "使用 Google 登录" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("访问令牌")).not.toBeInTheDocument();
   });
 });
