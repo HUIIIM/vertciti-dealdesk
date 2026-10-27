@@ -6,14 +6,13 @@ from typing import Any
 
 from sqlalchemy import select
 
-from app.core import security
+from app.core import google_auth, security
 from app.core.context import current_actor
 from app.core.i18n import T, label
 from app.domain.v2 import kill_criteria
 from app.services.persistence import audit
 from app.services.persistence.engine import session_scope
 from app.services.persistence.schema import AuditLog, SavedView, Template, User
-from app.services.v2 import google_auth
 from app.services.v2.errors import ConflictError, InvalidInputError, NotFoundError
 from app.services.v2.serialize import row
 
@@ -99,7 +98,7 @@ def list_users() -> list[JSON]:
         return [row(u, exclude=("token_sha256",)) for u in s.scalars(select(User).order_by(User.username)).all()]
 
 
-def create_user(username: str, role: str, display_name: str = "", email: str | None = None) -> JSON:
+def create_user(username: str, role: str, display_name: str = "") -> JSON:
     security.require("users.manage")
     try:
         security.Role(role)
@@ -108,48 +107,17 @@ def create_user(username: str, role: str, display_name: str = "", email: str | N
     with session_scope() as s:
         if s.scalar(select(User.id).where(User.username == username)) is not None:
             raise ConflictError(T("用户名 {0} 已存在", username))
-        _email_free(s, email)
     try:
-        token = security.add_user(username, role, display_name, email)
+        token = security.add_user(username, role, display_name)
     except ValueError as e:  # 保留名
         raise InvalidInputError(str(e)) from e
     with session_scope() as s:
         u = s.scalar(select(User).where(User.username == username))
         if u is None:  # add_user 刚写入；读不到说明库状态异常
             raise NotFoundError(T("用户 {0} 创建后读取失败", username))
-        audit.record(s, "user", u.id, "create", None, {"username": username, "role": role, "email": u.email})
+        audit.record(s, "user", u.id, "create", None, {"username": username, "role": role})
         return {**row(u, exclude=("token_sha256",)), "token": token,
                 "note": T("访问令牌只显示这一次，请立即妥善保存")}
-
-
-def _email_free(s: Any, email: str | None, username: str | None = None) -> None:
-    e = security.normalize_email(email)
-    if e is None:
-        return
-    other = s.scalar(select(User).where(User.email == e))
-    if other is not None and other.username != username:
-        raise ConflictError(T("邮箱 {0} 已登记给用户 {1}", e, other.username))
-
-
-def update_user(username: str, changes: JSON) -> JSON:
-    """改邮箱（邀请 / 撤销 Google 登录）、角色、启用状态。不能停用或降级自己，免得把自己锁在门外。"""
-    me = security.require("users.manage")
-    with session_scope() as s:
-        u = s.scalar(select(User).where(User.username == username))
-        if u is None:
-            raise NotFoundError(T("用户 {0} 不存在", username))
-        if u.username == me.username and (changes.get("active") is False or changes.get("role") not in (None, u.role)):
-            raise InvalidInputError(T("不能停用或降级自己"))
-        before = {"email": u.email, "role": u.role, "active": u.active}
-        if "email" in changes:
-            _email_free(s, changes["email"], u.username)
-            u.email = security.normalize_email(changes["email"])
-        if changes.get("role") is not None:
-            u.role = security.Role(changes["role"]).value
-        if changes.get("active") is not None:
-            u.active = bool(changes["active"])
-        audit.record(s, "user", u.id, "update", before, {"email": u.email, "role": u.role, "active": u.active})
-        return row(u, exclude=("token_sha256",))
 
 
 def audit_log(entity: str | None = None, entity_id: str | None = None, limit: int = 200) -> list[JSON]:
@@ -174,7 +142,7 @@ def data_sources() -> list[JSON]:
         {"key": "web", "label": T("公开网页（遵守 robots.txt）"), "configured": True, "detail": T(
             "失败诚实降级为手动录入")},
         {"key": "google_login", "label": T("Google 登录"), "configured": google_auth.configured(),
-         "detail": T("邀请制：在“用户”里登记邮箱的人可用 Google 账号登录；配置见 docs/GOOGLE-LOGIN.md")},
+         "detail": T("既有用户（用户名即邮箱）可用 Google 账号登录；未配置时登录页回退令牌登录")},
         {"key": "database", "label": T("数据库"), "configured": True,
          "detail": T("Postgres（DATABASE_URL）") if os.environ.get("DATABASE_URL") else T("SQLite（本机开发）")},
     ]

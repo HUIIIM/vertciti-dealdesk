@@ -196,18 +196,10 @@ class ViewIn(In):
 
 
 class UserIn(In):
-    username: str = Field(min_length=2, max_length=80, pattern=r"^[A-Za-z0-9._-]+$")
+    # 允许 @ 与邮箱字符：Google 登录以邮箱为 username 建号（账号映射键）；一般用户名形态不变
+    username: str = Field(min_length=2, max_length=80, pattern=r"^[A-Za-z0-9._%+\-@]+$")
     role: Literal["chairman", "analyst", "viewer"]
     display_name: str = Field(default="", max_length=120)
-    email: str | None = Field(default=None, max_length=254, pattern=r"^\s*\S+@\S+\.\S+\s*$",
-                              description="允许此人用 Google 登录（邀请制）")
-
-
-class UserPatch(In):
-    email: str | None = Field(default=None, max_length=254, pattern=r"^\s*(\S+@\S+\.\S+)?\s*$",
-                              description="空字符串 = 撤销 Google 登录")
-    role: Literal["chairman", "analyst", "viewer"] | None = None
-    active: bool | None = None
 
 
 # ---------------------------------------------------------------- 响应
@@ -709,6 +701,8 @@ class MeOut(Out):
     role_label: str
     display_name: str
     auth: bool
+    google_login: bool = False  # 服务端已配置 Google 登录凭证（登录页据此渲染按钮）
+    token_login: bool = False  # 令牌粘贴入口开关（过渡保留，缺省关）
     permissions: list[str]
 
 
@@ -773,7 +767,6 @@ class UserOut(Out):
     display_name: str
     role: str
     active: bool
-    email: str | None = None
 
 
 class UserCreatedOut(UserOut):

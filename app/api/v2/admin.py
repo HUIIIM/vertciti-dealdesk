@@ -20,11 +20,10 @@ from app.api.v2.schemas import (
     UserCreatedOut,
     UserIn,
     UserOut,
-    UserPatch,
     ViewIn,
     ViewOut,
 )
-from app.core import security
+from app.core import google_auth, security
 from app.core.context import current_actor
 from app.core.i18n import label
 from app.core.observability import RECENT_ERRORS
@@ -63,6 +62,8 @@ def me() -> dict[str, Any]:
             # 内置身份（本机用户 / 匿名）的显示名按语言输出；真实用户的显示名是用户数据，原样返回
             "display_name": label(a.display_name) if a.username in ("local", "anonymous") else a.display_name,
             "auth": security.auth_enabled(),
+            "google_login": google_auth.configured(),
+            "token_login": security.token_login_enabled(),
             "permissions": sorted(k for k in security.PERMISSIONS if security.can(a, k))}
 
 
@@ -79,13 +80,7 @@ def users() -> list[dict[str, Any]]:
 @router.post("/admin/users", response_model=UserCreatedOut, status_code=201, dependencies=[need("users.manage")])
 def create_user(body: UserIn) -> dict[str, Any]:
     """创建用户并返回一次性访问令牌（只显示这一次）。"""
-    return settings.create_user(body.username, body.role, body.display_name, body.email)
-
-
-@router.patch("/admin/users/{username}", response_model=UserOut, dependencies=[need("users.manage")])
-def update_user(username: str, body: UserPatch) -> dict[str, Any]:
-    """邀请（填 Google 邮箱）/ 撤销（邮箱填空）、改角色、停用。"""
-    return settings.update_user(username, body.model_dump(exclude_unset=True))
+    return settings.create_user(body.username, body.role, body.display_name)
 
 
 @router.get("/admin/audit", response_model=list[AuditOut], dependencies=[need("audit.read")])

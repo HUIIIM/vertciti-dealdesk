@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from app.api import admin, deals, documents, exports, intake, market, underwriting
+from app.api import admin, deals, documents, exports, google_auth, intake, market, underwriting
 
 # 装配顺序 = v1 main.py 中的注册顺序（intake 最先），保证路径匹配优先级不变
 ROUTERS: list[APIRouter] = [
@@ -14,4 +14,5 @@ ROUTERS: list[APIRouter] = [
     market.router,
     documents.router,
     exports.router,
+    google_auth.router,
 ]

@@ -2,10 +2,13 @@
 
 运行模式：
 - DEALDESK_AUTH 未设或为 off（缺省，与 v1 单用户本机工具一致）：所有请求视为本机用户 local（董事长）。
-- DEALDESK_AUTH=on：v2 接口需 `Authorization: Bearer <token>`（只认请求头、不读 cookie → 无 CSRF 面）；
-  无有效 token 的请求身份为匿名只读（GET 可读公开端点，写操作 401）。v1 旧接口（/api/ 下非 v2）一律要求登录
-  （/api/health 除外），v1 项目增删改要求“分析”及以上——认证开启即生效，不再需要另开开关
-  （DEALDESK_AUTH_PROTECT_V1 已废弃、设不设都一样）。
+- DEALDESK_AUTH=on：v2 接口认两种凭证——`Authorization: Bearer <token>`（API/应急令牌，浏览器不自动携带），
+  或浏览器会话 cookie（Google 登录签发，见 app/core/sessions.py；服务端记录、可吊销、SameSite=Lax，
+  cookie 认证的写请求另校验 Origin 同源）。无有效凭证的请求身份为匿名只读（GET 可读公开端点，写操作 401）。
+  另设 DEALDESK_AUTH_PROTECT_V1=1 时，v1 持久化面（项目/对比/研究证据/摄入待处理队列，见
+  observability._V1_PROTECTED）的读要求登录（只读及以上）、增删改要求“分析”及以上。
+- Google 登录：邮箱命中既有用户（username 即邮箱）且 active 才放行，不开放注册（app/core/google_auth.py）。
+  令牌粘贴入口由 DEALDESK_TOKEN_LOGIN_ENABLED 控制（缺省关；Google 未配置时前端自动回退显示，防锁死）。
 token 只存 sha256（users.token_sha256），明文只在创建时显示一次。
 同一来源 IP 带错令牌过多会被限流 429（见 app/core/hardening.py）。
 命令行：python -m app.core.security add-user <username> <chairman|analyst|viewer> [显示名]
@@ -20,12 +23,12 @@ import sys
 from enum import Enum
 
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.core.context import Actor, current_actor
 from app.core.i18n import T
 from app.services.persistence.engine import session_scope
-from app.services.persistence.schema import User, UserSession, utcnow
+from app.services.persistence.schema import User
 
 
 class Role(str, Enum):
@@ -67,6 +70,20 @@ def auth_enabled() -> bool:
     return os.environ.get("DEALDESK_AUTH", "off").strip().lower() in ("on", "1", "true", "yes")
 
 
+def token_login_enabled() -> bool:
+    """令牌粘贴入口开关（过渡保留）：缺省关，开时登录页同时给令牌表单。"""
+    return os.environ.get("DEALDESK_TOKEN_LOGIN_ENABLED", "").strip().lower() in ("on", "1", "true", "yes")
+
+
+def find_user_by_email(email: str) -> User | None:
+    """Google 登录的账号映射：邮箱 == username（大小写不敏感）。含未启用行，由调用方判 active。"""
+    with session_scope() as s:
+        u = s.scalar(select(User).where(func.lower(User.username) == email.strip().lower()))
+        if u is not None:
+            s.expunge(u)
+        return u
+
+
 def builtin_roles() -> dict[str, str]:
     """计票用的内置身份：只有认证关闭（单机模式）时本机用户才存在并视为董事长。"""
     return {} if auth_enabled() else {LOCAL.username: LOCAL.role}
@@ -81,12 +98,7 @@ def is_builtin_local(actor: Actor) -> bool:
 
 
 def protect_v1() -> bool:
-    """认证开启时 v1 旧接口一律受保护。
-
-    以前要另设 DEALDESK_AUTH_PROTECT_V1=1，生产没设：v1 的读写、研究抓取和 PDF 解析全部匿名可用
-    （独立评估 vertciti-dealdesk#30，SEC-A1 P0）。默认安全，不再看那个开关。
-    """
-    return auth_enabled()
+    return auth_enabled() and os.environ.get("DEALDESK_AUTH_PROTECT_V1", "") in ("1", "on", "true")
 
 
 def token_hash(token: str) -> str:
@@ -115,33 +127,23 @@ def resolve_token(token: str | None) -> Actor:
         return LOCAL
     if not token:
         return ANONYMOUS
-    h = token_hash(token)
     with session_scope() as s:
-        u = s.scalar(select(User).where(User.token_sha256 == h, User.active.is_(True)))
-        if u is None:  # Google 登录换来的会话令牌：未过期、且用户仍在用
-            u = s.scalar(select(User).join(UserSession, UserSession.username == User.username).where(
-                UserSession.token_sha256 == h, UserSession.expires_at > utcnow(), User.active.is_(True)))
+        u = s.scalar(select(User).where(User.token_sha256 == token_hash(token), User.active.is_(True)))
         if u is None:
             return ANONYMOUS
         return Actor(u.username, u.role, u.display_name)
 
 
-def add_user(username: str, role: str, display_name: str = "", email: str | None = None) -> str:
-    """创建用户并返回一次性明文 token。email：允许此人用 Google 登录（小写存）。"""
+def add_user(username: str, role: str, display_name: str = "") -> str:
+    """创建用户并返回一次性明文 token。"""
     Role(role)  # 校验
     if username.strip().lower() in RESERVED_USERNAMES:
         raise ValueError(T("用户名 {0} 是系统保留名，请换一个", username))
     token = "dd_" + secrets.token_urlsafe(32)
     with session_scope() as s:
         s.add(User(username=username, role=role, display_name=display_name or username,
-                   token_sha256=token_hash(token), created_by=current_actor().username,
-                   email=normalize_email(email)))
+                   token_sha256=token_hash(token), created_by=current_actor().username))
     return token
-
-
-def normalize_email(email: str | None) -> str | None:
-    e = (email or "").strip().lower()
-    return e or None
 
 
 if __name__ == "__main__":  # pragma: no cover — 运维命令行
