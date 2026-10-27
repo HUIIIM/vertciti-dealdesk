@@ -3,8 +3,9 @@
 运行模式：
 - DEALDESK_AUTH 未设或为 off（缺省，与 v1 单用户本机工具一致）：所有请求视为本机用户 local（董事长）。
 - DEALDESK_AUTH=on：v2 接口需 `Authorization: Bearer <token>`（只认请求头、不读 cookie → 无 CSRF 面）；
-  无有效 token 的请求身份为匿名只读（GET 可读公开端点，写操作 401）。另设 DEALDESK_AUTH_PROTECT_V1=1 时，v1 的项目
-  增删改端点同样要求“分析”及以上。
+  无有效 token 的请求身份为匿名只读（GET 可读公开端点，写操作 401）。v1 旧接口（/api/ 下非 v2）一律要求登录
+  （/api/health 除外），v1 项目增删改要求“分析”及以上——认证开启即生效，不再需要另开开关
+  （DEALDESK_AUTH_PROTECT_V1 已废弃、设不设都一样）。
 token 只存 sha256（users.token_sha256），明文只在创建时显示一次。
 同一来源 IP 带错令牌过多会被限流 429（见 app/core/hardening.py）。
 命令行：python -m app.core.security add-user <username> <chairman|analyst|viewer> [显示名]
@@ -80,7 +81,12 @@ def is_builtin_local(actor: Actor) -> bool:
 
 
 def protect_v1() -> bool:
-    return auth_enabled() and os.environ.get("DEALDESK_AUTH_PROTECT_V1", "") in ("1", "on", "true")
+    """认证开启时 v1 旧接口一律受保护。
+
+    以前要另设 DEALDESK_AUTH_PROTECT_V1=1，生产没设：v1 的读写、研究抓取和 PDF 解析全部匿名可用
+    （独立评估 vertciti-dealdesk#30，SEC-A1 P0）。默认安全，不再看那个开关。
+    """
+    return auth_enabled()
 
 
 def token_hash(token: str) -> str:

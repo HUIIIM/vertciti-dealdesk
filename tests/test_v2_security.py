@@ -91,16 +91,41 @@ def test_committee_vote_rights_and_veto(env):
     assert t["tally"]["result"] == "approved" and len(t["votes"]) == 2
 
 
-def test_v1_protection_is_opt_in(env, monkeypatch):
+def test_v1_is_closed_to_anonymous_when_auth_is_on(env, monkeypatch):
+    """独立评估 #30 SEC-A1（P0）：生产认证开启，但 v1 旧接口匿名可读写、研究抓取与 PDF 解析匿名可用。
+    认证开启即默认关闭：匿名一律 401（健康检查除外），不再依赖另开的 DEALDESK_AUTH_PROTECT_V1。"""
     c, tok = env
     from test_scoring import base_residential
     body = {"track": "residential", "name": "a", "address": "b", "input": base_residential()}
-    assert c.post("/api/projects", json=body).status_code == 200  # 缺省不改变 v1 公开行为
-    assert c.post("/api/score", json={"track": "residential", "input": base_residential()}).status_code == 200
-    monkeypatch.setenv("DEALDESK_AUTH_PROTECT_V1", "1")
-    assert c.post("/api/projects", json=body).status_code == 401
+    monkeypatch.delenv("DEALDESK_AUTH_PROTECT_V1", raising=False)  # 没设开关也必须关着
+    anon = [
+        ("GET", "/api/projects"), ("GET", "/api/uw/projects"), ("POST", "/api/projects"),
+        ("DELETE", "/api/projects/999999"), ("POST", "/api/score"), ("GET", "/api/tophap/status"),
+        ("POST", "/api/wb/research"), ("GET", "/api/wb/research/evidence?area=x"),
+        ("POST", "/api/wb/intake/pdf"), ("POST", "/api/uw-commercial/intake/pdf"), ("POST", "/api/compare"),
+    ]
+    for method, path in anon:
+        r = c.request(method, path, json=body if method == "POST" else None)
+        assert r.status_code == 401, (method, path, r.status_code)  # 401 先于解析：不是 422
+    assert c.get("/api/health").status_code == 200  # 健康检查不需登录
+    assert c.get("/api/projects", headers=H("dd_wrong")).status_code == 401
+    # 登录后行为不变：只读可读，项目增删改要“分析”及以上
+    assert c.get("/api/projects", headers=H(tok["viewer"])).status_code == 200
     assert c.post("/api/projects", json=body, headers=H(tok["viewer"])).status_code == 403
     assert c.post("/api/projects", json=body, headers=H(tok["analyst"])).status_code == 200
+    assert c.post("/api/score", json={"track": "residential", "input": base_residential()},
+                  headers=H(tok["viewer"])).status_code == 200
+    monkeypatch.setenv("DEALDESK_AUTH_PROTECT_V1", "0")  # 废弃开关不能把门重新打开
+    assert c.get("/api/projects").status_code == 401
+
+
+def test_v1_stays_open_in_single_user_mode(tmp_path, monkeypatch):
+    monkeypatch.setenv("DEALDESK_DB", str(tmp_path / "local.db"))
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.delenv("DEALDESK_AUTH", raising=False)
+    from test_scoring import base_residential
+    c = TestClient(app)
+    assert c.get("/api/projects").status_code == 200
     assert c.post("/api/score", json={"track": "residential", "input": base_residential()}).status_code == 200
 
 
