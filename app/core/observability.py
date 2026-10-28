@@ -47,8 +47,13 @@ _RID_OK = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 # SEC-A1（2026-10-26）：DEALDESK_AUTH_PROTECT_V1 门控的 v1 持久化面——读/写项目库、
 # 对比、研究证据与摄入待处理队列的路径。无状态计算面（/api/score 等）不在此列、保持公开
 # （口径由 tests/test_v2_security.py::test_v1_protection_is_opt_in 钉住）。
+# IVV-37（2026-10-27）：同一枚举门扩入 TopHap 配额面——后端会真调用 TopHap（付费
+# 数据源）的匿名可达路由：comps 拉取、产权穿透（TopHap 解析持有人）、卖方动机分
+# （TopHap 信号）、地址/链接搜集链（providers 链首源即 TopHap）。纯公开数据源面
+# （Socrata/Census/DDG/EchoWatch）与状态面（/api/tophap/status 发现握手）不在此列。
 _V1_PROTECTED = re.compile(
-    r"^/api/(projects|uw/projects|compare|wb/research|wb/intake/pending|wb/intake/extracted)(/|$)")
+    r"^/api/(projects|uw/projects|compare|wb/research|wb/intake/pending|wb/intake/extracted"
+    r"|wb/comps/pull|wb/ownership/tree|wb/sell-readiness/score|wb/intake/run)(/|$)")
 
 
 class JsonFormatter(logging.Formatter):
@@ -125,7 +130,9 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
             elif csrf_blocked:
                 resp = JSONResponse({"detail": T("请求来源异常，已拒绝"), "request_id": rid}, status_code=403)
             elif (security.protect_v1() and _V1_PROTECTED.match(path) and (
-                    (method in ("POST", "PUT", "DELETE") and not security.can(actor, "deal.write"))
+                    # IVV-37（2026-10-27）：写方法集补 PATCH（此前缺失；v1 暂无 PATCH
+                    # 路由属潜伏缺口，先补齐免得日后新增 PATCH 面裸奔）。
+                    (method in ("POST", "PUT", "PATCH", "DELETE") and not security.can(actor, "deal.write"))
                     or (method == "GET" and (actor is security.ANONYMOUS or not security.can(actor, "deal.read"))))):
                 resp = JSONResponse(
                     {"detail": T("需要“分析”及以上角色") if method != "GET" else T("需要登录：请提供有效的访问令牌"),
