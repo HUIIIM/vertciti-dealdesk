@@ -109,6 +109,35 @@ def test_v1_protection_is_opt_in(env, monkeypatch):
     assert c.post("/api/wb/research", json={"bogus": True}).status_code == 401
 
 
+def test_tophap_quota_surfaces_gated_by_protect_v1(env, monkeypatch):
+    # IVV-37（2026-10-27）：后端真调用 TopHap（付费配额）的 v1 路由随 PROTECT_V1 枚举门
+    # 一并受管：flag 关时匿名可达（服务打桩、不真调 TopHap），flag 开时匿名 401、
+    # 只读 403、分析及以上放行。纯公开计算面 /api/score 不受影响。
+    c, tok = env
+    from app.services import ownership, research_pipeline, sell_readiness, workbench
+    monkeypatch.setattr(workbench, "pull_comps", lambda address: {"ok": True, "rows": []})
+    monkeypatch.setattr(ownership, "tree_for_address",
+                        lambda address, owner_name=None, owner_source="": {"ok": True})
+    monkeypatch.setattr(sell_readiness, "score_for_address", lambda address: {"score": 0})
+    monkeypatch.setattr(research_pipeline, "run", lambda mode, text: {"ok": True})
+    calls = [
+        ("/api/wb/comps/pull", {"address": "450 W 44th St"}),
+        ("/api/wb/ownership/tree", {"address": "450 W 44th St"}),
+        ("/api/wb/sell-readiness/score", {"address": "450 W 44th St"}),
+        ("/api/wb/intake/run", {"mode": "address", "text": "450 W 44th St"}),
+    ]
+    for url, body in calls:  # flag 缺省关：匿名照达（与 v1 持久化面同口径）
+        assert c.post(url, json=body).status_code == 200, url
+    monkeypatch.setenv("DEALDESK_AUTH_PROTECT_V1", "1")
+    for url, body in calls:
+        assert c.post(url, json=body).status_code == 401, url
+        assert c.post(url, json=body, headers=H(tok["viewer"])).status_code == 403, url
+        assert c.post(url, json=body, headers=H(tok["analyst"])).status_code == 200, url
+    # PATCH 潜伏补齐（IVV-37）：写方法集含 PATCH，匿名 PATCH 持久化面先过门（不再 405 裸过）
+    assert c.patch("/api/projects", json={}).status_code == 401
+    assert c.patch("/api/projects", json={}, headers=H(tok["analyst"])).status_code != 401
+
+
 def test_v1_stays_open_in_single_user_mode(tmp_path, monkeypatch):
     # 自 PR #35 吸收（与门语义定版不冲突的增量）：认证关闭（单机模式）时 v1 面保持全开
     monkeypatch.setenv("DEALDESK_DB", str(tmp_path / "local.db"))
