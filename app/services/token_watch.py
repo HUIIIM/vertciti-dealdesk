@@ -26,12 +26,16 @@ from __future__ import annotations
 
 import time
 
-import httpx
+import httpx  # noqa: F401  （测试替身的历史 patch 点；刷新已改走 http_capped 流式上限）
 
+from app.services import http_capped
 from app.services import tophap
 
 REFRESH_THRESHOLD_SEC = 30 * 60  # 剩余有效期 <30 分钟才刷新
 NET_TIMEOUT = 20
+# token 端点响应大小上限：与页面抓取上限同值；
+# 刷新改走 http_capped.post_capped 流式停手，超限按刷新失败处理（旧 token 保留）。
+MAX_TOKEN_BYTES = http_capped.MAX_POST_BYTES
 
 
 def _read_dotenv_map() -> dict:
@@ -86,7 +90,12 @@ def _do_refresh(env: dict, now: int) -> dict:
     if client_secret:
         body["client_secret"] = client_secret
     try:
-        r = httpx.post(endpoint, data=body, timeout=NET_TIMEOUT)
+        r = http_capped.post_capped(endpoint, data=body, timeout=NET_TIMEOUT,
+                                    limit=MAX_TOKEN_BYTES)
+    except http_capped.ResponseTooLarge:
+        return {"refreshed": False,
+                "reason": (f"刷新响应过大（超过 {MAX_TOKEN_BYTES} 字节上限），"
+                           "已停止读取，旧 token 保留")}
     except Exception as e:  # noqa: BLE001
         return {"refreshed": False,
                 "reason": f"刷新请求失败（网络/连接）：{str(e)[:120]}"}
