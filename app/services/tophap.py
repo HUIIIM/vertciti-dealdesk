@@ -46,14 +46,18 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-import httpx
+import httpx  # noqa: F401  （测试替身的历史 patch 点；RPC 已改走 http_capped 流式上限）
 
 from app.paths import REPO_ROOT
+from app.services import http_capped
 from app.services import research_pipeline as rp
 
 MCP_URL_DEFAULT = "https://mcp.tophap.com/api/mcp"
 RPC_TIMEOUT_INIT = 10
 RPC_TIMEOUT_CALL = 25
+# MCP 响应大小上限：与页面抓取上限同值；
+# _rpc 改走 http_capped.post_capped 流式停手，超限按 MCPError 诚实降级。
+MAX_RPC_BYTES = http_capped.MAX_POST_BYTES
 SOURCE_NAME = "TopHap MCP"
 
 # ---- 实测 tool 名（2026-09-28 照抄 https://www.tophap.com/mcp） ----
@@ -234,7 +238,12 @@ def _rpc(method: str, params: dict | None = None, req_id: int = 1,
     if params is not None:
         payload["params"] = params
     try:
-        resp = httpx.post(mcp_url(), json=payload, headers=_headers(), timeout=timeout)
+        resp = http_capped.post_capped(mcp_url(), json=payload,
+                                       headers=_headers(), timeout=timeout,
+                                       limit=MAX_RPC_BYTES)
+    except http_capped.ResponseTooLarge:
+        raise MCPError(f"TopHap 响应过大（超过 {MAX_RPC_BYTES} 字节上限），"
+                       "已停止读取")
     except Exception as e:  # noqa: BLE001
         raise MCPError(f"TopHap MCP 连接失败：{str(e)[:120]}")
     if resp.status_code == 401:
@@ -250,9 +259,11 @@ def _rpc(method: str, params: dict | None = None, req_id: int = 1,
 
 def _notify_initialized() -> None:
     try:
-        httpx.post(mcp_url(),
-                   json={"jsonrpc": "2.0", "method": "notifications/initialized"},
-                   headers=_headers(), timeout=RPC_TIMEOUT_INIT)
+        http_capped.post_capped(
+            mcp_url(),
+            json={"jsonrpc": "2.0", "method": "notifications/initialized"},
+            headers=_headers(), timeout=RPC_TIMEOUT_INIT,
+            limit=MAX_RPC_BYTES)
     except Exception:
         pass
 

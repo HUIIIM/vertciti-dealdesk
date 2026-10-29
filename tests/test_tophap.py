@@ -14,6 +14,7 @@ import pytest
 
 from app import research_pipeline as rp
 from app import tophap
+from app.services import http_capped
 
 REPO = Path(__file__).resolve().parent.parent
 
@@ -78,6 +79,7 @@ class FakeResp:
         self.status_code = status
         self.headers = {"content-type": ctype}
         self._body = body
+        self.encoding = "utf-8"
 
     @property
     def text(self):
@@ -85,6 +87,28 @@ class FakeResp:
 
     def json(self):
         return json.loads(self.text)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def iter_bytes(self, chunk_size=65536):
+        data = self.text.encode()
+        for i in range(0, len(data), chunk_size):
+            yield data[i:i + chunk_size]
+
+
+def _patch_http(monkeypatch, fake_post):
+    """生产 _rpc/_notify 已改 http_capped.post_capped（httpx.stream）：
+    把 fake_post 适配成 stream 替身，fake 本体逻辑不变。"""
+    def fake_stream(method, url, **kwargs):
+        return fake_post(url, json=kwargs.get("json"),
+                         headers=kwargs.get("headers"),
+                         timeout=kwargs.get("timeout"),
+                         data=kwargs.get("data"))
+    monkeypatch.setattr(http_capped.httpx, "stream", fake_stream)
 
 
 def _result(payload):
@@ -136,7 +160,7 @@ def make_chain_post(calls, tools9=TOOLS9, fail_first_call_401=False,
 def _enable(monkeypatch, calls, **kw):
     monkeypatch.setenv("TOPHAP_ENABLED", "1")
     monkeypatch.setenv("TOPHAP_ACCESS_TOKEN", "fake-at")
-    monkeypatch.setattr(tophap.httpx, "post", make_chain_post(calls, **kw))
+    _patch_http(monkeypatch, make_chain_post(calls, **kw))
     monkeypatch.setattr(tophap, "write_dotenv",
                         lambda updates: calls.append(("dotenv", sorted(updates))))
 
@@ -145,7 +169,7 @@ def _enable(monkeypatch, calls, **kw):
 
 def test_disabled_never_calls_http(monkeypatch):
     calls = []
-    monkeypatch.setattr(tophap.httpx, "post", make_chain_post(calls))
+    _patch_http(monkeypatch, make_chain_post(calls))
     out = tophap.enrich_address("123 Main St, Tampa, FL 33602")
     assert out["ok"] is False and out["fields"] == []
     assert calls == []
@@ -154,7 +178,7 @@ def test_disabled_never_calls_http(monkeypatch):
 def test_missing_token_points_to_oauth_script(monkeypatch):
     monkeypatch.setenv("TOPHAP_ENABLED", "1")
     calls = []
-    monkeypatch.setattr(tophap.httpx, "post", make_chain_post(calls))
+    _patch_http(monkeypatch, make_chain_post(calls))
     out = tophap.enrich_address("123 Main St, Tampa, FL 33602")
     assert out["ok"] is False
     assert "tophap_oauth_setup.py" in out["note"]
@@ -270,7 +294,7 @@ def test_find_without_property_id_degrades(monkeypatch):
         if body.get("method") == "tools/call":
             return FakeResp(_result({"candidates": []}))
         return FakeResp({"jsonrpc": "2.0", "id": 1, "result": {}})
-    monkeypatch.setattr(tophap.httpx, "post", fake_post)
+    _patch_http(monkeypatch, fake_post)
     out = tophap.enrich_address("123 Main St, Tampa, FL 33602")
     assert out["ok"] is False and "attomId" in out["note"]
 
@@ -295,7 +319,7 @@ def test_expired_token_status_reports_reauth(monkeypatch):
     monkeypatch.setenv("TOPHAP_ENABLED", "1")
     monkeypatch.setenv("TOPHAP_ACCESS_TOKEN", "fake-at")
     monkeypatch.setenv("TOPHAP_TOKEN_EXPIRES_AT", "1000")  # 1970，早已过期
-    monkeypatch.setattr(tophap.httpx, "post", make_chain_post(calls))
+    _patch_http(monkeypatch, make_chain_post(calls))
     st = tophap.status()
     assert st["token_expired"] is True
     assert "过期" in st["note"] and "tophap_oauth_setup.py" in st["note"]
@@ -309,7 +333,7 @@ def test_status_future_expiry_proceeds(monkeypatch):
     monkeypatch.setenv("TOPHAP_ENABLED", "1")
     monkeypatch.setenv("TOPHAP_ACCESS_TOKEN", "fake-at")
     monkeypatch.setenv("TOPHAP_TOKEN_EXPIRES_AT", str(int(_t.time()) + 3600))
-    monkeypatch.setattr(tophap.httpx, "post", make_chain_post(calls))
+    _patch_http(monkeypatch, make_chain_post(calls))
     st = tophap.status()
     assert st["token_expired"] is False and st["reachable"] is True
 

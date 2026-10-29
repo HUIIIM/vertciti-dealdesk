@@ -6,7 +6,13 @@
 """
 from __future__ import annotations
 
-import httpx
+import logging
+
+import httpx  # noqa: F401  （历史 patch 点；GET 已改走 http_capped 流式上限）
+
+from app.services import http_capped
+
+logger = logging.getLogger(__name__)
 
 _CENSUS_URL = "https://geocoding.geo.census.gov/geocoder/locations/onelineaddress"
 _TIMEOUT = 12
@@ -21,12 +27,18 @@ def geocode_state(address: str) -> dict:
     if not address or not address.strip():
         return out
     try:
-        r = httpx.get(_CENSUS_URL, params={
+        r = http_capped.get_json_capped(_CENSUS_URL, params={
             "address": address.strip(), "benchmark": "2020", "format": "json",
         }, timeout=_TIMEOUT)
-        if r.status_code != 200:
+        if r["too_large"]:
+            logger.warning(
+                "Census geocoder 响应过大（超过 %s 字节上限），已停止读取，"
+                "按无匹配降级", http_capped.MAX_JSON_BYTES)
             return out
-        matches = (r.json().get("result") or {}).get("addressMatches") or []
+        if r["status_code"] != 200 or r["json_error"]:
+            return out
+        data = r["data"] if isinstance(r["data"], dict) else {}
+        matches = (data.get("result") or {}).get("addressMatches") or []
         if not matches:
             return out
         m = matches[0]

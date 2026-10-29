@@ -10,6 +10,7 @@ import pytest
 
 from app import tophap
 from app import token_watch
+from app.services import http_capped
 
 
 class _FakeResp:
@@ -17,9 +18,31 @@ class _FakeResp:
         self.status_code = status
         self._payload = payload
         self.text = json.dumps(payload)
+        self.headers = {"content-type": "application/json"}
+        self.encoding = "utf-8"
 
     def json(self):
         return self._payload
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def iter_bytes(self, chunk_size=65536):
+        data = self.text.encode()
+        for i in range(0, len(data), chunk_size):
+            yield data[i:i + chunk_size]
+
+
+def _patch_http(monkeypatch, fake_post):
+    """生产刷新已改 http_capped.post_capped（httpx.stream）：
+    把 fake_post 适配成 stream 替身，fake 本体逻辑不变。"""
+    def fake_stream(method, url, **kwargs):
+        return fake_post(url, data=kwargs.get("data"),
+                         timeout=kwargs.get("timeout"))
+    monkeypatch.setattr(http_capped.httpx, "stream", fake_stream)
 
 
 def _write_env(path, mapping):
@@ -54,7 +77,7 @@ def test_no_refresh_when_still_valid(env_file, monkeypatch):
     def _boom(*a, **k):
         raise AssertionError("还够用时不应发起任何 HTTP 请求")
 
-    monkeypatch.setattr(httpx, "post", _boom)
+    _patch_http(monkeypatch, _boom)
     r = token_watch.ensure_fresh_token()
     assert r == {"refreshed": False, "reason": "还够用"}
 
@@ -78,7 +101,7 @@ def test_refresh_when_expiring_updates_dotenv(env_file, monkeypatch):
                                "expires_in": 3600,
                                "refresh_token": "ref-new"})
 
-    monkeypatch.setattr(httpx, "post", _fake_post)
+    _patch_http(monkeypatch, _fake_post)
     r = token_watch.ensure_fresh_token()
     assert r["refreshed"] is True
 
@@ -107,7 +130,7 @@ def test_refresh_failure_returns_reason_no_exception(env_file, monkeypatch):
     def _fake_post(*a, **k):
         return _FakeResp(400, {"error": "invalid_grant"})
 
-    monkeypatch.setattr(httpx, "post", _fake_post)
+    _patch_http(monkeypatch, _fake_post)
     r = token_watch.ensure_fresh_token()  # 不抛异常
     assert r["refreshed"] is False
     assert "拒绝" in r["reason"] or "400" in r["reason"]
@@ -123,7 +146,7 @@ def test_refresh_network_error_no_exception(env_file, monkeypatch):
     def _fake_post(*a, **k):
         raise httpx.ConnectError("boom")
 
-    monkeypatch.setattr(httpx, "post", _fake_post)
+    _patch_http(monkeypatch, _fake_post)
     r = token_watch.ensure_fresh_token()
     assert r["refreshed"] is False
     assert r["reason"]  # 中文原因非空
@@ -136,7 +159,7 @@ def test_no_refresh_token_returns_chinese_reason(env_file, monkeypatch):
     def _boom(*a, **k):
         raise AssertionError("无 refresh_token 时不应发起 HTTP 请求")
 
-    monkeypatch.setattr(httpx, "post", _boom)
+    _patch_http(monkeypatch, _boom)
     r = token_watch.ensure_fresh_token()
     assert r["refreshed"] is False
     assert "无 refresh_token" in r["reason"]
@@ -150,7 +173,7 @@ def test_missing_expires_at_no_refresh(env_file, monkeypatch):
     def _boom(*a, **k):
         raise AssertionError("时间戳缺失时不应发起 HTTP 请求")
 
-    monkeypatch.setattr(httpx, "post", _boom)
+    _patch_http(monkeypatch, _boom)
     r = token_watch.ensure_fresh_token()
     assert r["refreshed"] is False
     assert "TOPHAP_TOKEN_EXPIRES_AT" in r["reason"]

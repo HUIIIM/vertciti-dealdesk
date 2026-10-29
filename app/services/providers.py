@@ -22,8 +22,9 @@
 循环 import 说明：
 - research_pipeline 在模块顶层 import 本模块；
 - 本模块对 research_pipeline / tophap 一律懒导入（方法内 import），
-  顶层只 import 无循环的 geocode（geocode 只依赖 httpx）。
-  因此 research_pipeline → providers → geocode 无环。
+  顶层只 import 无循环的 geocode 与 http_capped（两者只依赖 httpx
+  与标准库，http_capped 无 app 内依赖）。
+  因此 research_pipeline → providers → geocode/http_capped 无环。
 """
 
 from __future__ import annotations
@@ -32,11 +33,12 @@ import os
 import time
 from datetime import datetime
 
-import httpx
+import httpx  # noqa: F401  （测试替身的历史 patch 点；GET 已改走 http_capped）
 
 from app.paths import REPO_ROOT
 from app.services import cache as _cache
 from app.services import geocode
+from app.services import http_capped
 
 # ---------------- RentCast ----------------
 RENTCAST_URL = "https://api.rentcast.io/v1/properties"
@@ -324,29 +326,34 @@ class RentcastProvider(BaseProvider):
             return {"ok": False, "fields": [], "provider": self.name,
                     "note": "地址为空"}
         try:
-            r = httpx.get(RENTCAST_URL,
-                          params={"address": address, "limit": 1},
-                          headers={"X-Api-Key": key,
-                                   "Accept": "application/json",
-                                   "User-Agent": "DealDeskBot/2.0"},
-                          timeout=RENTCAST_TIMEOUT)
+            r = http_capped.get_json_capped(
+                RENTCAST_URL,
+                params={"address": address, "limit": 1},
+                headers={"X-Api-Key": key,
+                         "Accept": "application/json",
+                         "User-Agent": "DealDeskBot/2.0"},
+                timeout=RENTCAST_TIMEOUT)
         except Exception as e:  # noqa: BLE001
             return {"ok": False, "fields": [], "provider": self.name,
                     "note": f"RentCast 连接失败：{str(e)[:120]}"}
-        if r.status_code == 401:
+        if r["too_large"]:
+            return {"ok": False, "fields": [], "provider": self.name,
+                    "note": (f"RentCast 响应过大（超过 "
+                             f"{http_capped.MAX_JSON_BYTES} 字节上限），"
+                             "已停止读取")}
+        if r["status_code"] == 401:
             return {"ok": False, "fields": [], "provider": self.name,
                     "note": "RentCast API key 无效（401），请检查 RENTCAST_API_KEY"}
-        if r.status_code == 429:
+        if r["status_code"] == 429:
             return {"ok": False, "fields": [], "provider": self.name,
                     "note": "RentCast 限流（429），稍后重试"}
-        if r.status_code != 200:
+        if r["status_code"] != 200:
             return {"ok": False, "fields": [], "provider": self.name,
-                    "note": f"RentCast HTTP {r.status_code}"}
-        try:
-            data = r.json()
-        except Exception:
+                    "note": f"RentCast HTTP {r['status_code']}"}
+        if r["json_error"]:
             return {"ok": False, "fields": [], "provider": self.name,
                     "note": "RentCast 返回非 JSON"}
+        data = r["data"]
         rec = data[0] if isinstance(data, list) and data else None
         if not isinstance(rec, dict):
             return {"ok": False, "fields": [], "provider": self.name,

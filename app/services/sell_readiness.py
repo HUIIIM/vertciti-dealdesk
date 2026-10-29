@@ -32,7 +32,9 @@ import re
 import time
 from datetime import date, datetime
 
-import httpx
+import httpx  # noqa: F401  （_sanitize_proxy_env 的清洗对象；GET 已改走 http_capped）
+
+from app.services import http_capped
 
 
 def _sanitize_proxy_env() -> None:
@@ -357,18 +359,22 @@ def query_dob_violations(address: str, timeout: int = DOB_TIMEOUT) -> dict:
     }
     t0 = time.time()
     try:
-        r = httpx.get(DOB_URL, params=params, timeout=timeout,
-                      headers={"User-Agent": "dealdesk-sell-readiness/1.0"})
+        r = http_capped.get_json_capped(
+            DOB_URL, params=params, timeout=timeout,
+            headers={"User-Agent": "dealdesk-sell-readiness/1.0"})
     except Exception as e:  # noqa: BLE001
         return {"ok": False, "violations": [],
                 "note": f"DOB 查询失败（网络/超时）：{str(e)[:100]}"}
-    if r.status_code != 200:
+    if r["too_large"]:
         return {"ok": False, "violations": [],
-                "note": f"DOB 返回 HTTP {r.status_code}"}
-    try:
-        rows = r.json()
-    except Exception:
+                "note": (f"DOB 响应过大（超过 {http_capped.MAX_JSON_BYTES} "
+                         "字节上限），已停止读取")}
+    if r["status_code"] != 200:
+        return {"ok": False, "violations": [],
+                "note": f"DOB 返回 HTTP {r['status_code']}"}
+    if r["json_error"]:
         return {"ok": False, "violations": [], "note": "DOB 返回非 JSON"}
+    rows = r["data"]
     if not isinstance(rows, list):
         return {"ok": False, "violations": [], "note": "DOB 返回格式异常"}
     hits = [v for v in rows if isinstance(v, dict)
@@ -402,18 +408,22 @@ def query_ecb_cases(address: str, timeout: int = ECB_TIMEOUT) -> dict:
     }
     t0 = time.time()
     try:
-        r = httpx.get(ECB_URL, params=params, timeout=timeout,
-                      headers={"User-Agent": "dealdesk-sell-readiness/1.0"})
+        r = http_capped.get_json_capped(
+            ECB_URL, params=params, timeout=timeout,
+            headers={"User-Agent": "dealdesk-sell-readiness/1.0"})
     except Exception as e:  # noqa: BLE001
         return {"ok": False, "cases": [],
                 "note": f"ECB 查询失败（网络/超时）：{str(e)[:100]}"}
-    if r.status_code != 200:
+    if r["too_large"]:
         return {"ok": False, "cases": [],
-                "note": f"ECB 返回 HTTP {r.status_code}"}
-    try:
-        rows = r.json()
-    except Exception:
+                "note": (f"ECB 响应过大（超过 {http_capped.MAX_JSON_BYTES} "
+                         "字节上限），已停止读取")}
+    if r["status_code"] != 200:
+        return {"ok": False, "cases": [],
+                "note": f"ECB 返回 HTTP {r['status_code']}"}
+    if r["json_error"]:
         return {"ok": False, "cases": [], "note": "ECB 返回非 JSON"}
+    rows = r["data"]
     if not isinstance(rows, list):
         return {"ok": False, "cases": [], "note": "ECB 返回格式异常"}
     hits = [c for c in rows if isinstance(c, dict)
