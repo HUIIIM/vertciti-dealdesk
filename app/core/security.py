@@ -6,7 +6,8 @@
   或浏览器会话 cookie（Google 登录签发，见 app/core/sessions.py；服务端记录、可吊销、SameSite=Lax，
   cookie 认证的写请求另校验 Origin 同源）。无有效凭证的请求身份为匿名只读（GET 可读公开端点，写操作 401）。
   另设 DEALDESK_AUTH_PROTECT_V1=1 时，v1 持久化面（项目/对比/研究证据/摄入待处理队列，见
-  observability._V1_PROTECTED）的读要求登录（只读及以上）、增删改要求“分析”及以上。
+  observability._V1_PROTECTED）的读要求登录（只读及以上）、增删改要求“分析”及以上；
+  IVV-37（2026-10-27）起同一枚举另含 TopHap 配额面（comps 拉取/产权穿透/卖方动机/地址搜集链）。
 - Google 登录：邮箱命中既有用户（username 即邮箱）且 active 才放行，不开放注册（app/core/google_auth.py）。
   令牌粘贴入口由 DEALDESK_TOKEN_LOGIN_ENABLED 控制（缺省关；Google 未配置时前端自动回退显示，防锁死）。
 token 只存 sha256（users.token_sha256），明文只在创建时显示一次。
