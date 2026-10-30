@@ -30,7 +30,7 @@ import httpx
 
 from app.services import tophap
 
-REFRESH_THRESHOLD_SEC = 30 * 60  # 剩余有效期 <30 分钟才刷新
+REFRESH_THRESHOLD_SEC = 45 * 60  # 剩余 <45 分钟才刷新（2026-10-30 与巡检预刷新阈值 2700s 对齐：原 1800s 使 1800–2700 窗口内非 --push 主路恒不触发）
 NET_TIMEOUT = 20
 
 
