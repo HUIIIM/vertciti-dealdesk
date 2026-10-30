@@ -128,7 +128,16 @@ def discover_auth_server(mcp: str) -> dict:
 
 
 def register_client(as_meta: dict) -> dict:
-    """RFC 7591 动态注册 public client（PKCE，无 client_secret）。"""
+    """RFC 7591 动态注册 public client（PKCE，无 client_secret）。
+
+    固定 client 复用（2026-10-30 P2 实验定版）：env TOPHAP_FIXED_CLIENT_ID
+    在位时跳过动态注册、直接复用该 client——同 client 同 scope 的后续授权
+    服务端跳过 consent，且其 refresh_token 归属与 consent 历史不錯位。
+    """
+    _fixed = os.environ.get("TOPHAP_FIXED_CLIENT_ID", "").strip()
+    if _fixed:
+        log(f"复用固定 client_id={_fixed[:12]}…（跳过动态注册）")
+        return {"client_id": _fixed}
     reg_ep = as_meta.get("registration_endpoint")
     if not reg_ep:
         cid = os.environ.get("TOPHAP_CLIENT_ID", "").strip()
@@ -261,11 +270,46 @@ def exchange_code(as_meta: dict, client_id: str, client_secret: str | None,
     return tok
 
 
+def _archive_existing_state(state_file: str) -> None:
+    """Phase 1 覆写前归档既有 state 文件（2026-10-22 修复）。
+
+    背景：单 state 文件 + 无条件 O_TRUNC 覆写是 2026-10-22 三轮事故
+    （02:25／08:55／20:55）的结构性根因之一——同轮重跑 Phase 1 即销毁
+    先前程的 PKCE verifier，其正式 handoff 迟到送达时 code 已不可兑换。
+    改法：覆写前把旧文件改名归档为 <state_file>.prev-<created_at>.json
+    （仍 600 权限），迟到 code 可按 state 值定位归档、用归档文件跑
+    Phase 2；归档保留 24h 后由下一次 Phase 1 顺手清理。
+    """
+    p = Path(state_file)
+    if p.exists():
+        try:
+            created = json.loads(p.read_text()).get("created_at") or int(
+                p.stat().st_mtime)
+        except Exception:
+            created = int(p.stat().st_mtime)
+        archive = p.with_name(p.name + f".prev-{created}.json")
+        try:
+            os.replace(p, archive)
+            os.chmod(archive, 0o600)
+            log(f"既有 state 已归档：{archive.name}（迟到 code 可用它兑换）")
+        except OSError as e:
+            log(f"state 归档失败（继续覆写）：{e}")
+    # 顺手清理 >24h 的旧归档，防堆积
+    try:
+        cutoff = time.time() - 86400
+        for old in p.parent.glob(p.name + ".prev-*.json"):
+            if old.stat().st_mtime < cutoff:
+                old.unlink()
+    except OSError:
+        pass
+
+
 def phase1(state_file: str) -> None:
     """两阶段模式 Phase 1：生成 OAuth state 并落盘，不等待 code。
     供 cron worker 调用：state 进持久文件（~/workspace 下），不依赖后台进程 stdin。
     输出：授权 URL（打印到 stdout，worker 取最后一行）。
     """
+    _archive_existing_state(state_file)
     mcp = mcp_url()
     as_meta = discover_auth_server(mcp)
     reg = register_client(as_meta)
@@ -274,7 +318,8 @@ def phase1(state_file: str) -> None:
     verifier, challenge = pkce_pair()
     state = secrets.token_urlsafe(16)
     auth_url = build_authorize_url(as_meta, client_id, challenge, state,
-                                   scope="openid profile email")
+                                   scope=os.environ.get("TOPHAP_AUTH_SCOPE",
+                                   "openid profile email offline_access"))
     payload = {
         "mcp": mcp,
         "as_meta": as_meta,
