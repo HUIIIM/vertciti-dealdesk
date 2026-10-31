@@ -166,6 +166,9 @@ def main() -> int:
         [str(OCI_PY), str(RUNNER), str(script_file), str(out_prefix), "600"],
         capture_output=True, text=True, timeout=1800,
     )
+    # The composed script embeds the live block; destroy it as soon as
+    # the run is over. The .out/.json results carry no values and stay.
+    script_file.unlink(missing_ok=True)
     out_text = ""
     out_file = Path(str(out_prefix) + ".out")
     if out_file.exists():
