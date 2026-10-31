@@ -5,7 +5,7 @@ import logging
 import time
 from typing import Any
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Response
 from sqlalchemy import text
 
 from app.api.v2.deps import LocalizedRoute, need
@@ -36,9 +36,13 @@ _STARTED = time.time()
 logger = logging.getLogger(__name__)
 
 
-@router.get("/health", response_model=HealthOut)
-def health() -> dict[str, Any]:
-    """存活 + 数据库连通 + 迁移版本 + 引擎版本（部署后第一动作）。"""
+@router.get("/health", response_model=HealthOut, responses={503: {"model": HealthOut}})
+def health(response: Response) -> dict[str, Any]:
+    """存活 + 数据库连通 + 迁移版本 + 引擎版本（部署后第一动作）。
+
+    DB 不可用时 HTTP 状态码回 503（ARCH-6）：body 结构与诊断字段不变、
+    ``ok`` 仍为 False，外部探活/监控按状态码判活不再被 200 误报健康。
+    """
     db_ok, rev, err = True, None, ""
     try:
         eng = ensure_migrated()
@@ -48,6 +52,8 @@ def health() -> dict[str, Any]:
         # 对外只给异常类型：原文可能带数据库主机 / 用户名（health 不需要登录）；详情进服务端日志
         logger.exception("health: 数据库不可用")
         db_ok, err = False, type(e).__name__
+    if not db_ok:
+        response.status_code = 503
     url = database_url()
     return {"ok": db_ok, "service": "dealdesk", "version": reproducible.APP_VERSION,
             "engine_version": reproducible.engine_version(), "db": {"ok": db_ok, "revision": rev,
