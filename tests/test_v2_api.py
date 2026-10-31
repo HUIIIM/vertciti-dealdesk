@@ -209,7 +209,9 @@ def test_documents_and_compare(client):
 
 def test_health_catalog_and_templates(client):
     c = client
-    h = c.get("/api/v2/health").json()
+    r = c.get("/api/v2/health")
+    assert r.status_code == 200  # ARCH-6：DB 正常时 health 回 200
+    h = r.json()
     assert h["ok"] and h["db"]["revision"] == "0003" and h["engine_version"].startswith("2.1.0+")
     cat = c.get("/api/v2/catalog").json()
     assert cat["primary_metric"]["commercial"] == "irr_pct" and "rent_level" in str(cat["assumptions"])
@@ -230,8 +232,10 @@ def test_health_does_not_leak_db_error_text(client, monkeypatch):
     def boom():
         raise RuntimeError("could not connect to postgresql://dealdesk:s3cret@db.internal:5432/prod")
     monkeypatch.setattr(admin, "ensure_migrated", boom)
-    h = client.get("/api/v2/health").json()
-    assert h["ok"] is False and h["db"]["error"] == "RuntimeError"
+    r = client.get("/api/v2/health")
+    assert r.status_code == 503  # ARCH-6：DB 故障时回 503，探活按状态码不再误报健康
+    h = r.json()
+    assert h["ok"] is False and h["db"]["ok"] is False and h["db"]["error"] == "RuntimeError"
     assert "s3cret" not in str(h) and "db.internal" not in str(h)
 
 
