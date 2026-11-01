@@ -20,8 +20,10 @@ Exit: 0 ok / 2 VM-side push failed / 3 pushed but public verify failed.
 from __future__ import annotations
 
 import argparse
+import fcntl
 import hashlib
 import json
+import os
 import subprocess
 import sys
 import time
@@ -145,6 +147,22 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--caller", default="manual")
     args = ap.parse_args()
+
+    # Single-flight guard (2026-11-01, 0829EST incident): a patrol worker
+    # misread interim polling output of an in-flight push as a final FAIL
+    # and launched a concurrent rerun, whose mid-flight readbacks produced
+    # a misleading one-cycle-lag fingerprint pattern. Refuse to run while
+    # another push holds the lock; the caller must wait for the in-flight
+    # process to exit and judge only its final stdout/exit code.
+    lock_path = Path(__file__).resolve().parent.parent / ".tophap-vm-push.lock"
+    lock_fd = open(lock_path, "w")
+    try:
+        fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        print("VM_PUSH FAIL already_running")
+        return 21
+    lock_fd.write("pid=%d ts=%d\n" % (os.getpid(), int(time.time())))
+    lock_fd.flush()
 
     block = read_block()
     fp = hashlib.md5(
