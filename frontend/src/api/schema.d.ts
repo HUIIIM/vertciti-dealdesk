@@ -873,6 +873,9 @@ export interface paths {
         /**
          * Health
          * @description 存活 + 数据库连通 + 迁移版本 + 引擎版本（部署后第一动作）。
+         *
+         *     DB 不可用时 HTTP 状态码回 503（ARCH-6）：body 结构与诊断字段不变、
+         *     ``ok`` 仍为 False，外部探活/监控按状态码判活不再被 200 误报健康。
          */
         get: operations["health_api_v2_health_get"];
         put?: never;
@@ -5116,6 +5119,15 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthOut"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

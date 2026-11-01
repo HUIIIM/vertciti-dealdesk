@@ -8159,7 +8159,7 @@
   },
   "/api/v2/health": {
    "get": {
-    "description": "存活 + 数据库连通 + 迁移版本 + 引擎版本（部署后第一动作）。",
+    "description": "存活 + 数据库连通 + 迁移版本 + 引擎版本（部署后第一动作）。\n\nDB 不可用时 HTTP 状态码回 503（ARCH-6）：body 结构与诊断字段不变、\n``ok`` 仍为 False，外部探活/监控按状态码判活不再被 200 误报健康。",
     "operationId": "health_api_v2_health_get",
     "responses": {
      "200": {
@@ -8171,6 +8171,16 @@
        }
       },
       "description": "Successful Response"
+     },
+     "503": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HealthOut"
+        }
+       }
+      },
+      "description": "Service Unavailable"
      }
     },
     "summary": "Health",
