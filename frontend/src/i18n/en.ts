@@ -419,6 +419,7 @@ export const EN: Record<string, string> = {
   "无来源": "No source",
   "无法满足": "Can't be met",
   "无法计算": "Can't compute",
+  "无法连接服务器：网络中断或后端暂不可用，请稍后重试": "Cannot reach the server: the network is down or the backend is temporarily unavailable. Please try again shortly.",
   "无运行": "No run",
   "日志": "Log",
   "时间线": "Timeline",

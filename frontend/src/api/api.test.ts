@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { ApiError, api, call, detailText, getToken, raw, rawJson, setToken } from "./client";
+import { ApiError, api, call, detailText, getToken, isNetworkError, raw, rawJson, setToken } from "./client";
 import { optimistic } from "./useApi";
-import { calls, override } from "@/test/server";
+import { calls, install, override } from "@/test/server";
 
 describe("API 客户端", () => {
   it("422 字段错误拼成中文可读的一句话", () => {
@@ -26,6 +26,23 @@ describe("API 客户端", () => {
     expect(calls.length).toBe(2);
     setToken(null);
     expect(getToken()).toBeNull();
+  });
+  it("网络失败（断网/后端不可达）收敛为中文 ApiError，不漏浏览器原生英文", async () => {
+    const e = await call(Promise.reject(new TypeError("Failed to fetch"))).catch((x: unknown) => x);
+    expect(e).toBeInstanceOf(ApiError);
+    expect(isNetworkError(e)).toBe(true);
+    expect((e as ApiError).status).toBe(0);
+    expect((e as ApiError).message).toContain("无法连接服务器");
+    expect((e as ApiError).message).not.toContain("Failed to fetch");
+    globalThis.fetch = (() => Promise.reject(new TypeError("Failed to fetch"))) as typeof fetch;
+    try {
+      const e2 = await raw("/api/v2/me").catch((x: unknown) => x);
+      expect(e2).toBeInstanceOf(ApiError);
+      expect(isNetworkError(e2)).toBe(true);
+      expect((e2 as ApiError).message).not.toContain("Failed to fetch");
+    } finally {
+      install();
+    }
   });
   it("乐观更新：失败回滚并把错误抛给调用方", async () => {
     let v = 1;
