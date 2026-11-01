@@ -31,6 +31,16 @@ export class ApiError extends Error {
   }
 }
 
+// 网络层失败（断网 / 后端不可达）时 fetch 只会抛浏览器原生英文异常（TypeError: Failed to fetch），
+// 一律收敛为 status=0 的中文 ApiError：用户永远不该看到原生异常文案（台账第 30 项 DES-6/SEC-A6）。
+export const NETWORK_ERROR_TEXT = T("无法连接服务器：网络中断或后端暂不可用，请稍后重试");
+export function networkError(): ApiError {
+  return new ApiError(0, NETWORK_ERROR_TEXT, null);
+}
+export function isNetworkError(e: unknown): boolean {
+  return e instanceof ApiError && e.status === 0;
+}
+
 // 框架层（Starlette / Pydantic）的英文报错一律转成中文可操作的话：用户永远不该看到英文原因短语
 const FRAMEWORK_TEXT: Record<string, string> = {
   "Not Found": T("接口不存在：前后端版本可能不一致，请刷新页面"),
@@ -88,9 +98,15 @@ const auth: Middleware = {
 export const api = createClient<paths>({ baseUrl: typeof window === "undefined" ? "" : window.location.origin });
 api.use(auth);
 
-/** 统一取数：成功返回 data，失败抛 ApiError（带后端 request_id，便于对账日志）。 */
+/** 统一取数：成功返回 data，失败抛 ApiError（带后端 request_id，便于对账日志）。网络层拒绝收敛为中文网络错误。 */
 export async function call<T>(p: Promise<{ data?: T; error?: unknown; response: Response }>): Promise<T> {
-  const { data, error, response } = await p;
+  let settled: { data?: T; error?: unknown; response: Response };
+  try {
+    settled = await p;
+  } catch (e) {
+    throw e instanceof ApiError ? e : networkError();
+  }
+  const { data, error, response } = settled;
   if (error !== undefined || !response.ok) {
     const body = (error ?? {}) as { detail?: unknown; request_id?: string; gate?: unknown };
     throw new ApiError(response.status, detailText(body.detail) || `HTTP ${response.status}`,
@@ -105,7 +121,12 @@ export async function raw(path: string, init: RequestInit = {}): Promise<Respons
   const t = getToken();
   if (t) headers.set("Authorization", `Bearer ${t}`);
   if (lang() === "en") headers.set("X-DD-Lang", "en");
-  const r = await fetch(path, { ...init, headers });
+  let r: Response;
+  try {
+    r = await fetch(path, { ...init, headers });
+  } catch {
+    throw networkError();
+  }
   if (!r.ok) {
     let body: { detail?: unknown; request_id?: string; gate?: unknown } = {};
     try { body = await r.json(); } catch { /* 非 JSON */ }

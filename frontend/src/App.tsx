@@ -59,7 +59,8 @@ export function App() {
     { combo: "g s", label: T("设置"), group: T("全局"), run: () => navigate({ name: "settings", section: "templates" }) },
   ], !overlay);
 
-  if (boot.error && !(boot.error instanceof ApiError && boot.error.status === 401)) return <main className="page"><ErrorBox error={boot.error} onRetry={boot.reload} /></main>;
+  // 启动失败且手里没有任何已加载数据时才整页出错误态；已有数据时保留界面（页面级取数会各自报错），不清空（台账第 30 项）
+  if (boot.error && !boot.data && !(boot.error instanceof ApiError && boot.error.status === 401)) return <main className="page"><ErrorBox error={boot.error} onRetry={boot.reload} /></main>;
   if (boot.loading && !boot.data) return <main className="page"><Skeleton rows={6} h={32} /></main>;
   if (!boot.data?.catalog || (boot.error instanceof ApiError && boot.error.status === 401)) return <Login onDone={() => setAuthTick((t) => t + 1)} me={boot.data?.me ?? null} />;
   const { me, catalog } = boot.data;
