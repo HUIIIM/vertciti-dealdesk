@@ -25,6 +25,7 @@
 from __future__ import annotations
 
 import time
+from pathlib import Path
 
 import httpx
 
@@ -131,10 +132,38 @@ def _ensure() -> dict:
     return _do_refresh(env, now)
 
 
+STATE_ARCHIVE_MAX_AGE_SEC = 24 * 3600  # 与 oauth_setup 归档保留口径一致（24h）
+
+
+def prune_state_archives(directory=None) -> int:
+    """清理超 24h 的 OAuth state 归档（.tophap-oauth-state.json.prev-*.json）。
+
+    归档由 tools/tophap_oauth_setup.py 在 Phase 1 覆写 state 前生成，原设计
+    靠"下一次 Phase 1"顺手清理；2026-10-30 主路改判静默刷新后 Phase 1 稀跑、
+    清理失去触发源（2026-11-01 盘点存量 15 份超期滞留、无主认领池 5-10 项）。
+    本函数随 ensure_fresh_token() 每轮调用，把清理触发迁到必走的静默刷新
+    路径。返回删除份数；绝不抛异常。"""
+    try:
+        base = Path(directory) if directory else tophap.dotenv_path().parent
+        cutoff = time.time() - STATE_ARCHIVE_MAX_AGE_SEC
+        removed = 0
+        for old in base.glob(".tophap-oauth-state.json.prev-*.json"):
+            try:
+                if old.stat().st_mtime < cutoff:
+                    old.unlink()
+                    removed += 1
+            except OSError:
+                pass
+        return removed
+    except Exception:  # noqa: BLE001  # 清理失败不许影响刷新主路
+        return 0
+
+
 def ensure_fresh_token() -> dict:
     """保证 token 有效：快过期就用 refresh_token 自动换新。
 
     返回 {"refreshed": bool, "reason": 中文原因}；绝不抛异常。"""
+    prune_state_archives()  # 清理触发迁入静默刷新路径（2026-11-02，无主池 5-10）
     try:
         return _ensure()
     except Exception as e:  # noqa: BLE001  # 兜底：任何未预料的异常都转成结果

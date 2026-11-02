@@ -154,3 +154,25 @@ def test_missing_expires_at_no_refresh(env_file, monkeypatch):
     r = token_watch.ensure_fresh_token()
     assert r["refreshed"] is False
     assert "TOPHAP_TOKEN_EXPIRES_AT" in r["reason"]
+
+
+
+def test_prune_state_archives_removes_only_expired(tmp_path):
+    import os as _os
+
+    old = tmp_path / ".tophap-oauth-state.json.prev-111.json"
+    new = tmp_path / ".tophap-oauth-state.json.prev-222.json"
+    other = tmp_path / ".tophap-oauth-state.json"
+    for p in (old, new, other):
+        p.write_text("{}")
+    past = time.time() - 25 * 3600
+    _os.utime(old, (past, past))
+    removed = token_watch.prune_state_archives(tmp_path)
+    assert removed == 1
+    assert not old.exists()
+    assert new.exists()
+    assert other.exists()
+
+
+def test_prune_state_archives_missing_dir_no_exception(tmp_path):
+    assert token_watch.prune_state_archives(tmp_path / "nope") == 0
