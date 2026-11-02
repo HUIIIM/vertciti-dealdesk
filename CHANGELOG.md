@@ -16,7 +16,7 @@
 
 ### 新增
 - **Google 登录**：授权码流＋PKCE（S256）、id_token 以 JWKS RS256 本地验签；邮箱 == 既有用户 username
-  （大小写不敏感）且启用才放行，未建档拒入（`not_invited`），没有公开注册。会话为服务端记录
+  （大小写不敏感）且启用才放行，未建档拒入（`not_provisioned`），没有公开注册。会话为服务端记录
   （迁移 0003 `web_sessions`，可吊销、30 天滑动续期，cookie `dd_session`）；访问令牌保留给脚本与应急
   （粘贴入口由 `DEALDESK_TOKEN_LOGIN_ENABLED` 控制）。配置见 `docs/RUNBOOK.md`。
   （早期邀请制实现——`users.email` / `user_sessions` / 所有者邮箱自动建号——已整套摘除。）
