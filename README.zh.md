@@ -11,7 +11,7 @@ DealDesk 把一笔交易从一个地址或一份发行备忘录，一路做到�
 | 状态 | 生产：**v2.1.0**（`/api/v2/health`，2026-11-02 核对）——机构级承销引擎 cre-1.0、Google 登录（邀请制）与后台操作台（[CHANGELOG](CHANGELOG.md)） |
 | 质量门 | 每个 PR 跑 CI：pytest（覆盖率 ≥85%，含 v1 金标准）、ruff、mypy strict、Postgres 套件、前端类型检查 / lint / 单元测试、Playwright E2E（含 axe）、CodeQL、依赖审查、pip-audit / npm audit、gitleaks、OpenSSF Scorecard |
 | 部署 | 自部署：Python 3.10+，默认 SQLite，`DATABASE_URL` 接 Postgres；生产实例部署在 Vercel |
-| 生产实例 | [vertciti-dealdesk.vercel.app](https://vertciti-dealdesk.vercel.app/app/)：创始人自用的 v2 工作台，登录仅对操作人与受邀朋友开放，无公开注册。 |
+| 生产实例 | [dealdesk.vertciti.com](https://dealdesk.vertciti.com/app/)：创始人自用的 v2 工作台，登录仅对操作人与受邀朋友开放，无公开注册。 |
 | 接口 | Web 工作台（`/app/`）· HTTP API（`/api/v2`，OpenAPI，Bearer 令牌） |
 | 语言 | 产品界面与 API：中文 · English · README：[English](README.md) · 简体中文 |
 | 许可证 | MIT（[LICENSE](LICENSE)） |
@@ -130,7 +130,7 @@ flowchart LR
 
 ## 现状与局限
 
-DealDesk 是 vertciti 的在用样板，生产实例在 [vertciti-dealdesk.vercel.app](https://vertciti-dealdesk.vercel.app/app/)。
+DealDesk 是 vertciti 的在用样板，生产实例在 [dealdesk.vertciti.com](https://dealdesk.vertciti.com/app/)。
 
 - 生产运行 **2.1.0**（2026-11-02 核对）：机构级赛道、Google 登录与后台操作台均已上线。
 - 机构级导出（Excel 模型、投委会备忘录）目前只有中文；界面与 API 已双语。
