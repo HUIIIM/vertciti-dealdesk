@@ -1,12 +1,15 @@
-/*! vertciti DNA v4.0.0 — plain CSS (tokens + base + components)
+/*! vertciti DNA v4.1.0 — plain CSS (tokens + base + components)
  * GENERATED from HUIIIM/.github design/tokens.json by design/build.py. Do not edit by hand:
  * change tokens.json upstream, rebuild, then re-vendor. Source: https://vertciti.com/ (官网 v4, site.css) — extracted 2026-10-22
  */
 @font-face{font-family:"Nunito Sans";font-style:normal;font-weight:200 1000;font-display:swap;src:url(fonts/nunito-sans-latin.woff2) format("woff2");unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
 @font-face{font-family:"Nunito Sans";font-style:normal;font-weight:200 1000;font-display:swap;src:url(fonts/nunito-sans-latin-ext.woff2) format("woff2");unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}
-:root{--bg:#FFFFFF;--fg:#000000;--fg-2:#3F3F3F;--fg-3:#6B6B6B;--soft:#F3F3F3;--line:#DEDEDE;--strong:#000000;--card:#FFFFFF;--ok:#1D8348;--warn:#FFCE00;--on-warn:#000000;--bad:#C62828;--info:#2B7363;--orange:#FF4713;--yellow:#FFCE00;--green:#1D8348;--verd:#2B7363;--verd-dark:#5DB8A3;--font:"Nunito Sans",-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC","Noto Sans CJK SC",sans-serif;--mono:ui-monospace,"SFMono-Regular","Cascadia Code",Menlo,Consolas,"Liberation Mono",monospace;--w:1200px;--gut:clamp(20px,4.5vw,64px);--sec:clamp(64px,8vw,104px);--tap:44px;--btn-h:52px;--radius:0;--focus-ring:3px solid #FF4713;--focus-offset:2px;--lh-tight:1.1;--lh-snug:1.35;--lh-body:1.75;--tracking-display:-.03em;--tracking-heading:-.02em;--tracking-zh:.01em;--tracking-caps:.1em;--fs-xs:12px;--fs-sm:14px;--fs-base:16px;--fs-md:17px;--fs-lg:20px;--fs-xl:clamp(24px,2.6vw,36px);--fs-2xl:clamp(36px,4.4vw,56px);--fs-display:clamp(60px,7vw,104px);--dur-fast:.15s;--dur-base:.25s;--dur-slow:1.2s;--ease:cubic-bezier(.2,.7,.2,1);--shadow-pop:0 24px 40px -24px rgba(0,0,0,.25);--z-header:50;--z-overlay:80;--z-toast:90;--z-skip:99;color-scheme:light;}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#000000;--fg:#FFFFFF;--fg-2:#F5F5F5;--fg-3:#DEDEDE;--soft:#3F3F3F;--line:#6B6B6B;--strong:#FFFFFF;--card:#3F3F3F;--ok:#3FA86A;--warn:#FFCE00;--on-warn:#000000;--bad:#E25555;--info:#5DB8A3;--orange:#FF4713;--verd:#5DB8A3;color-scheme:dark;}}
-:root[data-theme="dark"]{--bg:#000000;--fg:#FFFFFF;--fg-2:#F5F5F5;--fg-3:#DEDEDE;--soft:#3F3F3F;--line:#6B6B6B;--strong:#FFFFFF;--card:#3F3F3F;--ok:#3FA86A;--warn:#FFCE00;--on-warn:#000000;--bad:#E25555;--info:#5DB8A3;--orange:#FF4713;--verd:#5DB8A3;color-scheme:dark;}
+:root{--bg:#FFFFFF;--fg:#000000;--fg-2:#3F3F3F;--fg-3:#6B6B6B;--soft:#F3F3F3;--line:#DEDEDE;--strong:#000000;--card:#FFFFFF;--ok:#166B3B;--warn:#FFCE00;--on-warn:#000000;--bad:#C62828;--info:#2B7363;--pointer:#FF4713;--orange:#FF4713;--yellow:#FFCE00;--green:#1D8348;--verd:#2B7363;--verd-dark:#5DB8A3;--on-yellow:#000000;--font:"Nunito Sans",-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC","Noto Sans CJK SC",sans-serif;--mono:ui-monospace,"SFMono-Regular","Cascadia Code",Menlo,Consolas,"Liberation Mono",monospace;--w:1200px;--gut:clamp(20px,4.5vw,64px);--sec:clamp(64px,8vw,104px);--tap:44px;--btn-h:52px;--radius:0;--focus-ring:3px solid var(--pointer);--focus-offset:2px;--lh-tight:1.1;--lh-snug:1.35;--lh-body:1.75;--tracking-display:-.03em;--tracking-heading:-.02em;--tracking-zh:.01em;--tracking-caps:.1em;--fs-xs:12px;--fs-sm:14px;--fs-base:16px;--fs-md:17px;--fs-lg:20px;--fs-xl:clamp(24px,2.6vw,36px);--fs-2xl:clamp(36px,4.4vw,56px);--fs-display:clamp(60px,7vw,104px);--motion-fast-01:70ms;--motion-fast-02:110ms;--motion-moderate-01:150ms;--motion-moderate-02:240ms;--motion-slow-01:400ms;--ease-standard:cubic-bezier(0.2,0,0.38,0.9);--ease-entrance:cubic-bezier(0,0,0.38,0.9);--ease-exit:cubic-bezier(0.2,0,1,0.9);--dur-fast:var(--motion-fast-02);--dur-base:var(--motion-moderate-02);--dur-slow:var(--motion-slow-01);--ease:var(--ease-standard);--shadow-pop:0 24px 40px -24px rgba(0,0,0,.25);--z-header:50;--z-overlay:80;--z-toast:90;--z-skip:99;color-scheme:light;}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#000000;--fg:#FFFFFF;--fg-2:#F5F5F5;--fg-3:#DEDEDE;--soft:#262626;--line:#6B6B6B;--strong:#FFFFFF;--card:#161616;--ok:#3FA86A;--warn:#FFCE00;--on-warn:#000000;--bad:#E87272;--info:#5DB8A3;--pointer:#FF4713;--orange:#FF4713;--verd:#5DB8A3;color-scheme:dark;}}
+:root[data-theme="dark"]{--bg:#000000;--fg:#FFFFFF;--fg-2:#F5F5F5;--fg-3:#DEDEDE;--soft:#262626;--line:#6B6B6B;--strong:#FFFFFF;--card:#161616;--ok:#3FA86A;--warn:#FFCE00;--on-warn:#000000;--bad:#E87272;--info:#5DB8A3;--pointer:#FF4713;--orange:#FF4713;--verd:#5DB8A3;color-scheme:dark;}
+.dna-card--ink,.dna-utility,.dna-code{--bg:#000000;--fg:#FFFFFF;--fg-2:#DEDEDE;--fg-3:#B5B5B5;--soft:#161616;--line:#3A3A3A;--strong:#FFFFFF;--card:#000000;--ok:#3FA86A;--warn:#FFCE00;--on-warn:#000000;--bad:#E87272;--info:#5DB8A3;--pointer:#FF4713;color-scheme:dark;}
+.dna-card--accent{--bg:#FFCE00;--fg:#000000;--fg-2:#222222;--fg-3:#3F3F3F;--soft:#F0C200;--line:#000000;--strong:#000000;--card:#FFCE00;--ok:#12512D;--warn:#000000;--on-warn:#FFCE00;--bad:#861919;--info:#1B4A40;--pointer:#000000;}
+@media print{:root{--bg:#FFFFFF;--fg:#000000;--fg-2:#3F3F3F;--fg-3:#6B6B6B;--soft:#F3F3F3;--line:#DEDEDE;--strong:#000000;--card:#FFFFFF;--ok:#166B3B;--warn:#FFCE00;--on-warn:#000000;--bad:#C62828;--info:#2B7363;--pointer:#FF4713;}}
 /* @section base — element defaults. Mirrors vertciti.com site.css (官网 v4). */
 *, *::before, *::after { box-sizing: border-box; }
 html {
@@ -27,7 +30,7 @@ body {
 html[lang^="zh"] body { letter-spacing: var(--tracking-zh); }
 h1, h2, h3, h4 { color: var(--strong); font-weight: 800; line-height: var(--lh-snug); letter-spacing: var(--tracking-heading); }
 h1 { line-height: var(--lh-tight); letter-spacing: var(--tracking-display); }
-a { color: inherit; text-underline-offset: 4px; text-decoration-color: var(--orange); text-decoration-thickness: 2px; }
+a { color: inherit; text-underline-offset: 4px; text-decoration-color: var(--pointer); text-decoration-thickness: 2px; }
 a:hover { text-decoration-color: currentColor; }
 img, svg, video { max-width: 100%; }
 img { height: auto; display: block; }
@@ -37,14 +40,16 @@ hr { border: 0; border-top: 1px solid var(--line); }
 table { border-collapse: collapse; width: 100%; }
 th { text-align: left; font-weight: 700; border-bottom: 2px solid var(--strong); }
 th, td { padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
-::selection { background: var(--yellow); color: #000; }
+::selection { background: var(--yellow); color: var(--on-yellow); }
 :focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
 main:focus { outline: none; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 }
+/* Motion (SOTA MOT-1..7): each transition below names the state change it expresses; only transform
+   animates (MOT-3); entering a state uses the entrance curve, leaving uses the faster exit (MOT-7).
+   Colour, shadow and size changes are instant. Reduced motion collapses everything to ~0 (MOT-6). */
 @media print {
-  :root { --bg: #fff; --fg: #000; --line: #999; }
   .dna-no-print, nav, .dna-skip { display: none !important; }
   a[href^="http"]::after { content: " (" attr(href) ")"; font-size: .8em; }
 }
@@ -52,10 +57,10 @@ main:focus { outline: none; }
 .dna-wrap { max-width: calc(var(--w) + 2 * var(--gut)); margin: 0 auto; padding-left: var(--gut); padding-right: var(--gut); }
 .dna-section { padding-top: var(--sec); padding-bottom: var(--sec); }
 .dna-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-.dna-skip { position: absolute; left: -999px; top: 0; z-index: var(--z-skip); background: var(--yellow); color: #000; padding: 12px 16px; font-weight: 800; }
+.dna-skip { position: absolute; left: -999px; top: 0; z-index: var(--z-skip); background: var(--yellow); color: var(--on-yellow); padding: 12px 16px; font-weight: 800; }
 .dna-skip:focus { left: 12px; top: 12px; }
 .dna-eyebrow { font-size: 12px; font-weight: 700; letter-spacing: var(--tracking-caps); text-transform: uppercase; color: var(--fg-3); }
-.dna-rule { box-shadow: inset 0 -3px 0 var(--orange); }
+.dna-rule { box-shadow: inset 0 -3px 0 var(--pointer); }
 
 .dna-btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 10px;
@@ -63,10 +68,11 @@ main:focus { outline: none; }
   font-weight: 800; font-size: 16px; line-height: 1.2; white-space: nowrap; text-decoration: none; cursor: pointer;
   border: 2px solid var(--strong); border-radius: var(--radius);
   background: var(--strong); color: var(--bg);
-  transition: background var(--dur-fast), color var(--dur-fast), transform var(--dur-fast);
+  /* state: pressed -> 1px down. Hover inversion is an instant colour swap. */
+  transition: transform var(--motion-fast-01) var(--ease-exit);
 }
 .dna-btn:hover { background: transparent; color: var(--fg); }
-.dna-btn:active { transform: translateY(1px); }
+.dna-btn:active { transform: translateY(1px); transition-timing-function: var(--ease-entrance); }
 /* Disabled = clearly "off" AND still readable: never opacity (it took labels to ~2:1, worse on iOS).
    !important so variants (--secondary, :hover …) cannot mix their colours in. */
 .dna-btn[disabled], .dna-btn[aria-disabled="true"], .dna-btn[disabled]:hover, .dna-btn[aria-disabled="true"]:hover,
@@ -77,20 +83,20 @@ main:focus { outline: none; }
 }
 .dna-btn--secondary { background: transparent; color: var(--fg); }
 .dna-btn--secondary:hover { background: var(--strong); color: var(--bg); }
-.dna-btn--text { background: transparent; border-color: transparent; color: var(--fg); padding: 0 4px; text-decoration: underline; text-decoration-color: var(--orange); text-decoration-thickness: 2px; }
+.dna-btn--text { background: transparent; border-color: transparent; color: var(--fg); padding: 0 4px; text-decoration: underline; text-decoration-color: var(--pointer); text-decoration-thickness: 2px; }
 .dna-btn--sm { min-height: var(--tap); padding: 0 16px; font-size: 14px; }
 
 .dna-card { position: relative; background: var(--card); border-top: 4px solid var(--strong); border-radius: var(--radius); padding: 28px; }
 .dna-card--flat { border-top-width: 1px; border-top-color: var(--line); }
-/* Inverse surfaces re-declare the theme tokens locally, so EVERYTHING inside (headings, eyebrows, buttons,
-   inputs, links) follows the surface, not the page theme. Hard-coding only some children is how ink-on-ink
-   (1:1) and white-on-yellow (1.5:1) headings shipped before. */
-.dna-card--ink { --bg: #000; --fg: #fff; --fg-2: #DEDEDE; --fg-3: #B5B5B5; --strong: #fff; --soft: #161616; --line: #3A3A3A;
-  background: #000; color: #fff; border-top-color: #000; }
-.dna-card--accent { --bg: #FFCE00; --fg: #000; --fg-2: #222; --fg-3: #3F3F3F; --strong: #000; --soft: #F0C200; --line: #000;
-  background: var(--yellow); color: #000; border-top-color: #000; }
-.dna-card--pop { transition: transform var(--dur-base) ease, box-shadow var(--dur-base) ease; }
-.dna-card--pop:hover { transform: translateY(-2px); box-shadow: var(--shadow-pop); }
+/* Inverse surfaces: tokens.json color.ink / color.accent are emitted by build.py as scoped rules that
+   re-declare the WHOLE theme (incl. ok/bad/info/pointer) on .dna-card--ink/.dna-utility/.dna-code and
+   .dna-card--accent, so everything inside follows the surface. Components below only read variables. */
+.dna-card--ink { background: var(--bg); color: var(--fg); border-top-color: var(--bg); }
+.dna-card--accent { background: var(--bg); color: var(--fg); border-top-color: var(--line); }
+/* state: hovered or holds focus -> lifted 2px (exit faster than entry). The shadow is an instant state. */
+.dna-card--pop { transition: transform var(--motion-fast-02) var(--ease-exit); }
+.dna-card--pop:hover, .dna-card--pop:focus-within { transform: translateY(-2px); box-shadow: var(--shadow-pop);
+  transition-duration: var(--motion-moderate-01); transition-timing-function: var(--ease-entrance); }
 
 .dna-field { display: grid; gap: 6px; }
 .dna-label { font-size: 14px; font-weight: 700; color: var(--fg); letter-spacing: .01em; }
@@ -134,41 +140,47 @@ html[lang^="zh"] .dna-eyebrow { text-transform: none; letter-spacing: .08em; }
 
 /* Arrow link: bold text + orange arrow that nudges on hover */
 .dna-arrow { display: inline-flex; align-items: center; gap: 10px; font-weight: 800; text-decoration: none; color: inherit; min-height: var(--tap); }
-.dna-arrow::after { content: "→"; color: var(--orange); font-weight: 800; transition: transform var(--dur-fast); }
-.dna-arrow:hover::after { transform: translateX(4px); }
+/* state: hovered or focused -> the arrow points 4px further toward the destination. */
+.dna-arrow::after { content: "→"; color: var(--pointer); font-weight: 800; transition: transform var(--motion-fast-02) var(--ease-exit); }
+.dna-arrow:hover::after, .dna-arrow:focus-visible::after { transform: translateX(4px);
+  transition-duration: var(--motion-moderate-01); transition-timing-function: var(--ease-entrance); }
 
 /* ===== App shell (AESTHETICS §3) ===== */
-.dna-utility { background: #000; color: #fff; font-size: 13px; font-weight: 700; }
-.dna-utility__in { display: flex; align-items: center; gap: 20px; min-height: 40px; }
-.dna-utility a { color: #DEDEDE; text-decoration: none; }
-.dna-utility a:hover, .dna-utility [aria-current="page"] { color: #fff; }
+/* Utility bar = ink surface (scoped tokens from build.py). Targets are 44px (AESTHETICS §7, WCAG 2.5.8). */
+.dna-utility { background: var(--bg); color: var(--fg); font-size: 13px; font-weight: 700; }
+.dna-utility__in { display: flex; align-items: center; gap: 20px; min-height: var(--tap); }
+.dna-utility a { color: var(--fg-2); text-decoration: none; display: inline-flex; align-items: center; justify-content: center; min-height: var(--tap); min-width: var(--tap); }
+.dna-utility a:hover, .dna-utility [aria-current="page"] { color: var(--fg); }
 .dna-utility__end { margin-left: auto; display: flex; align-items: center; gap: 16px; }
-.dna-utility button { background: transparent; border: 0; color: #fff; font-weight: 700; font-size: 13px; cursor: pointer; min-height: 40px; padding: 0 4px; }
+.dna-utility button { background: transparent; border: 0; color: var(--fg); font-weight: 700; font-size: 13px; cursor: pointer; min-height: var(--tap); min-width: var(--tap); padding: 0 4px; }
 
 .dna-header { position: sticky; top: 0; z-index: var(--z-header); background: var(--bg); border-bottom: 1px solid var(--line); }
 .dna-header__in { display: flex; align-items: stretch; gap: 32px; min-height: 72px; }
-.dna-logo { display: inline-flex; align-items: baseline; gap: 12px; align-self: center; text-decoration: none; color: var(--strong); white-space: nowrap; flex-shrink: 0; }
+.dna-logo { display: inline-flex; align-items: baseline; gap: 12px; align-self: center; padding: 10px 0; min-height: var(--tap); text-decoration: none; color: var(--strong); white-space: nowrap; flex-shrink: 0; }
 .dna-logo__word { font-size: 30px; font-weight: 800; letter-spacing: -.035em; line-height: 1; }
-.dna-logo__word::after { content: "."; color: var(--orange); }
+.dna-logo__word::after { content: "."; color: var(--pointer); }
 .dna-logo__product { font-size: 14px; font-weight: 700; color: var(--fg-3); letter-spacing: .01em; }
 .dna-header__end { margin-left: auto; display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+.dna-header__end > a:not(.dna-btn) { display: inline-flex; align-items: center; min-height: var(--tap); min-width: var(--tap); }
 
 .dna-tabs { display: flex; align-items: stretch; gap: 4px; min-width: 0; overflow-x: auto; scrollbar-width: none; }
 .dna-tabs::-webkit-scrollbar { display: none; }
-.dna-tab { display: inline-flex; align-items: center; padding: 0 14px; font-size: 15px; font-weight: 700; color: var(--fg); text-decoration: none; white-space: nowrap; flex-shrink: 0; box-shadow: inset 0 -3px 0 transparent; transition: box-shadow var(--dur-fast); }
+.dna-tab { display: inline-flex; align-items: center; min-height: var(--tap); padding: 0 14px; font-size: 15px; font-weight: 700; color: var(--fg); text-decoration: none; white-space: nowrap; flex-shrink: 0; box-shadow: inset 0 -3px 0 transparent; }
 .dna-tab:hover { box-shadow: inset 0 -3px 0 var(--line); }
-.dna-tab[aria-current="page"], .dna-tab[aria-selected="true"] { box-shadow: inset 0 -3px 0 var(--orange); }
+.dna-tab[aria-current="page"], .dna-tab[aria-selected="true"] { box-shadow: inset 0 -3px 0 var(--pointer); }
 
 .dna-announce { background: var(--soft); border-bottom: 1px solid var(--line); font-size: 14px; }
 .dna-announce__in { display: flex; align-items: center; gap: 12px; min-height: 48px; padding-top: 8px; padding-bottom: 8px; }
 .dna-announce strong { font-weight: 800; }
 
-.dna-progress { position: fixed; top: 0; left: 0; height: 3px; background: var(--orange); z-index: calc(var(--z-header) + 1); }
+/* Reading position = a pointer ("you are here"), so it stays orange (SOTA DES-1). */
+.dna-progress { position: fixed; top: 0; left: 0; height: 3px; background: var(--pointer); z-index: calc(var(--z-header) + 1); }
 
 .dna-footer { border-top: 4px solid var(--strong); margin-top: var(--sec); padding: 40px 0 48px; font-size: 13px; color: var(--fg-3); }
 .dna-footer__in { display: grid; gap: 14px; }
 .dna-footer__row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 24px; }
 .dna-footer strong { color: var(--fg); }
+.dna-footer__row > a { display: inline-flex; align-items: center; min-height: var(--tap); }
 
 /* Status dot: honesty legend ■ verified / ■ building / ■ planned */
 .dna-dot { display: inline-block; width: 8px; height: 8px; background: var(--fg-3); flex-shrink: 0; vertical-align: middle; }
@@ -191,22 +203,32 @@ html[lang^="zh"] .dna-eyebrow { text-transform: none; letter-spacing: .08em; }
 .dna-seg > *:first-child { margin-left: 0; }
 .dna-seg > [aria-pressed="true"], .dna-seg > [aria-checked="true"], .dna-seg > [aria-selected="true"] { background: var(--strong); color: var(--bg); position: relative; z-index: 1; }
 
-/* Stat: big light numeral + bold label + provenance + orange data bar */
+/* Stat: big light numeral + bold label + provenance + ink data bar */
 .dna-stat { display: grid; gap: 10px; align-content: start; }
 .dna-stat__num { font-size: clamp(56px, 6vw, 88px); font-weight: 300; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
 .dna-stat__label { font-weight: 800; }
 .dna-stat__src { font-size: 13px; color: var(--fg-3); }
+/* Data bar: a value, not a pointer, so it is ink (SOTA DES-1: orange = pointer only). Data-true: the bar
+   shows the new value at once; no width animation (MOT-3, MOT-5). */
 .dna-bar { height: 4px; background: var(--line); }
-.dna-bar > span { display: block; height: 100%; background: var(--orange); transition: width var(--dur-slow) var(--ease); }
+.dna-bar > span { display: block; height: 100%; background: var(--strong); }
 
 /* Code block */
-.dna-code { background: #000; color: #fff; font-family: var(--mono); font-size: 14px; line-height: 1.6; padding: 20px; overflow: auto; border-radius: var(--radius); }
+.dna-code { background: var(--bg); color: var(--fg); font-family: var(--mono); font-size: 14px; line-height: 1.6; padding: 20px; overflow: auto; border-radius: var(--radius); }
 
-/* Skeleton */
+/* Three honest states (SOTA DES-6, AESTHETICS §4): loading / empty / error.
+   Loading: grey skeleton bars inside a container marked aria-busy="true" with a visually hidden "加载中" label.
+   Empty: eyebrow + one sentence + one next-step button. Error: .dna-alert--bad with what happened + what to do.
+   Unreachable backends say so; never show 0 or sample data in place of missing data. */
 .dna-skeleton { background: var(--soft); min-height: 1em; }
+.dna-empty { display: grid; gap: 16px; justify-items: start; padding: 48px 0; max-width: 46em; }
+.dna-empty__text { margin: 0; font-size: 17px; color: var(--fg-2); }
 
 /* Layout helpers */
 .dna-grid { display: grid; gap: 24px; grid-template-columns: repeat(12, minmax(0, 1fr)); }
+/* A child without a dna-span-* class takes the full row. Before v4.1 it took 1/12 and its text wrapped one
+   character per line (seen in this repo's own gallery, #40). Must stay above the span rules (same specificity). */
+.dna-grid > * { grid-column: span 12; min-width: 0; }
 .dna-span-8 { grid-column: span 8; } .dna-span-4 { grid-column: span 4; } .dna-span-6 { grid-column: span 6; } .dna-span-12 { grid-column: span 12; }
 @media (max-width: 900px) { .dna-grid > [class*="dna-span-"] { grid-column: span 12; } }
 @media (max-width: 600px) {
