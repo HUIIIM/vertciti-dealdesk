@@ -13,7 +13,9 @@ if [ -z "${DEALDESK_SMOKE_TOKEN:-}" ]; then
   exit 2
 fi
 
-BASE="https://vertciti-dealdesk.vercel.app"
+# 生产已切自有 VM 并以 dealdesk.vertciti.com 对外；Vercel 部署为回滚靶，
+# 其用户库独立，生产签发的 token 在彼处不被认，故冒烟目标改指生产域名。
+BASE="https://dealdesk.vertciti.com"
 TIMEOUT=60
 SLEEP_BETWEEN=3
 MIN_FIELDS=15
