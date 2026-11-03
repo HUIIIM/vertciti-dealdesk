@@ -5,6 +5,14 @@
 
 set -u
 
+# 2026-11-02 生产鉴权收紧：/api/wb/intake/run 需 analyst 及以上 Bearer 凭证。
+# 凭证只从环境变量 DEALDESK_SMOKE_TOKEN 读取（cron 运行前 source 密钥文件注入）；
+# 未设置即明确报错退出，禁止静默裸调用。
+if [ -z "${DEALDESK_SMOKE_TOKEN:-}" ]; then
+  echo "[DealDesk 冒烟测试] 错误：环境变量 DEALDESK_SMOKE_TOKEN 未设置，拒绝无凭证调用生产接口。" >&2
+  exit 2
+fi
+
 BASE="https://vertciti-dealdesk.vercel.app"
 TIMEOUT=60
 SLEEP_BETWEEN=3
@@ -34,6 +42,7 @@ for item in "${ADDRS[@]}"; do
   http=$(curl -s -m "$TIMEOUT" -o "$tmpfile" -w "%{http_code}" \
     -X POST "$BASE/api/wb/intake/run" \
     -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $DEALDESK_SMOKE_TOKEN" \
     -d "{\"text\":\"$addr\",\"mode\":\"address\"}" 2>/dev/null || echo "000")
 
   if [ "$http" = "200" ]; then
