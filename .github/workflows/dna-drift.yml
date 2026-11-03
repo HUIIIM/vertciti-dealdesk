@@ -1,0 +1,21 @@
+name: DNA drift
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dna:
+    # vendored DNA 不能悄悄偏离上游（STANDARDS UI-2，#42）
+    uses: HUIIIM/.github/.github/workflows/dna-drift.yml@34c36533c87a1d3727d564454627d50bdd39f960 # main 2026-11
+    with:
+      vendored: _brand-dna/dna.css
+      flavor: dna.css
