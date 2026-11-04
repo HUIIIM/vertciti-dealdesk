@@ -5,7 +5,7 @@
 # 本脚本 + Muse cron（dealdesk-resident-watchdog，每小时）构成自动恢复：
 # unit 唯一真源 = ~/workspace/vertcity/03-产品与工程/dealdesk.service.system-level（持久盘）
 # （2026-10-19 路径修订：该文件已随信息归纳迁至 03-产品与工程/，旧址 deliverables/ 兜底）
-# 行为：健康时只读检查、零写操作；异常时才重装 unit 并拉起服务。幂等，可反复执行。
+# 行为：健康时对服务面只读检查、零写操作（仅向持久盘事件日志记一行）；异常时才重装 unit 并拉起服务。幂等，可反复执行。
 set -u
 
 UNIT_SRC="/home/hatch/workspace/vertcity/03-产品与工程/dealdesk.service.system-level"
@@ -14,19 +14,29 @@ UNIT_DST="/etc/systemd/system/dealdesk.service"
 APP_DIR="/home/hatch/workspace/vertcity/dealdesk"
 URL="http://127.0.0.1:8100/"
 
+# 结构化事件日志（2026-11-03 补，SRE 自愈总案件 1 留痕缺口的源头修复）：每轮一行落持久盘，
+# 使自愈实绩可机检计数，不再只靠 cron 摘要。字段：时刻(UTC)／结果／触发态／HTTP／动作。
+EVENT_LOG="$APP_DIR/.dealdesk-watchdog-events.log"
+log_event() {
+  printf '%s outcome=%s state=%s http=%s action=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$1" "${state:-?}" "${code:-?}" "$2" >> "$EVENT_LOG" 2>/dev/null || true
+}
+
 state="$(systemctl is-active dealdesk.service 2>/dev/null || true)"
 code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "$URL" 2>/dev/null || echo 000)"
 
-if [ "$state" = "active" ] && [ "$code" = "200" ]; then
+if [ "$state" = "active" ] && { [ "$code" = "200" ] || [ "$code" = "307" ]; }; then
   echo "HEALTHY state=$state http=$code"
+  log_event "HEALTHY" "none"
   exit 0
 fi
 
 echo "RECOVERING state=$state http=$code"
 
 # 1) unit 缺失或与镜像不一致才重装（/etc 被清后走这条）
+action="start_only"
 if ! cmp -s "$UNIT_SRC" "$UNIT_DST" 2>/dev/null; then
   cp "$UNIT_SRC" "$UNIT_DST"
+  action="reinstall+start"
   echo "unit installed from mirror"
 fi
 
@@ -48,7 +58,7 @@ for delay in 2 3 5 8 12 15 15; do
   waited=$((waited + delay))
   state="$(systemctl is-active dealdesk.service 2>/dev/null || true)"
   code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "$URL" 2>/dev/null || echo 000)"
-  if [ "$state" = "active" ] && [ "$code" = "200" ]; then
+  if [ "$state" = "active" ] && { [ "$code" = "200" ] || [ "$code" = "307" ]; }; then
     echo "probe ready after ${waited}s"
     break
   fi
@@ -56,9 +66,11 @@ for delay in 2 3 5 8 12 15 15; do
 done
 
 echo "RESULT state=$state http=$code pending_dir=$([ -d "$APP_DIR/uploads/pending" ] && echo present || echo MISSING)"
-if [ "$state" = "active" ] && [ "$code" = "200" ]; then
+if [ "$state" = "active" ] && { [ "$code" = "200" ] || [ "$code" = "307" ]; }; then
   echo "RECOVERED"
+  log_event "RECOVERED" "$action"
   exit 0
 fi
 echo "RECOVERY_FAILED"
+log_event "RECOVERY_FAILED" "$action"
 exit 1
