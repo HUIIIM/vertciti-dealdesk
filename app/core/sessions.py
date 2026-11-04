@@ -2,7 +2,8 @@
 
 - cookie 名 dd_session，只存随机明文（dd_sess_…），库里只存 sha256（同令牌口径）。
 - 滑动续期：剩余有效期不足一半（15 天）时，resolve 顺延 expires_at 并标记需重发 cookie（中间件执行）。
-- 吊销：登出吊销当前条；改密/停用等场景可按用户全吊销（revoke_all_for_user 预留给管理面）。
+- 吊销：登出吊销当前条；停用 / 改角色 / 改用户名时，persistence/schema.py 的 after_flush 钩子
+  在同一事务内吊销该用户全部会话；revoke_all_for_user 供管理面主动全吊销。
 """
 
 from __future__ import annotations
