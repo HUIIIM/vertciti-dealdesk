@@ -27,6 +27,7 @@ rm -f dealdesk.db && .venv/bin/pytest tests/ -q
 - **跑测试前必删 `dealdesk.db`**（仓库根的开发副产品库）：历史上 `DEALDESK_DB` 在
   `app.db` import 之后才生效、脏库会让 `test_list_sorted_by_cash_to_close` 误挂。
   v2 起连库改为懒读（tests/conftest.py 会话级临时库），但删库成本为零，仍保留此步。
+  引用注记：本节测试 DB 隔离口径见 REG-090《工程卫生汇编》第 5 条（正本同 Git 节注记路径）。
 - v2 质量门（CI 同款，提交前本机全跑）：
   - `ruff check app tests tools`
   - `ruff check --config ruff-strict.toml app/domain/v2 app/services/v2 app/api/v2 app/core app/services/persistence app/paths.py --exclude app/services/persistence/migrations`
@@ -47,6 +48,8 @@ rm -f dealdesk.db && .venv/bin/pytest tests/ -q
   或改走非拦截通道；JSON POST 不受此影响。
 
 ## 构建与部署
+
+> **【2026-11-04 迁移定版 · 协议工程组】生产承接面已迁出 Vercel**：现行生产面＝OCI VM（`https://dealdesk.vertciti.com`，Caddy/uvicorn，容器 dealdesk-app-prod 走宿主 app.env→--env-file）。Vercel 项目 `vertciti-dealdesk` 已被平台禁用（DEPLOYMENT_DISABLED，2026-11-04 实测），本节下文的 vercel-deploy/ 同步、vc-deploy 部署、Vercel API 回滚等口径**全部退役停用**（代码与目录留置备查，不再执行）；令牌分发终态＝VM 单面（`tools/tophap_vm_push.py`；`tophap-auto-refresh.sh` 的 Vercel 腿已加退役闸、默认跳过）。部署后验证改读 VM 域名 `/api/tophap/status`。
 
 - 本地即生产形态：无构建步骤，后端 `app/`＋静态 `static/` 直接跑。v2 前端源码在 `frontend/`，
   构建产物 `static/app/` 入库（随 `static/` 一起同步到 vercel-deploy/）。
@@ -82,6 +85,7 @@ rm -f dealdesk.db && .venv/bin/pytest tests/ -q
 - **绝不提交**：`.env`（600 权限，含 TopHap token）、`dealdesk.db`、
   `.tophap-oauth-state.json`、`__pycache__/`。
 - push 事项由 parent 定夺；本仓库默认只 commit 不 push。
+- 引用注记：本节作者邮箱口径见 REG-090《工程卫生汇编》第 1 条（正本 deliverables/autonomy-standards-suite/batch2/std-49-engineering-hygiene.md）。
 
 ## 禁区
 
@@ -102,5 +106,5 @@ rm -f dealdesk.db && .venv/bin/pytest tests/ -q
 | 加用户 | `.venv/bin/python -m app.core.security add-user <名> <chairman\|analyst\|viewer>` |
 | 备份 | `.venv/bin/python tools/db_backup.py backup ~/backups` |
 | 查 TopHap 状态 | `curl http://127.0.0.1:8100/api/tophap/status` |
-| 生产状态 | `curl https://vertciti-dealdesk.vercel.app/api/tophap/status` |
+| 生产状态 | `curl https://dealdesk.vertciti.com/api/tophap/status`（VM 面；原 vercel.app 面 2026-11-04 已退役） |
 | 敏感扫描 | `bash ~/workspace/vertcity/security-watch/data-room-gate.sh` |
