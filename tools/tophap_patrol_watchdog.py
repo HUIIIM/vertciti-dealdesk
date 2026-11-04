@@ -37,14 +37,20 @@ def fetch_status(url: str) -> dict | None:
     env = dict(os.environ)
     env["NO_PROXY"] = "localhost,127.0.0.1"
     env["no_proxy"] = "localhost,127.0.0.1"
-    try:
-        out = subprocess.run(
-            ["curl", "-s", "--max-time", "25", url],
-            capture_output=True, text=True, env=env, timeout=35,
-        )
-        return json.loads(out.stdout)
-    except Exception:
-        return None
+    # 确认重取（2026-11-03 晚补）：单次传输失败先隔 3 秒重取一次，两次皆败才判
+    # unreachable——首夜 7 轮中 2 轮单域 unreachable 且次轮自清，属瞬时网络噪声，
+    # 与舰队 F2/F4 口径同向（探针未知先定界、不以单次失败定性）。
+    for attempt in range(2):
+        try:
+            out = subprocess.run(
+                ["curl", "-s", "--max-time", "25", url],
+                capture_output=True, text=True, env=env, timeout=35,
+            )
+            return json.loads(out.stdout)
+        except Exception:
+            if attempt == 0:
+                time.sleep(3)
+    return None
 
 
 def local_remaining() -> int | None:
