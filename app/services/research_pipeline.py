@@ -21,6 +21,7 @@ import re
 import socket
 import time
 import urllib.parse
+import urllib.request
 from datetime import datetime
 
 import httpx
@@ -306,6 +307,39 @@ class UnsafeRedirectError(Exception):
     """跳转目标不是公网地址（或跳转过多）。"""
 
 
+class UnsafeTargetError(UnsafeRedirectError):
+    """实际连上的对端 IP 不是公网（DNS 重绑定：检查时解析到公网，连接时解析到内网）。"""
+
+
+def _peer_ip(r: object) -> str | None:
+    """httpx 响应实际连接的对端 IP；拿不到（测试替身等）返回 None。"""
+    stream = (getattr(r, "extensions", None) or {}).get("network_stream")
+    if stream is None:
+        return None
+    addr = stream.get_extra_info("server_addr")
+    return str(addr[0]) if addr else None
+
+
+def _via_proxy(url: str) -> bool:
+    """出站走代理时对端是代理本身、目标由代理解析：对端复核不适用（仍保留连接前的公网检查）。"""
+    parts = urllib.parse.urlparse(url)
+    proxies = urllib.request.getproxies()
+    if not (proxies.get(parts.scheme) or proxies.get("all")):
+        return False
+    return not urllib.request.proxy_bypass(parts.hostname or "")
+
+
+def _check_peer(r: object, url: str) -> None:
+    """连接后复核：_is_public_url 与 httpx 各自解析一次，中间可被 DNS 重绑定换成内网地址。
+    这里核对 httpx 实际连上的 IP，非公网则在读响应体之前中止（响应内容不会被读取或回显）。"""
+    peer = _peer_ip(r)
+    if peer is None or _via_proxy(url):
+        return
+    ip = ipaddress.ip_address(peer)
+    if not ip.is_global:
+        raise UnsafeTargetError(f"实际连接到非公网 IP（{ip}），疑似 DNS 重绑定，拒绝抓取")
+
+
 @contextlib.contextmanager
 def _public_stream(url: str, **kw):
     """同 httpx.stream("GET")，但不让 httpx 自动跟跳转：每一跳都重新过 _is_public_url。
@@ -314,6 +348,7 @@ def _public_stream(url: str, **kw):
     """
     for _hop in range(MAX_REDIRECTS + 1):
         with httpx.stream("GET", url, follow_redirects=False, **kw) as r:
+            _check_peer(r, url)
             location = r.headers.get("location") if r.status_code in REDIRECT_CODES else None
             if not location:
                 yield r
@@ -356,6 +391,9 @@ def fetch_page(url: str, log: list) -> dict:
                 _log(log, f"抓取 {url[:80]}", "failed", note)
                 return {"ok": False, "note": note, "too_large": True}
             html_text = (body or b"").decode(encoding, errors="replace")
+    except UnsafeTargetError as e:
+        _log(log, f"抓取 {url[:80]}", "skipped", str(e))
+        return {"ok": False, "note": str(e)}
     except UnsafeRedirectError as e:
         _log(log, f"抓取 {url[:80]}", "skipped", f"跳转被拦：{e}")
         return {"ok": False, "note": f"跳转被拦：{e}"}
