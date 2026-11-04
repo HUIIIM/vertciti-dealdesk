@@ -125,6 +125,9 @@ def _revoke_sessions_on_account_change(session: Session, _flush_context: object)
     """挂在 ORM 层而非某个服务函数：任何写路径（管理面、脚本、运维）改到上述列都在同一事务内生效。
 
     after_flush 时 session.dirty 与属性 history 仍是本次 flush 前的状态（SQLAlchemy 文档约定）。
+    吊销与账户变更走同一连接同一事务：变更回滚，吊销一并回滚。
+    不覆盖：绕过 ORM 实例的批量 update(User) / 原生 SQL 不触发本钩子（仓内现无此类写法）；
+    以后若加，须在同一事务里显式调用 app.core.sessions.revoke_all_for_user。
     """
     user_ids = {u.id for u in session.dirty if isinstance(u, User)
                 and any(inspect(u).attrs[c].history.has_changes() for c in _SESSION_BOUND_COLUMNS)}
