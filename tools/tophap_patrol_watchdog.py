@@ -28,8 +28,10 @@ ENV_FILE = os.path.join(BASE, ".env")
 LOG_FILE = os.path.join(BASE, ".tophap-patrol-watchdog.log")
 URLS = [
     "https://dealdesk.vertciti.com/api/tophap/status",
-    "https://vertciti-dealdesk.vercel.app/api/tophap/status",
 ]
+# 2026-11-04: vertciti-dealdesk.vercel.app 已随 vertciti.com 迁出 Vercel 退役
+# （部署被平台禁用 DEPLOYMENT_DISABLED，实测）；验证面定版为 VM 单面，
+# 原双域判读钥匙（单域 unreachable＝传输噪声）随之作废，见巡检任务体定版块。
 REMAINING_FLOOR_SEC = 1800
 
 
