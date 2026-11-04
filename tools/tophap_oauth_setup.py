@@ -246,12 +246,17 @@ def wait_for_code(manual: bool) -> str:
 
 
 def exchange_code(as_meta: dict, client_id: str, client_secret: str | None,
-                  code: str, verifier: str) -> dict:
+                  code: str, verifier: str,
+                  redirect_uri_override: str | None = None) -> dict:
     # RFC 8707：token 交换也必须带 resource（与 authorize 一致），否则 401。
+    # redirect_uri 必须与 authorize 步逐字一致：两阶段模式下以 state 文件内
+    # Phase 1 落盘值为准（override），不得现算 env——2026-11-04 rig 复测实证：
+    # Phase 2 壳漏设 TOPHAP_REDIRECT_URI 时现算出 localhost、与 authorize 的
+    # capture 端点 mismatch，且错兑同样烧毁单用 code，整轮作废。
     body = {
         "grant_type": "authorization_code",
         "code": code,
-        "redirect_uri": redirect_uri(),
+        "redirect_uri": redirect_uri_override or redirect_uri(),
         "resource": mcp_url(),
         "client_id": client_id,
         "code_verifier": verifier,
@@ -351,7 +356,8 @@ def phase2(state_file: str, code: str) -> None:
         raise SystemExit("state 文件已超过 30 分钟，code/verifier 可能失效，中止")
     tok = exchange_code(payload["as_meta"], payload["client_id"],
                         payload.get("client_secret"), code.strip(),
-                        payload["verifier"])
+                        payload["verifier"],
+                        redirect_uri_override=payload.get("redirect_uri"))
     updates = {
         "TOPHAP_MCP_URL": payload["mcp"],
         "TOPHAP_ACCESS_TOKEN": tok["access_token"],
