@@ -20,6 +20,7 @@ from urllib.parse import urlencode
 import httpx  # noqa: F401  （测试替身的历史 patch 点；token 换码已改走 http_capped 流式上限）
 import jwt
 from jwt import PyJWKClient
+from jwt.exceptions import PyJWKClientConnectionError, PyJWKClientError
 
 from app.services import http_capped
 
@@ -31,6 +32,52 @@ ISSUERS = ("https://accounts.google.com", "accounts.google.com")
 # Google token 端点响应大小上限：与页面/POST 上限同值；
 # 换码改走 http_capped.post_capped 流式停手，超限收敛为 verify_failed（旧口径不变）。
 MAX_TOKEN_BYTES = http_capped.MAX_POST_BYTES
+
+# JWKS 响应大小上限：与 GET 型 JSON 上限同值（台账第 34 项）。
+# 查实结论（2026-11-04，PyJWT 2.15.1，jwt/jwks_client.py）：PyJWKClient.fetch_data
+# 用 urllib + json.load(response) 整页读入，无字节上限——只有 timeout 与
+# 缓存 lifespan（管新鲜度、不管大小）。故改自管 capped 抓取（见 _CappedPyJWKClient）。
+MAX_JWKS_BYTES = http_capped.MAX_JSON_BYTES
+
+
+class _CappedPyJWKClient(PyJWKClient):
+    """PyJWKClient 的 capped 变体：只覆写 fetch_data（PyJWT 官方子类扩展点）。
+
+    抓取改走 http_capped.get_json_capped 流式＋上限（Content-Length 预检＋
+    流式停手，不整页读入）；其余行为（JWK Set 缓存 lifespan、cache_keys、
+    kid 匹配/刷新/cooldown）全部继承 PyJWKClient 不变。
+    超限/非 200/网络异常收敛为 PyJWKClientConnectionError、非 JSON/非 dict
+    收敛为 PyJWKClientError——与原生 fetch_data 的异常契约同型，
+    verify_id_token 既有 verify_failed 收敛口径不变。
+    """
+
+    def fetch_data(self) -> Any:
+        try:
+            result = http_capped.get_json_capped(
+                self.uri,
+                headers=self.headers or None,
+                timeout=getattr(self, "timeout", 30) or 30,
+                limit=MAX_JWKS_BYTES,
+            )
+        except Exception as e:  # 网络异常/超时：与原生同型收敛
+            raise PyJWKClientConnectionError(
+                f'Fail to fetch data from the url, err: "{e}"') from e
+        if result.get("too_large"):
+            raise PyJWKClientConnectionError(
+                f"JWKS 响应过大（超过 {MAX_JWKS_BYTES} 字节上限），已停止读取")
+        if result.get("status_code") != 200:
+            raise PyJWKClientConnectionError(
+                f"Fail to fetch data from the url, status: {result.get('status_code')}")
+        data = result.get("data")
+        if result.get("json_error") or not isinstance(data, dict):
+            raise PyJWKClientError("The JWKS endpoint did not return a JSON object")
+        # 与原生 fetch_data 同口径：成功才写 JWK Set 缓存并记成功时点，
+        # 失败不清空既有缓存。
+        cache = getattr(self, "jwk_set_cache", None)
+        if cache is not None:
+            cache.put(data)
+        self._last_successful_fetch = time.monotonic()  # 原生成功时点字段（旧版无此字段时多记无害）
+        return data
 
 
 class GoogleAuthError(Exception):
@@ -116,7 +163,7 @@ def exchange_code(code: str, verifier: str) -> dict[str, Any]:
 
 @lru_cache(maxsize=1)
 def _jwks() -> PyJWKClient:
-    return PyJWKClient(JWKS_URL, cache_keys=True, lifespan=3600)
+    return _CappedPyJWKClient(JWKS_URL, cache_keys=True, lifespan=3600)
 
 
 def verify_id_token(id_token: str) -> GoogleIdentity:
