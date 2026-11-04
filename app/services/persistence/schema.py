@@ -26,8 +26,11 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    event,
+    inspect,
+    update,
 )
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
 NAMING = {
     "ix": "ix_%(column_0_label)s",
@@ -111,6 +114,25 @@ class WebSession(AuditMixin, Base):
     last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     __table_args__ = (Index("ix_web_sessions_user", "user_id"),)
+
+
+# 账户生命周期：这三列一变（停用 / 改角色 / 改用户名＝改登录邮箱），该用户已签发的浏览器会话全部吊销。
+_SESSION_BOUND_COLUMNS = ("active", "role", "username")
+
+
+@event.listens_for(Session, "after_flush")
+def _revoke_sessions_on_account_change(session: Session, _flush_context: object) -> None:
+    """挂在 ORM 层而非某个服务函数：任何写路径（管理面、脚本、运维）改到上述列都在同一事务内生效。
+
+    after_flush 时 session.dirty 与属性 history 仍是本次 flush 前的状态（SQLAlchemy 文档约定）。
+    """
+    user_ids = {u.id for u in session.dirty if isinstance(u, User)
+                and any(inspect(u).attrs[c].history.has_changes() for c in _SESSION_BOUND_COLUMNS)}
+    if user_ids:
+        session.connection().execute(
+            update(WebSession)
+            .where(WebSession.user_id.in_(user_ids), WebSession.revoked_at.is_(None))
+            .values(revoked_at=utcnow()))
 
 
 # ---------------------------------------------------------------- v2：交易与生命周期
