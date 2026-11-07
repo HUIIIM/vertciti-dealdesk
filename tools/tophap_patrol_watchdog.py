@@ -12,7 +12,7 @@ in a re-clone cleanup. Behavior:
   2026-11-03 confirm-retry fix).
 - verdict OK iff remaining >= floor (1800) and all domains ok, else FLAG.
 - Appends one line to dealdesk/.tophap-patrol-watchdog.log and prints it.
-Exit codes: 0 = OK, 1 = FLAG.
+Exit codes: 0 = OK, 3 = FLAG (wrapper contract).
 No token values are read beyond the expiry field; nothing secret is logged.
 """
 import json
@@ -76,7 +76,7 @@ def main():
     print(line)
     with LOG.open("a") as fh:
         fh.write(line + "\n")
-    return 0 if verdict == "OK" else 1
+    return 0 if verdict == "OK" else 3
 
 
 if __name__ == "__main__":
