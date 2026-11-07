@@ -41,11 +41,31 @@ for item in "${ADDRS[@]}"; do
   addr="${item#*|}"
 
   tmpfile=$(mktemp)
+  retried=0
   http=$(curl -s -m "$TIMEOUT" -o "$tmpfile" -w "%{http_code}" \
     -X POST "$BASE/api/wb/intake/run" \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer $DEALDESK_SMOKE_TOKEN" \
-    -d "{\"text\":\"$addr\",\"mode\":\"address\"}" 2>/dev/null || echo "000")
+    -d "{\"text\":\"$addr\",\"mode\":\"address\"}" 2>/dev/null)
+  rc=$?
+  # 传输层失败判据＝curl 非零退出或状态 000（旧写法 || echo "000" 在 curl 已自印
+  # 000 时会叠成 000000，2026-11-07 本地模拟实证，故改以退出码＋状态双判并归一化）
+  if [ "$rc" -ne 0 ] || [ "$http" = "000" ]; then
+    http="000"
+    # 2026-11-07 中枢照准：传输层失败（超时无响应体）先重试一次再判失败。
+    # 缘起：2026-11-07 07:43 冒烟 NY/TX 首呼各烧满 60s 回 000、同轮第三呼通过、
+    # 07:58 复测 3/3 全过，定性瞬时冷启型卡顿——重试吸收该类误报；
+    # 重试事实在报告行显名（通过行加注／失败详情加行），不静默吞。
+    retried=1
+    sleep 5
+    http=$(curl -s -m "$TIMEOUT" -o "$tmpfile" -w "%{http_code}" \
+      -X POST "$BASE/api/wb/intake/run" \
+      -H "Content-Type: application/json" \
+      -H "Authorization: Bearer $DEALDESK_SMOKE_TOKEN" \
+      -d "{\"text\":\"$addr\",\"mode\":\"address\"}" 2>/dev/null)
+    rc=$?
+    [ "$rc" -ne 0 ] && http="000"
+  fi
 
   if [ "$http" = "200" ]; then
     fields=$(jq -r '.fields | length' "$tmpfile" 2>/dev/null || echo "NA")
@@ -56,7 +76,9 @@ for item in "${ADDRS[@]}"; do
     [ -z "$primary" ] && ok=0
     if [ "$ok" = "1" ]; then
       pass=$((pass+1))
-      report_lines+=("地址$i ($label): 通过 fields=$fields primary=$primary")
+      line="地址$i ($label): 通过 fields=$fields primary=$primary"
+      [ "$retried" = "1" ] && line="$line（首呼 000，重试后通过）"
+      report_lines+=("$line")
     else
       report_lines+=("地址$i ($label): 失败 fields=$fields primary=${primary:-空}")
       diag=$(jq -r '.diagnostics // "无diagnostics"' "$tmpfile" 2>/dev/null | head -c 800)
@@ -69,6 +91,7 @@ for item in "${ADDRS[@]}"; do
     report_lines+=("地址$i ($label): 失败 HTTP=$http")
     diag=$(head -c 500 "$tmpfile" 2>/dev/null || echo "无返回体")
     fail_detail+=("[$label] HTTP=$http (curl 返回码，非 200)")
+    [ "$retried" = "1" ] && fail_detail+=("  首呼 HTTP=000，间隔 5s 已重试一次，仍失败")
     fail_detail+=("  返回体前500字符: $diag")
   fi
   rm -f "$tmpfile"
