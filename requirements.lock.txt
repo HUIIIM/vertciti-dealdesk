@@ -1,0 +1,50 @@
+# 生产依赖完整传递闭包锁定 (SEC-A5, 台账第 31 项, 2026-11-03; 2026-11-07 代行修复再生: pillow 13.0.0 / pypdf 6.21.4 / certifi 2026.10.23, pip-audit 清零口径)
+# 口径: requirements.txt 全部直接依赖 (含 extras: uvicorn[standard] /
+# PyJWT[crypto] / psycopg[binary]) 在 Python 3.12 / linux x86_64 下的传递闭包,
+# 逐包 == 精确版本。来源: 全量测试通过的项目 .venv 依赖图遍历 (importlib.metadata
+# Requires-Dist 闭包); 其他 Python 版本/平台的条件依赖 (exceptiongroup / tzdata
+# 等 marker 不命中的包) 不在本闭包内。
+# 可复现安装: python3 -m venv .venv && .venv/bin/pip install -r requirements.lock.txt
+# 再生: 升级 requirements.txt 任一钉版后, 在干净 venv 安装新钉版并重新遍历闭包,
+# 同步更新本文件; tests/test_supply_chain_pins.py 守直接钉版与本文件的包含关系。
+alembic==1.20.1
+annotated-doc==0.0.5
+annotated-types==0.8.0
+anyio==4.15.1
+certifi==2026.10.23
+cffi==2.1.1
+charset-normalizer==3.5.2
+click==8.5.0
+cryptography==50.0.2
+et_xmlfile==2.0.0
+fastapi==0.141.1
+h11==0.16.0
+httpcore==1.0.9
+httptools==0.8.0
+httpx==0.28.1
+idna==3.20
+Mako==1.4.3
+MarkupSafe==3.0.4
+openpyxl==3.1.5
+pillow==13.0.0
+psycopg==3.3.6
+psycopg-binary==3.3.6
+pycparser==3.12
+pydantic==2.13.5
+pydantic_core==2.46.5
+PyJWT==2.15.1
+pypdf==6.21.4
+pypinyin==0.55.0
+python-dotenv==1.2.3
+python-multipart==0.0.32
+PyYAML==6.0.3
+reportlab==5.0.1
+SQLAlchemy==2.1.6
+starlette==1.7.0
+tomli==2.5.0
+typing_extensions==4.16.0
+typing-inspection==0.4.4
+uvicorn==0.54.0
+uvloop==0.22.1
+watchfiles==1.3.0
+websockets==17.1
