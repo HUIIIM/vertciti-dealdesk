@@ -6,7 +6,7 @@ uvicorn[standard]==0.54.0
 httpx==0.28.1
 PyJWT[crypto]==2.15.1  # Google 登录 id_token 验签 (JWKS RS256)
 python-multipart==0.0.32
-reportlab==5.0.1  # 5.x 已实测金标准全过
+reportlab==5.1.0  # 5.x 已实测金标准全过
 openpyxl==3.1.5
 pypinyin==0.55.0
 Pillow==13.0.0  # 报告图表: 服务端手绘 PNG (pdf_report 嵌入), Vercel serverless 可用

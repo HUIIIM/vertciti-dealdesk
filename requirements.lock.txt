@@ -38,7 +38,7 @@ pypinyin==0.55.0
 python-dotenv==1.2.3
 python-multipart==0.0.32
 PyYAML==6.0.3
-reportlab==5.0.1
+reportlab==5.1.0
 SQLAlchemy==2.1.6
 starlette==1.7.0
 tomli==2.5.0
