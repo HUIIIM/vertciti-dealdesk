@@ -51,10 +51,10 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:pypi/certifi@2026.7.22",
+      "bom-ref": "pkg:pypi/certifi@2026.10.23",
       "name": "certifi",
-      "version": "2026.7.22",
-      "purl": "pkg:pypi/certifi@2026.7.22",
+      "version": "2026.10.23",
+      "purl": "pkg:pypi/certifi@2026.10.23",
       "scope": "required"
     },
     {
@@ -171,10 +171,10 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:pypi/pillow@12.3.0",
+      "bom-ref": "pkg:pypi/pillow@13.0.0",
       "name": "pillow",
-      "version": "12.3.0",
-      "purl": "pkg:pypi/pillow@12.3.0",
+      "version": "13.0.0",
+      "purl": "pkg:pypi/pillow@13.0.0",
       "scope": "required"
     },
     {
@@ -227,10 +227,10 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:pypi/pypdf@6.19.0",
+      "bom-ref": "pkg:pypi/pypdf@6.21.4",
       "name": "pypdf",
-      "version": "6.19.0",
-      "purl": "pkg:pypi/pypdf@6.19.0",
+      "version": "6.21.4",
+      "purl": "pkg:pypi/pypdf@6.21.4",
       "scope": "required"
     },
     {
