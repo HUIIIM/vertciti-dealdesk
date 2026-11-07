@@ -14,7 +14,11 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-os.environ["DEALDESK_DB"] = os.path.join(os.path.dirname(__file__), "test-pdf.db")
+# 注意：绝不在 import 期写 DEALDESK_DB。pytest collection 会先 import 全部
+# 测试模块再跑用例，import 期覆写会把 conftest 的会话级临时库顶掉、全会话
+# 改落到这个持久文件上，address_cache 等状态跨 run 残留（test_cache 全量
+# flake 的根因，2026-11-07 定案）。库路径只在 _fresh_db() 里按需设置。
+_DB_PATH = os.path.join(os.path.dirname(__file__), "test-pdf.db")
 
 from app import db, pdf_report  # noqa: E402
 from app import scoring_commercial as com  # noqa: E402
@@ -23,6 +27,7 @@ from test_scoring import base_commercial, base_residential  # noqa: E402
 
 
 def _fresh_db():
+    os.environ["DEALDESK_DB"] = _DB_PATH
     p = os.environ["DEALDESK_DB"]
     if os.path.exists(p):
         os.remove(p)

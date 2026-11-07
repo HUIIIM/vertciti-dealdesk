@@ -16,6 +16,46 @@ import app.cache as cache
 import app.providers as pv
 from app.db import _conn
 
+# 本模块全部测试地址（归一化变体与原串同 hash，不另列）。
+_TEST_ADDRESSES = (
+    "cache-hit 123 Main St, Tampa, FL 33602",
+    "cache-ttl 456 Oak Ave, Austin, TX 78701",
+    "cache-stale 789 Pine Rd, Miami, FL 33101",
+    "cache-nocache 999 Nowhere Ln, Void, XX 00000",
+    "cache-off 321 Elm St, Denver, CO 80202",
+)
+
+
+@pytest.fixture(autouse=True)
+def _isolate_address_cache():
+    """逐测清掉本模块地址在当前活动库里的 address_cache 行（前后各一次）。
+
+    定案（2026-11-07，台账第 44 项）：缓存经 persistence session_scope 落
+    DEALDESK_DB 指向的库；历史上 test_pdf.py 在 import 期把该变量顶成持久
+    文件 tests/test-pdf.db，全量 collection 后整会话共用该文件，先前/并行
+    run 写入的新鲜行（<24h TTL）会让本模块首调即命中缓存、provider 调用
+    数为 0 而挂。test_pdf 侧已移除 import 期覆写；本 fixture 是第二道防线：
+    无论活动库是哪个、里面有什么，本模块每个用例都从干净缓存起跑。
+    """
+    from sqlalchemy import delete
+
+    from app.services.persistence.engine import session_scope
+    from app.services.persistence.schema import AddressCache
+
+    hashes = [cache.address_hash(a) for a in _TEST_ADDRESSES]
+
+    def _clear() -> None:
+        try:
+            with session_scope() as sess:
+                sess.execute(delete(AddressCache).where(
+                    AddressCache.address_hash.in_(hashes)))
+        except Exception:
+            pass  # 表/库尚不可用时无行可清，不让隔离动作本身成为失败源
+
+    _clear()
+    yield
+    _clear()
+
 
 def _field(key, value, source="TopHap MCP"):
     return {"key": key, "label": key, "value": value, "display": str(value),
