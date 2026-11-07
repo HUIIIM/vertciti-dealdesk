@@ -236,7 +236,7 @@ def _verdict_panel(st: dict, s: dict, verdict: dict | None = None) -> Table:
         dg = s.get("downgrades") or []
         for d in dg:
             verdict_lines.append(Paragraph(
-                f"<font color=\"#8A5A00\">▲ {d['message']}</font>", st["body"]))
+                f"<font color=\"{brand.AMBER_TEXT}\">▲ {d['message']}</font>", st["body"]))
         # Phase 5 第三轮 B5：新 verdict 引擎的降级理由（"缺关键数据，结论降一档"）
         # 与旧 s["downgrades"] 同源判断——有降级提示时页眉不许写"无降级提示"
         v_reasons = (verdict or {}).get("reasons") or []
@@ -307,8 +307,8 @@ def _check_list(st: dict, title: str, items: list, ok_color: str) -> list:
                      Paragraph(msg, st["cell"])])
     t = Table(rows, colWidths=[16, CONTENT_W - 16])
     t.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, -1), HexColor("#F7E9E8")),
-        ("BOX", (0, 0), (-1, -1), 0.6, HexColor("#E6B8B4")),
+        ("BACKGROUND", (0, 0), (-1, -1), HexColor(brand.RED_TINT)),
+        ("BOX", (0, 0), (-1, -1), 0.6, HexColor("#E6B8B4")),  # 报告面功能描边值：品牌组 2026-10-27 暂登记（冻结、仅报告状态面板描边、禁作他用）
         ("TOPPADDING", (0, 0), (-1, -1), 5),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
         ("LEFTPADDING", (0, 0), (-1, -1), 8),
@@ -549,11 +549,11 @@ def build_pdf(project: dict) -> bytes:
     dg = s.get("downgrades") or []
     if dg:
         flow = [_section_title(st, "降级提示（封顶降级，非一票否决）")]
-        rows = [[Paragraph("<font color=\"#8A5A00\">▲</font>", st["cell"]),
+        rows = [[Paragraph(f"<font color=\"{brand.AMBER_TEXT}\">▲</font>", st["cell"]),
                  Paragraph(d["message"], st["cell"])] for d in dg]
         t = Table(rows, colWidths=[16, CONTENT_W - 16])
         t.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, -1), HexColor("#FFF5CC")),
+            ("BACKGROUND", (0, 0), (-1, -1), HexColor(brand.YELLOW_TINT)),
             ("BOX", (0, 0), (-1, -1), 0.6, HexColor("#FFCE00")),
             ("TOPPADDING", (0, 0), (-1, -1), 5),
             ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
