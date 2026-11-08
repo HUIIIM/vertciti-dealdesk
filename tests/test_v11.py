@@ -344,6 +344,9 @@ class TestAPIStrictValidation(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         import tempfile
+        # 保存类级覆盖前的会话库指针，tearDownClass 原样恢复（台账第 51 项：
+        # 此前无恢复，后续模块会继承本类临时库指针、临时文件亦永不删除）。
+        cls._prev_db = os.environ.get("DEALDESK_DB")
         cls._db = tempfile.NamedTemporaryFile(suffix=".db", delete=False).name
         os.environ["DEALDESK_DB"] = cls._db
         from app import db
@@ -351,6 +354,18 @@ class TestAPIStrictValidation(unittest.TestCase):
         from fastapi.testclient import TestClient
         from app.main import app
         cls.client = TestClient(app)
+
+    @classmethod
+    def tearDownClass(cls):
+        if cls._prev_db is None:
+            os.environ.pop("DEALDESK_DB", None)
+        else:
+            os.environ["DEALDESK_DB"] = cls._prev_db
+        for suffix in ("", "-wal", "-shm", "-journal"):
+            try:
+                os.remove(cls._db + suffix)
+            except OSError:
+                pass
 
     def _payload(self, track="residential", **over):
         data = base_residential() if track == "residential" else base_commercial()
@@ -395,6 +410,23 @@ class TestAPIStrictValidation(unittest.TestCase):
         vals = [p["cash_to_close"] for p in items]
         self.assertEqual(vals, sorted(vals))
         self.assertLess(items[0]["cash_to_close"], items[1]["cash_to_close"])
+
+
+class TestV11DbPointerRestore(unittest.TestCase):
+    """回归守卫（台账第 51 项）：TestAPIStrictValidation 类级 DEALDESK_DB
+    覆盖必须在类结束后恢复原指针并删临时库，不得泄漏给后续模块。"""
+
+    def test_setup_teardown_restores_env_and_removes_db(self):
+        before = os.environ.get("DEALDESK_DB")
+        TestAPIStrictValidation.setUpClass()
+        try:
+            leaked = os.environ.get("DEALDESK_DB")
+            self.assertNotEqual(leaked, before)
+            self.assertTrue(os.path.exists(leaked))
+        finally:
+            TestAPIStrictValidation.tearDownClass()
+        self.assertEqual(os.environ.get("DEALDESK_DB"), before)
+        self.assertFalse(os.path.exists(leaked))
 
 
 if __name__ == "__main__":
