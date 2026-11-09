@@ -29,9 +29,13 @@
 
 from __future__ import annotations
 
+import logging
 import os
+import re
 import time
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 import httpx  # noqa: F401  （测试替身的历史 patch 点；GET 已改走 http_capped）
 
@@ -420,6 +424,29 @@ class CensusProvider(BaseProvider):
 
 PROVIDER_ORDER = (TophapProvider, RentcastProvider, WebProvider, CensusProvider)
 
+# intake 段位计时（台账第 53 项）：冒烟首呼 60s 超时无段位日志、归因不可得，
+# 故 run_chain 逐 provider 计时（available＋enrich 全段），结束时落一行
+# 结构化日志 intake_timing（含逐段 ms 与总 ms），超时事件可直接段位归因。
+_TIMING_SLUGS = {"TopHap MCP": "tophap_mcp", "RentCast": "rentcast",
+                 "公开网页": "web", "Census": "census"}
+
+
+def _timing_slug(name: str, idx: int) -> str:
+    if name in _TIMING_SLUGS:
+        return _TIMING_SLUGS[name]
+    slug = re.sub(r"[^a-z0-9]+", "_", (name or "").lower()).strip("_")
+    return slug or f"provider_{idx}"
+
+
+def _emit_intake_timing(timings: list[dict], total_ms: int, *,
+                        ok: bool, cache_hit: bool = False) -> None:
+    """落一行结构化段位计时日志：intake_timing total_ms=.. <段>_ms=.. ..。"""
+    segs = " ".join(
+        f"{_timing_slug(t['provider'], i)}_ms={t['elapsed_ms']}"
+        for i, t in enumerate(timings))
+    logger.info("intake_timing total_ms=%d %s cache_hit=%s ok=%s",
+                total_ms, segs, str(cache_hit).lower(), str(ok).lower())
+
 
 def run_chain(address: str, log: list | None = None,
               providers: list | None = None,
@@ -439,10 +466,18 @@ def run_chain(address: str, log: list | None = None,
       diagnostics 追加说明），无缓存则原样返回诊断
 
     返回 {"ok", "fields", "primary_provider", "provider_results",
-          "diagnostics", "log", "cached", "stale"?}。
+          "diagnostics", "log", "cached", "stale"?, "timings"}。
+    timings = {"total_ms", "providers": [{provider, elapsed_ms}]}
+    （第 53 项段位计时；provider_results 每条亦带 elapsed_ms）。
     providers 参数供测试注入；默认按 PROVIDER_ORDER 实例化。
     """
     log = log if log is not None else []
+    chain_t0 = time.perf_counter()
+    timings: list[dict] = []
+
+    def _total_ms() -> int:
+        return int(round((time.perf_counter() - chain_t0) * 1000))
+
     cache_enabled = use_cache and providers is None
     cached = _cache.get_cached(address) if cache_enabled else None
 
@@ -454,6 +489,9 @@ def run_chain(address: str, log: list | None = None,
         data.pop("stale", None)
         _log_provider(log, "地址缓存", "hit", f"命中缓存（{age_h:.1f} 小时前）")
         data["log"] = log
+        total_ms = _total_ms()
+        data["timings"] = {"total_ms": total_ms, "providers": []}
+        _emit_intake_timing([], total_ms, ok=True, cache_hit=True)
         return data
 
     if providers is None:
@@ -463,13 +501,19 @@ def run_chain(address: str, log: list | None = None,
     primary: str | None = None
 
     for p in providers:
+        seg_t0 = time.perf_counter()
+
+        def _seg_ms() -> int:
+            ms = int(round((time.perf_counter() - seg_t0) * 1000))
+            timings.append({"provider": p.name, "elapsed_ms": ms})
+            return ms
         try:
             ok_avail, why = p.available()
         except Exception as e:  # noqa: BLE001
             ok_avail, why = False, f"可用性检查异常：{str(e)[:100]}"
         if not ok_avail:
             results.append({"provider": p.name, "status": "skipped",
-                            "note": why or "不可用"})
+                            "note": why or "不可用", "elapsed_ms": _seg_ms()})
             _log_provider(log, p.name, "skipped", why or "不可用")
             continue
         try:
@@ -477,14 +521,14 @@ def run_chain(address: str, log: list | None = None,
         except Exception as e:  # noqa: BLE001
             note = f"{p.name} 内部异常（已跳过）：{str(e)[:150]}"
             results.append({"provider": p.name, "status": "failed",
-                            "note": note})
+                            "note": note, "elapsed_ms": _seg_ms()})
             _log_provider(log, p.name, "failed", note)
             continue
         fields = res.get("fields") if isinstance(res, dict) else None
         if not (isinstance(res, dict) and res.get("ok")) or not fields:
             note = (res.get("note") if isinstance(res, dict) else "") or "未返回有效数据"
             results.append({"provider": p.name, "status": "failed",
-                            "note": note})
+                            "note": note, "elapsed_ms": _seg_ms()})
             _log_provider(log, p.name, "failed", note)
             continue
         if primary is None:
@@ -497,13 +541,16 @@ def run_chain(address: str, log: list | None = None,
         note = res.get("note") or f"{len(fields)} 个字段"
         results.append({"provider": p.name, "status": "ok",
                         "note": f"{note}；合并 {added} 个新字段",
-                        "fields_total": len(fields), "fields_added": added})
+                        "fields_total": len(fields), "fields_added": added,
+                        "elapsed_ms": _seg_ms()})
         _log_provider(log, p.name, "ok", f"{note}；合并 {added} 个新字段")
 
     fields = list(merged.values())
     if not fields:
         diag = "；".join(f"{r['provider']}：{r['note']}" for r in results)
         _log_provider(log, "数据源链", "failed", "全部数据源失败：" + diag)
+        total_ms = _total_ms()
+        _emit_intake_timing(timings, total_ms, ok=False)
         if cache_enabled and cached is not None:
             # 全挂兜底：返回缓存数据（过期也行），标记 stale
             data = cached["data"]
@@ -513,13 +560,17 @@ def run_chain(address: str, log: list | None = None,
             data["diagnostics"] = ((data.get("diagnostics") or "") + "；" + stale_note).lstrip("；")
             _log_provider(log, "地址缓存", "stale", stale_note)
             data["log"] = log
+            data["timings"] = {"total_ms": total_ms, "providers": timings}
             return data
         return {"ok": False, "fields": [], "primary_provider": None,
                 "provider_results": results, "diagnostics": diag, "log": log,
-                "cached": False}
+                "cached": False,
+                "timings": {"total_ms": total_ms, "providers": timings}}
     result = {"ok": True, "fields": fields, "primary_provider": primary,
               "provider_results": results, "diagnostics": "", "log": log,
-              "cached": False}
+              "cached": False,
+              "timings": {"total_ms": _total_ms(), "providers": timings}}
+    _emit_intake_timing(timings, result["timings"]["total_ms"], ok=True)
     if cache_enabled:
         _cache.put_cached(address, result)
     return result
