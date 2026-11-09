@@ -829,6 +829,8 @@ def run_address_pipeline(address: str, log: list | None = None) -> dict:
     result = {"mode": "address", "address": parsed["full"], "parsed": parsed,
               "fields": fields, "manual_needed": manual, "log": log,
               "fetched_at": _now(),
+              # 第 53 项段位计时：provider 链逐段＋总耗时（日志行见 providers.run_chain）
+              "timings": chain.get("timings"),
               # W2（2026-10-05）：有效需求三项独立验证清单，初始 unknown 待评估人逐项确认
               "demand_validation": dv.demand_validation_block(),
               "primary_provider": chain["primary_provider"],
