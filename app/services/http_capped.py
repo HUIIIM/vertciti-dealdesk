@@ -33,6 +33,8 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Mapping
+from typing import Any
 
 import httpx
 
@@ -51,13 +53,13 @@ MAX_JSON_BYTES = 2_000_000
 class ResponseTooLarge(Exception):
     """响应体超过字节上限（已流式停手，未读整页、未用残页）。"""
 
-    def __init__(self, limit: int, url: str = ""):
+    def __init__(self, limit: int, url: str = "") -> None:
         super().__init__(f"响应过大（超过 {limit} 字节上限）")
         self.limit = limit
         self.url = url
 
 
-def collect_capped(resp, limit: int) -> tuple[bytes | None, bool]:
+def collect_capped(resp: httpx.Response, limit: int) -> tuple[bytes | None, bool]:
     """流式读取响应体并执行字节上限（与 research_pipeline._collect_capped 同逻辑）。
 
     返回 (body, too_large)：Content-Length 超限在读 body 前停手；
@@ -87,8 +89,8 @@ class CappedResponse:
     body 已在上限内完整读入内存（流式阶段已执行上限）。
     """
 
-    def __init__(self, status_code: int, headers, content: bytes,
-                 encoding: str | None = None):
+    def __init__(self, status_code: int, headers: httpx.Headers, content: bytes,
+                 encoding: str | None = None) -> None:
         self.status_code = status_code
         self.headers = headers
         self.content = content
@@ -98,11 +100,11 @@ class CappedResponse:
     def text(self) -> str:
         return self.content.decode(self.encoding, errors="replace")
 
-    def json(self):
+    def json(self) -> Any:
         return json.loads(self.text)
 
 
-def post_capped(url: str, *, limit: int | None = None, **kwargs) -> CappedResponse:
+def post_capped(url: str, *, limit: int | None = None, **kwargs: Any) -> CappedResponse:
     """流式 POST 并执行字节上限，返回 CappedResponse。
 
     kwargs 透传 httpx.stream（json= / data= / headers= / timeout= 等）。
@@ -125,8 +127,9 @@ def post_capped(url: str, *, limit: int | None = None, **kwargs) -> CappedRespon
         return CappedResponse(status, headers, body or b"", encoding)
 
 
-def get_json_capped(url: str, *, params=None, headers=None,
-                    timeout: float = 15, limit: int | None = None) -> dict:
+def get_json_capped(url: str, *, params: Mapping[str, Any] | None = None,
+                    headers: Mapping[str, str] | None = None,
+                    timeout: float = 15, limit: int | None = None) -> dict[str, Any]:
     """流式 GET 一个 JSON 端点并执行字节上限。
 
     返回 {"status_code": int, "data": 解析结果或 None,
