@@ -190,15 +190,65 @@ def test_zero_sf_no_div0():
 
 # ---------- API ----------
 def _client():
+    """自建显式临时库的 TestClient（台账第 52 项）。
+
+    此前实现读当前 DEALDESK_DB 环境指针并直接 os.remove() 该文件再
+    init_db——破坏性使用环境指针：指针被同族泄漏污染（第 44/51 项）
+    或误指非测试库时删错对象。现改走自建临时库：指针指向哪都不读、
+    不删，只把指针切到本函数新建的临时文件（逐测指针恢复由 conftest
+    的 _restore_session_db 负责），临时文件及旁文件经 atexit 清理。
+    """
+    import atexit
     import os
+    import tempfile
     from fastapi.testclient import TestClient
     from app import db
     from app.main import app
-    p = os.environ["DEALDESK_DB"]
-    if os.path.exists(p):
-        os.remove(p)
+    fd, path = tempfile.mkstemp(prefix="dealdesk-test-uw-", suffix=".db")
+    os.close(fd)
+
+    def _cleanup(path=path):
+        for suffix in ("", "-wal", "-shm", "-journal"):
+            try:
+                os.remove(path + suffix)
+            except OSError:
+                pass
+
+    atexit.register(_cleanup)
+    os.environ["DEALDESK_DB"] = path
     db.init_db()
     return TestClient(app)
+
+
+def test_uw_client_never_deletes_env_pointed_db(tmp_path):
+    """守卫（台账第 52 项）：_client 不得删除/改动环境指针指向的文件，
+    且工作库必须是自建临时库而非指针原值。"""
+    import os
+    sentinel = tmp_path / "not-a-test-db.db"
+    sentinel.write_bytes(b"sentinel-do-not-delete")
+    os.environ["DEALDESK_DB"] = str(sentinel)
+    client = _client()
+    # 指针原文件必须完好无损
+    assert sentinel.read_bytes() == b"sentinel-do-not-delete"
+    # 当前指针已切到自建临时库，且客户端可用
+    current = os.environ["DEALDESK_DB"]
+    assert current != str(sentinel)
+    assert os.path.basename(current).startswith("dealdesk-test-uw-")
+    assert client.get("/api/uw/template").status_code == 200
+
+
+def test_uw_client_each_call_gets_fresh_db():
+    """守卫（台账第 52 项）：两次 _client 调用各得独立新库，
+    前一库写入的项目不得串入后一库。"""
+    import os
+    c1 = _client()
+    first_db = os.environ["DEALDESK_DB"]
+    r = c1.post("/api/uw/projects", json={"name": "隔离验证", "input": example_39_main()})
+    assert r.status_code == 200
+    c2 = _client()
+    second_db = os.environ["DEALDESK_DB"]
+    assert second_db != first_db
+    assert c2.get("/api/uw/projects").json() == []
 
 
 def test_uw_api_crud_and_compute():
