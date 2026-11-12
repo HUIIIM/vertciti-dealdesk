@@ -38,8 +38,11 @@ except Exception as e:  # pragma: no cover
     print(f"cannot list tracked files: {e}")
     sys.exit(1)
 
+SELF = pathlib.Path(__file__).resolve()
 for rel in tracked:
     p = ROOT / rel
+    if p.resolve() == SELF:
+        continue  # the banned-value list lives in this file; skip self-scan
     if not p.is_file():
         continue
     try:
