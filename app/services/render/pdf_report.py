@@ -308,7 +308,7 @@ def _check_list(st: dict, title: str, items: list, ok_color: str) -> list:
     t = Table(rows, colWidths=[16, CONTENT_W - 16])
     t.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, -1), HexColor("#F7E9E8")),
-        ("BOX", (0, 0), (-1, -1), 0.6, HexColor("#E6B8B4")),
+        ("BOX", (0, 0), (-1, -1), 0.6, HexColor("#F9DEDC")),
         ("TOPPADDING", (0, 0), (-1, -1), 5),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
         ("LEFTPADDING", (0, 0), (-1, -1), 8),

@@ -4,7 +4,7 @@
 body.vc{margin:0;font-family:var(--vc-font);font-size:15px;line-height:1.65;color:#000;background:var(--vc-mist);-webkit-font-smoothing:antialiased}
 .vc :focus-visible{outline:3px solid var(--vc-orange);outline-offset:2px}
 .vc-util{background:#000;color:#fff;font-size:13px;min-height:44px;display:flex;align-items:center;gap:20px;padding:0 24px}
-.vc-util a{color:#BDBDBD;text-decoration:none;font-weight:700;min-height:44px;display:inline-flex;align-items:center;border-bottom:3px solid transparent}
+.vc-util a{color:#DEDEDE;text-decoration:none;font-weight:700;min-height:44px;display:inline-flex;align-items:center;border-bottom:3px solid transparent}
 .vc-util a[aria-current]{color:#fff;border-bottom-color:var(--vc-orange)}
 .vc-top{background:#fff;border-bottom:1px solid var(--vc-line);min-height:64px;display:flex;align-items:center;gap:16px;padding:0 24px;position:sticky;top:0;z-index:20}
 .vc-top .logo svg{height:24px;width:auto;display:block}.vc-top .prod{font-weight:800;border-left:1px solid var(--vc-line);padding-left:16px}.vc-top .sp{flex:1}
