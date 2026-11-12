@@ -33,7 +33,7 @@ ISSUERS = ("https://accounts.google.com", "accounts.google.com")
 # 换码改走 http_capped.post_capped 流式停手，超限收敛为 verify_failed（旧口径不变）。
 MAX_TOKEN_BYTES = http_capped.MAX_POST_BYTES
 
-# JWKS 响应大小上限：与 GET 型 JSON 上限同值（台账第 34 项）。
+# JWKS 响应大小上限：与 GET 型 JSON 上限同值。
 # 查实结论（2026-11-04，PyJWT 2.15.1，jwt/jwks_client.py）：PyJWKClient.fetch_data
 # 用 urllib + json.load(response) 整页读入，无字节上限——只有 timeout 与
 # 缓存 lifespan（管新鲜度、不管大小）。故改自管 capped 抓取（见 _CappedPyJWKClient）。

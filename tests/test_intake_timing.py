@@ -1,4 +1,4 @@
-"""台账第 53 项：intake 段位计时日志（providers.run_chain）。
+"""intake 段位计时日志（providers.run_chain）。
 
 冒烟首呼超时无段位日志、归因不可得 —— run_chain 须逐 provider 计时，
 结束时落一行结构化日志 intake_timing（含逐段 ms 与总 ms），且结果 dict

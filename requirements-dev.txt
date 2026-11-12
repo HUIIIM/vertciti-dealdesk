@@ -1,5 +1,5 @@
 # 开发 / CI 测试依赖 (不进生产 bundle; 生产依赖见 requirements.txt)
-# 精确钉版 (SEC-A5, 台账第 31 项, 2026-11-03): 与 requirements.txt 同口径全量 ==
+# 精确钉版 (SEC-A5, 2026-11-03): 与 requirements.txt 同口径全量 ==
 -r requirements.txt
 pytest==9.1.1
 pytest-cov==7.1.0

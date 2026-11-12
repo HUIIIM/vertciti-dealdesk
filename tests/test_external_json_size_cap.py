@@ -1,4 +1,4 @@
-"""外部 JSON API 响应大小上限测试（台账第 25 项，2026-10-24）.
+"""外部 JSON API 响应大小上限测试（2026-10-24）.
 
 第 23 项曾在 v1 线给四端点加过共享 capped GET helper，但 v2 分层
 迁移未把 GET 变体带进 app/services/http_capped.py，四端点回归为

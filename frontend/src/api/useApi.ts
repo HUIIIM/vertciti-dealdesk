@@ -19,7 +19,7 @@ export function useApi<T>(fetcher: () => Promise<T>, deps: unknown[]): ApiState<
     const settle = () => { const w = waiters.current; waiters.current = []; w.forEach((f) => f()); };
     fetchRef.current().then(
       (data) => { if (alive) { setSlot({ key, tick, data }); settle(); } },
-      // 失败时保留上一次成功的数据（哪怕本次是换键重取）：界面同时给出错误态与旧数据，不清空、不白屏（台账第 30 项）
+      // 失败时保留上一次成功的数据（哪怕本次是换键重取）：界面同时给出错误态与旧数据，不清空、不白屏
       (error: Error) => { if (alive) { setSlot((s) => ({ key, tick, data: s.data, error })); settle(); } },
     );
     return () => { alive = false; };

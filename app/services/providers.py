@@ -424,7 +424,7 @@ class CensusProvider(BaseProvider):
 
 PROVIDER_ORDER = (TophapProvider, RentcastProvider, WebProvider, CensusProvider)
 
-# intake 段位计时（台账第 53 项）：冒烟首呼 60s 超时无段位日志、归因不可得，
+# intake 段位计时：冒烟首呼 60s 超时无段位日志、归因不可得，
 # 故 run_chain 逐 provider 计时（available＋enrich 全段），结束时落一行
 # 结构化日志 intake_timing（含逐段 ms 与总 ms），超时事件可直接段位归因。
 _TIMING_SLUGS = {"TopHap MCP": "tophap_mcp", "RentCast": "rentcast",
