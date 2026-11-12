@@ -810,15 +810,21 @@ def run_web_collection(address: str, log: list | None = None) -> dict:
     return {"fields": fields, "parsed": parsed, "log": log}
 
 
-def run_address_pipeline(address: str, log: list | None = None) -> dict:
+def run_address_pipeline(address: str, log: list | None = None,
+                         pre_timings: list | None = None) -> dict:
     """纯地址 → 多数据源 fallback 链搜集（TopHap → RentCast → 公开网页 → Census 保底）。
 
     字段按优先级合并（TopHap > RentCast > 网页 > Census），每个字段自带来源标注；
     全部数据源失败时返回各源中文诊断（diagnostics），不静默空结果。
+    pre_timings（台账第 54 项）：url 模式的前置段计时，透传给
+    providers.run_chain 并入同一行 intake_timing 日志与结果 timings。
     """
     log = log if log is not None else []
     parsed = parse_address(address)
-    chain = providers.run_chain(parsed.get("full") or address, log)
+    # 无前置段时不传 pre_timings，保持既有 run_chain 调用面不变
+    chain_kwargs = {"pre_timings": pre_timings} if pre_timings else {}
+    chain = providers.run_chain(parsed.get("full") or address, log,
+                                **chain_kwargs)
     fields = chain["fields"]
 
     keys = {f["key"] for f in fields}
@@ -842,13 +848,47 @@ def run_address_pipeline(address: str, log: list | None = None) -> dict:
     return result
 
 
+def _url_no_address_result(result: dict, seller_fields: list,
+                           seller_photos: list, log: list,
+                           pre_timings: list, total_ms: int) -> None:
+    """URL 模式无地址收尾：卖方字段/照片直出＋手动补清单＋段位计时一行。
+
+    自 run_url_pipeline 拆出（控复杂度）；无地址不进 provider 链，
+    本路由自行补落 intake_timing 一行（第 54 项，ok=false：
+    独立搜集未跑通，前置段耗时仍可段位归因）。
+    """
+    result["fields"] = seller_fields
+    if seller_photos:
+        result["fields"] = seller_fields + [_photos_field(seller_photos[:6])]
+        _log(log, "提取房源照片", "ok", f"{len(seller_photos[:6])} 张（房源链接页）")
+    result["manual_needed"] = [
+        {"key": k, "label": FIELD_LABELS[k], "status": "manual_needed",
+         "note": "未提取到地址，无法做独立搜集；请手动输入地址"}
+        for k in ("building_sf", "taxes_annual", "monthly_rent")]
+    result["timings"] = {"total_ms": total_ms, "providers": pre_timings}
+    providers.emit_intake_timing(pre_timings, total_ms, ok=False)
+
+
 def run_url_pipeline(url: str, log: list | None = None) -> dict:
     """房源链接 → 先提地址+卖方基础信息，再走全网独立搜集。"""
     log = log if log is not None else []
+    # 台账第 54 项：前置抓取段（fetch_page＋卖方字段/地址/照片提取）单独计时，
+    # 段名 url_fetch。有地址时经 run_address_pipeline 透传进链的同一行
+    # intake_timing 日志；抓取失败/无地址两路不进链，由本函数补落同一行式
+    # 日志——url 模式任一出口恰落一行，慢/挂在前置段时可直接段位归因。
+    url_t0 = time.perf_counter()
+
+    def _url_fetch_ms() -> int:
+        return round((time.perf_counter() - url_t0) * 1000)
+
     page = fetch_page(url, log)
     if not page.get("ok"):
+        fetch_ms = _url_fetch_ms()
+        pre = [{"provider": "url_fetch", "elapsed_ms": fetch_ms}]
+        providers.emit_intake_timing(pre, fetch_ms, ok=False)
         return {"mode": "url", "url": url, "fields": [], "manual_needed": [],
                 "log": log, "error": page.get("note", "抓取失败"),
+                "timings": {"total_ms": fetch_ms, "providers": pre},
                 "fetched_at": _now()}
     host = (urllib.parse.urlparse(page["final_url"]).hostname or "").lower()
     seller_fields = extract_fields(page["text"], f"{host} 房源页",
@@ -862,10 +902,13 @@ def run_url_pipeline(url: str, log: list | None = None) -> dict:
     _log(log, "提取房源地址", "ok" if address else "failed",
          address or "页面未找到规范地址，请手动输入地址再跑地址模式")
     seller_photos = extract_images(page.get("html", ""), page["final_url"])
+    url_fetch_ms = _url_fetch_ms()
+    pre_timings = [{"provider": "url_fetch", "elapsed_ms": url_fetch_ms}]
     result = {"mode": "url", "url": page["final_url"], "address": address,
               "seller_fields": seller_fields, "log": log, "fetched_at": _now()}
     if address:
-        indep = run_address_pipeline(address, log)
+        indep = run_address_pipeline(address, log, pre_timings=pre_timings)
+        result["timings"] = indep.get("timings")
         # 独立源优先；卖方声称保留备注
         merged = merge_fields(indep["fields"] + seller_fields)
         # 照片合并：用户粘贴链接的图优先，去重，最多 6 张（设计稿 2.2）
@@ -888,14 +931,8 @@ def run_url_pipeline(url: str, log: list | None = None) -> dict:
         result["manual_needed"] = indep["manual_needed"]
         result["independent_note"] = "独立搜集结果优先；卖方口径数字已标注待验证"
     else:
-        result["fields"] = seller_fields
-        if seller_photos:
-            result["fields"] = seller_fields + [_photos_field(seller_photos[:6])]
-            _log(log, "提取房源照片", "ok", f"{len(seller_photos[:6])} 张（房源链接页）")
-        result["manual_needed"] = [
-            {"key": k, "label": FIELD_LABELS[k], "status": "manual_needed",
-             "note": "未提取到地址，无法做独立搜集；请手动输入地址"}
-            for k in ("building_sf", "taxes_annual", "monthly_rent")]
+        _url_no_address_result(result, seller_fields, seller_photos, log,
+                               pre_timings, _url_fetch_ms())
     # W2（2026-10-05）：地址模式已在 run_address_pipeline 内附带；url 无地址分支在此补
     if "demand_validation" not in result:
         result["demand_validation"] = dv.demand_validation_block()

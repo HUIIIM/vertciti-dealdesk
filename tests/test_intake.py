@@ -209,7 +209,7 @@ def test_url_pipeline_seller_labeling(monkeypatch):
                      "fetched_at": "t", "confidence": "高", "seller_claimed": False,
                      "claim_label": "", "note": "", "status": "filled"}]
     monkeypatch.setattr(rp, "run_address_pipeline",
-                        lambda addr, log: {"fields": indep_fields, "manual_needed": [], "log": log})
+                        lambda addr, log, pre_timings=None: {"fields": indep_fields, "manual_needed": [], "log": log})
     d = rp.run_url_pipeline("https://www.example-listing.com/456-oak")
     assert d["address"].startswith("456 Oak Ave")
     by_key = {f["key"]: f for f in d["fields"]}

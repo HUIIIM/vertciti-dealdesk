@@ -428,7 +428,9 @@ PROVIDER_ORDER = (TophapProvider, RentcastProvider, WebProvider, CensusProvider)
 # 故 run_chain 逐 provider 计时（available＋enrich 全段），结束时落一行
 # 结构化日志 intake_timing（含逐段 ms 与总 ms），超时事件可直接段位归因。
 _TIMING_SLUGS = {"TopHap MCP": "tophap_mcp", "RentCast": "rentcast",
-                 "公开网页": "web", "Census": "census"}
+                 "公开网页": "web", "Census": "census",
+                 # 台账第 54 项：url 模式前置抓取段（fetch_page＋提取地址）
+                 "url_fetch": "url_fetch"}
 
 
 def _timing_slug(name: str, idx: int) -> str:
@@ -438,9 +440,13 @@ def _timing_slug(name: str, idx: int) -> str:
     return slug or f"provider_{idx}"
 
 
-def _emit_intake_timing(timings: list[dict], total_ms: int, *,
-                        ok: bool, cache_hit: bool = False) -> None:
-    """落一行结构化段位计时日志：intake_timing total_ms=.. <段>_ms=.. ..。"""
+def emit_intake_timing(timings: list[dict], total_ms: int, *,
+                       ok: bool, cache_hit: bool = False) -> None:
+    """落一行结构化段位计时日志：intake_timing total_ms=.. <段>_ms=.. ..。
+
+    公开名供 research_pipeline 的 url 模式补落同一行式日志（第 54 项）；
+    _emit_intake_timing 为既有私有别名，指向同一函数。
+    """
     segs = " ".join(
         f"{_timing_slug(t['provider'], i)}_ms={t['elapsed_ms']}"
         for i, t in enumerate(timings))
@@ -448,9 +454,13 @@ def _emit_intake_timing(timings: list[dict], total_ms: int, *,
                 total_ms, segs, str(cache_hit).lower(), str(ok).lower())
 
 
+_emit_intake_timing = emit_intake_timing
+
+
 def run_chain(address: str, log: list | None = None,
               providers: list | None = None,
-              use_cache: bool = True) -> dict:
+              use_cache: bool = True,
+              pre_timings: list | None = None) -> dict:
     """多数据源 fallback 链。
 
     按 TopHap → RentCast → 公开网页 → Census 顺序尝试：
@@ -470,13 +480,18 @@ def run_chain(address: str, log: list | None = None,
     timings = {"total_ms", "providers": [{provider, elapsed_ms}]}
     （第 53 项段位计时；provider_results 每条亦带 elapsed_ms）。
     providers 参数供测试注入；默认按 PROVIDER_ORDER 实例化。
+    pre_timings（第 54 项）：调用方在进链前已耗时的前置段计时
+    （如 url 模式的 url_fetch 段），逐条并入 timings 且其耗时计入
+    total_ms，使一行 intake_timing 日志含前置段＋各 provider 段＋总耗时；
+    provider_results 仍只含 provider 本身，前置段不冒充 provider 结果。
     """
     log = log if log is not None else []
     chain_t0 = time.perf_counter()
-    timings: list[dict] = []
+    timings: list[dict] = list(pre_timings or [])
+    pre_ms = sum(t.get("elapsed_ms") or 0 for t in timings)
 
     def _total_ms() -> int:
-        return int(round((time.perf_counter() - chain_t0) * 1000))
+        return pre_ms + int(round((time.perf_counter() - chain_t0) * 1000))
 
     cache_enabled = use_cache and providers is None
     cached = _cache.get_cached(address) if cache_enabled else None
@@ -490,8 +505,8 @@ def run_chain(address: str, log: list | None = None,
         _log_provider(log, "地址缓存", "hit", f"命中缓存（{age_h:.1f} 小时前）")
         data["log"] = log
         total_ms = _total_ms()
-        data["timings"] = {"total_ms": total_ms, "providers": []}
-        _emit_intake_timing([], total_ms, ok=True, cache_hit=True)
+        data["timings"] = {"total_ms": total_ms, "providers": list(timings)}
+        _emit_intake_timing(timings, total_ms, ok=True, cache_hit=True)
         return data
 
     if providers is None:
