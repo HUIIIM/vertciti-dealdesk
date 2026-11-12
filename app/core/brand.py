@@ -26,8 +26,8 @@ LINE_SOFT = "#ECECEC"
 GREEN_TINT = "#E8F3EC"
 YELLOW_TINT = "#FFF5CC"
 RED_TINT = "#F7E9E8"
-ORANGE_TINT = "#FFEDE7"
-NAV_GREY = "#BDBDBD"     # 黑底品牌条上的次级文字
+ORANGE_TINT = "#FFF0EB"
+NAV_GREY = "#DEDEDE"     # 黑底品牌条上的次级文字
 
 FONT_STACK = ('"Nunito Sans",-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC",'
               '"Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",sans-serif')
