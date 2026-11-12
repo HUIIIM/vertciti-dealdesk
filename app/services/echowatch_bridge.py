@@ -45,7 +45,7 @@ PER_DIM = 3
 TIMEOUT_S = 8.0
 WINDOW = "30d"
 
-# 响应大小上限（台账第 27 项，2026-10-26）：与外部 JSON API 共用同一上限
+# 响应大小上限（2026-10-26）：与外部 JSON API 共用同一上限
 # 值（http_capped.MAX_JSON_BYTES = 2,000,000）与流式 helper
 # （http_capped.collect_capped）——per_page=3 约束的是条数不是字节数，
 # ECHOWATCH_URL 是环境配置的外部端点，异常/被劫持时可返回超大响应；

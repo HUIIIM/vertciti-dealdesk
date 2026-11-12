@@ -69,7 +69,7 @@ _DOS_ROW = {
 
 
 class _FakeResp:
-    """httpx.stream 替身（台账第 25 项：NY DOS 改走 http_capped 流式上限）。"""
+    """httpx.stream 替身（NY DOS 改走 http_capped 流式上限）。"""
 
     def __init__(self, status_code, payload):
         self.status_code = status_code

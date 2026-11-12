@@ -1,4 +1,4 @@
-"""JWKS 拉取响应大小上限测试（台账第 34 项）。
+"""JWKS 拉取响应大小上限测试。
 
 查实结论：PyJWT 2.15.1 的 PyJWKClient.fetch_data 用 urllib + json.load(response)
 整页读入，无字节上限（只有 timeout 与缓存 lifespan）。google_auth 改用

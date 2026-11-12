@@ -30,7 +30,7 @@ _TEST_ADDRESSES = (
 def _isolate_address_cache():
     """逐测清掉本模块地址在当前活动库里的 address_cache 行（前后各一次）。
 
-    定案（2026-11-07，台账第 44 项）：缓存经 persistence session_scope 落
+    定案（2026-11-07）：缓存经 persistence session_scope 落
     DEALDESK_DB 指向的库；历史上 test_pdf.py 在 import 期把该变量顶成持久
     文件 tests/test-pdf.db，全量 collection 后整会话共用该文件，先前/并行
     run 写入的新鲜行（<24h TTL）会让本模块首调即命中缓存、provider 调用

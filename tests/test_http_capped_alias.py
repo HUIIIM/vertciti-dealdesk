@@ -1,4 +1,4 @@
-"""台账第 43 项：app.http_capped 别名与 app.services.http_capped 同对象。
+"""app.http_capped 别名与 app.services.http_capped 同对象。
 
 feat 线第 24 项曾建 app/http_capped.py 别名（与 geocode/providers 等
 app 层别名同式），对平 main 树缺此别名，跨线移植的专属测试

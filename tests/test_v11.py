@@ -344,8 +344,8 @@ class TestAPIStrictValidation(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         import tempfile
-        # 保存类级覆盖前的会话库指针，tearDownClass 原样恢复（台账第 51 项：
-        # 此前无恢复，后续模块会继承本类临时库指针、临时文件亦永不删除）。
+        # 保存类级覆盖前的会话库指针，tearDownClass 原样恢复（此前无恢复，
+        # 后续模块会继承本类临时库指针、临时文件亦永不删除）。
         cls._prev_db = os.environ.get("DEALDESK_DB")
         cls._db = tempfile.NamedTemporaryFile(suffix=".db", delete=False).name
         os.environ["DEALDESK_DB"] = cls._db
@@ -413,7 +413,7 @@ class TestAPIStrictValidation(unittest.TestCase):
 
 
 class TestV11DbPointerRestore(unittest.TestCase):
-    """回归守卫（台账第 51 项）：TestAPIStrictValidation 类级 DEALDESK_DB
+    """回归守卫：TestAPIStrictValidation 类级 DEALDESK_DB
     覆盖必须在类结束后恢复原指针并删临时库，不得泄漏给后续模块。"""
 
     def test_setup_teardown_restores_env_and_removes_db(self):

@@ -1,4 +1,4 @@
-// useApi 失败口径（台账第 30 项）：重取失败时保留上一次成功的数据，不清空界面；恢复后重试可达。
+// useApi 失败口径：重取失败时保留上一次成功的数据，不清空界面；恢复后重试可达。
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { ApiError } from "./client";

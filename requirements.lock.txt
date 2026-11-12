@@ -1,4 +1,4 @@
-# 生产依赖完整传递闭包锁定 (SEC-A5, 台账第 31 项, 2026-11-03; 2026-11-07 代行修复再生: pillow 13.0.0 / pypdf 6.21.4 / certifi 2026.10.23, pip-audit 清零口径)
+# 生产依赖完整传递闭包锁定 (SEC-A5, 2026-11-03; 2026-11-07 代行修复再生: pillow 13.0.0 / pypdf 6.21.4 / certifi 2026.10.23, pip-audit 清零口径)
 # 口径: requirements.txt 全部直接依赖 (含 extras: uvicorn[standard] /
 # PyJWT[crypto] / psycopg[binary]) 在 Python 3.12 / linux x86_64 下的传递闭包,
 # 逐包 == 精确版本。来源: 全量测试通过的项目 .venv 依赖图遍历 (importlib.metadata

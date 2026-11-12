@@ -32,7 +32,7 @@ export class ApiError extends Error {
 }
 
 // 网络层失败（断网 / 后端不可达）时 fetch 只会抛浏览器原生英文异常（TypeError: Failed to fetch），
-// 一律收敛为 status=0 的中文 ApiError：用户永远不该看到原生异常文案（台账第 30 项 DES-6/SEC-A6）。
+// 一律收敛为 status=0 的中文 ApiError：用户永远不该看到原生异常文案（DES-6/SEC-A6）。
 export const NETWORK_ERROR_TEXT = T("无法连接服务器：网络中断或后端暂不可用，请稍后重试");
 export function networkError(): ApiError {
   return new ApiError(0, NETWORK_ERROR_TEXT, null);
