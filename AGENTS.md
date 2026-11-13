@@ -105,5 +105,5 @@ rm -f dealdesk.db && .venv/bin/pytest tests/ -q
 | 加用户 | `.venv/bin/python -m app.core.security add-user <名> <chairman\|analyst\|viewer>` |
 | 备份 | `.venv/bin/python tools/db_backup.py backup ~/backups` |
 | 查 TopHap 状态 | `curl http://127.0.0.1:8100/api/tophap/status` |
-| 生产状态 | `curl https://vertciti-dealdesk.vercel.app/api/tophap/status` |
+| 生产状态 | `curl https://dealdesk.vertciti.com/api/tophap/status`（旧 vertciti-dealdesk.vercel.app 面已退役禁用，2026-11-13 T3 全扫改字） |
 | 敏感扫描 | `bash <monorepo>/security-watch/data-room-gate.sh` |
