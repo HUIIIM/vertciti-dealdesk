@@ -25,6 +25,7 @@
 from __future__ import annotations
 
 import time
+from typing import Any
 
 import httpx  # noqa: F401  （测试替身的历史 patch 点；刷新已改走 http_capped 流式上限）
 
@@ -38,9 +39,9 @@ NET_TIMEOUT = 20
 MAX_TOKEN_BYTES = http_capped.MAX_POST_BYTES
 
 
-def _read_dotenv_map() -> dict:
+def _read_dotenv_map() -> dict[str, str]:
     """读仓库 .env，返回 {key: value}（只取 TOPHAP_*；失败返回空 dict）。"""
-    out: dict = {}
+    out: dict[str, str] = {}
     try:
         path = tophap.dotenv_path()
         if not path.exists():
@@ -58,7 +59,7 @@ def _read_dotenv_map() -> dict:
     return out
 
 
-def _expires_at(env: dict) -> int | None:
+def _expires_at(env: dict[str, str]) -> int | None:
     try:
         v = int((env.get("TOPHAP_TOKEN_EXPIRES_AT") or "").strip())
         return v if v > 0 else None
@@ -66,7 +67,7 @@ def _expires_at(env: dict) -> int | None:
         return None
 
 
-def _do_refresh(env: dict, now: int) -> dict:
+def _do_refresh(env: dict[str, str], now: int) -> dict[str, Any]:
     refresh_token = (env.get("TOPHAP_REFRESH_TOKEN") or "").strip()
     if not refresh_token:
         return {"refreshed": False,
@@ -127,7 +128,7 @@ def _do_refresh(env: dict, now: int) -> dict:
             "new_expires_at": updates.get("TOPHAP_TOKEN_EXPIRES_AT")}
 
 
-def _ensure() -> dict:
+def _ensure() -> dict[str, Any]:
     env = _read_dotenv_map()
     exp = _expires_at(env)
     if exp is None:
@@ -140,7 +141,7 @@ def _ensure() -> dict:
     return _do_refresh(env, now)
 
 
-def ensure_fresh_token() -> dict:
+def ensure_fresh_token() -> dict[str, Any]:
     """保证 token 有效：快过期就用 refresh_token 自动换新。
 
     返回 {"refreshed": bool, "reason": 中文原因}；绝不抛异常。"""
