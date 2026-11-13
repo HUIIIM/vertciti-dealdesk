@@ -86,8 +86,10 @@ rm -f dealdesk.db && .venv/bin/pytest tests/ -q
 
 ## 禁区
 
-- TopHap token 只活 1 小时、无 refresh token：过期走 OAuth 重授权，
-  **绝不把 token 明文写进日志/代码/记忆**。
+- TopHap access token 只活 1 小时，但有 rolling refresh token（2026-10-30 起）：
+  巡检 cron 静默刷新为常态，OAuth 重授权只是兜底通道（capture 端点 rig）；
+  **绝不把 token 明文写进日志/代码/记忆**。（2026-11-08 C-1 改字：原文「无 refresh
+  token」系 2026-10-30 前旧况，已作废。）
 - 未知数据保持未知：缺数渲染"—"，**绝不编数字**（NOI 未知不许写 $0）。
 - 百分比口径：商业空置率等一律按"百分比数"（15 表示 15%），小数口径是 P0 bug。
 - 敏感扫描：发布前跑 data-room 门禁（token/私钥/身份证号为 FAIL）。
