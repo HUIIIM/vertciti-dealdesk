@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 import httpx  # noqa: F401  （历史 patch 点；GET 已改走 http_capped 流式上限）
 
@@ -18,12 +19,12 @@ _CENSUS_URL = "https://geocoding.geo.census.gov/geocoder/locations/onelineaddres
 _TIMEOUT = 12
 
 
-def geocode_state(address: str) -> dict:
+def geocode_state(address: str) -> dict[str, Any]:
     """返回 {"state": "NY"|None, "matched_address": str|None, "lat": float|None, "lng": float|None}.
 
     任何失败（超时/无匹配/格式变化）都返回 state=None，不抛异常。
     """
-    out = {"state": None, "matched_address": None, "lat": None, "lng": None}
+    out: dict[str, Any] = {"state": None, "matched_address": None, "lat": None, "lng": None}
     if not address or not address.strip():
         return out
     try:
