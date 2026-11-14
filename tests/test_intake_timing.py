@@ -67,7 +67,7 @@ def test_intake_timing_slow_call_segments_and_total(caplog):
         _Slow("公开网页", 0.03, [_field("baths", 2, "公开网页")]),
         _Slow("Census", 0.0),
     ]
-    with caplog.at_level(logging.INFO, logger="app.services.providers"):
+    with caplog.at_level(logging.INFO, logger="dealdesk.providers"):
         chain = pv.run_chain("123 Main St, Tampa, FL 33602",
                              providers=providers, use_cache=False)
     assert chain["ok"] is True
@@ -103,7 +103,7 @@ def test_intake_timing_slow_call_segments_and_total(caplog):
 
 def test_intake_timing_all_fail_still_logs(caplog):
     """全挂路径同样落一行（ok=false），超时/失败事件可归因。"""
-    with caplog.at_level(logging.INFO, logger="app.services.providers"):
+    with caplog.at_level(logging.INFO, logger="dealdesk.providers"):
         chain = pv.run_chain("nowhere", providers=[_Slow("Census", 0.02)],
                              use_cache=False)
     assert chain["ok"] is False
@@ -112,6 +112,42 @@ def test_intake_timing_all_fail_still_logs(caplog):
     assert "ok=false" in lines[0]
     assert _seg_ms(lines[0], "census") >= 10
     assert chain["timings"]["providers"][0]["provider"] == "Census"
+
+
+def test_intake_timing_reaches_dealdesk_logger_under_prod_config():
+    """生产回归（台账第 53 项部署后补验）：configure_logging() 只配置
+    dealdesk logger（handler＋INFO、propagate=False），根 logger 保持默认
+    WARNING。此配置下 intake_timing 行必须经 dealdesk.* 命名空间到达该
+    handler——旧 __name__ logger（app.services.providers）下 INFO 行被根
+    级别静默丢弃、生产段位归因失效，本用例在旧实现下必挂。"""
+    import io
+
+    from app.core.observability import configure_logging
+
+    dealdesk_log = logging.getLogger("dealdesk")
+    saved_handlers, saved_level = dealdesk_log.handlers[:], dealdesk_log.level
+    saved_propagate = dealdesk_log.propagate
+    stream = io.StringIO()
+    try:
+        dealdesk_log.handlers = [h for h in saved_handlers
+                                 if h.__class__.__name__ != "StreamHandler"]
+        configure_logging()  # 幂等：已有 JsonFormatter handler 时不重复挂
+        for h in dealdesk_log.handlers:
+            if isinstance(h, logging.StreamHandler):
+                h.setStream(stream)
+        chain = pv.run_chain("123 Main St, Tampa, FL 33602",
+                             providers=[_Slow("TopHap MCP", 0.02,
+                                              [_field("beds", 3)])],
+                             use_cache=False)
+    finally:
+        dealdesk_log.handlers, dealdesk_log.level = saved_handlers, saved_level
+        dealdesk_log.propagate = saved_propagate
+    assert chain["ok"] is True
+    out = stream.getvalue()
+    assert "intake_timing total_ms=" in out, f"生产配置下计时行未达 dealdesk handler：{out!r}"
+    assert "tophap_mcp_ms=" in out
+    assert pv.logger.name == "dealdesk.providers"
+    assert pv.logger.parent is dealdesk_log
 
 
 def test_timing_slug_mapping():

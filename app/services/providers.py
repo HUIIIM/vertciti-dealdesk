@@ -35,7 +35,11 @@ import re
 import time
 from datetime import datetime
 
-logger = logging.getLogger(__name__)
+# 日志名必须落在 dealdesk.* 命名空间：生产 configure_logging() 只给
+# dealdesk logger 挂 handler 并设 INFO 级别，__name__（app.services.providers）
+# 不在其下、INFO 行被根 logger 默认 WARNING 级别静默丢弃——2026-11-13 生产
+# 部署后补验实证 intake_timing 行在生产不可得（台账第 53 项改点）。
+logger = logging.getLogger("dealdesk.providers")
 
 import httpx  # noqa: F401  （测试替身的历史 patch 点；GET 已改走 http_capped）
 
