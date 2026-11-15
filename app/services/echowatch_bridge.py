@@ -18,6 +18,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+from typing import Any
 
 import httpx
 
@@ -62,18 +63,18 @@ def _query(market_key: str, dim: str, area: str = "") -> str:
     return f"{city} {DIM_TERMS[dim]}".strip()
 
 
-def fetch_evidence(market_key: str = "", client: httpx.Client | None = None, area: str = "") -> dict:
+def fetch_evidence(market_key: str = "", client: httpx.Client | None = None, area: str = "") -> dict[str, Any]:
     """返回 {"ok", "reason"?, "source", "window", "dims": [{dim, label, query, items|error}]}."""
     base, token = _config()
     if not base or not token:
         return {"ok": False, "reason": "未配置 EchoWatch（需 ECHOWATCH_URL 与 ECHOWATCH_TOKEN）", "dims": []}
     own = client is None
     client = client or httpx.Client(timeout=TIMEOUT_S, headers={"Authorization": f"Bearer {token}"})
-    dims = []
+    dims: list[dict[str, Any]] = []
     try:
         for dim in DIM_TERMS:
             q = _query(market_key, dim, area)
-            entry = {"dim": dim, "label": DIM_LABELS[dim], "query": q}
+            entry: dict[str, Any] = {"dim": dim, "label": DIM_LABELS[dim], "query": q}
             try:
                 with client.stream("GET", f"{base}/api/v1/mentions",
                                    params={"q": q, "per_page": PER_DIM,
