@@ -30,6 +30,11 @@ from app.domain import demand_validation as dv
 from app.services import providers
 
 logger = logging.getLogger(__name__)
+# photos 段位计时专用 logger（台账第 57 项）：走 dealdesk.* 命名空间——生产
+# configure_logging() 只给 dealdesk logger 挂 handler＋INFO 级别，__name__
+# （app.services.research_pipeline）的 INFO 行会被根 logger 默认级别静默
+# 丢弃（第 53 项生产实证）。本模块其余日志调用的 logger 收敛归第 59 项。
+timing_logger = logging.getLogger("dealdesk.research_pipeline")
 
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/126.0 Safari/537.36")
@@ -902,18 +907,49 @@ def run_url_pipeline(url: str, log: list | None = None) -> dict:
     return result
 
 
+def _emit_photos_timing(timings: dict, *, ok: bool) -> None:
+    """落一行结构化段位计时日志：photos_timing total_ms=.. search_ms=.. fetch1_ms=.. ..。
+
+    经 timing_logger（dealdesk.* 命名空间）发出：生产 configure_logging()
+    只给 dealdesk logger 挂 handler＋INFO 级别，__name__ 的 INFO 行会被根
+    logger 默认级别静默丢弃（第 53 项生产实证），故计时行不走模块 logger。
+    """
+    segs = [f"search_ms={timings['search_ms']}"]
+    segs += [f"fetch{i}_ms={ms}" for i, ms in enumerate(timings["fetch_ms"], 1)]
+    timing_logger.info(
+        "photos_timing total_ms=%d %s cache_hit=%s ok=%s",
+        timings["total_ms"], " ".join(segs),
+        str(timings["cache_hit"]).lower(), str(ok).lower())
+
+
 def run_photos_pipeline(address: str, log: list | None = None) -> dict:
     """轻量取图：商业页 A 栏"外观"小图专用。
 
     先查 24h 地址缓存（命中直接返回照片，约 0.7s）；未命中则做一次轻量抓取
     （DDG 搜地址 → 最多抓 3 页 → 只提 og:image），不写缓存、不跑全量字段抽取。
-    返回 {"photos": [...], "cached": bool}。
+    返回 {"photos": [...], "cached": bool, "timings": {...}}。
+
+    段位计时（台账第 57 项）：未命中路的搜索段与逐页抓取段逐段计时，
+    任一出口（缓存命中／未命中／异常／空地址）恰落一行 photos_timing
+    结构化日志，结果 dict 同步带 timings 可回读对平——A 栏小图慢呼
+    可直接段位归因，不再只有散行 pipeline log。
     """
     from app.services import cache as _cache
     log = log if log is not None else []
+    started = time.perf_counter()
+    search_ms = 0
+    fetch_ms: list[int] = []
+
+    def _done(photos: list, cached: bool, ok: bool) -> dict:
+        timings = {"total_ms": int((time.perf_counter() - started) * 1000),
+                   "search_ms": search_ms, "fetch_ms": list(fetch_ms),
+                   "cache_hit": cached}
+        _emit_photos_timing(timings, ok=ok)
+        return {"photos": photos, "cached": cached, "timings": timings}
+
     addr = (address or "").strip()
     if not addr:
-        return {"photos": [], "cached": False}
+        return _done([], False, True)
     try:
         cached = _cache.get_cached(addr)
     except Exception:  # noqa: BLE001
@@ -922,10 +958,15 @@ def run_photos_pipeline(address: str, log: list | None = None) -> dict:
         for f in (cached["data"].get("fields") or []):
             if f.get("key") == "property_photos" and isinstance(f.get("value"), list):
                 _log(log, "照片缓存", "hit", f"{len(f['value'])} 张")
-                return {"photos": f["value"], "cached": True}
+                return _done(f["value"], True, True)
     photos, seen = [], set()
+    ok = True
     try:
-        results = list(ddg_search(f'"{addr}"', log, max_results=8))
+        t0 = time.perf_counter()
+        try:
+            results = list(ddg_search(f'"{addr}"', log, max_results=8))
+        finally:
+            search_ms = int((time.perf_counter() - t0) * 1000)
         # 房源站优先：先抓挂牌站，非房源站不抓（省配额、杜绝假图）
         results.sort(key=lambda r: 0 if _is_listing_host(
             (urllib.parse.urlparse(r["url"]).hostname or "").lower()) else 1)
@@ -937,7 +978,11 @@ def run_photos_pipeline(address: str, log: list | None = None) -> dict:
                 continue
             if not _is_listing_host(host):
                 continue  # 非房源站：不抓，宁缺毋假
-            page = fetch_page(r["url"], log)
+            t0 = time.perf_counter()
+            try:
+                page = fetch_page(r["url"], log)
+            finally:
+                fetch_ms.append(int((time.perf_counter() - t0) * 1000))
             if not page.get("ok"):
                 continue
             for img in extract_images(page.get("html", ""), page["final_url"]):
@@ -945,9 +990,10 @@ def run_photos_pipeline(address: str, log: list | None = None) -> dict:
                     seen.add(img["url"])
                     photos.append(img)
     except Exception as e:  # noqa: BLE001
+        ok = False
         _log(log, "轻量取图", "failed", str(e)[:100])
     _log(log, "轻量取图", "ok" if photos else "empty", f"{len(photos)} 张")
-    return {"photos": photos[:6], "cached": False}
+    return _done(photos[:6], False, ok)
 
 
 def run(mode: str, text: str) -> dict:
