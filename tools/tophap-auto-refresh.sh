@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # TopHap token 自愈 cron 脚本：调 app/token_watch.py 的 ensure_fresh_token()，
 # 刷新成功后把新 token 同步到 Vercel 生产环境变量并触发 redeploy。
+# 【2026-11-04 注】Vercel 腿已退役（见文末退役闸）；现行分发＝VM 单面推送。
 #
 # 用法（cron）：cd <repo>（本仓根目录） && tools/tophap-auto-refresh.sh
 # - 没刷新（还够用 / 无法刷新）：直接 exit 0，什么都不做。
@@ -52,6 +53,16 @@ fi
 
 echo "[tophap-auto-refresh] $REASON"
 fi # PUSH_ONLY=0
+
+# === Vercel 分发腿退役闸（2026-11-04 协议工程组核定）===
+# vertciti.com 生产承接面已迁出 Vercel（董事长令＋SRE 事实单）；vertciti-dealdesk
+# 部署经实测已被平台禁用（DEPLOYMENT_DISABLED）。分发终态＝VM 单面
+# （tools/tophap_vm_push.py 由巡检轮调用）。本闸默认关：Vercel 同步＋redeploy
+# 整段跳过；如平台面将来恢复，置 TOPHAP_VERCEL_SYNC=1 显式重启本腿。
+if [ "${TOPHAP_VERCEL_SYNC:-0}" != "1" ]; then
+  echo "[tophap-auto-refresh] Vercel 分发腿已退役（2026-11-04），跳过同步与 redeploy；分发走 VM 推送面"
+  exit 0
+fi
 
 # （--push 或刷新成功）把 .env 里的值推到 Vercel（python 内读 .env，不经 shell 变量）
 "$PY" - <<EOF
