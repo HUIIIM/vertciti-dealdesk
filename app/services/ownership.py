@@ -21,7 +21,9 @@ from __future__ import annotations
 
 import os
 import re
+from collections.abc import Callable
 from datetime import datetime
+from typing import Any
 
 import httpx  # noqa: F401  （_sanitize_proxy_env 的清洗对象；GET 已改走 http_capped）
 
@@ -147,8 +149,8 @@ def infer_person_from_entity(entity_name: str) -> str | None:
     return " ".join(t.capitalize() for t in toks)
 
 
-def _fmt_addr(a1: str = "", a2: str = "", city: str = "",
-              state: str = "", zipc: str = "") -> str:
+def _fmt_addr(a1: object = "", a2: object = "", city: object = "",
+              state: object = "", zipc: object = "") -> str:
     parts = [str(a1 or "").strip(), str(a2 or "").strip()]
     tail = ", ".join(p for p in (str(city or "").strip(),
                                  str(state or "").strip(),
@@ -157,7 +159,7 @@ def _fmt_addr(a1: str = "", a2: str = "", city: str = "",
     return (head + (", " + tail if tail else "")).strip(" ,") if (head or tail) else ""
 
 
-def query_ny_dos(entity_name: str, timeout: int = SOS_TIMEOUT) -> dict:
+def query_ny_dos(entity_name: str, timeout: int = SOS_TIMEOUT) -> dict[str, Any]:
     """查 NY DOS 公开备案（Socrata n9v6-gdp6，无需鉴权）。
 
     返回 {"ok", "records": [...], "note"}；网络/超时/空结果一律 ok=False + 中文 note，
@@ -201,7 +203,7 @@ def query_ny_dos(entity_name: str, timeout: int = SOS_TIMEOUT) -> dict:
     if not isinstance(rows, list) or not rows:
         return {"ok": False, "records": [],
                 "note": f"NY DOS 未检索到“{entity_name}”（公开备案无此名）"}
-    records = []
+    records: list[dict[str, str]] = []
     for row in rows:
         if not isinstance(row, dict):
             continue
@@ -234,16 +236,17 @@ def query_ny_dos(entity_name: str, timeout: int = SOS_TIMEOUT) -> dict:
             "note": f"NY DOS 命中 {len(records)} 条公开备案"}
 
 
-def _pick_best_record(records: list[dict], entity_name: str) -> tuple[dict, str, str]:
+def _pick_best_record(records: list[dict[str, Any]],
+                      entity_name: str) -> tuple[dict[str, Any], str, str]:
     """选最匹配的一条备案 → (record, match_kind, note)。
 
     match_kind: exact（归一化全等）| fuzzy（包含/首条）。"""
     want = _norm_name(entity_name)
     for rec in records:
-        if _norm_name(rec.get("name")) == want:
+        if _norm_name(str(rec.get("name") or "")) == want:
             return rec, "exact", "NY DOS 备案名与持有人名归一化全等"
     for rec in records:
-        rn = _norm_name(rec.get("name"))
+        rn = _norm_name(str(rec.get("name") or ""))
         if want in rn or rn in want:
             return rec, "fuzzy", f"NY DOS {len(records)} 条命中、无全等名，取包含匹配“{rec.get('name')}”"
     rec = records[0]
@@ -255,12 +258,13 @@ def _infer_state(address: str) -> str:
     return m.group(1) if m else ""
 
 
-def _src(source: str, note: str = "", url: str = "") -> dict:
+def _src(source: str, note: str = "", url: str = "") -> dict[str, Any]:
     return {"source": source, "url": url, "fetched_at": now_str(), "note": note}
 
 
 def _node(nid: str, level: int, ntype: str, name: str, confidence: str,
-          relation: str, sources: list[dict], note: str = "") -> dict:
+          relation: str, sources: list[dict[str, Any]],
+          note: str = "") -> dict[str, Any]:
     display = name + (f" {NEED_VERIFY}" if confidence == "inferred" else "")
     return {"id": nid, "level": level, "type": ntype, "name": name,
             "display": display, "confidence": confidence, "relation": relation,
@@ -270,14 +274,18 @@ def _node(nid: str, level: int, ntype: str, name: str, confidence: str,
 def build_tree(address: str, owner_name: str | None = None,
                owner_source: str = "", owner_note: str = "",
                subject_state: str | None = None,
-               sos_fetch=None) -> dict:
+               sos_fetch: Callable[[str], dict[str, Any]] | None = None
+               ) -> dict[str, Any]:
     """构建产权穿透树（纯函数；sos_fetch 可注入 mock，默认走真实 NY DOS）。
 
     owner_name 为空 → 只返回 L0 物业节点 + 未解析 caveat（owner_resolved=False）。
     """
     sos_fetch = sos_fetch or query_ny_dos
     state = (subject_state or _infer_state(address or "") or "").upper()
-    nodes, edges, contacts, caveats = [], [], [], []
+    nodes: list[dict[str, Any]] = []
+    edges: list[dict[str, str]] = []
+    contacts: list[dict[str, str]] = []
+    caveats: list[str] = []
 
     nodes.append(_node("prop", 0, "property", (address or "").strip(), "verified",
                        "标的物业", [_src("请求地址", "查询起点")],
@@ -417,7 +425,9 @@ def build_tree(address: str, owner_name: str | None = None,
 
 
 def tree_for_address(address: str, owner_name: str | None = None,
-                     owner_source: str = "", sos_fetch=None) -> dict:
+                     owner_source: str = "",
+                     sos_fetch: Callable[[str], dict[str, Any]] | None = None
+                     ) -> dict[str, Any]:
     """端点编排：owner_name 未给时走 TopHap 解析持有人，再 build_tree。
 
     TopHap 不可用（未启用/无 token/token 过期/调用失败）→ 返回部分树
