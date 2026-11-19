@@ -41,6 +41,8 @@ from datetime import datetime
 # 部署后补验实证 intake_timing 行在生产不可得（台账第 53 项改点）。
 logger = logging.getLogger("dealdesk.providers")
 
+from typing import Any, Protocol
+
 import httpx  # noqa: F401  （测试替身的历史 patch 点；GET 已改走 http_capped）
 
 from app.paths import REPO_ROOT
@@ -98,17 +100,18 @@ def _now_str() -> str:
     return datetime.now().strftime("%Y-%m-%d %H:%M")
 
 
-def _field_labels() -> dict:
+def _field_labels() -> dict[str, str]:
     global _labels_registered
     from app.services import research_pipeline as rp
     if not _labels_registered:
         for _k, _v in RENTCAST_FIELD_LABELS.items():
             rp.FIELD_LABELS.setdefault(_k, _v)
         _labels_registered = True
-    return rp.FIELD_LABELS
+    labels: dict[str, str] = rp.FIELD_LABELS
+    return labels
 
 
-def _num(x):
+def _num(x: object) -> float | None:
     try:
         if x is None or x == "":
             return None
@@ -117,12 +120,13 @@ def _num(x):
         return None
 
 
-def _money(v) -> str | None:
+def _money(v: object) -> str | None:
     n = _num(v)
     return f"${n:,.0f}" if n is not None else None
 
 
-def _log_provider(log: list, step: str, status: str, note: str = ""):
+def _log_provider(log: list[dict[str, str]], step: str, status: str,
+                  note: str = "") -> None:
     log.append({"step": step, "status": status, "note": note, "at": _now_str()})
 
 
@@ -138,14 +142,27 @@ class BaseProvider:
         """(是否可用, 不可用时的中文原因)。"""
         return True, ""
 
-    def enrich(self, address: str, log: list) -> dict:
+    def enrich(self, address: str, log: list[dict[str, str]]) -> dict[str, Any]:
         """-> {"ok", "fields", "provider", "note"}；可抛异常（链会接住）。"""
         raise NotImplementedError
 
 
+class _ProviderLike(Protocol):
+    """run_chain 可注入的 provider 鸭子类型（测试替身不继承 BaseProvider）。"""
+
+    name: str
+
+    def available(self) -> tuple[bool, str]:
+        ...
+
+    def enrich(self, address: str,
+               log: list[dict[str, str]]) -> dict[str, Any]:
+        ...
+
+
 # ---------------- TopHap ----------------
 
-def _tophap_summary_field(th: dict) -> dict:
+def _tophap_summary_field(th: dict[str, Any]) -> dict[str, Any]:
     """TopHap 状态标记字段（沿用旧 pipeline 的 tophap_enrich_status，前端/测试识别用）。"""
     return {"key": "tophap_enrich_status", "label": "TopHap 数据源状态",
             "value": th.get("tool_used") or "tophap", "display": th.get("note", ""),
@@ -172,7 +189,8 @@ class TophapProvider(BaseProvider):
             return False, "TopHap token 已过期（需重跑授权脚本完成一次 OAuth 授权）"
         return True, ""
 
-    def enrich(self, address: str, log: list) -> dict:
+    def enrich(self, address: str,
+               log: list[dict[str, str]]) -> dict[str, Any]:
         from app.services import tophap
         try:
             res = tophap.enrich_address(address, log)
@@ -181,7 +199,7 @@ class TophapProvider(BaseProvider):
                           f"enrich 内部异常（已跳过）: {str(e)[:120]}")
             return {"ok": False, "fields": [], "provider": self.name,
                     "note": "TopHap enrich 内部异常，已跳过"}
-        out = {"ok": bool(res.get("ok")),
+        out: dict[str, Any] = {"ok": bool(res.get("ok")),
                "fields": list(res.get("fields") or []),
                "provider": self.name,
                "note": res.get("note", "")}
@@ -191,7 +209,7 @@ class TophapProvider(BaseProvider):
 
 # ---------------- RentCast ----------------
 
-def _map_rentcast(rec: dict) -> list[dict]:
+def _map_rentcast(rec: dict[str, Any]) -> list[dict[str, Any]]:
     """RentCast property record → DealDesk 字段（防御式：缺字段跳过）。
 
     结构依据 https://developers.rentcast.io/reference/property-data-schema：
@@ -203,9 +221,10 @@ def _map_rentcast(rec: dict) -> list[dict]:
     if not isinstance(rec, dict):
         return []
     labels = _field_labels()
-    out = []
+    out: list[dict[str, Any]] = []
 
-    def add(key, value, display=None, confidence="高", note=""):
+    def add(key: str, value: Any, display: str | None = None,
+            confidence: str = "高", note: str = "") -> None:
         if value is None or value == "" or value == []:
             return
         out.append({"key": key, "label": labels.get(key, key),
@@ -215,7 +234,7 @@ def _map_rentcast(rec: dict) -> list[dict]:
                     "seller_claimed": False, "claim_label": "",
                     "note": note, "status": "filled"})
 
-    def get(*names, d=rec):
+    def get(*names: str, d: dict[str, Any] = rec) -> Any:
         for n in names:
             v = d.get(n) if isinstance(d, dict) else None
             if v not in (None, ""):
@@ -225,7 +244,8 @@ def _map_rentcast(rec: dict) -> list[dict]:
     ptype = get("propertyType")
     if ptype:
         add("property_type_detail", str(ptype), note="RentCast 物业类型（county 公共记录）")
-    feats = rec.get("features") if isinstance(rec.get("features"), dict) else {}
+    _feats = rec.get("features")
+    feats: dict[str, Any] = _feats if isinstance(_feats, dict) else {}
     uc = _num(feats.get("unitCount"))
     if uc is not None:
         add("building_units", int(uc), note="RentCast 单元数（公共记录）")
@@ -256,11 +276,13 @@ def _map_rentcast(rec: dict) -> list[dict]:
     zoning = get("zoning")
     if zoning:
         add("zoning", str(zoning), note="RentCast 用途分区（公共记录）")
-    owner = rec.get("owner") if isinstance(rec.get("owner"), dict) else {}
+    _owner = rec.get("owner")
+    owner: dict[str, Any] = _owner if isinstance(_owner, dict) else {}
     names = owner.get("names")
     if isinstance(names, list) and names and names[0]:
         add("owner_name", str(names[0]), note="RentCast 业主记录（公共记录）")
-    hoa = rec.get("hoa") if isinstance(rec.get("hoa"), dict) else {}
+    _hoa = rec.get("hoa")
+    hoa: dict[str, Any] = _hoa if isinstance(_hoa, dict) else {}
     hoa_fee = _num(hoa.get("fee"))
     if hoa_fee is not None:
         add("hoa_monthly", hoa_fee, f"${hoa_fee:,.0f}/月",
@@ -292,7 +314,7 @@ def _map_rentcast(rec: dict) -> list[dict]:
                 note="RentCast 上次成交日期")
     hist = rec.get("history")
     if isinstance(hist, dict) and hist:
-        rows = []
+        rows: list[dict[str, Any]] = []
         for dstr in sorted(hist.keys(), reverse=True):
             h = hist[dstr]
             if not isinstance(h, dict):
@@ -327,7 +349,8 @@ class RentcastProvider(BaseProvider):
             return False, "RentCast 未配置（RENTCAST_API_KEY 未设置，已跳过）"
         return True, ""
 
-    def enrich(self, address: str, log: list) -> dict:
+    def enrich(self, address: str,
+               log: list[dict[str, str]]) -> dict[str, Any]:
         key = rentcast_api_key()
         address = (address or "").strip()
         if not address:
@@ -383,7 +406,8 @@ class WebProvider(BaseProvider):
     name = "公开网页"
     priority = 2
 
-    def enrich(self, address: str, log: list) -> dict:
+    def enrich(self, address: str,
+               log: list[dict[str, str]]) -> dict[str, Any]:
         from app.services import research_pipeline as rp
         res = rp.run_web_collection(address, log)
         fields = res.get("fields") or []
@@ -402,7 +426,8 @@ class CensusProvider(BaseProvider):
     name = "Census"
     priority = 3
 
-    def enrich(self, address: str, log: list) -> dict:
+    def enrich(self, address: str,
+               log: list[dict[str, str]]) -> dict[str, Any]:
         try:
             g = geocode.geocode_state(address)
         except Exception as e:  # noqa: BLE001
@@ -442,7 +467,7 @@ def _timing_slug(name: str, idx: int) -> str:
     return slug or f"provider_{idx}"
 
 
-def _emit_intake_timing(timings: list[dict], total_ms: int, *,
+def _emit_intake_timing(timings: list[dict[str, Any]], total_ms: int, *,
                         ok: bool, cache_hit: bool = False) -> None:
     """落一行结构化段位计时日志：intake_timing total_ms=.. <段>_ms=.. ..。"""
     segs = " ".join(
@@ -452,9 +477,9 @@ def _emit_intake_timing(timings: list[dict], total_ms: int, *,
                 total_ms, segs, str(cache_hit).lower(), str(ok).lower())
 
 
-def run_chain(address: str, log: list | None = None,
-              providers: list | None = None,
-              use_cache: bool = True) -> dict:
+def run_chain(address: str, log: list[dict[str, str]] | None = None,
+              providers: list[_ProviderLike] | None = None,
+              use_cache: bool = True) -> dict[str, Any]:
     """多数据源 fallback 链。
 
     按 TopHap → RentCast → 公开网页 → Census 顺序尝试：
@@ -477,7 +502,7 @@ def run_chain(address: str, log: list | None = None,
     """
     log = log if log is not None else []
     chain_t0 = time.perf_counter()
-    timings: list[dict] = []
+    timings: list[dict[str, Any]] = []
 
     def _total_ms() -> int:
         return int(round((time.perf_counter() - chain_t0) * 1000))
@@ -487,7 +512,7 @@ def run_chain(address: str, log: list | None = None,
 
     if cache_enabled and cached is not None and not cached["stale"]:
         # 命中未过期缓存：直接返回，不调任何 provider
-        data = cached["data"]
+        data: dict[str, Any] = cached["data"]
         age_h = (time.time() - cached["fetched_at"]) / 3600
         data["cached"] = True
         data.pop("stale", None)
@@ -500,8 +525,8 @@ def run_chain(address: str, log: list | None = None,
 
     if providers is None:
         providers = [c() for c in PROVIDER_ORDER]
-    merged: dict[str, dict] = {}
-    results: list[dict] = []
+    merged: dict[str, dict[str, Any]] = {}
+    results: list[dict[str, Any]] = []
     primary: str | None = None
 
     for p in providers:
@@ -570,7 +595,8 @@ def run_chain(address: str, log: list | None = None,
                 "provider_results": results, "diagnostics": diag, "log": log,
                 "cached": False,
                 "timings": {"total_ms": total_ms, "providers": timings}}
-    result = {"ok": True, "fields": fields, "primary_provider": primary,
+    result: dict[str, Any] = {"ok": True, "fields": fields,
+              "primary_provider": primary,
               "provider_results": results, "diagnostics": "", "log": log,
               "cached": False,
               "timings": {"total_ms": _total_ms(), "providers": timings}}
@@ -597,7 +623,7 @@ if __name__ == "__main__":
     import sys
 
     addr = sys.argv[1] if len(sys.argv) > 1 else "450 West 44th Street, New York, NY 10036"
-    _log: list = []
+    _log: list[dict[str, str]] = []
     _t0 = time.time()
     _res = run_chain(addr, _log)
     print(json.dumps({
