@@ -30,7 +30,9 @@ from __future__ import annotations
 import os
 import re
 import time
+from collections.abc import Callable
 from datetime import date, datetime
+from typing import Any
 
 import httpx  # noqa: F401  （_sanitize_proxy_env 的清洗对象；GET 已改走 http_capped）
 
@@ -58,7 +60,7 @@ ECB_URL = f"https://data.cityofnewyork.us/resource/{ECB_DATASET}.json"
 ECB_TIMEOUT = 15
 NEED_VERIFY = "[待验证]"
 
-SIGNALS = (
+SIGNALS: tuple[dict[str, Any], ...] = (
     {"id": "holding_years", "label": "长期持有", "points": 25,
      "rule": "上次成交距今 > 10 年"},
     {"id": "mortgage_maturity", "label": "贷款到期临近", "points": 30,
@@ -113,7 +115,7 @@ def holding_years(last_sale_date: str | None, today: date | None = None) -> floa
     return (today - d).days / 365.25
 
 
-def sales_trend_hit(trend: list[dict] | None) -> tuple[bool | None, str]:
+def sales_trend_hit(trend: list[dict[str, Any]] | None) -> tuple[bool | None, str]:
     """区域成交热度：最近完整年度 sale_count ≥ 前一年 +10%。
 
     返回 (hit|None, 说明)；数据不足 → (None, 原因)。"""
@@ -122,6 +124,8 @@ def sales_trend_hit(trend: list[dict] | None) -> tuple[bool | None, str]:
     for t in rows:
         y = t.get("year")
         c = t.get("sale_count")
+        if y is None or c is None:
+            continue
         try:
             y, c = int(y), int(c)
         except (TypeError, ValueError):
@@ -141,7 +145,7 @@ def sales_trend_hit(trend: list[dict] | None) -> tuple[bool | None, str]:
 _OPEN_NEG = ("DISMISS", "RESOLV", "CLOS", "WITHDRAW")
 
 
-def dob_open_count(violations: list[dict] | None) -> tuple[int | None, int]:
+def dob_open_count(violations: list[dict[str, Any]] | None) -> tuple[int | None, int]:
     """DOB 违规：返回 (未关闭数|None, 总数)。violations 为 None → 无数据。"""
     if violations is None:
         return None, 0
@@ -157,7 +161,7 @@ def dob_open_count(violations: list[dict] | None) -> tuple[int | None, int]:
     return open_n, len(violations)
 
 
-def _parse_money(v) -> float | None:
+def _parse_money(v: object) -> float | None:
     """Socrata 金额字段（字符串，可能带千分位/空）→ float；不可解析 → None。"""
     if v is None:
         return None
@@ -167,7 +171,7 @@ def _parse_money(v) -> float | None:
         return None
 
 
-def ecb_balance(cases: list[dict] | None) -> tuple[int | None, float, int]:
+def ecb_balance(cases: list[dict[str, Any]] | None) -> tuple[int | None, float, int]:
     """ECB 案件：返回 (未清偿案件数|None, 欠款合计, 案件总数)。
     cases 为 None → 未查询。未清偿判定 = balance_due > 0（既定口径）；
     balance_due 缺失/不可解析的案件不计未清偿（未知保持未知，不凑数）。"""
@@ -184,7 +188,7 @@ def ecb_balance(cases: list[dict] | None) -> tuple[int | None, float, int]:
     return open_n, due, len(cases)
 
 
-def score(data: dict, today: date | None = None) -> dict:
+def score(data: dict[str, Any], today: date | None = None) -> dict[str, Any]:
     """纯函数打分。data 键：
       last_sale_date, distress(bool), pre_foreclosure(list|None),
       dob_violations(list|None, None=未查询), ecb_cases(list|None, None=未查询),
@@ -273,15 +277,15 @@ def score(data: dict, today: date | None = None) -> dict:
                         f"{dob_note}；{ecb_note}"))
 
     # 5. 区域成交热度上升
-    hit, note = sales_trend_hit(data.get("market_trend"))
-    if hit is None:
+    trend_hit, note = sales_trend_hit(data.get("market_trend"))
+    if trend_hit is None:
         signals.append(_sig("zip_sales_trend", "unavailable", 0, "未知",
                              "TopHap CMA 年度成交趋势（公共记录）", note))
     else:
-        total += _POINTS["zip_sales_trend"] if hit else 0
+        total += _POINTS["zip_sales_trend"] if trend_hit else 0
         signals.append(_sig(
-            "zip_sales_trend", "hit" if hit else "miss",
-            _POINTS["zip_sales_trend"] if hit else 0, note,
+            "zip_sales_trend", "hit" if trend_hit else "miss",
+            _POINTS["zip_sales_trend"] if trend_hit else 0, note,
             "TopHap CMA 年度成交趋势（公共记录）",
             "代理指标：CMA 覆盖区域年度成交数同比，非 zip 精确口径"))
 
@@ -296,7 +300,7 @@ def score(data: dict, today: date | None = None) -> dict:
 
 
 def _sig(sid: str, status: str, earned: int, value: str,
-         source: str, note: str) -> dict:
+         source: str, note: str) -> dict[str, Any]:
     return {"id": sid, "label": _LABELS[sid], "rule": _RULES[sid],
             "points": _POINTS[sid], "earned": earned, "status": status,
             "value": value, "source": source, "note": note}
@@ -339,7 +343,7 @@ def _street_match(ds_street: str, want_tokens: list[str]) -> bool:
     return all(t in ds for t in want_tokens)
 
 
-def query_dob_violations(address: str, timeout: int = DOB_TIMEOUT) -> dict:
+def query_dob_violations(address: str, timeout: int = DOB_TIMEOUT) -> dict[str, Any]:
     """查 NYC DOB 公开违规（Socrata 3h2n-5cm9，无需鉴权）。
 
     返回 {"ok", "violations": [...], "note"}；网络/超时/空结果一律 ok=False +
@@ -385,7 +389,7 @@ def query_dob_violations(address: str, timeout: int = DOB_TIMEOUT) -> dict:
     return {"ok": True, "violations": hits, "note": note}
 
 
-def query_ecb_cases(address: str, timeout: int = ECB_TIMEOUT) -> dict:
+def query_ecb_cases(address: str, timeout: int = ECB_TIMEOUT) -> dict[str, Any]:
     """查 NYC ECB/OATH 未清偿罚金案件（Socrata 6bgk-3dad，无需鉴权）。
 
     返回 {"ok", "cases": [...], "note"}；网络/超时/空结果一律 ok=False +
@@ -442,8 +446,11 @@ def _infer_state(address: str) -> str:
     return m.group(1) if m else ""
 
 
-def score_for_address(address: str, tophap_fetch=None,
-                      dob_fetch=None, ecb_fetch=None) -> dict:
+def score_for_address(
+        address: str,
+        tophap_fetch: Callable[[str], dict[str, Any]] | None = None,
+        dob_fetch: Callable[[str], dict[str, Any]] | None = None,
+        ecb_fetch: Callable[[str], dict[str, Any]] | None = None) -> dict[str, Any]:
     """端点编排：TopHap 取 last_sale_date/distress/法拍预警/CMA 趋势
     （best-effort，不可用则对应信号 unavailable）；NY 地址自动查 DOB 违规
     与 ECB 未清偿罚金。
@@ -456,19 +463,20 @@ def score_for_address(address: str, tophap_fetch=None,
                 "caveats": ["地址为空"], "generated_at": now_str()}
 
     # None = 未查询（非 NYC/失败时保持）
-    data: dict = {"dob_violations": None, "ecb_cases": None}
+    data: dict[str, Any] = {"dob_violations": None, "ecb_cases": None}
     caveats: list[str] = []
     state = _infer_state(address).upper()
 
     # TopHap（延迟 import，避免循环依赖）
     if tophap_fetch is None:
-        def tophap_fetch(addr):  # noqa: ANN001, ANN202
+        def tophap_fetch(addr: str) -> dict[str, Any]:
             from app.services import tophap as _tophap
             try:
-                return _tophap.enrich_address(addr, log=[])
+                result: dict[str, Any] = _tophap.enrich_address(addr, log=[])
             except Exception as e:  # noqa: BLE001
                 return {"ok": False, "fields": [],
                         "note": f"TopHap 调用异常：{str(e)[:100]}"}
+            return result
     en = tophap_fetch(address)
     if en.get("ok"):
         by_key = {f.get("key"): f for f in en.get("fields", [])
