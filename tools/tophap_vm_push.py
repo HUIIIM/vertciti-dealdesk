@@ -13,6 +13,10 @@ Exit codes: 0 = pushed and verified; 2 = push/Run Command failure;
 3 = pushed but verify still failing after the bounded poll;
 21 = another push holds the flock.
 Only fingerprints and expiries are printed/traced; never token values.
+On a push failure (exit 2) the full driver output is preserved locally
+as .tophap-vm-push-failure-<UTC>-rc<rc>.log with the in-memory token
+values redacted before writing; the trace and stdout FAIL lines name
+the file as evidence=<name>.
 """
 import argparse
 import base64
@@ -125,6 +129,25 @@ echo PUSH_DONE
 '''
 
 
+def preserve_failure_evidence(out, rc, block):
+    """Write a failed push's full driver output to a local evidence file.
+
+    The in-memory TOPHAP_ACCESS_TOKEN / TOPHAP_REFRESH_TOKEN values are
+    replaced with [redacted] before anything touches disk; empty values
+    are never replaced (an empty needle would corrupt the whole text).
+    Returns the evidence file's basename for the trace/stdout lines.
+    """
+    text = out
+    for key in ("TOPHAP_ACCESS_TOKEN", "TOPHAP_REFRESH_TOKEN"):
+        value = block.get(key, "")
+        if value:
+            text = text.replace(value, "[redacted]")
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    name = f".tophap-vm-push-failure-{stamp}-rc{rc}.log"
+    (ROOT / name).write_text(text)
+    return name
+
+
 def run_rc(payload):
     with tempfile.NamedTemporaryFile("w", suffix=".sh", delete=False) as pf:
         pf.write(payload)
@@ -171,12 +194,14 @@ def main():
     rc, out = run_rc(build_payload(block, order, exp))
     merged_ok = f"MERGED fp={fp} exp={exp}" in out
     if rc != 0 or "PUSH_DONE" not in out:
-        trace(f"caller={args.caller} event=vm_push fp={fp} fp_caliber=values result=fail vm_ok=False merged=[]")
-        print(f"VM_PUSH FAIL fp={fp} exp={exp} rc={rc}")
+        evidence = preserve_failure_evidence(out, rc, block)
+        trace(f"caller={args.caller} event=vm_push fp={fp} fp_caliber=values result=fail vm_ok=False merged=[] evidence={evidence}")
+        print(f"VM_PUSH FAIL fp={fp} exp={exp} rc={rc} evidence={evidence}")
         return 2
     if not merged_ok:
-        trace(f"caller={args.caller} event=vm_push fp={fp} fp_caliber=values result=fail vm_ok=False merged=[]")
-        print(f"VM_PUSH FAIL fp={fp} exp={exp} reason=merged_fp_mismatch")
+        evidence = preserve_failure_evidence(out, rc, block)
+        trace(f"caller={args.caller} event=vm_push fp={fp} fp_caliber=values result=fail vm_ok=False merged=[] evidence={evidence}")
+        print(f"VM_PUSH FAIL fp={fp} exp={exp} reason=merged_fp_mismatch evidence={evidence}")
         return 2
 
     # Bounded verify: public data plane, up to ~60s (6 tries x 10s),
