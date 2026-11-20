@@ -45,6 +45,7 @@ import os
 import time
 from datetime import datetime
 from pathlib import Path
+from typing import Any, Callable
 
 import httpx  # noqa: F401  （测试替身的历史 patch 点；RPC 已改走 http_capped 流式上限）
 
@@ -81,7 +82,7 @@ FIND_ARG_STYLES = ("address", "query")
 ID_ARG_STYLES = ("attomId", "property_id", "propertyId", "id")
 
 # 新增字段标签（注册进 research_pipeline.FIELD_LABELS，保持单一标签表）
-TOPHAP_FIELD_LABELS = {
+TOPHAP_FIELD_LABELS: dict[str, str] = {
     "tophap_value": "TopHap 估值参考",
     "tophap_value_range": "TopHap 估值区间",
     "tophap_comps": "TopHap 可比成交",
@@ -114,7 +115,7 @@ def now_str() -> str:
 
 
 def repo_root() -> Path:
-    return REPO_ROOT
+    return Path(REPO_ROOT)
 
 
 def dotenv_path() -> Path:
@@ -161,7 +162,7 @@ def is_configured() -> bool:
     return bool(access_token())
 
 
-def write_dotenv(updates: dict) -> None:
+def write_dotenv(updates: dict[str, Any]) -> None:
     """更新仓库 .env（gitignored）：原地替换已有键，不存在则追加。只写非长期密钥。
 
     写完强制 chmod 600（token 凭证文件不许组/他人可读）。"""
@@ -192,7 +193,7 @@ def write_dotenv(updates: dict) -> None:
 
 # ---------------- JSON-RPC 客户端 ----------------
 
-def _headers() -> dict:
+def _headers() -> dict[str, str]:
     h = {"Content-Type": "application/json",
          "Accept": "application/json, text/event-stream",
          "User-Agent": rp.UA}
@@ -202,10 +203,10 @@ def _headers() -> dict:
     return h
 
 
-def _parse_rpc_response(resp) -> dict:
+def _parse_rpc_response(resp: http_capped.CappedResponse) -> dict[str, Any]:
     """解析 JSON-RPC 响应（兼容纯 JSON 与 SSE 两种回包）。"""
     ctype = (resp.headers.get("content-type") or "").lower()
-    msgs: list = []
+    msgs: list[Any] = []
     if "text/event-stream" in ctype:
         for line in resp.text.splitlines():
             line = line.strip()
@@ -232,9 +233,9 @@ def _parse_rpc_response(resp) -> dict:
     raise MCPError("TopHap 返回无法解析（无有效 JSON-RPC 消息）")
 
 
-def _rpc(method: str, params: dict | None = None, req_id: int = 1,
-         timeout: int = RPC_TIMEOUT_CALL) -> dict:
-    payload = {"jsonrpc": "2.0", "id": req_id, "method": method}
+def _rpc(method: str, params: dict[str, Any] | None = None, req_id: int = 1,
+         timeout: int = RPC_TIMEOUT_CALL) -> dict[str, Any]:
+    payload: dict[str, Any] = {"jsonrpc": "2.0", "id": req_id, "method": method}
     if params is not None:
         payload["params"] = params
     try:
@@ -268,7 +269,7 @@ def _notify_initialized() -> None:
         pass
 
 
-def discover_tools() -> dict:
+def discover_tools() -> dict[str, Any]:
     """initialize → tools/list，返回 {tool_name: tool_def}。"""
     _rpc("initialize",
          {"protocolVersion": "2024-11-05", "capabilities": {},
@@ -277,15 +278,15 @@ def discover_tools() -> dict:
     _notify_initialized()
     lst = _rpc("tools/list", {}, req_id=2, timeout=RPC_TIMEOUT_INIT)
     tools = lst.get("tools") or []
-    return {t.get("name"): t for t in tools if isinstance(t, dict) and t.get("name")}
+    return {str(t.get("name")): t for t in tools if isinstance(t, dict) and t.get("name")}
 
 
-def call_tool(name: str, arguments: dict, req_id: int = 3) -> dict:
+def call_tool(name: str, arguments: dict[str, Any], req_id: int = 3) -> dict[str, Any]:
     """调一个 tool，返回其结构化结果（dict）。文本 content 尝试解析为 JSON。"""
     result = _rpc("tools/call", {"name": name, "arguments": arguments},
                   req_id=req_id, timeout=RPC_TIMEOUT_CALL)
     content = result.get("content") if isinstance(result, dict) else None
-    texts = []
+    texts: list[str] = []
     if isinstance(content, list):
         for part in content:
             if isinstance(part, dict) and part.get("type") == "text":
@@ -300,7 +301,7 @@ def call_tool(name: str, arguments: dict, req_id: int = 3) -> dict:
         return {"_text": blob}
 
 
-def _call_with_arg_styles(tool: str, value: str, styles: tuple) -> dict:
+def _call_with_arg_styles(tool: str, value: str, styles: tuple[str, ...]) -> dict[str, Any]:
     """参数键多样式兼容：逐个试，返回第一个非空结果（[待验证] 授权后校准）。
 
     401/403 直接上抛（调用方降级并提示重跑授权脚本；不再 refresh）。"""
@@ -316,7 +317,7 @@ def _call_with_arg_styles(tool: str, value: str, styles: tuple) -> dict:
     return {}
 
 
-def _extract_property_id(found: dict) -> str | None:
+def _extract_property_id(found: dict[str, Any]) -> str | None:
     """从 find_property_by_address 返回里提取物业 ID（防御式）。
 
     TopHap 真实结构（2026-09-29 实测）：{match: {attomId: 169551792, ...}, alternates: [...]}。
@@ -344,7 +345,7 @@ def _extract_property_id(found: dict) -> str | None:
 
 # ---------------- 记录 → DealDesk 字段 ----------------
 
-def _num(x):
+def _num(x: object) -> float | None:
     try:
         if x is None or x == "":
             return None
@@ -353,12 +354,13 @@ def _num(x):
         return None
 
 
-def _money(v) -> str | None:
+def _money(v: object) -> str | None:
     n = _num(v)
     return f"${n:,.0f}" if n is not None else None
 
 
-def _new_field(key, value, display=None, confidence="高", note=""):
+def _new_field(key: str, value: Any, display: str | None = None,
+               confidence: str = "高", note: str = "") -> dict[str, Any] | None:
     if value is None or value == "" or value == []:
         return None
     return {"key": key, "label": rp.FIELD_LABELS.get(key, key),
@@ -369,8 +371,8 @@ def _new_field(key, value, display=None, confidence="高", note=""):
             "note": note, "status": "filled"}
 
 
-def _getter(rec: dict):
-    def _get(*names):
+def _getter(rec: dict[str, Any]) -> Callable[..., Any]:
+    def _get(*names: str) -> Any:
         for n in names:
             if isinstance(rec, dict) and rec.get(n) not in (None, ""):
                 return rec.get(n)
@@ -378,10 +380,10 @@ def _getter(rec: dict):
     return _get
 
 
-def _map_detail(rec: dict) -> list[dict]:
+def _map_detail(rec: dict[str, Any]) -> list[dict[str, Any]]:
     """get_property_detail → TopHap 物业档案（字段结构 2026-09-29 对 MCP 实测校准）。"""
     g = _getter(rec or {})
-    out = []
+    out: list[dict[str, Any] | None] = []
     ptype = g("propType")
     if ptype:
         pc = g("propClass")
@@ -448,7 +450,7 @@ def _map_detail(rec: dict) -> list[dict]:
                                   note="TopHap 上次成交记录（公共记录）"))
     own = g("ownerName")
     if own:
-        flags = []
+        flags: list[str] = []
         if g("companyOwned"):
             flags.append("公司持有")
         if g("absenteeOwner"):
@@ -487,13 +489,13 @@ def _map_detail(rec: dict) -> list[dict]:
     return [f for f in out if f]
 
 
-def _map_insights(rec: dict) -> list[dict]:
+def _map_insights(rec: dict[str, Any]) -> list[dict[str, Any]]:
     """get_property_insights → 成交记录/社区/学校/法拍预警（2026-09-29 对 MCP 实测校准）。"""
     g = _getter(rec or {})
-    out = []
+    out: list[dict[str, Any] | None] = []
 
     txs = g("transactions") or []
-    hist = []
+    hist: list[dict[str, Any]] = []
     if isinstance(txs, list):
         for t in txs:
             if not isinstance(t, dict):
@@ -520,7 +522,7 @@ def _map_insights(rec: dict) -> list[dict]:
 
     comm = g("community")
     if isinstance(comm, dict):
-        parts = []
+        parts: list[str] = []
         if comm.get("name"):
             parts.append(str(comm["name"]))
         mhi = _num(comm.get("medianHouseholdIncome"))
@@ -538,7 +540,7 @@ def _map_insights(rec: dict) -> list[dict]:
         out.append(_new_field("school_district", str(dn), note="TopHap 学区（公共记录）"))
 
     sch = g("schools") or []
-    rows = []
+    rows: list[dict[str, Any]] = []
     if isinstance(sch, list):
         for s in sch:
             if not isinstance(s, dict) or not s.get("name"):
@@ -560,12 +562,12 @@ def _map_insights(rec: dict) -> list[dict]:
     return [f for f in out if f]
 
 
-def _map_cma(rec: dict) -> list[dict]:
+def _map_cma(rec: dict[str, Any]) -> list[dict[str, Any]]:
     """get_property_cma → 可比成交＋年度价格趋势（2026-09-29 对 MCP 实测校准）。"""
     g = _getter(rec or {})
-    out = []
+    out: list[dict[str, Any] | None] = []
     comps = g("comparables") or []
-    rows = []
+    rows: list[dict[str, Any]] = []
     if isinstance(comps, list):
         for c in comps:
             if not isinstance(c, dict):
@@ -599,7 +601,7 @@ def _map_cma(rec: dict) -> list[dict]:
         out.append(_new_field("tophap_comps", rows, f"{len(rows)} 套可比成交：" + disp,
                               confidence="中", note=note))
     trend = g("trend") or []
-    trows = []
+    trows: list[dict[str, Any]] = []
     if isinstance(trend, list):
         for t in trend:
             if not isinstance(t, dict) or t.get("year") is None:
@@ -622,9 +624,9 @@ def _map_cma(rec: dict) -> list[dict]:
     return [f for f in out if f]
 
 
-def _map_schools(items: list) -> list[dict]:
+def _map_schools(items: list[Any]) -> list[dict[str, Any]]:
     """search_schools → 周边学校（best-effort，可信度=中）。"""
-    rows = []
+    rows: list[dict[str, Any]] = []
     for s in items or []:
         if not isinstance(s, dict):
             continue
@@ -648,7 +650,7 @@ def _map_schools(items: list) -> list[dict]:
 
 # ---------------- enrich 主链路 ----------------
 
-def _enrich_chain(address: str, log: list) -> tuple[list[dict], str]:
+def _enrich_chain(address: str, log: list[Any]) -> tuple[list[dict[str, Any]], str]:
     """find → detail → insights/cma → 字段。返回 (fields, tool 链路描述)。
 
     单个 tool 缺失/失败只跳过该环节（记日志），不整链崩；
@@ -659,7 +661,7 @@ def _enrich_chain(address: str, log: list) -> tuple[list[dict], str]:
         rp._log(log, "TopHap", "skipped",
                 "tools/list 缺少核心 tool（" + ", ".join(missing_core)
                 + "），缺失环节跳过")
-    used = []
+    used: list[str] = []
 
     found = _call_with_arg_styles(TOOL_FIND, address, FIND_ARG_STYLES)
     pid = _extract_property_id(found)
@@ -668,18 +670,22 @@ def _enrich_chain(address: str, log: list) -> tuple[list[dict], str]:
     used.append(TOOL_FIND)
     rp._log(log, "TopHap", "ok", f"地址定位成功（attomId={pid[:24]}）")
 
-    fields: list[dict] = []
+    fields: list[dict[str, Any]] = []
     # P0-3 (2026-10-05): 主体位置——find 响应的 match 自带 countrySubd（州）、locality（城市）；
     # pull_comps 用 subject_state 与输入地址比对，模糊命中异地物业时拒收
     _m = found.get("match") if isinstance(found, dict) else None
     _subj_state = str((_m.get("countrySubd") or "")).upper() if isinstance(_m, dict) else ""
     _subj_city = _m.get("locality") if isinstance(_m, dict) else ""
     if _subj_state:
-        fields.append(_new_field("subject_state", _subj_state,
-                                 note="TopHap 定位到的物业所在州（主体校验用）"))
+        _f_state = _new_field("subject_state", _subj_state,
+                              note="TopHap 定位到的物业所在州（主体校验用）")
+        if _f_state:
+            fields.append(_f_state)
     if _subj_city:
-        fields.append(_new_field("subject_city", str(_subj_city),
-                                 note="TopHap 定位到的物业所在城市（主体校验用）"))
+        _f_city = _new_field("subject_city", str(_subj_city),
+                             note="TopHap 定位到的物业所在城市（主体校验用）")
+        if _f_city:
+            fields.append(_f_city)
     if TOOL_DETAIL in tools:
         try:
             d = _call_with_arg_styles(TOOL_DETAIL, pid, ID_ARG_STYLES)
@@ -733,12 +739,12 @@ def _enrich_chain(address: str, log: list) -> tuple[list[dict], str]:
     return fields, " → ".join(used)
 
 
-def _degraded(log: list, note: str) -> dict:
+def _degraded(log: list[Any], note: str) -> dict[str, Any]:
     rp._log(log, "TopHap", "failed", note + "；已降级走原 pipeline")
     return {"ok": False, "fields": [], "note": note + "；已降级"}
 
 
-def enrich_address(address: str, log: list | None = None) -> dict:
+def enrich_address(address: str, log: list[Any] | None = None) -> dict[str, Any]:
     """按地址取 TopHap 全记录 → DealDesk 字段。返回 {ok, fields, note, tool_used}。
 
     失败时 ok=False + 中文 note，调用方负责降级；本函数不抛异常（除程序 bug）。
@@ -802,7 +808,7 @@ def token_expires_in_hours() -> float | None:
     return (exp - int(time.time())) / 3600.0
 
 
-def token_expiry_report() -> dict:
+def token_expiry_report() -> dict[str, Any]:
     """给监控用的结构化报告：剩余小时数 + 状态 + 建议动作（中文）。"""
     hours = token_expires_in_hours()
     if hours is None:
@@ -818,9 +824,9 @@ def token_expiry_report() -> dict:
             "action": "token 有效，无需操作"}
 
 
-def status() -> dict:
+def status() -> dict[str, Any]:
     """数据源状态：开关 / 授权 / token 过期 / 连通性 / tool 面（供前端与授权后验证用）。"""
-    st: dict = {"enabled": is_enabled(), "configured": is_configured(),
+    st: dict[str, Any] = {"enabled": is_enabled(), "configured": is_configured(),
                 "mcp_url": mcp_url(), "reachable": None,
                 "tools": [], "core_ready": False, "token_expired": False, "note": ""}
     if not st["enabled"]:
