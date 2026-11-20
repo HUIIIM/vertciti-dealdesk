@@ -16,6 +16,44 @@ import pytest
 from golden_lib import (GOLDEN_DIR, network_blocked, read_jsonl_gz, run_api_cases, run_fn_case,
                         write_jsonl_gz)
 
+# 金标准时钟钉：录制基线时各函数的「距今」类输出以录制日为锚。confidence 的
+# 时效因子按 sale_date 距今天的月数出文案与分数——墙钟一动，基线必然漂移
+# （2026-11-20 实测：录制窗口 2026-10-16..11-14 之外，9 条 fn 用例的时效
+# 文案系统性 +1 个月，CI 三红八代无人定性即此故）。golden_lib 的文本归一化
+# 只能抹绝对时间戳，抹不掉相对月数，故在此把被测模块的 date/datetime 钉到
+# 录制窗口中点 2026-10-31：录制与回放同锚，此后任何偏离都是真实变更。
+GOLDEN_TODAY = (2026, 10, 31)
+
+
+@pytest.fixture(autouse=True)
+def _golden_clock(monkeypatch):
+    from datetime import date as _date
+    from datetime import datetime as _datetime
+
+    y, m, d = GOLDEN_TODAY
+
+    class _FrozenDate(_date):
+        @classmethod
+        def today(cls):
+            return cls(y, m, d)
+
+    class _FrozenDateTime(_datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return cls(y, m, d, 12, 0, 0, tzinfo=tz)
+
+    import app.api.exports as _exports
+    import app.domain.commercial_plus as _cplus
+    import app.domain.confidence as _conf
+    import app.domain.validators as _vals
+
+    monkeypatch.setattr(_conf, "date", _FrozenDate)
+    monkeypatch.setattr(_cplus, "date", _FrozenDate)
+    monkeypatch.setattr(_exports, "date", _FrozenDate)
+    monkeypatch.setattr(_vals, "datetime", _FrozenDateTime)
+    yield
+
+
 RECORD = os.environ.get("GOLDEN_RECORD") == "1"
 FN_CASES = read_jsonl_gz(GOLDEN_DIR / "fn_cases.jsonl.gz")
 API_CASES = read_jsonl_gz(GOLDEN_DIR / "api_cases.jsonl.gz")
