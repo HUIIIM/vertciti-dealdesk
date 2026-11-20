@@ -106,8 +106,11 @@ cat "$ENV_DIR/tophap.part" >> "$ENV_FILE.new"
 chmod 600 "$ENV_FILE.new"
 mv "$ENV_FILE.new" "$ENV_FILE"
 rm -f "$ENV_DIR/tophap.part"
+UPLOADS_HOST="/var/lib/ocarun/dealdesk-prod/uploads"
+mkdir -p "$UPLOADS_HOST"
+chmod 700 "$UPLOADS_HOST"
 docker rm -f dealdesk-app-prod
-docker run -d --name dealdesk-app-prod --restart unless-stopped --env-file "$ENV_FILE" --network dd-prod-net dealdesk-prod:4901c4b >/dev/null
+docker run -d --name dealdesk-app-prod --restart unless-stopped --env-file "$ENV_FILE" --network dd-prod-net -v "$UPLOADS_HOST":/srv/dealdesk/uploads dealdesk-prod:4901c4b >/dev/null
 docker network connect miao-prod_default dealdesk-app-prod
 for i in $(seq 1 40); do
   OUT=$(docker exec dealdesk-app-prod python3 -c "import urllib.request;print(urllib.request.urlopen('http://127.0.0.1:8100/api/tophap/status',timeout=5).read().decode())" 2>/dev/null) && {{ echo "STATUS=$OUT"; break; }}

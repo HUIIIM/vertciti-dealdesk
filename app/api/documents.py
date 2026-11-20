@@ -243,7 +243,7 @@ async def uw_commercial_intake_image(request: Request, file: UploadFile = File(.
 async def wb_intake_image(request: Request, file: UploadFile = File(...)):
     """截图 intake：上传房源页截图（png/jpg/webp）→ 存入 pending 队列.
 
-    视觉提取由定时 watcher 完成（约10分钟内），结果经
+    视觉提取由定时 watcher 排队完成，结果经
     GET /api/wb/intake/pending 查询、GET /api/wb/intake/extracted/{task_id} 取回。
     全部字段标"截图提取、待验证"。
     """

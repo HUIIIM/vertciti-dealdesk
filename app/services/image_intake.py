@@ -63,7 +63,7 @@ def save_screenshot(data: bytes, filename: str) -> dict:
         json.dump(manifest, f, ensure_ascii=False, indent=2)
     return {"task_id": task_id, "status": "pending", "filename": name,
             "received_at": manifest["received_at"],
-            "message": "已收到截图，等待提取（约10分钟内）"}
+            "message": "已收到截图，提取排队中"}
 
 
 def _read_manifest(task_dir: str) -> dict | None:
