@@ -519,13 +519,15 @@ def test_status_endpoint_trims_info_surface(monkeypatch):
 
     full = {"enabled": True, "configured": True, "mcp_url": "https://mcp.example.invalid/api",
             "reachable": True, "tools": ["find_property_by_address", "search_properties"],
-            "core_ready": True, "token_expired": False, "note": "MCP 连通"}
+            "core_ready": True, "token_expired": False, "note": "MCP 连通",
+            "operational": True, "access_state": "ok"}
     monkeypatch.setattr(svc_tophap, "status", lambda: dict(full))
     r = TestClient(app).get("/api/tophap/status")
     assert r.status_code == 200
     body = r.json()
     assert body == {"enabled": True, "configured": True, "reachable": True,
-                    "core_ready": True, "token_expired": False, "tools_count": 2}
+                    "core_ready": True, "token_expired": False, "tools_count": 2,
+                    "operational": True, "access_state": "ok"}
     assert "mcp" not in r.text and "find_property_by_address" not in r.text
 
 
@@ -672,12 +674,14 @@ def test_status_disabled_not_operational(monkeypatch):
 
 
 
-def test_status_endpoint_bytes_unchanged_by_operational(monkeypatch):
-    """匿名 /api/tophap/status 响应受 v1 金标准锁定：operational/access_state 不外露。"""
+def test_status_endpoint_exposes_operational(monkeypatch):
+    """匿名 /api/tophap/status 透传 status() 的 operational/access_state（同值）。"""
     from fastapi.testclient import TestClient
 
     from app.main import app
 
     _fresh_access_state(monkeypatch)
+    st = tophap.status()
     body = TestClient(app).get("/api/tophap/status").json()
-    assert "operational" not in body and "access_state" not in body
+    assert body["operational"] is st["operational"] is False
+    assert body["access_state"] == st["access_state"] == "unknown"

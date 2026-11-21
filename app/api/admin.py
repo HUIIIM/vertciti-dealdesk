@@ -30,6 +30,8 @@ def tophap_status():
         "core_ready": bool(st.get("core_ready")),
         "token_expired": bool(st.get("token_expired")),
         "tools_count": len(st.get("tools") or []),
+        "operational": bool(st.get("operational")),
+        "access_state": st.get("access_state"),
     }
 
 

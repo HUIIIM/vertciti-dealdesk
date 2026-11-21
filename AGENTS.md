@@ -69,7 +69,8 @@ rm -f dealdesk.db && .venv/bin/pytest tests/ -q
   `GET /api/tophap/status` 冒烟，500 则回滚、不反复重部署同一 bundle。
   非 500 只证明部署活着，响应里 reachable/core_ready/token 全绿也**不等于** TopHap 可用：
   可用口径是 `app.services.tophap.status()` 的 `operational`（`access_state=limit_reached`
-  时握手全绿也不可用）；匿名端点字节受 v1 金标准锁定，暂不外露这两个字段。
+  时握手全绿也不可用）；该端点响应已外露 `operational` 与 `access_state`
+  （与 status() 同值，v1 金标准已按此重录），冒烟须读 `operational`。
 - vercel-deploy/ 有**两处**静态副本：根目录一份 ＋ `static/` 子目录一份
   （与仓库 `static/` 三方对齐，缺任一=生产页面版本错乱）；rsync 同步三条：
   `app/ → vercel-deploy/app/`、`static/ → vercel-deploy/static/`、

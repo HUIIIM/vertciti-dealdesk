@@ -58,7 +58,7 @@ python -m app.core.security add-user miao chairman "苗总"   # 打印一次性 
    `app.services.tophap.status()` 的 `operational`（`access_state` = 本进程最近一次计费调用的访问状态，
    `limit_reached` 时握手 / tools/list / token 全绿也不可用；`unknown` = 尚无计费调用，按其余因素判）。
    access_state 是进程内状态：新起的进程（如一次性 CLI）总是 `unknown`，须在服务进程内读。
-   匿名端点响应字节受 v1 金标准锁定，暂不外露这两个字段。
+   匿名端点 `GET /api/tophap/status` 已透传这两个字段（与服务进程内 status() 同值），冒烟直接读响应里的 `operational`。
 
 ## 5. 备份与恢复
 
