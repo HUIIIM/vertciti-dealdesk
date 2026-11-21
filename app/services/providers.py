@@ -34,6 +34,7 @@ import os
 import re
 import time
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 # 日志名必须落在 dealdesk.* 命名空间：生产 configure_logging() 只给
 # dealdesk logger 挂 handler 并设 INFO 级别，__name__（app.services.providers）
@@ -54,6 +55,12 @@ from app.services import http_capped
 RENTCAST_URL = "https://api.rentcast.io/v1/properties"
 RENTCAST_TIMEOUT = 20
 RENTCAST_SOURCE = "RentCast"
+# 月度预算帽：免费档 50 次/月，超额按量计费且账户绑卡——帽是硬性"零花费"保证。
+# 窗口 = America/New_York 自然月；默认 45（留 5 次余量），env RENTCAST_MONTHLY_CAP 覆盖。
+# 计数持久化在地址缓存同库同表（cache.usage_count/usage_reserve，键 usage:rentcast:YYYY-MM），
+# 跨进程/跨实例共享；每次真正发出的 HTTP 请求（成败都算）在发出前原子预占 +1。
+RENTCAST_MONTHLY_CAP_DEFAULT = 45
+_RENTCAST_TZ = ZoneInfo("America/New_York")
 
 # RentCast 新增字段的中文标签（懒注册进 research_pipeline.FIELD_LABELS）
 RENTCAST_FIELD_LABELS = {
@@ -94,6 +101,39 @@ _load_rentcast_key_from_dotenv()
 
 def rentcast_api_key() -> str:
     return os.environ.get("RENTCAST_API_KEY", "").strip()
+
+
+def rentcast_monthly_cap() -> int:
+    """月度预算帽（次）：env RENTCAST_MONTHLY_CAP（非负整数）覆盖，非法回落默认 45。"""
+    raw = os.environ.get("RENTCAST_MONTHLY_CAP", "").strip()
+    try:
+        v = int(raw)
+    except ValueError:
+        return RENTCAST_MONTHLY_CAP_DEFAULT
+    return v if v >= 0 else RENTCAST_MONTHLY_CAP_DEFAULT
+
+
+def _rentcast_now() -> datetime:
+    """纽约时间当前时刻（测试替换点）。"""
+    return datetime.now(_RENTCAST_TZ)
+
+
+def rentcast_usage_key(now: datetime | None = None) -> str:
+    """本月计数键：rentcast:YYYY-MM（America/New_York 自然月）。"""
+    t = (now or _rentcast_now()).astimezone(_RENTCAST_TZ)
+    return f"rentcast:{t:%Y-%m}"
+
+
+def rentcast_budget_block() -> str:
+    """预算帽检查：可发请求返回空串，否则返回中文原因（计数不可读时 fail-closed）。"""
+    cap = rentcast_monthly_cap()
+    try:
+        used = _cache.usage_count(rentcast_usage_key())
+    except Exception as e:  # noqa: BLE001
+        return f"RentCast 月度预算计数不可读（{str(e)[:80]}），为防超额计费已跳过"
+    if used >= cap:
+        return f"RentCast 月度预算帽已达（{cap}/月）"
+    return ""
 
 
 def _now_str() -> str:
@@ -339,6 +379,7 @@ class RentcastProvider(BaseProvider):
     """RentCast API：物业公共记录（第二优先级）。key 走 RENTCAST_API_KEY。
 
     无 key 时 available() 返回 False，链跳过并记日志，不报错。
+    本月已发请求数达预算帽（rentcast_monthly_cap）时同样不可用，链照常降级。
     """
 
     name = "RentCast"
@@ -347,6 +388,9 @@ class RentcastProvider(BaseProvider):
     def available(self) -> tuple[bool, str]:
         if not rentcast_api_key():
             return False, "RentCast 未配置（RENTCAST_API_KEY 未设置，已跳过）"
+        block = rentcast_budget_block()
+        if block:
+            return False, block
         return True, ""
 
     def enrich(self, address: str,
@@ -356,6 +400,19 @@ class RentcastProvider(BaseProvider):
         if not address:
             return {"ok": False, "fields": [], "provider": self.name,
                     "note": "地址为空"}
+        # 预算帽：发请求前原子预占一次（+1 在发出前落库：发出后进程崩溃也不漏计；
+        # 已达帽或计数写不进去就不发——硬性零花费保证，宁可多计不可少计）
+        cap = rentcast_monthly_cap()
+        try:
+            reserved = _cache.usage_reserve(rentcast_usage_key(), cap)
+        except Exception as e:  # noqa: BLE001
+            note = f"RentCast 月度预算计数写入失败（{str(e)[:80]}），为防超额计费未发请求"
+            _log_provider(log, self.name, "skipped", note)
+            return {"ok": False, "fields": [], "provider": self.name, "note": note}
+        if reserved is None:
+            note = f"RentCast 月度预算帽已达（{cap}/月）"
+            _log_provider(log, self.name, "skipped", note)
+            return {"ok": False, "fields": [], "provider": self.name, "note": note}
         try:
             r = http_capped.get_json_capped(
                 RENTCAST_URL,

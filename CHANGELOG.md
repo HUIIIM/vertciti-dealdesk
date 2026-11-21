@@ -13,6 +13,12 @@
   `POST /api/wb/intake/pdf` 不立行内门（滥用面归部署侧边缘限流）。单机模式（认证关）行为不变。
   （消解批定版口径：其间一版“认证开启即全关（`_V1_ANY`）”已回退，不作现行语义。）
 - **`/api/tophap/status` 信息面收口**：匿名响应只保留状态布尔与计数，去除 MCP 地址与工具清单；可达性不变。
+- **RentCast 月度预算帽**：默认 45 次/月（`RENTCAST_MONTHLY_CAP`，纽约自然月），达帽该源跳过，杜绝超额计费。
+
+### 修复
+- **TopHap 访问类错误透传**：tool 回 `{"access":"limit_reached",…}` 时如实报「TopHap 配额耗尽 limit_reached（used/limit）」，不再掩盖成「未返回 attomId」。
+- **TopHap 状态口径**：`tophap.status()` 新增 `operational`／`access_state`，以最近一次计费调用判定可用性（握手全绿≠可用）；匿名 `/api/tophap/status` 字节受 v1 金标准锁定，不变。
+- **地址缓存分级 TTL**：完整成功结果 7 天、部分 / 失败结果 24h（此前部分失败结果与成功同享 24h 且被原样命中）。
 
 ### 新增
 - **Google 登录**：授权码流＋PKCE（S256）、id_token 以 JWKS RS256 本地验签；邮箱 == 既有用户 username

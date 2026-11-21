@@ -45,6 +45,7 @@ import os
 import time
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 import httpx  # noqa: F401  （测试替身的历史 patch 点；RPC 已改走 http_capped 流式上限）
 
@@ -107,6 +108,67 @@ class MCPError(Exception):
 
 class MCPAuthError(MCPError):
     """401/403：token 无效或过期，需要（重新）OAuth 授权。"""
+
+
+class MCPAccessError(MCPError):
+    """tools/call 返回结构化访问类错误（如 {"access": "limit_reached",
+    "freeCalls": {"used": 25, "limit": 25}}）：配额/访问受限，不是"无物业"。"""
+
+    def __init__(self, access: str, used: object = None, limit: object = None) -> None:
+        self.access = access
+        self.used = used
+        self.limit = limit
+        super().__init__(_access_error_text(access, used, limit))
+
+
+# ---------------- 访问类错误（计费 tools/call 的配额/访问状态） ----------------
+# "access" 键的正常取值；其余非空字符串一律视为访问类错误（limit_reached 等）。
+ACCESS_NORMAL_STATES = frozenset({"ok", "granted", "allowed", "active", "full",
+                                  "free", "paid", "unlimited", "subscribed"})
+
+# 进程内最近一次计费 tools/call 的访问状态（status() 的 access_state 真相源）。
+# state: "unknown"（本进程尚无计费调用）/ "ok" / 非正常 access 原值（如 limit_reached）。
+_ACCESS_STATE: dict[str, object] = {"state": "unknown", "at": None,
+                                    "used": None, "limit": None}
+
+
+def _access_error_text(access: str, used: object, limit: object) -> str:
+    """访问类错误的统一中文文本（enrich note、链日志、status note 同一口径）。"""
+    label = "配额耗尽" if access == "limit_reached" else "访问受限"
+    nums = f"（{used}/{limit}）" if used is not None or limit is not None else ""
+    return f"TopHap {label} {access}{nums}"
+
+
+def _access_error_of(rec: object) -> MCPAccessError | None:
+    """rec 是访问类错误（顶层 dict 含 "access" 且取值非正常）时返回对应异常，否则 None。
+
+    只看顶层 "access" 键；正常响应解析路径不受影响。"""
+    if not isinstance(rec, dict) or "access" not in rec:
+        return None
+    access = rec.get("access")
+    if not isinstance(access, str) or not access.strip():
+        return None
+    if access.strip().lower() in ACCESS_NORMAL_STATES:
+        return None
+    fc = rec.get("freeCalls")
+    used = fc.get("used") if isinstance(fc, dict) else None
+    limit = fc.get("limit") if isinstance(fc, dict) else None
+    return MCPAccessError(access.strip(), used, limit)
+
+
+def _record_access(rec: object) -> None:
+    """记录一次计费 tools/call 的访问状态（访问类错误记原值，其余记 ok）。"""
+    err = _access_error_of(rec)
+    if err is None:
+        _ACCESS_STATE.update(state="ok", at=time.time(), used=None, limit=None)
+    else:
+        _ACCESS_STATE.update(state=err.access, at=time.time(),
+                             used=err.used, limit=err.limit)
+
+
+def access_state() -> dict[str, object]:
+    """最近一次计费 tools/call 的访问状态快照：{state, at, used, limit}。"""
+    return dict(_ACCESS_STATE)
 
 
 def now_str() -> str:
@@ -281,9 +343,18 @@ def discover_tools() -> dict:
 
 
 def call_tool(name: str, arguments: dict, req_id: int = 3) -> dict:
-    """调一个 tool，返回其结构化结果（dict）。文本 content 尝试解析为 JSON。"""
+    """调一个 tool，返回其结构化结果（dict）。文本 content 尝试解析为 JSON。
+
+    每次拿到回包都记录访问状态（_record_access：status() 的 access_state 真相源）。"""
     result = _rpc("tools/call", {"name": name, "arguments": arguments},
                   req_id=req_id, timeout=RPC_TIMEOUT_CALL)
+    out = _parse_tool_result(result)
+    _record_access(out)
+    return out
+
+
+def _parse_tool_result(result: object) -> dict[str, Any]:
+    """tools/call 的 result → dict（原 call_tool 解析逻辑，未改）。"""
     content = result.get("content") if isinstance(result, dict) else None
     texts = []
     if isinstance(content, list):
@@ -648,11 +719,29 @@ def _map_schools(items: list) -> list[dict]:
 
 # ---------------- enrich 主链路 ----------------
 
-def _enrich_chain(address: str, log: list) -> tuple[list[dict], str]:
-    """find → detail → insights/cma → 字段。返回 (fields, tool 链路描述)。
+def _raise_if_access_error(rec: object) -> None:
+    """tool 回包是访问类错误时抛 MCPAccessError（先于正常解析判定）。"""
+    err = _access_error_of(rec)
+    if err is not None:
+        raise err
+
+
+def _log_access_error(log: list[dict[str, str]],
+                      err: MCPAccessError) -> MCPAccessError:
+    """数据环节遇访问类错误：按原文记 failed 日志（不吞成"跳过"），返回该错误。"""
+    rp._log(log, "TopHap", "failed", str(err))
+    return err
+
+
+def _enrich_chain(address: str,
+                  log: list) -> tuple[list[dict], str, MCPAccessError | None]:
+    """find → detail → insights/cma → 字段。返回 (fields, tool 链路描述, 访问类错误)。
 
     单个 tool 缺失/失败只跳过该环节（记日志），不整链崩；
-    find 失败则整链无法定位，直接抛 MCPError。"""
+    find 失败则整链无法定位，直接抛 MCPError。
+    访问类错误（配额耗尽 limit_reached 等）：find 命中直接抛 MCPAccessError；
+    detail/insights/cma/schools 命中记 failed 日志并跳过该环节，若
+    detail/insights/cma 一个都没成功则整链抛该 MCPAccessError。"""
     tools = discover_tools()
     missing_core = [t for t in CORE_TOOLS if t not in tools]
     if missing_core:
@@ -660,8 +749,13 @@ def _enrich_chain(address: str, log: list) -> tuple[list[dict], str]:
                 "tools/list 缺少核心 tool（" + ", ".join(missing_core)
                 + "），缺失环节跳过")
     used = []
+    access_err: MCPAccessError | None = None
 
     found = _call_with_arg_styles(TOOL_FIND, address, FIND_ARG_STYLES)
+    # 访问类错误先判：配额耗尽等不许被掩盖成"未返回 attomId"
+    find_err = _access_error_of(found)
+    if find_err is not None:
+        raise find_err
     pid = _extract_property_id(found)
     if not pid:
         raise MCPError("find_property_by_address 未返回 attomId，无法定位物业")
@@ -683,6 +777,7 @@ def _enrich_chain(address: str, log: list) -> tuple[list[dict], str]:
     if TOOL_DETAIL in tools:
         try:
             d = _call_with_arg_styles(TOOL_DETAIL, pid, ID_ARG_STYLES)
+            _raise_if_access_error(d)
             n0 = len(fields)
             fields += _map_detail(d)
             used.append(TOOL_DETAIL)
@@ -690,36 +785,45 @@ def _enrich_chain(address: str, log: list) -> tuple[list[dict], str]:
         except MCPAuthError:
             # 401/403：token 中途过期，整链终止（不吞成"跳过"）
             raise
+        except MCPAccessError as e:
+            access_err = _log_access_error(log, e)
         except MCPError as e:
             rp._log(log, "TopHap", "skipped", f"get_property_detail 跳过：{str(e)[:100]}")
 
     if TOOL_INSIGHTS in tools:
         try:
             ins = _call_with_arg_styles(TOOL_INSIGHTS, pid, ID_ARG_STYLES)
+            _raise_if_access_error(ins)
             n0 = len(fields)
             fields += _map_insights(ins)
             used.append(TOOL_INSIGHTS)
             rp._log(log, "TopHap", "ok", f"物业洞察映射 {len(fields) - n0} 个字段")
         except MCPAuthError:
             raise
+        except MCPAccessError as e:
+            access_err = _log_access_error(log, e)
         except MCPError as e:
             rp._log(log, "TopHap", "skipped", f"get_property_insights 跳过：{str(e)[:100]}")
 
     if TOOL_CMA in tools:
         try:
             cma = _call_with_arg_styles(TOOL_CMA, pid, ID_ARG_STYLES)
+            _raise_if_access_error(cma)
             n0 = len(fields)
             fields += _map_cma(cma)
             used.append(TOOL_CMA)
             rp._log(log, "TopHap", "ok", f"CMA 映射 {len(fields) - n0} 个字段")
         except MCPAuthError:
             raise
+        except MCPAccessError as e:
+            access_err = _log_access_error(log, e)
         except MCPError as e:
             rp._log(log, "TopHap", "skipped", f"get_property_cma 跳过：{str(e)[:100]}")
 
     if TOOL_SCHOOLS in tools:  # best-effort，不阻塞主链路
         try:
             s = _call_with_arg_styles(TOOL_SCHOOLS, address, FIND_ARG_STYLES)
+            _raise_if_access_error(s)
             items = s.get("schools") if isinstance(s, dict) else None
             if not isinstance(items, list) and isinstance(s, dict):
                 items = s.get("results") or []
@@ -727,10 +831,16 @@ def _enrich_chain(address: str, log: list) -> tuple[list[dict], str]:
             fields += _map_schools(items if isinstance(items, list) else [])
             if len(fields) > n0:
                 used.append(TOOL_SCHOOLS)
+        except MCPAccessError as e:
+            access_err = _log_access_error(log, e)
         except MCPError:
             pass
 
-    return fields, " → ".join(used)
+    if access_err is not None and not any(
+            t in used for t in (TOOL_DETAIL, TOOL_INSIGHTS, TOOL_CMA)):
+        # 数据环节一个都没成：整链按访问类错误失败（不报"成功但只有定位字段"）
+        raise access_err
+    return fields, " → ".join(used), access_err
 
 
 def _degraded(log: list, note: str) -> dict:
@@ -764,15 +874,21 @@ def enrich_address(address: str, log: list | None = None) -> dict:
     if not address:
         return {"ok": False, "fields": [], "note": "地址为空"}
     try:
-        fields, used = _enrich_chain(address, log)
+        fields, used, access_err = _enrich_chain(address, log)
     except MCPAuthError as e:
         return _degraded(log, f"{e}；需重跑 tools/tophap_oauth_setup.py 完成一次 "
                               "OAuth 授权（在已登录 TopHap 的浏览器里点 Approve）")
+    except MCPAccessError as e:
+        # 访问类错误：note 与日志用同一原文（provider 链日志取本 note），不加后缀
+        rp._log(log, "TopHap", "failed", str(e))
+        return {"ok": False, "fields": [], "note": str(e)}
     except MCPError as e:
         return _degraded(log, str(e))
     rp._log(log, "TopHap", "ok", f"链路 {used}，映射 {len(fields)} 个字段（公共记录口径）")
-    return {"ok": True, "fields": fields, "tool_used": used,
-            "note": f"TopHap 公共记录 enrich：{len(fields)} 个字段"}
+    note = f"TopHap 公共记录 enrich：{len(fields)} 个字段"
+    if access_err is not None:
+        note += f"（部分环节 {access_err}）"
+    return {"ok": True, "fields": fields, "tool_used": used, "note": note}
 
 
 def token_expires_at() -> int | None:
@@ -819,7 +935,34 @@ def token_expiry_report() -> dict:
 
 
 def status() -> dict:
-    """数据源状态：开关 / 授权 / token 过期 / 连通性 / tool 面（供前端与授权后验证用）。"""
+    """数据源状态：开关 / 授权 / token 过期 / 连通性 / tool 面 / 计费调用可用性。
+
+    握手＋tools/list＋token 新鲜度只说明"连得上"，不说明计费调用活着；
+    operational 才是"能用"的口径：
+      access_state = 本进程最近一次计费 tools/call 的访问状态
+                     （ok / limit_reached 等非正常原值 / unknown=本进程尚无计费调用）
+      operational  = enabled AND configured AND reachable AND core_ready
+                     AND access_state ∈ {ok, unknown}
+    （unknown 不判红：尚无计费调用时只按其余因素判定。）"""
+    st = _status_base()
+    acc = access_state()
+    state = str(acc.get("state") or "unknown")
+    st["access_state"] = state
+    st["operational"] = bool(st["enabled"] and st["configured"]
+                             and st["reachable"] is True and st["core_ready"]
+                             and state in ("ok", "unknown"))
+    if state not in ("ok", "unknown"):
+        at = acc.get("at")
+        when = (datetime.fromtimestamp(float(at)).strftime("%Y-%m-%d %H:%M")
+                if isinstance(at, (int, float)) else "—")
+        text = _access_error_text(state, acc.get("used"), acc.get("limit"))
+        st["note"] = (st["note"] + "；" if st["note"] else "") + \
+            f"最近一次计费调用（{when}）：{text}"
+    return st
+
+
+def _status_base() -> dict[str, Any]:
+    """status() 的握手/授权/tool 面部分（原 status 逻辑，字段与判定未改）。"""
     st: dict = {"enabled": is_enabled(), "configured": is_configured(),
                 "mcp_url": mcp_url(), "reachable": None,
                 "tools": [], "core_ready": False, "token_expired": False, "note": ""}

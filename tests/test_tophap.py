@@ -537,3 +537,147 @@ def test_write_dotenv_roundtrip(tmp_path, monkeypatch):
     content = env_file.read_text()
     assert "A=1" in content and "TOPHAP_ACCESS_TOKEN=new" in content
     assert "old" not in content and "TOPHAP_CLIENT_ID=c" in content
+
+
+# ---------- 访问类结构化错误透传（配额耗尽 limit_reached 等） ----------
+
+LIMIT = {"access": "limit_reached", "freeCalls": {"used": 25, "limit": 25},
+         "message": "Free call limit reached"}
+LIMIT_TEXT = "TopHap 配额耗尽 limit_reached（25/25）"
+
+
+def _fresh_access_state(monkeypatch):
+    monkeypatch.setattr(tophap, "_ACCESS_STATE",
+                        {"state": "unknown", "at": None, "used": None, "limit": None})
+
+
+def _enable_with_payloads(monkeypatch, overrides):
+    """全链 fake，overrides={tool_name: payload} 覆盖指定 tool 的回包。"""
+    calls = []
+    _enable(monkeypatch, calls)
+    base = make_chain_post(calls)
+
+    def fake_post(url, json=None, headers=None, timeout=None, data=None):  # noqa: A002
+        body = json or {}
+        name = (body.get("params") or {}).get("name")
+        if body.get("method") == "tools/call" and name in overrides:
+            calls.append(("rpc", f"tools/call:{name}"))
+            return FakeResp(_result(overrides[name]))
+        return base(url, json=json, headers=headers, timeout=timeout, data=data)
+    _patch_http(monkeypatch, fake_post)
+    return calls
+
+
+def test_find_limit_reached_surfaces_real_cause(monkeypatch):
+    """find 回 limit_reached：note 报配额耗尽原值与 used/limit，不再报"未返回 attomId"。"""
+    _fresh_access_state(monkeypatch)
+    _enable_with_payloads(monkeypatch, {"find_property_by_address": LIMIT})
+    log = []
+    out = tophap.enrich_address("123 Main St, Tampa, FL 33602", log)
+    assert out["ok"] is False and out["fields"] == []
+    assert out["note"] == LIMIT_TEXT
+    assert "attomId" not in out["note"]
+    assert any(e["status"] == "failed" and e["note"] == LIMIT_TEXT for e in log)
+    assert tophap.access_state()["state"] == "limit_reached"
+
+
+def test_provider_chain_log_uses_same_access_text(monkeypatch):
+    """provider 链日志与 enrich note 同一原文。"""
+    from app import providers as pv
+    _fresh_access_state(monkeypatch)
+    _enable_with_payloads(monkeypatch, {"find_property_by_address": LIMIT})
+    log = []
+    res = pv.TophapProvider().enrich("123 Main St, Tampa, FL 33602", log)
+    assert res["ok"] is False and res["note"] == LIMIT_TEXT
+    chain = pv.run_chain("123 Main St, Tampa, FL 33602", [],
+                         providers=[pv.TophapProvider()])
+    th = [r for r in chain["provider_results"] if r["provider"] == "TopHap MCP"][0]
+    assert th["status"] == "failed" and th["note"] == LIMIT_TEXT
+    assert any(e["step"] == "TopHap MCP" and e["note"] == LIMIT_TEXT
+               for e in chain["log"])
+
+
+def test_all_data_legs_limit_reached_fails_chain(monkeypatch):
+    """find 成功但 detail/insights/cma 全回 limit_reached：整链按访问类错误失败。"""
+    _fresh_access_state(monkeypatch)
+    _enable_with_payloads(monkeypatch, {"get_property_detail": LIMIT,
+                                        "get_property_insights": LIMIT,
+                                        "get_property_cma": LIMIT,
+                                        "search_schools": LIMIT})
+    out = tophap.enrich_address("123 Main St, Tampa, FL 33602", [])
+    assert out["ok"] is False and out["note"] == LIMIT_TEXT
+
+
+def test_mid_chain_limit_keeps_earlier_fields(monkeypatch):
+    """detail 成功、cma 回 limit_reached：保留已得字段，note 与日志显名访问类错误。"""
+    _fresh_access_state(monkeypatch)
+    _enable_with_payloads(monkeypatch, {"get_property_cma": LIMIT})
+    log = []
+    out = tophap.enrich_address("123 Main St, Tampa, FL 33602", log)
+    assert out["ok"] is True and out["fields"]
+    assert LIMIT_TEXT in out["note"]
+    assert any(e["status"] == "failed" and e["note"] == LIMIT_TEXT for e in log)
+
+
+def test_normal_access_value_parses_normally(monkeypatch):
+    """回包带正常 access 值（ok）时走原解析路径，字段不变。"""
+    _fresh_access_state(monkeypatch)
+    detail_ok = dict(DETAIL, access="ok")
+    calls = _enable_with_payloads(monkeypatch, {"get_property_detail": detail_ok})
+    out = tophap.enrich_address("123 Main St, Tampa, FL 33602", [])
+    assert out["ok"] is True
+    assert "beds" in {f["key"] for f in out["fields"]}
+    assert calls
+    assert tophap.access_state()["state"] == "ok"
+
+
+def test_status_operational_unknown_before_any_billed_call(monkeypatch):
+    """尚无计费调用：access_state=unknown，operational 按其余因素判（不默认判红）。"""
+    _fresh_access_state(monkeypatch)
+    _enable(monkeypatch, [])
+    st = tophap.status()
+    assert st["access_state"] == "unknown"
+    assert st["operational"] is True
+    for k in ("enabled", "configured", "mcp_url", "reachable", "tools",
+              "core_ready", "token_expired", "note"):
+        assert k in st
+
+
+def test_status_not_operational_after_limit_reached(monkeypatch):
+    """握手全绿但最近一次计费调用 limit_reached：operational=False。"""
+    _fresh_access_state(monkeypatch)
+    _enable_with_payloads(monkeypatch, {"find_property_by_address": LIMIT})
+    tophap.enrich_address("123 Main St, Tampa, FL 33602", [])
+    st = tophap.status()
+    assert st["reachable"] is True and st["core_ready"] is True
+    assert st["access_state"] == "limit_reached"
+    assert st["operational"] is False
+    assert LIMIT_TEXT in st["note"]
+
+
+def test_status_recovers_after_successful_billed_call(monkeypatch):
+    _fresh_access_state(monkeypatch)
+    _enable_with_payloads(monkeypatch, {"find_property_by_address": LIMIT})
+    tophap.enrich_address("123 Main St, Tampa, FL 33602", [])
+    _enable(monkeypatch, [])
+    tophap.enrich_address("123 Main St, Tampa, FL 33602", [])
+    st = tophap.status()
+    assert st["access_state"] == "ok" and st["operational"] is True
+
+
+def test_status_disabled_not_operational(monkeypatch):
+    _fresh_access_state(monkeypatch)
+    st = tophap.status()
+    assert st["operational"] is False and st["access_state"] == "unknown"
+
+
+
+def test_status_endpoint_bytes_unchanged_by_operational(monkeypatch):
+    """匿名 /api/tophap/status 响应受 v1 金标准锁定：operational/access_state 不外露。"""
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+
+    _fresh_access_state(monkeypatch)
+    body = TestClient(app).get("/api/tophap/status").json()
+    assert "operational" not in body and "access_state" not in body

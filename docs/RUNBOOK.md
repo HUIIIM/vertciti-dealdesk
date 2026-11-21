@@ -30,6 +30,8 @@
 | `DEALDESK_ERROR_WEBHOOK` | 空 | 未捕获异常 POST 到该地址（Slack / 飞书等） |
 | `DEALDESK_LOG_LEVEL` | INFO | JSON 结构化日志级别 |
 | `TOPHAP_*`、`RENTCAST_API_KEY` | — | 数据源；token 只放 `.env`（600），**绝不写进日志 / 代码** |
+| `RENTCAST_MONTHLY_CAP` | 45 | RentCast 月度预算帽（America/New_York 自然月，每次真正发出的请求计 1；达帽该源跳过、链照常降级）。免费档 50 次/月、超额计费，帽是零花费保证 |
+| `DEALDESK_CACHE_TTL_SECONDS` / `DEALDESK_CACHE_TTL_PARTIAL_SECONDS` | 604800 / 86400 | 地址缓存分级 TTL：完整成功结果 7 天、部分 / 失败结果 24h（判据见 `app/services/cache.py`） |
 
 ## 3. 用户与权限
 
@@ -51,7 +53,12 @@ python -m app.core.security add-user miao chairman "苗总"   # 打印一次性 
 2. 日志按编号检索：每行 JSON 带 `request_id`、`actor`、`path`、`status`、`ms`。
 3. 最近 100 条未捕获异常（含堆栈）：`GET /api/v2/admin/errors`（需审计权限）。
 4. 健康检查：`GET /api/v2/health`（不需登录），返回版本、库类型与迁移版本。
-5. 部署后第一动作仍是 `GET /api/tophap/status` 冒烟（AGENTS.md）。
+5. 部署后第一动作仍是 `GET /api/tophap/status` 冒烟（AGENTS.md）：非 500 只证明部署活着；
+   `reachable` / `core_ready` / `token_expired` 全绿≠可用。TopHap **能不能用**只看
+   `app.services.tophap.status()` 的 `operational`（`access_state` = 本进程最近一次计费调用的访问状态，
+   `limit_reached` 时握手 / tools/list / token 全绿也不可用；`unknown` = 尚无计费调用，按其余因素判）。
+   access_state 是进程内状态：新起的进程（如一次性 CLI）总是 `unknown`，须在服务进程内读。
+   匿名端点响应字节受 v1 金标准锁定，暂不外露这两个字段。
 
 ## 5. 备份与恢复
 

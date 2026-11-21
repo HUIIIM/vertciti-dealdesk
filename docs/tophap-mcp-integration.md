@@ -32,7 +32,13 @@ intake（地址/链接/PDF/截图）
 
 - `app/tophap.py`：适配器（JSON-RPC/SSE 解析、tool 链路、字段映射、token 刷新、降级）。
 - `tools/tophap_oauth_setup.py`：首次 OAuth 授权独立脚本（见第 5 节）。
-- `GET /api/tophap/status`：开关/授权/连通性/核心 tool 齐全性检查。
+- `GET /api/tophap/status`：开关/授权/连通性/核心 tool 齐全性检查（只说明连得上）。
+- `app.services.tophap.status()`（进程内）另有 `operational`／`access_state`，**能否用以 `operational` 为准**
+  （匿名端点字节受 v1 金标准锁定，暂不外露）——
+  `access_state` 取本进程最近一次计费 tools/call 的访问状态（`ok`／`limit_reached` 等／`unknown`=尚无计费调用），
+  `operational = enabled ∧ configured ∧ reachable ∧ core_ready ∧ access_state∈{ok, unknown}`。
+  tool 回包为访问类结构化错误（如 `{"access":"limit_reached","freeCalls":{"used":25,"limit":25}}`）时，
+  enrich note 与链日志原样报「TopHap 配额耗尽 limit_reached（25/25）」，不再掩盖成「未返回 attomId」。
 
 ## 4. 字段映射表
 

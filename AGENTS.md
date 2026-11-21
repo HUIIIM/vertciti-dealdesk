@@ -67,6 +67,9 @@ rm -f dealdesk.db && .venv/bin/pytest tests/ -q
   处置顺序：① 立即用 Vercel API redeploy 上一健康部署回滚（2 分钟恢复）；
   ② 再用同一 bundle 做一次干净生产部署。部署后第一动作永远是
   `GET /api/tophap/status` 冒烟，500 则回滚、不反复重部署同一 bundle。
+  非 500 只证明部署活着，响应里 reachable/core_ready/token 全绿也**不等于** TopHap 可用：
+  可用口径是 `app.services.tophap.status()` 的 `operational`（`access_state=limit_reached`
+  时握手全绿也不可用）；匿名端点字节受 v1 金标准锁定，暂不外露这两个字段。
 - vercel-deploy/ 有**两处**静态副本：根目录一份 ＋ `static/` 子目录一份
   （与仓库 `static/` 三方对齐，缺任一=生产页面版本错乱）；rsync 同步三条：
   `app/ → vercel-deploy/app/`、`static/ → vercel-deploy/static/`、
@@ -104,6 +107,6 @@ rm -f dealdesk.db && .venv/bin/pytest tests/ -q
 | v2 工作台 | `http://127.0.0.1:8100/app/` |
 | 加用户 | `.venv/bin/python -m app.core.security add-user <名> <chairman\|analyst\|viewer>` |
 | 备份 | `.venv/bin/python tools/db_backup.py backup ~/backups` |
-| 查 TopHap 状态 | `curl http://127.0.0.1:8100/api/tophap/status` |
+| 查 TopHap 状态 | `curl http://127.0.0.1:8100/api/tophap/status`（只证连通；可用口径是服务进程内 `tophap.status()` 的 `operational`，见 docs/RUNBOOK.md §4 第 5 条） |
 | 生产状态 | `curl https://dealdesk.vertciti.com/api/tophap/status`（旧 vertciti-dealdesk.vercel.app 面已退役禁用，2026-11-13 T3 全扫改字） |
 | 敏感扫描 | `bash <monorepo>/security-watch/data-room-gate.sh` |
