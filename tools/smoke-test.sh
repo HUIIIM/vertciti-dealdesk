@@ -25,7 +25,7 @@ NOW=$(TZ=America/New_York date "+%Y-%m-%d %H:%M %Z")
 ADDRS=(
   "NY商业|450 West 44th Street, New York, NY 10036"
   "TX住宅|1 Main St, Houston, TX 77002"
-  "CA商业|500 S Grand Ave, Los Angeles, CA 90071"
+  "CA商业|533 S Grand Ave, Los Angeles, CA 90071"
 )
 
 pass=0
