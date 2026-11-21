@@ -22,7 +22,9 @@ import socket
 import time
 import urllib.parse
 import urllib.request
+from collections.abc import Iterator
 from datetime import datetime
+from typing import Any
 
 import httpx
 
@@ -41,6 +43,9 @@ logger = logging.getLogger(__name__)
 # （app.services.research_pipeline）的 INFO 行会被根 logger 默认级别静默
 # 丢弃（第 53 项生产实证）。本模块其余日志调用的 logger 收敛归第 59 项。
 timing_logger = logging.getLogger("dealdesk.research_pipeline")
+
+# pipeline 日志条目类型（与 providers.run_chain 的 log 口径一致）
+LogList = list[dict[str, str]]
 
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/126.0 Safari/537.36")
@@ -104,13 +109,13 @@ def _now() -> str:
     return datetime.now().strftime("%Y-%m-%d %H:%M")
 
 
-def _log(log: list, step: str, status: str, note: str = ""):
+def _log(log: LogList, step: str, status: str, note: str = "") -> None:
     log.append({"step": step, "status": status, "note": note, "at": _now()})
 
 
 # ---------------- 流式大小上限 helper ----------------
 
-def _collect_capped(resp, limit: int) -> tuple[bytes | None, bool]:
+def _collect_capped(resp: httpx.Response, limit: int) -> tuple[bytes | None, bool]:
     """流式读取响应体并执行字节上限（fetch_page 与 robots 共用）。
 
     返回 (body, too_large)：Content-Length 超限在读 body 前停手；
@@ -151,7 +156,7 @@ def _parse_robots_rules(text: str) -> list[tuple[str, str]]:
     rules: list[tuple[str, str]] = []
     seen_rule = False
 
-    def _flush():
+    def _flush() -> None:
         nonlocal agents, rules, seen_rule
         if agents:
             groups.append((agents, rules))
@@ -352,7 +357,7 @@ def _check_peer(r: object, url: str) -> None:
 
 
 @contextlib.contextmanager
-def _public_stream(url: str, **kw):
+def _public_stream(url: str, **kw: Any) -> Iterator[httpx.Response]:
     """同 httpx.stream("GET")，但不让 httpx 自动跟跳转：每一跳都重新过 _is_public_url。
 
     否则公网页面一个 302 就能把服务端引到内网 / 云元数据地址（SSRF）。
@@ -372,7 +377,7 @@ def _public_stream(url: str, **kw):
     raise UnsafeRedirectError("跳转次数过多")
 
 
-def fetch_page(url: str, log: list) -> dict:
+def fetch_page(url: str, log: LogList) -> dict[str, Any]:
     """抓取单个公开页面。返回 {ok, text, final_url, status, note}."""
     ok, reason = _is_public_url(url)
     if not ok:
@@ -435,9 +440,10 @@ def ddg_unwrap(href: str) -> str:
     return href
 
 
-def _parse_ddg_links(html_text: str, max_results: int) -> list[dict]:
+def _parse_ddg_links(html_text: str, max_results: int) -> list[dict[str, str]]:
     """从 DDG 结果页提取外链（lite 与 html 端点通用）。"""
-    out, seen = [], set()
+    out: list[dict[str, str]] = []
+    seen: set[str] = set()
     for m in re.finditer(r'<a[^>]+href="([^"]+)"[^>]*>(.*?)</a>', html_text, re.S):
         href = _html.unescape(m.group(1))
         if "duckduckgo.com/y.js" in href or "duckduckgo-help-pages" in href:
@@ -455,7 +461,7 @@ def _parse_ddg_links(html_text: str, max_results: int) -> list[dict]:
     return out
 
 
-def ddg_search(query: str, log: list, max_results: int = 8) -> list[dict]:
+def ddg_search(query: str, log: LogList, max_results: int = 8) -> list[dict[str, str]]:
     """DuckDuckGo 搜索（免 key）。lite 端点优先，html 端点兜底。返回 [{title, url}]。
 
     流式抓取＋MAX_SEARCH_BYTES 上限：超限按该端点失败
@@ -500,7 +506,7 @@ def ddg_search(query: str, log: list, max_results: int = 8) -> list[dict]:
 MAX_ADDRESS_CHARS = 200
 
 
-def parse_address(text: str) -> dict:
+def parse_address(text: str) -> dict[str, Any]:
     """从用户输入解析 street/city/state/zip（尽力而为）。"""
     t = text.strip()
     # 正常地址远短于 200 字符；超长输入不进这条正则（多段懒惰匹配在病态输入上是多项式级回溯）
@@ -530,7 +536,7 @@ def _money_near(text: str, pattern: str) -> float | None:
 
 
 def extract_fields(text: str, source_name: str, source_url: str,
-                   seller_claimed: bool = False) -> list[dict]:
+                   seller_claimed: bool = False) -> list[dict[str, Any]]:
     """从页面文本抽取结构化字段。每条带来源/时间/可信度。"""
     at = _now()
     host = (urllib.parse.urlparse(source_url).hostname or "").lower()
@@ -547,7 +553,8 @@ def extract_fields(text: str, source_name: str, source_url: str,
             return "中"
         return "低"
 
-    def F(key, value, display=None, kind="fact", note=""):
+    def F(key: str, value: Any, display: str | None = None,
+          kind: str = "fact", note: str = "") -> dict[str, Any] | None:
         if value is None:
             return None
         return {"key": key, "label": FIELD_LABELS.get(key, key),
@@ -558,7 +565,7 @@ def extract_fields(text: str, source_name: str, source_url: str,
                 "claim_label": "卖方口径、待验证" if seller_claimed else "",
                 "note": note, "status": "filled"}
 
-    fields = []
+    fields: list[dict[str, Any] | None] = []
     price = _money_near(text, r"(?:list price|asking price|price)")
     if price:
         fields.append(F("asking_price", price, f"${price:,.0f}",
@@ -577,9 +584,11 @@ def extract_fields(text: str, source_name: str, source_url: str,
         v = _num(sf_m.group(1))
         fields.append(F("building_sf", v, f"{v:,.0f} SF"))
     lot_m = re.search(r"([\d.,]+)\s*acre", text, re.I)
-    if lot_m and _num(lot_m.group(1)):
-        v = _num(lot_m.group(1)) * 43560
-        fields.append(F("lot_sf", round(v), f"{v:,.0f} SF（{lot_m.group(1)} acre 换算）"))
+    lot_acres = lot_m.group(1) if lot_m else ""
+    lot_num = _num(lot_acres)
+    if lot_num:
+        v = lot_num * 43560
+        fields.append(F("lot_sf", round(v), f"{v:,.0f} SF（{lot_acres} acre 换算）"))
     yb_m = re.search(r"(?:built in|year built)[^\d]{0,10}(19\d{2}|20\d{2})", text, re.I)
     if yb_m:
         fields.append(F("year_built", int(yb_m.group(1))))
@@ -599,7 +608,7 @@ def extract_fields(text: str, source_name: str, source_url: str,
                         note="平台算法估值，非成交价"))
 
     # 价格历史：日期 + 事件词 + 价格
-    hist = []
+    hist: list[dict[str, Any]] = []
     for m in re.finditer(
             r"((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{4}|\d{1,2}/\d{1,2}/\d{2,4})"
             r"[^$]{0,80}?\$([\d,]+)", text, re.I):
@@ -621,10 +630,10 @@ def extract_fields(text: str, source_name: str, source_url: str,
     return [f for f in fields if f]
 
 
-def merge_fields(all_fields: list[dict]) -> list[dict]:
+def merge_fields(all_fields: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """同 key 保留可信度最高的；卖方口径备注保留在 note。"""
     rank = {"高": 3, "中": 2, "低": 1, "卖方口径": 0}
-    best: dict[str, dict] = {}
+    best: dict[str, dict[str, Any]] = {}
     for f in all_fields:
         k = f["key"]
         cur = best.get(k)
@@ -654,7 +663,7 @@ def _candidate_priority(url: str) -> int:
 
 # ---------- pipeline 入口 ----------
 
-def run_web_collection(address: str, log: list | None = None) -> dict:
+def run_web_collection(address: str, log: LogList | None = None) -> dict[str, Any]:
     """公开网页搜集：DDG 搜索 + 抓取 + 字段抽取（含市场新闻字段）。
 
     供 providers.WebProvider 调用（多数据源链的一环）。
@@ -671,7 +680,8 @@ def run_web_collection(address: str, log: list | None = None) -> dict:
     ]
     if city_state:
         queries.append(f"{city_state} housing market news home prices")
-    seen, candidates = set(), []
+    seen: set[str] = set()
+    candidates: list[dict[str, str]] = []
     for q in queries:
         for r in ddg_search(q, log):
             if r["url"] not in seen:
@@ -679,8 +689,10 @@ def run_web_collection(address: str, log: list | None = None) -> dict:
                 candidates.append(r)
     candidates.sort(key=lambda r: _candidate_priority(r["url"]))
 
-    all_fields, news = [], []
-    photos, photo_seen = [], set()
+    all_fields: list[dict[str, Any]] = []
+    news: list[dict[str, str]] = []
+    photos: list[dict[str, Any]] = []
+    photo_seen: set[str] = set()
     fetches = 0
     for c in candidates:
         if fetches >= MAX_FETCHES:
@@ -717,7 +729,7 @@ def run_web_collection(address: str, log: list | None = None) -> dict:
     return {"fields": fields, "parsed": parsed, "log": log}
 
 
-def run_address_pipeline(address: str, log: list | None = None) -> dict:
+def run_address_pipeline(address: str, log: LogList | None = None) -> dict[str, Any]:
     """纯地址 → 多数据源 fallback 链搜集（TopHap → RentCast → 公开网页 → Census 保底）。
 
     字段按优先级合并（TopHap > RentCast > 网页 > Census），每个字段自带来源标注；
@@ -749,7 +761,7 @@ def run_address_pipeline(address: str, log: list | None = None) -> dict:
     return result
 
 
-def run_url_pipeline(url: str, log: list | None = None) -> dict:
+def run_url_pipeline(url: str, log: LogList | None = None) -> dict[str, Any]:
     """房源链接 → 先提地址+卖方基础信息，再走全网独立搜集。"""
     log = log if log is not None else []
     page = fetch_page(url, log)
@@ -776,11 +788,12 @@ def run_url_pipeline(url: str, log: list | None = None) -> dict:
         # 独立源优先；卖方声称保留备注
         merged = merge_fields(indep["fields"] + seller_fields)
         # 照片合并：用户粘贴链接的图优先，去重，最多 6 张（设计稿 2.2）
-        indep_photos = []
+        indep_photos: list[dict[str, Any]] = []
         for f in indep["fields"]:
             if f.get("key") == "property_photos" and isinstance(f.get("value"), list):
                 indep_photos = f["value"]
-        combined, cseen = [], set()
+        combined: list[dict[str, Any]] = []
+        cseen: set[Any] = set()
         for q in (seller_photos + indep_photos):
             u = q.get("url")
             if u and u not in cseen:
@@ -809,7 +822,7 @@ def run_url_pipeline(url: str, log: list | None = None) -> dict:
     return result
 
 
-def _emit_photos_timing(timings: dict, *, ok: bool) -> None:
+def _emit_photos_timing(timings: dict[str, Any], *, ok: bool) -> None:
     """落一行结构化段位计时日志：photos_timing total_ms=.. search_ms=.. fetch1_ms=.. ..。
 
     经 timing_logger（dealdesk.* 命名空间）发出：生产 configure_logging()
@@ -824,7 +837,7 @@ def _emit_photos_timing(timings: dict, *, ok: bool) -> None:
         str(timings["cache_hit"]).lower(), str(ok).lower())
 
 
-def run_photos_pipeline(address: str, log: list | None = None) -> dict:
+def run_photos_pipeline(address: str, log: LogList | None = None) -> dict[str, Any]:
     """轻量取图：商业页 A 栏"外观"小图专用。
 
     先查 24h 地址缓存（命中直接返回照片，约 0.7s）；未命中则做一次轻量抓取
@@ -842,8 +855,8 @@ def run_photos_pipeline(address: str, log: list | None = None) -> dict:
     search_ms = 0
     fetch_ms: list[int] = []
 
-    def _done(photos: list, cached: bool, ok: bool) -> dict:
-        timings = {"total_ms": int((time.perf_counter() - started) * 1000),
+    def _done(photos: list[dict[str, Any]], cached: bool, ok: bool) -> dict[str, Any]:
+        timings: dict[str, Any] = {"total_ms": int((time.perf_counter() - started) * 1000),
                    "search_ms": search_ms, "fetch_ms": list(fetch_ms),
                    "cache_hit": cached}
         _emit_photos_timing(timings, ok=ok)
@@ -861,7 +874,8 @@ def run_photos_pipeline(address: str, log: list | None = None) -> dict:
             if f.get("key") == "property_photos" and isinstance(f.get("value"), list):
                 _log(log, "照片缓存", "hit", f"{len(f['value'])} 张")
                 return _done(f["value"], True, True)
-    photos, seen = [], set()
+    photos: list[dict[str, Any]] = []
+    seen: set[str] = set()
     ok = True
     try:
         t0 = time.perf_counter()
@@ -898,7 +912,7 @@ def run_photos_pipeline(address: str, log: list | None = None) -> dict:
     return _done(photos[:6], False, ok)
 
 
-def run(mode: str, text: str) -> dict:
+def run(mode: str, text: str) -> dict[str, Any]:
     """统一入口：mode = address | url。"""
     text = (text or "").strip()
     if not text:
