@@ -14,6 +14,8 @@ DealDesk deal intake 的评估清单补充项：任何 deal 在进估值/结构�
 
 from __future__ import annotations
 
+from typing import Any
+
 # 三项验证的检查要点与证据要求（评估清单原文，进 intake 输出）
 DEMAND_VALIDATION_ITEMS = [
     {
@@ -60,7 +62,7 @@ STATUS_LABELS = {
 VALID_STATUSES = frozenset(STATUS_LABELS)
 
 
-def evaluate(results: dict) -> dict:
+def evaluate(results: dict[str, Any]) -> dict[str, Any]:
     """评估有效需求三项验证结果，返回 intake  verdict。
 
     参数 results: {key: {"status": "pass"|"fail"|"unknown", "evidence_note": str}}
@@ -70,7 +72,7 @@ def evaluate(results: dict) -> dict:
     items = []
     blockers = []
     for item in DEMAND_VALIDATION_ITEMS:
-        key = item["key"]
+        key = str(item["key"])
         given = results.get(key, {}) if isinstance(results, dict) else {}
         status = given.get("status", "unknown")
         if status not in VALID_STATUSES:
@@ -90,7 +92,7 @@ def evaluate(results: dict) -> dict:
     }
 
 
-def demand_validation_block() -> dict:
+def demand_validation_block() -> dict[str, Any]:
     """返回 intake 输出里的有效需求验证清单块。
 
     初始状态三项均为 unknown（待人工/后续验证补证据），

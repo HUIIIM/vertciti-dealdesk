@@ -93,7 +93,7 @@ def address_hash(address: str) -> str:
     return hashlib.sha256(normalize_address(address).encode("utf-8")).hexdigest()
 
 
-def get_cached(address: str) -> dict | None:
+def get_cached(address: str) -> dict[str, Any] | None:
     """查缓存。
 
     返回 {"data": 反序列化后的 run_chain 结果, "fetched_at": float,
@@ -124,7 +124,7 @@ def get_cached(address: str) -> dict | None:
     }
 
 
-def put_cached(address: str, result_dict: dict) -> None:
+def put_cached(address: str, result_dict: dict[str, Any]) -> None:
     """写入缓存（upsert），fetched_at=now。
 
     现状调用方：providers.run_chain 在合并出 ≥1 个字段（ok=True，可能是部分失败）时调用；
