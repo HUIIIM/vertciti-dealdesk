@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from typing import Any, TypeVar
 
 from fastapi import HTTPException, Request
 from pydantic import BaseModel, ConfigDict, ValidationError
@@ -54,7 +55,7 @@ def _zh_error_message(exc: ValidationError) -> str:
     return "；".join(parts)
 
 
-def validate_input(track: str, data: dict) -> dict:
+def validate_input(track: str, data: dict[str, Any]) -> dict[str, Any]:
     """Pydantic 严格校验（extra="forbid"），非法字段返回中文错误信息。"""
     if track not in ("residential", "commercial"):
         raise HTTPException(400, f"unknown track: {track}")
@@ -82,7 +83,10 @@ def _check_upload_size(request: Request, limit: int, label: str) -> None:
         pass
 
 
-def _validate(model, data, label: str = "输入"):
+_ModelT = TypeVar("_ModelT", bound=BaseModel)
+
+
+def _validate(model: type[_ModelT], data: Any, label: str = "输入") -> _ModelT:
     """手动 model_validate 的统一包装：ValidationError → 422 中文（不 500）。"""
     try:
         return model.model_validate(data)
@@ -90,14 +94,14 @@ def _validate(model, data, label: str = "输入"):
         raise HTTPException(422, f"{label}校验失败：" + _zh_error_message(exc))
 
 
-def score_input(track: str, data: dict, lang: str = "zh") -> dict:
+def score_input(track: str, data: dict[str, Any], lang: str = "zh") -> dict[str, Any]:
     validated = validate_input(track, data)
     if track == "residential":
         return scoring_residential.score(validated, lang=lang)
     return scoring_commercial.score(validated, lang=lang)
 
 
-def _with_fresh_score(p: dict) -> dict:
+def _with_fresh_score(p: dict[str, Any]) -> dict[str, Any]:
     """每次读取都用最新引擎重算，保证口径一致；并挂载一级字段 cash_to_close。"""
     try:
         p["score"] = score_input(p["track"], p["input"])
@@ -111,10 +115,10 @@ def _with_fresh_score(p: dict) -> dict:
 class UwProjectIn(BaseModel):
     model_config = ConfigDict(extra="allow")
     name: str = ""
-    input: dict = {}
+    input: dict[str, Any] = {}
 
 
-def _enforce_quality_gate(data: dict, action: str):
+def _enforce_quality_gate(data: dict[str, Any], action: str) -> dict[str, Any]:
     """fail 清零才能进 underwriting：blocked → 422 硬拦。"""
     g = validators.gate_verdict_for_state(data)
     if g["blocked"]:
@@ -133,7 +137,7 @@ class _WbIntakeReq(BaseModel):
     text: str = ""
 
 
-def _enforce_gate_fields(gate_fields: dict | None, deal_type: str, action: str):
+def _enforce_gate_fields(gate_fields: dict[str, Any] | None, deal_type: str, action: str) -> dict[str, Any] | None:
     """导出前过门：前端显式送来的 gate_fields 跑门，
     blocked → 422 硬拦（与商业 /api/uw/report 同口径）。
     未送 gate_fields 时不拦（向后兼容旧调用方）。"""
@@ -169,7 +173,7 @@ def _deal_slug(text: str) -> str:
     return slug
 
 
-def _parse_rr_date(v) -> str:
+def _parse_rr_date(v: object) -> str:
     """rent roll 日期鲁棒解析（P0-13＋Phase 5 第二轮 item 14）：datetime/date 对象、
     YYYY-MM-DD 文本、YYYY/MM/DD、"Jan 1, 2025" / "January 1, 2025" 英文文本均接受；
     解析失败返回 ""（调用方计数，不静默吞掉整行）。"""
@@ -211,16 +215,16 @@ class _MemoReq(BaseModel):
     track: str = "residential"
     name: str = ""
     address: str = ""
-    input: dict = {}
+    input: dict[str, Any] = {}
     variant: str = "classic"
     # P0-8：当前 deal 真实数据（前端传入）
-    verdict: dict | None = None
-    score: dict | None = None
-    comps: list = []
-    assumptions: dict = {}
+    verdict: dict[str, Any] | None = None
+    score: dict[str, Any] | None = None
+    comps: list[Any] = []
+    assumptions: dict[str, Any] = {}
     # Phase 5 第四轮 B2：前端实际生效的假设清单（含默认值，标 is_default）
-    effective_assumptions: list = []
-    uw_input: dict | None = None  # 商业：compute-plus 同款富输入（含租户/假设）
+    effective_assumptions: list[Any] = []
+    uw_input: dict[str, Any] | None = None  # 商业：compute-plus 同款富输入（含租户/假设）
     # Phase 5 第四轮 A1：verdict 显示词（否决态为独立第 4 状态：住宅"否决"/商业"VETO"，
     # 与网页 Zone 1 同源）、否决数、银行口径 trailing DSCR（与网页 KPI 卡同数）
     verdict_word: str = ""
@@ -233,18 +237,18 @@ class _MemoReq(BaseModel):
     valuation_display: str = ""
     # 导出前过门——前端送来的 intake 门字段
     # （住宅 asking_price/building_sf/... 或商业扁平字段）；blocked → 422
-    gate_fields: dict | None = None
+    gate_fields: dict[str, Any] | None = None
     gate_deal_type: str = ""
 
 
 class _ResXlsxReq(BaseModel):
     model_config = ConfigDict(extra="ignore")
-    score: dict = {}
-    input: dict = {}
+    score: dict[str, Any] = {}
+    input: dict[str, Any] = {}
     address: str = ""
-    verdict: dict | None = None
-    confidence: dict | None = None
-    comps: list = []
+    verdict: dict[str, Any] | None = None
+    confidence: dict[str, Any] | None = None
+    comps: list[Any] = []
     # 导出前过门（同 _MemoReq）
-    gate_fields: dict | None = None
+    gate_fields: dict[str, Any] | None = None
     gate_deal_type: str = ""
