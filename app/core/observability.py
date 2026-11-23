@@ -51,9 +51,12 @@ _RID_OK = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 # 数据源）的匿名可达路由：comps 拉取、产权穿透（TopHap 解析持有人）、卖方动机分
 # （TopHap 信号）、地址/链接搜集链（providers 链首源即 TopHap）。纯公开数据源面
 # （Socrata/Census/DDG/EchoWatch）与状态面（/api/tophap/status 发现握手）不在此列。
+# Stage 2（2026-11-23）：截图消费腿取原图端点 GET wb/intake/original 入枚举。
+# POST wb/intake/extracted/{task_id}（回写）与既有 GET 同路径，已被
+# wb/intake/extracted 备选覆盖（本中间件只按路径匹配、方法无关），不另加。
 _V1_PROTECTED = re.compile(
     r"^/api/(projects|uw/projects|compare|wb/research|wb/intake/pending|wb/intake/extracted"
-    r"|wb/comps/pull|wb/ownership/tree|wb/sell-readiness/score|wb/intake/run)(/|$)")
+    r"|wb/intake/original|wb/comps/pull|wb/ownership/tree|wb/sell-readiness/score|wb/intake/run)(/|$)")
 
 
 class JsonFormatter(logging.Formatter):

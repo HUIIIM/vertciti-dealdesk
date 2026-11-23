@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import json
 
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 from fastapi.responses import Response
@@ -269,6 +270,46 @@ def wb_intake_extracted(task_id: str):
         return image_intake.get_extracted(task_id)
     except FileNotFoundError:
         raise HTTPException(404, "提取结果尚未生成，请稍后刷新")
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@router.get("/api/wb/intake/original/{task_id}")
+def wb_intake_original(task_id: str):
+    """取回某截图任务的原图字节（Stage 2 消费腿：本机 extractor 拉取用）。
+
+    Content-Type 按原图扩展名；鉴权与 wb 既有端点同一面（全局中间件
+    DEALDESK_AUTH + _V1_PROTECTED 枚举角色门），不加路由级鉴权。
+    """
+    try:
+        data, content_type = image_intake.get_original(task_id)
+    except FileNotFoundError:
+        raise HTTPException(404, "任务或原图不存在")
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return Response(content=data, media_type=content_type)
+
+
+@router.post("/api/wb/intake/extracted/{task_id}")
+async def wb_intake_extracted_write(request: Request, task_id: str):
+    """回写某截图任务的视觉提取结果（extracted.json 全文，Stage 2 消费腿）。
+
+    路由层先判原始体大小（>2MB 直接 400、不解析）；契约校验与原子落盘
+    在 image_intake.save_extracted（序列化再判一次 2MB）。status=done
+    由 list_tasks 按 extracted.json 在位派生，manifest 不动（契约零改）。
+    鉴权与 wb 既有端点同一面，不加路由级鉴权。
+    """
+    raw = await request.body()
+    if len(raw) > image_intake.MAX_EXTRACTED_BYTES:
+        raise HTTPException(400, "提取结果超过 2MB 上限")
+    try:
+        payload = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        raise HTTPException(400, "请求体不是合法 JSON")
+    try:
+        return image_intake.save_extracted(task_id, payload)
+    except FileNotFoundError:
+        raise HTTPException(404, "任务不存在")
     except ValueError as e:
         raise HTTPException(400, str(e))
 
