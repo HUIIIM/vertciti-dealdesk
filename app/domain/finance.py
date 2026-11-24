@@ -5,11 +5,26 @@
 
 from __future__ import annotations
 
+import math
+
 
 def _safe_pow(base: float, exp: int) -> float | None:
     """安全幂：溢出返回 None（调用方降级），不抛 OverflowError."""
     try:
         return base ** exp
+    except OverflowError:
+        return None
+
+
+def _powm1(r: float, exp: int) -> float | None:
+    """精确计算 (1 + r) ** exp - 1：经 expm1(exp * log1p(r)) 求值.
+
+    r 极小时直接算 (1+r)**exp - 1 会灾难性相消（factor-1 的相对误差可达
+    数个百分点，月供被算高、随利率反降——第 67 项 Hypothesis 反例定案）。
+    expm1/log1p 在小 r 段保持相对精度；溢出返回 None（调用方降级）。
+    """
+    try:
+        return math.expm1(exp * math.log1p(r))
     except OverflowError:
         return None
 
@@ -29,10 +44,18 @@ def monthly_payment(principal: float, annual_rate_pct: float, years: float) -> f
     factor = _safe_pow(1 + r, n)
     if factor is None:
         return 0.0
+    fm1 = factor - 1
+    if fm1 < 1e-6:
+        # 极小利率段：(1+r)^n - 1 相消误差可达数个百分点（第 67 项反例），
+        # 改走 expm1 精确求值；正常段保留原式位精确结果（金标准口径不动）
+        fm1 = _powm1(r, n)
+        if fm1 is None:
+            return 0.0
+        factor = 1 + fm1
     if factor == 1:  # 利率小到 (1+r)^n 在浮点下等于 1：按零利率摊还，而不是月供 0（性质测试发现）
         return principal / n
-    # r 极小时 factor - 1 有相消误差，可能算出低于零利率的月供；数学上月供不会低于 本金/期数
-    return max(principal * r * factor / (factor - 1), principal / n)
+    # 数学上月供不会低于零利率摊还 本金/期数，下限守卫保留作最后防线
+    return max(principal * r * factor / fm1, principal / n)
 
 
 def remaining_balance(principal: float, annual_rate_pct: float, years: float,
@@ -53,9 +76,16 @@ def remaining_balance(principal: float, annual_rate_pct: float, years: float,
     f1 = _safe_pow(1 + r, k)
     if f1 is None:
         return 0.0
+    fm1 = f1 - 1
+    if fm1 < 1e-6:
+        # 极小利率段与 monthly_payment 同口径改走 expm1 精确求值（第 67 项）
+        fm1 = _powm1(r, k)
+        if fm1 is None:
+            return 0.0
+        f1 = 1 + fm1
     if f1 == 1:  # 同上：浮点下等同零利率
         return principal - pmt * k
-    return principal * f1 - pmt * ((f1 - 1) / r)
+    return principal * f1 - pmt * (fm1 / r)
 
 
 def wrap_analysis(underlying_balance: float, underlying_rate_pct: float,
