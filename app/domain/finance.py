@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import math
+from typing import Any, cast
 
 
 def _safe_pow(base: float, exp: int) -> float | None:
@@ -48,9 +49,10 @@ def monthly_payment(principal: float, annual_rate_pct: float, years: float) -> f
     if fm1 < 1e-6:
         # 极小利率段：(1+r)^n - 1 相消误差可达数个百分点（第 67 项反例），
         # 改走 expm1 精确求值；正常段保留原式位精确结果（金标准口径不动）
-        fm1 = _powm1(r, n)
-        if fm1 is None:
+        precise = _powm1(r, n)
+        if precise is None:
             return 0.0
+        fm1 = precise
         factor = 1 + fm1
     if factor == 1:  # 利率小到 (1+r)^n 在浮点下等于 1：按零利率摊还，而不是月供 0（性质测试发现）
         return principal / n
@@ -79,9 +81,10 @@ def remaining_balance(principal: float, annual_rate_pct: float, years: float,
     fm1 = f1 - 1
     if fm1 < 1e-6:
         # 极小利率段与 monthly_payment 同口径改走 expm1 精确求值（第 67 项）
-        fm1 = _powm1(r, k)
-        if fm1 is None:
+        precise = _powm1(r, k)
+        if precise is None:
             return 0.0
+        fm1 = precise
         f1 = 1 + fm1
     if f1 == 1:  # 同上：浮点下等同零利率
         return principal - pmt * k
@@ -91,7 +94,7 @@ def remaining_balance(principal: float, annual_rate_pct: float, years: float,
 def wrap_analysis(underlying_balance: float, underlying_rate_pct: float,
                   underlying_term_years: float, sale_price: float,
                   down_payment: float, wrap_rate_pct: float,
-                  wrap_term_years: float, balloon_years: float | None) -> dict:
+                  wrap_term_years: float, balloon_years: float | None) -> dict[str, Any]:
     """F11: wrap / subject-to 利差结构分析（clean-room 重写 R2 计算逻辑）.
 
     返回: wrap 贷款额 / wrap 月供 / 底层月供 / 月利差 /
@@ -121,12 +124,12 @@ def wrap_analysis(underlying_balance: float, underlying_rate_pct: float,
     }
 
 
-def walt(leases: list[dict]) -> float:
+def walt(leases: list[dict[str, Any]]) -> float:
     """F12: 加权平均剩余租期. leases: [{'base_rent': x, 'years_left': y}]."""
-    total = sum(l.get("base_rent", 0) for l in leases)
+    total = cast(float, sum(l.get("base_rent", 0) for l in leases))
     if total <= 0:
         return 0.0
-    return sum(l.get("base_rent", 0) * l.get("years_left", 0) for l in leases) / total
+    return cast(float, sum(l.get("base_rent", 0) * l.get("years_left", 0) for l in leases) / total)
 
 
 def safe_div(num: float, den: float) -> float | None:
