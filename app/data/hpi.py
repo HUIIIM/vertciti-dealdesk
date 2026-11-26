@@ -10,6 +10,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 FHFA_RELEASE = "FHFA House Price Index 2026年Q2发布"
 FHFA_RELEASE_DATE = "2026-08-25"  # 发布日前后；FRED 系列同日更新
 FHFA_DOWNLOADS_URL = "https://www.fhfa.gov/DataTools/Downloads/Pages/House-Price-Index-Datasets.aspx"
@@ -20,7 +22,7 @@ METHODOLOGY = (
     "是价格指数（index），不是房价本身；不能直接换算成 $/SF 或具体房产价值。"
 )
 
-MARKETS = {
+MARKETS: dict[str, Any] = {
     "us": {
         "label": "全美",
         "geo": "United States",
@@ -146,7 +148,7 @@ MARKETS = {
 }
 
 # 市场调查模块的公开数据源链接（全部为本会话核验过的原文 URL）
-PUBLIC_SOURCES = [
+PUBLIC_SOURCES: list[dict[str, Any]] = [
     {"name": "FHFA 房价指数数据集下载页", "url": FHFA_DOWNLOADS_URL,
      "note": "州/MSA/县三级 HPI，免费下载（purchase-only 与 all-transactions）"},
     {"name": "FRED · 凤凰城 MSA 房价指数", "url": "https://fred.stlouisfed.org/series/ATNHPIUS38060Q",
@@ -170,16 +172,16 @@ PUBLIC_SOURCES = [
 ]
 
 
-def get_market(key: str) -> dict | None:
+def get_market(key: str) -> dict[str, Any] | None:
     return MARKETS.get(key)
 
 
-def market_list() -> list[dict]:
+def market_list() -> list[dict[str, Any]]:
     return [{"key": k, **{kk: vv for kk, vv in v.items() if kk != "series"}}
             for k, v in MARKETS.items()]
 
 
-def yoy_from_series(series: list[dict]) -> dict | None:
+def yoy_from_series(series: list[dict[str, Any]]) -> dict[str, Any] | None:
     """从季度序列算最新同比（需 >=5 个点）；返回 {latest_q, latest, yoy_pct}."""
     if not series or len(series) < 5:
         return None

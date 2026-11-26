@@ -15,6 +15,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 TIERS = ("Excellent", "Good", "Average", "Fair", "Poor")
 
 BAND_ADJACENT = (0.03, 0.08)  # 相邻档
@@ -29,7 +31,7 @@ def tier_index(tier: str) -> int:
 
 
 def adjust(subject_tier: str, comp_tier: str, comp_price: float,
-           basis: str, rate: float | None = None) -> dict:
+           basis: str, rate: float | None = None) -> dict[str, Any]:
     """返回调整结果. rate=None 时取区间中点（公开默认）."""
     si = tier_index(subject_tier)
     ci = tier_index(comp_tier)

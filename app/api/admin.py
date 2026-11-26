@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import APIRouter
 from fastapi.responses import RedirectResponse
 
@@ -9,12 +11,12 @@ router = APIRouter(tags=["admin"])
 
 
 @router.get("/api/health")
-def health():
+def health() -> dict[str, Any]:
     return {"ok": True, "service": "dealdesk"}
 
 
 @router.get("/api/tophap/status")
-def tophap_status():
+def tophap_status() -> dict[str, Any]:
     """TopHap 数据源状态（匿名面）：只回状态布尔与计数。
 
     本端点无令牌可达（巡检与部署冒烟的既有消费方式不变），但响应按

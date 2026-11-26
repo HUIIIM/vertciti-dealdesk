@@ -13,7 +13,7 @@
 
 from __future__ import annotations
 
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -155,5 +155,5 @@ class ProjectCreate(BaseModel):
     track: Literal["residential", "commercial"]
     name: str = ""
     address: str = ""
-    input: dict
+    input: dict[str, Any]
     lang: str = "zh"  # EN 界面（2026-10-16）：叙事/否决文案语言，默认 zh

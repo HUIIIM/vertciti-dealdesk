@@ -7,6 +7,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import APIRouter, HTTPException
 
 from app.services import pdf_intake
@@ -15,7 +17,7 @@ router = APIRouter(tags=["intake"])
 
 
 @router.post("/api/wb/intake/pdf-ocr-pages")
-def wb_intake_pdf_ocr_pages(payload: dict):
+def wb_intake_pdf_ocr_pages(payload: dict[str, Any]) -> dict[str, Any]:
     """住宅混合型 PDF 逐页 OCR 合并。
 
     混合 PDF 上传返回 needs_ocr_pages + page_texts（文本层逐页文本）；
@@ -41,7 +43,7 @@ def wb_intake_pdf_ocr_pages(payload: dict):
 
 
 @router.post("/api/uw-commercial/intake/pdf-ocr-pages")
-def uw_commercial_intake_pdf_ocr_pages(payload: dict):
+def uw_commercial_intake_pdf_ocr_pages(payload: dict[str, Any]) -> dict[str, Any]:
     """商业混合型 PDF 逐页 OCR 合并。
 
     混合 PDF 上传返回 needs_ocr_pages + page_texts（文本层逐页文本）；
