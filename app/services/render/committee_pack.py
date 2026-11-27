@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import io
+from collections.abc import Callable
 from typing import Any
 
 from openpyxl import Workbook
@@ -109,8 +110,8 @@ def _tornado(rt: JSON, width: float = 174 * mm) -> Drawing:
     return d
 
 
-def _footer(pack: JSON):  # noqa: ANN202 — reportlab 回调
-    def draw(canvas, doc) -> None:  # noqa: ANN001
+def _footer(pack: JSON) -> Callable[[Any, Any], None]:  # reportlab 回调
+    def draw(canvas: Any, doc: Any) -> None:
         canvas.saveState()
         canvas.setFillColor(INK)
         canvas.rect(0, A4[1] - 10 * mm, A4[0], 10 * mm, stroke=0, fill=1)
