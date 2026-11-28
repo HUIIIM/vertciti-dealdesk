@@ -11,6 +11,7 @@ import html as _html
 import re
 import urllib.parse
 from datetime import datetime
+from typing import Any
 
 
 def _now() -> str:
@@ -54,7 +55,7 @@ def _is_listing_host(host: str) -> bool:
     return any(lh in h for lh in _LISTING_HOSTS)
 
 
-def extract_images(html: str, source_url: str, per_page: int = 3) -> list[dict]:
+def extract_images(html: str, source_url: str, per_page: int = 3) -> list[dict[str, Any]]:
     """从页面 HTML 提取 og:image 系图片（设计稿 2.2：主图必提 + 同页最多 2 张）。
 
     只返回 URL（不下载），每张带来源域名 + 抓取时间。TopHap/RentCast/Census
@@ -64,7 +65,7 @@ def extract_images(html: str, source_url: str, per_page: int = 3) -> list[dict]:
         return []
     host = (urllib.parse.urlparse(source_url).hostname or "").lower()
     seen: set[str] = set()
-    out: list[dict] = []
+    out: list[dict[str, Any]] = []
 
     if not _is_listing_host(host):
         return []  # 非房源站：直接不要图，宁缺毋假
@@ -103,7 +104,7 @@ def extract_images(html: str, source_url: str, per_page: int = 3) -> list[dict]:
     return out[:per_page]
 
 
-def _photos_field(photos: list[dict]) -> dict:
+def _photos_field(photos: list[dict[str, Any]]) -> dict[str, Any]:
     """property_photos 字段（设计稿 2.3 格式）。"""
     hosts: list[str] = []
     for q in photos:
